@@ -4,6 +4,8 @@ node_modules/
 !.env.example
 .secrets/
 .demo-data/
+backups/*
+!backups/.gitkeep
 coverage/
 playwright-report/
 test-results/

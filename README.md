@@ -141,6 +141,10 @@ Use a 64-bit Raspberry Pi OS (a 32-bit OS cannot run the ARM64 MongoDB image). T
 
 MongoDB 4.4.18 is end-of-life. It is affected by CVE-2025-14847, so both Compose configurations explicitly disable the vulnerable zlib network compressor; this is a mitigation, not a substitute for a patched release. Because of the Pi 4 CPU limit, keep MongoDB unexposed: the production Compose file does not publish port 27017 and places it on an internal Docker network, with authentication and replica-set keyfile enabled. Restrict the Pi's host firewall to the web ports and keep the OS patched. Use a USB SSD for persistent MongoDB data rather than relying on a microSD card, and set up off-device backups. For a public-facing league, the safer option is to run the Next.js app on the Pi and use a currently supported MongoDB Atlas cluster for the database.
 
+The production stack runs a backup sidecar using the same MongoDB image. It makes a compressed database dump as soon as MongoDB is healthy, repeats every 24 hours, retries failures hourly, and deletes backups older than 14 days. The defaults are editable with `BACKUP_INTERVAL_HOURS` and `BACKUP_RETENTION_DAYS`. Dumps are written to `BACKUP_PATH` (default `./backups`), outside the MongoDB data volume, with owner-only directory/file permissions. Check its logs with `docker compose --env-file .env.production -f compose.production.yaml logs -f backup`.
+
+On the Pi, mount a USB SSD at a stable path (for example `/mnt/club-ssd`) and set `BACKUP_PATH=/mnt/club-ssd/fight-club-backups` in `.env.production`. Create that directory and set `BACKUP_UID` and `BACKUP_GID` in the same file to the IDs of the user who owns it (`id -u` and `id -g` on the Pi). Make sure the SSD is mounted before Docker starts; otherwise the host may write backups to the SD card's mount directory. Copy backups to a separate device or encrypted remote storage as well; a backup on the Pi cannot protect against losing the Pi or its attached disk.
+
 Before starting the stack, create an A record for your domain pointing to the server and allow inbound TCP ports 80 and 443. Replace `fightclub.example.com` in `.env.production` with the domain you choose, and set `LETSENCRYPT_EMAIL`, `ADMIN_EMAIL` and `VAPID_SUBJECT` to addresses you control. Keep `.env.production` and `.secrets/mongo-keyfile` private; both are ignored by Git and contain generated secrets. The VAPID key pair is already generated in `.env.production` for this installation. Configure SMTP and any optional Google/WhatsApp credentials there when ready.
 
 On the Docker host, from the project directory, run:
@@ -153,7 +157,17 @@ docker compose --env-file .env.production -f compose.production.yaml run --rm ap
 docker compose --env-file .env.production -f compose.production.yaml up --build -d
 ```
 
-The first start obtains the TLS certificate after DNS points to the host. Check progress with `docker compose --env-file .env.production -f compose.production.yaml logs -f traefik app mongo worker`. The app health endpoint is `/api/health`. The worker handles queued notifications and deadlines automatically. Back up the `fight-club-production-mongo` and `traefik-certs` volumes; store a protected copy of `.env.production` and `.secrets/mongo-keyfile` separately. Losing the Mongo keyfile prevents the replica set from restarting against its existing data. Do not use `docker compose down -v` unless you intend to erase database and certificate data.
+The first start obtains the TLS certificate after DNS points to the host. Check progress with `docker compose --env-file .env.production -f compose.production.yaml logs -f traefik app mongo worker backup`. The app health endpoint is `/api/health`. The worker handles queued notifications and deadlines automatically. The backup sidecar writes logical MongoDB archives to `BACKUP_PATH`; do not copy the live MongoDB data volume as a routine backup. Back up `traefik-certs` if you want to preserve issued certificates, and store protected copies of `.env.production` and `.secrets/mongo-keyfile` separately. Losing the Mongo keyfile prevents the replica set from restarting against its existing data. Do not use `docker compose down -v` unless you intend to erase database and certificate data.
+
+To restore an archive, first stop the app, worker, and scheduled backup so none writes during restoration. Replace the filename below with the desired archive; the restore script asks you to type `RESTORE` before it drops and recreates the archived database collections:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yaml stop app worker backup
+docker compose --env-file .env.production -f compose.production.yaml run --rm --no-deps --entrypoint /bin/bash backup /usr/local/bin/restore.sh /backups/fight-club-YYYYMMDDTHHMMSSZ.archive.gz
+docker compose --env-file .env.production -f compose.production.yaml up -d app worker backup
+```
+
+Test a restore on a separate MongoDB instance before relying on these backups. Keep a copy of `.env.production` and `.secrets/mongo-keyfile` with the backup: the dump contains league data, but the environment/keyfile are needed to operate the deployment securely.
 
 When the real domain is set, rebuild the app so its HTTPS security headers are generated for the production origin. If you change it later, update `APP_DOMAIN` and `APP_URL` together and recreate the stack. The included `.env.production` is only a local template with generated secrets and a reserved placeholder domain; it is not configured to obtain a public certificate until you replace those values and point DNS at the server.
 
