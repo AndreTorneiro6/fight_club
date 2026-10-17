@@ -133,7 +133,13 @@ Use an HTTPS `APP_URL`; session cookies become secure automatically. The health 
 
 ### Self-host with Docker Compose, Traefik and Let's Encrypt
 
-The repository also includes a self-hosted stack. It runs the Next.js app and notification/deadline worker, an authenticated MongoDB 8 single-node replica set, and Traefik with automatic HTTPS certificates. MongoDB is only reachable on the private Docker network; only ports 80 and 443 are published. The existing `compose.yaml` remains the local development database setup.
+The repository also includes a self-hosted stack. It runs the Next.js app and notification/deadline worker, an authenticated MongoDB 4.4.18 single-node replica set, and Traefik with automatic HTTPS certificates. MongoDB is only reachable on the private Docker network; only ports 80 and 443 are published. The existing `compose.yaml` uses the same MongoDB version for local development.
+
+#### Raspberry Pi 4 database compatibility
+
+Use a 64-bit Raspberry Pi OS (a 32-bit OS cannot run the ARM64 MongoDB image). The Pi 4's Cortex-A72 is ARMv8-A; MongoDB's prebuilt server releases after 4.4.18 require ARMv8.2-A, so the Compose files pin MongoDB to `4.4.18`. Docker selects the ARM64 image on the Pi. The application uses the MongoDB Node.js driver 7, whose minimum supported server version is 4.4, and the league's replica-set transactions are available in 4.4.
+
+MongoDB 4.4.18 is end-of-life. It is affected by CVE-2025-14847, so both Compose configurations explicitly disable the vulnerable zlib network compressor; this is a mitigation, not a substitute for a patched release. Because of the Pi 4 CPU limit, keep MongoDB unexposed: the production Compose file does not publish port 27017 and places it on an internal Docker network, with authentication and replica-set keyfile enabled. Restrict the Pi's host firewall to the web ports and keep the OS patched. Use a USB SSD for persistent MongoDB data rather than relying on a microSD card, and set up off-device backups. For a public-facing league, the safer option is to run the Next.js app on the Pi and use a currently supported MongoDB Atlas cluster for the database.
 
 Before starting the stack, create an A record for your domain pointing to the server and allow inbound TCP ports 80 and 443. Replace `fightclub.example.com` in `.env.production` with the domain you choose, and set `LETSENCRYPT_EMAIL`, `ADMIN_EMAIL` and `VAPID_SUBJECT` to addresses you control. Keep `.env.production` and `.secrets/mongo-keyfile` private; both are ignored by Git and contain generated secrets. The VAPID key pair is already generated in `.env.production` for this installation. Configure SMTP and any optional Google/WhatsApp credentials there when ready.
 

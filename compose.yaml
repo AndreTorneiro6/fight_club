@@ -1,13 +1,13 @@
 services:
   mongo:
-    image: mongo:8
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    image: mongo:4.4.18
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--networkMessageCompressors", "snappy,zstd"]
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
       - fight-club-mongo:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"]
+      test: ["CMD", "mongo", "--quiet", "--eval", "try { var s = rs.status(); print(s.ok === 1 ? 1 : rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok) } catch (e) { print(rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok) }"]
       interval: 5s
       timeout: 5s
       retries: 20
