@@ -1,0 +1,131 @@
+services:
+  traefik:
+    image: traefik:v3.7.14
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=fightclub_proxy
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - proxy
+    security_opt:
+      - no-new-privileges:true
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/usr/local/bin/fightclub-mongo-entrypoint.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - fight-club-production-mongo:/data/db
+      - ./.secrets/mongo-keyfile:/run/secrets/mongo_keyfile:ro
+      - ./docker/mongo-entrypoint.sh:/usr/local/bin/fightclub-mongo-entrypoint.sh:ro
+    networks:
+      - data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh "mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/admin?directConnection=true"
+          --quiet --eval 'try { rs.status().ok } catch (e) { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}).ok }'
+          | grep -q 1
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  app:
+    image: fightclub:production
+    build:
+      context: .
+      args:
+        APP_URL: ${APP_URL}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - proxy
+      - data
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=fightclub_proxy
+      - traefik.http.routers.fightclub.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.fightclub.entrypoints=websecure
+      - traefik.http.routers.fightclub.tls=true
+      - traefik.http.routers.fightclub.tls.certresolver=le
+      - traefik.http.services.fightclub.loadbalancer.server.port=3000
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  worker:
+    image: fightclub:production
+    build:
+      context: .
+      args:
+        APP_URL: ${APP_URL}
+    restart: unless-stopped
+    command: ["npm", "run", "notifications:work:container"]
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+networks:
+  proxy:
+    name: fightclub_proxy
+  data:
+    name: fightclub_data
+    internal: true
+
+volumes:
+  fight-club-production-mongo:
+  traefik-certs:
