@@ -574,7 +574,7 @@ export function Application({
           </div>
         </header>
         <main className="content">
-          {s.actor.role === "player" && <PlayerAppRegistration />}
+          <PlayerAppRegistration />
           {error && <div className="error">{error}</div>}
           {route === "inicio" ? (
             <Dashboard {...actions} />
@@ -2603,16 +2603,12 @@ function Profile(a: Actions) {
               </button>
             </form>
           </Section>
-          {s.actor.role === "player" && (
-            <Section title="App dos jogadores">
-              <MobileApp />
-            </Section>
-          )}
-          {s.actor.role === "player" && (
-            <Section title="Notificações no telemóvel">
-              <PushNotificationSettings />
-            </Section>
-          )}
+          <Section title="App dos jogadores">
+            <MobileApp />
+          </Section>
+          <Section title="Notificações no telemóvel">
+            <PushNotificationSettings />
+          </Section>
           <Section title="Email e WhatsApp">
             <NotificationSettings
               key={JSON.stringify([p.phone, p.notificationPreferences])}

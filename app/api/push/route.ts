@@ -4,7 +4,6 @@ import { z } from "zod";
 import { rateLimit, requireActor } from "@/lib/auth";
 import { database } from "@/lib/db";
 import { failure, sameOrigin } from "@/lib/http";
-import { ensure } from "@/lib/rules";
 import { readJson } from "@/lib/request-body";
 import { isSupportedPushEndpoint } from "@/lib/push";
 import type { PushSubscriptionRecord } from "@/lib/notification-delivery";
@@ -24,11 +23,6 @@ const endpointId = (endpoint: string) =>
 export async function GET() {
   try {
     const actor = await requireActor();
-    ensure(
-      actor.role === "player",
-      "As notificações push são para jogadores.",
-      403,
-    );
     const { db } = await database();
     const subscriptions = await db
       .collection<PushSubscriptionRecord>("push_subscriptions")
@@ -60,11 +54,6 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const actor = await requireActor();
-    ensure(
-      actor.role === "player",
-      "As notificações push são para jogadores.",
-      403,
-    );
     await rateLimit(`push:${actor.userId}`, 30);
     const body = z
       .object({ subscription: subscriptionSchema })
@@ -97,11 +86,6 @@ export async function DELETE(request: Request) {
   try {
     sameOrigin(request);
     const actor = await requireActor();
-    ensure(
-      actor.role === "player",
-      "As notificações push são para jogadores.",
-      403,
-    );
     await rateLimit(`push:${actor.userId}`, 30);
     const body = z
       .object({ endpoint: subscriptionSchema.shape.endpoint })
