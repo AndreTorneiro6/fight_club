@@ -33,7 +33,7 @@ npm run seed
 npm run dev
 ```
 
-The regular seed adds settings, divisions, courts and an active season. It does **not** create demo users or players. The account matching `ADMIN_EMAIL` becomes administrator after email ownership is confirmed. There is no automatic “first account wins admin” behavior.
+The regular seed adds settings, divisions, courts and an active season. It does **not** create demo users or players. Each address in comma-separated `ADMIN_EMAIL` may register as an administrator after confirming email ownership. There is no automatic “first account wins admin” behavior.
 
 If SMTP is not configured, register the administrator account in the app, then run `npm run recovery -- admin@yourclub.pt` on the server and open the one-use address it prints. This CLI requires local access to the database configuration.
 

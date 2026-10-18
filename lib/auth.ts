@@ -6,6 +6,7 @@ import { database, transaction } from "./db";
 import { ensure } from "./rules";
 import type { Actor, Player, Session, User } from "./types";
 import nodemailer from "nodemailer";
+import { isConfiguredAdminEmail } from "./admin-emails";
 
 export const cookieName = "fightclub_session";
 const digest = (v: string) => createHash("sha256").update(v).digest("hex");
@@ -101,7 +102,7 @@ export async function register(raw: unknown, verified = false) {
   await rateLimit(`registration:${digest(data.email)}`, 5);
   const { db } = await database();
   if (
-    data.email !== process.env.ADMIN_EMAIL?.toLowerCase() &&
+    !isConfiguredAdminEmail(data.email) &&
     !(await db.collection<Player>("players").findOne({ email: data.email }))
   ) {
     ensure(
@@ -152,7 +153,7 @@ export async function createAccount(data: {
     const existingPlayer = s.players.find(
       (x) => x.email.toLowerCase() === data.email,
     );
-    const bootstrap = process.env.ADMIN_EMAIL?.toLowerCase() === data.email;
+    const bootstrap = isConfiguredAdminEmail(data.email);
     if (!existingPlayer && !bootstrap) {
       ensure(
         data.invite,
@@ -177,10 +178,7 @@ export async function createAccount(data: {
       email: data.email,
       name: data.name,
       passwordHash: data.passwordHash,
-      role:
-        process.env.ADMIN_EMAIL?.toLowerCase() === data.email
-          ? "admin"
-          : "player",
+      role: isConfiguredAdminEmail(data.email) ? "admin" : "player",
       createdAt: new Date().toISOString(),
       verified: data.verified,
       privacyAcceptedAt: data.privacyAccepted
