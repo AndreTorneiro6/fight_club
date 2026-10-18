@@ -441,11 +441,22 @@ strong {
   letter-spacing: 0.1em;
 }
 .landing footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
   padding: 22px;
   text-align: center;
   color: var(--muted);
   font-size: 10px;
   letter-spacing: 0.15em;
+}
+.landing-credit {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+.landing-credit strong {
+  color: var(--gold);
 }
 .sidebar {
   position: fixed;

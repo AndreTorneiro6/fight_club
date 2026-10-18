@@ -698,7 +698,12 @@ function Landing() {
         </Link>
         <small style={{ marginTop: 22 }}>Uma vitória é uma vitória.</small>
       </main>
-      <footer>TRÊS DIVISÕES. UM OBJETIVO. CONQUISTA O TEU LUGAR.</footer>
+      <footer>
+        <span>TRÊS DIVISÕES. UM OBJETIVO. CONQUISTA O TEU LUGAR.</span>
+        <span className="landing-credit">
+          Desenvolvido por <strong>WBGLabs</strong>
+        </span>
+      </footer>
     </div>
   );
 }
