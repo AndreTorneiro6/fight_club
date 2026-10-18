@@ -1,0 +1,16 @@
+# Raspberry Pi deployment that reuses the existing Traefik instance and ACME store.
+# Combine with compose.production.yaml for every command on the Pi.
+services:
+  traefik:
+    profiles:
+      - standalone-proxy
+
+  app:
+    labels:
+      - traefik.docker.network=web-app_default
+      - traefik.http.routers.fightclub.tls.certresolver=letsencrypt
+
+networks:
+  proxy:
+    external: true
+    name: web-app_default

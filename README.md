@@ -143,6 +143,22 @@ MongoDB 4.4.18 is end-of-life. It is affected by CVE-2025-14847, so both Compose
 
 The production stack runs a backup sidecar using the same MongoDB image. It makes a compressed database dump as soon as MongoDB is healthy, repeats every 24 hours, retries failures hourly, and deletes backups older than 14 days. The defaults are editable with `BACKUP_INTERVAL_HOURS` and `BACKUP_RETENTION_DAYS`. Dumps are written to `BACKUP_PATH` (default `./backups`), outside the MongoDB data volume, with owner-only directory/file permissions. Check its logs with `docker compose --env-file .env.production -f compose.production.yaml logs -f backup`.
 
+##### Raspberry Pi with the existing WBGLabs Traefik
+
+The Fight Night Pi deployment uses `compose.pi.yaml` to reuse the existing Traefik container, Docker network (`web-app_default`) and ACME store at `/etc/traefik/acme/acme.json`. This avoids a second Traefik trying to bind ports 80 and 443. Start the existing Traefik from its current project directory (`/home/andre/Desktop/WBGLabs/atlas/web-app`) so its bind mount points to the existing `traefik.toml`; do not replace or truncate the ACME file. The ACME store currently contains the `atlas.wbglabs.io` certificate; Traefik will request `fight-night.wbglabs.io` when the Fight Night route starts.
+
+Use both Compose files for all Fight Night commands on the Pi:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml config
+docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml build app
+docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml up -d mongo
+docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml run --rm app npm run seed:container
+docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml up -d
+```
+
+Run the seed command only when initializing Fight Night's new database for the first time. It does not use or modify the separate Atlas MongoDB database.
+
 On the Pi, mount a USB SSD at a stable path (for example `/mnt/club-ssd`) and set `BACKUP_PATH=/mnt/club-ssd/fight-club-backups` in `.env.production`. Create that directory and set `BACKUP_UID` and `BACKUP_GID` in the same file to the IDs of the user who owns it (`id -u` and `id -g` on the Pi). Make sure the SSD is mounted before Docker starts; otherwise the host may write backups to the SD card's mount directory. Copy backups to a separate device or encrypted remote storage as well; a backup on the Pi cannot protect against losing the Pi or its attached disk.
 
 Before starting the stack, create an A record for your domain pointing to the server and allow inbound TCP ports 80 and 443. Use `fight-night.wbglabs.io` in `.env.production`, and set `LETSENCRYPT_EMAIL`, `ADMIN_EMAIL` and `VAPID_SUBJECT` to addresses you control. Keep `.env.production` and `.secrets/mongo-keyfile` private; both are ignored by Git and contain generated secrets. The VAPID key pair is already generated in `.env.production` for this installation. Configure SMTP and any optional Google/WhatsApp credentials there when ready.
