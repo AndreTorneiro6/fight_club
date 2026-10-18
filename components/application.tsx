@@ -520,6 +520,9 @@ export function Application({
             <LogOut size={14} />
             Terminar sessão
           </button>
+          <div className="sidebar-credit">
+            Desenvolvido por <strong>WBGLabs</strong>
+          </div>
         </div>
       </aside>
       <div className="app-main">

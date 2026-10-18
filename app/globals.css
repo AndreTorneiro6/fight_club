@@ -519,6 +519,16 @@ strong {
   border-top: 1px solid var(--border);
   padding-top: 18px;
 }
+.sidebar-credit {
+  margin-top: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+.sidebar-credit strong {
+  color: var(--gold);
+}
 .club-label {
   font-size: 10px;
   font-weight: 800;
