@@ -92,6 +92,7 @@ export async function register(raw: unknown, verified = false) {
   const data = credentials
     .extend({
       name: z.string().trim().min(2).max(150),
+      divisionId: z.string().trim().min(1).max(100),
       invite: z
         .string()
         .regex(/^[a-f0-9]{64}$/)
@@ -100,28 +101,6 @@ export async function register(raw: unknown, verified = false) {
     })
     .parse(raw);
   await rateLimit(`registration:${digest(data.email)}`, 5);
-  const { db } = await database();
-  if (
-    !isConfiguredAdminEmail(data.email) &&
-    !(await db.collection<Player>("players").findOne({ email: data.email }))
-  ) {
-    ensure(
-      data.invite,
-      "Precisas do link de inscrição partilhado pelo clube.",
-      403,
-    );
-    const link = await db
-      .collection<import("./types").RegistrationLink>("registrationLinks")
-      .findOne({ tokenHash: digest(data.invite!) });
-    ensure(
-      link &&
-        link.active &&
-        Date.parse(link.expiresAt) > Date.now() &&
-        link.uses < link.maxUses,
-      "Este convite expirou, foi desativado ou atingiu o limite de inscrições.",
-      403,
-    );
-  }
   const passwordHash = await hash(data.password, 12);
   return createAccount({ ...data, passwordHash, verified });
 }
@@ -130,6 +109,7 @@ export async function createAccount(data: {
   name: string;
   passwordHash: string;
   verified: boolean;
+  divisionId?: string;
   invite?: string;
   privacyAccepted: true;
 }) {
@@ -150,16 +130,9 @@ export async function createAccount(data: {
         .findOne({ email: data.email }, { session })),
       "Já existe uma conta com este email.",
     );
-    const existingPlayer = s.players.find(
-      (x) => x.email.toLowerCase() === data.email,
-    );
     const bootstrap = isConfiguredAdminEmail(data.email);
-    if (!existingPlayer && !bootstrap) {
-      ensure(
-        data.invite,
-        "Precisas do link de inscrição partilhado pelo clube.",
-        403,
-      );
+    let invited = false;
+    if (data.invite) {
       const link = s.registrationLinks.find(
         (x) => x.tokenHash === digest(data.invite!),
       );
@@ -172,6 +145,7 @@ export async function createAccount(data: {
         403,
       );
       link.uses++;
+      invited = true;
     }
     const user: User = {
       _id: random(),
@@ -192,14 +166,29 @@ export async function createAccount(data: {
     if (p) {
       p.userId = user._id;
     } else {
-      const div = [...s.divisions].sort((a, b) => b.tier - a.tier)[0];
+      const div = s.divisions.find(
+        (division) => division._id === data.divisionId,
+      );
+      ensure(
+        div,
+        "Escolhe uma categoria válida para o ranking: Ouro, Prata ou Bronze.",
+      );
       const count = s.players.filter(
         (x) => x.divisionId === div._id && x.status !== "removed",
       ).length;
       ensure(
         count < div.capacity,
-        "A divisão de entrada está completa. Contacta o clube.",
+        "A categoria escolhida está completa. Escolhe outra categoria ou contacta o clube.",
       );
+      const occupied = new Set(
+        s.players
+          .filter(
+            (player) =>
+              player.divisionId === div._id && player.status !== "removed",
+          )
+          .map((player) => player.position),
+      );
+      const entryPosition = Math.max(0, ...occupied) + 1;
       p = {
         _id: random(),
         userId: user._id,
@@ -209,10 +198,10 @@ export async function createAccount(data: {
         photo: "",
         number: Math.max(0, ...s.players.map((p) => p.number)) + 1,
         divisionId: div._id,
-        position: count + 1,
-        previousPosition: count + 1,
-        status: bootstrap ? "active" : "inactive",
-        awaitingApproval: !bootstrap,
+        position: entryPosition,
+        previousPosition: entryPosition,
+        status: bootstrap || invited ? "active" : "inactive",
+        awaitingApproval: !bootstrap && !invited,
         partner: "",
         wins: 0,
         losses: 0,
@@ -229,6 +218,7 @@ export async function createAccount(data: {
       action: "registration.created",
       details: JSON.stringify({
         playerId: p._id,
+        divisionId: p.divisionId,
         awaitingApproval: !!p.awaitingApproval,
         privacyVersion: user.privacyVersion,
       }),
@@ -334,6 +324,7 @@ export async function resetAccount(raw: unknown) {
       token: z.string().length(64),
       password: z.string().min(10).max(72),
       name: z.string().min(2).max(150).optional(),
+      divisionId: z.string().trim().min(1).max(100).optional(),
       privacyAccepted: z.literal(true).optional(),
     })
     .parse(raw);
@@ -356,6 +347,7 @@ export async function resetAccount(raw: unknown) {
     user = await createAccount({
       email: token.email,
       name: data.name ?? "Jogador",
+      divisionId: data.divisionId,
       passwordHash,
       verified: true,
       privacyAccepted: true,

@@ -9,8 +9,8 @@ export const themes = [
     colors: ["#0a1425", "#15253a", "#e7b85b", "#c9d3e0"],
   },
   {
-    id: "fight-night",
-    name: "Fight Night",
+    id: "fight-club",
+    name: "Fight Club",
     description: "Inspirado no teu cartão: preto, ouro, fogo e prata.",
     colors: ["#0c0a09", "#f3c34d", "#ff833b", "#ed3e35", "#d4d4d8"],
   },
@@ -113,12 +113,12 @@ export default function ThemeSelector() {
               aria-label={`Tema ${t.name}`}
               onClick={() => choose(t.id)}
             >
-              {t.id === "fight-night" && (
+              {t.id === "fight-club" && (
                 <div
                   className="theme-reference"
-                  style={{ backgroundImage: "url(/fight-night-reference.png)" }}
+                  style={{ backgroundImage: "url(/fight-club-reference.png)" }}
                   role="img"
-                  aria-label="Cartão Fight Night do Neiva Padel Club"
+                  aria-label="Cartão Fight Club do Neiva Padel Club"
                 />
               )}
               <div className="row between">

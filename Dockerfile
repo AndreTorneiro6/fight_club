@@ -6,7 +6,7 @@ RUN npm ci
 FROM dependencies AS builder
 WORKDIR /app
 COPY . .
-ARG APP_URL=https://fight-night.wbglabs.io
+ARG APP_URL=https://fight-club.wbglabs.io
 ENV APP_URL=${APP_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build

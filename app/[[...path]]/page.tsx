@@ -12,6 +12,8 @@ const routes = new Set([
   "perfil",
   "notificacoes",
   "admin",
+  "ajuda",
+  "ajuda/admin",
   "title-fight",
   "campeoes",
   "epocas",

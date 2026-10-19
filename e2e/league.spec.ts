@@ -27,6 +27,9 @@ async function login(page: Page, email: string) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  const tour = page.getByRole("dialog", { name: "Bem-vindo ao Fight Club" });
+  if (await tour.isVisible())
+    await tour.getByRole("button", { name: "Saltar visita" }).click();
   await expect(
     page.getByRole("heading", { name: /Vamos a jogo/ }),
   ).toBeVisible();
@@ -171,6 +174,11 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await player.goto("/ranking");
   await expect(player.locator(".ranking-row.me .rank-number")).toHaveText("05");
   await admin.goto("/admin");
+  if (await admin.getByRole("dialog").isVisible())
+    await admin
+      .getByRole("dialog")
+      .getByRole("button", { name: "Saltar visita" })
+      .click();
   await admin.getByRole("button", { name: "Jogadores", exact: true }).click();
   await admin.getByRole("button", { name: "Adicionar jogador" }).click();
   const modal = admin.getByRole("dialog");
@@ -263,17 +271,17 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
   await login(page, "admin@fightclub.local");
   await page.getByRole("button", { name: "Escolher tema de cores" }).click();
   await page
-    .getByRole("button", { name: "Tema Fight Night", exact: true })
+    .getByRole("button", { name: "Tema Fight Club", exact: true })
     .click();
   await expect(page.locator("html")).toHaveAttribute(
     "data-theme",
-    "fight-night",
+    "fight-club",
   );
   await page.getByRole("button", { name: "Usar este tema" }).click();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute(
     "data-theme",
-    "fight-night",
+    "fight-club",
   );
   await page.goto("/premios");
   await page.getByRole("button", { name: "Editar prémios" }).click();
@@ -333,7 +341,7 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
     ),
   ).toBe(false);
   await page.screenshot({
-    path: "test-results/fight-night-mobile.png",
+    path: "test-results/fight-club-mobile.png",
     fullPage: true,
   });
   const playerContext = await browser.newContext(),

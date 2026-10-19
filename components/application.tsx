@@ -7,6 +7,10 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { rankingEntries, teamMembers, teamName } from "@/lib/ranking-groups";
+import AdminTeamRanking from "./admin-team-ranking";
+import MatchdayGenerator from "./matchday-generator";
+import AppGuide, { FirstVisitWalkthrough } from "./app-guide";
 import MobileApp, { PlayerAppRegistration } from "./mobile-app";
 import {
   DeliveryStatus,
@@ -28,6 +32,8 @@ import {
   Clock3,
   Crown,
   Download,
+  Eye,
+  EyeOff,
   Flame,
   History,
   Home,
@@ -69,7 +75,15 @@ import {
   type Settings,
   type View,
 } from "@/lib/types";
-import { clubDateTime, clubDay, initialProposals } from "@/lib/calendar";
+import { WeeklyRoles, WeeklyBadge, WeekNavigation } from "./weekly-controls";
+import { weeklyWindow, weeklyRole, frozenRanking } from "@/lib/weekly";
+import {
+  clubDateTime,
+  clubDay,
+  initialProposals,
+  clubWeek,
+  addClubDays,
+} from "@/lib/calendar";
 
 async function request(url: string, body?: unknown) {
   const res = await fetch(
@@ -422,18 +436,27 @@ export function Application({
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     admin = s.actor.role === "admin",
     unread = s.notifications.filter((n) => !n.read).length;
-  if (p.awaitingApproval && !admin)
+  if ((p.awaitingApproval || p.registrationRejectedAt) && !admin)
     return (
       <main className="center-screen">
         <div className="panel stack">
           <Logo />
-          <h1>Inscrição recebida</h1>
+          <h1>
+            {p.registrationRejectedAt
+              ? "Inscrição recusada"
+              : "Inscrição recebida"}
+          </h1>
           <p>
-            O clube vai aprovar a tua entrada na liga. Receberás um aviso quando
-            puderes começar a jogar.
+            {p.registrationRejectedAt
+              ? "O clube não aprovou a tua inscrição. Contacta o clube se precisares de esclarecimentos. Esta conta será eliminada automaticamente 2 dias após a recusa."
+              : "A tua inscrição aguarda a decisão do clube. Receberás um aviso quando a tua entrada na liga for aprovada."}
           </p>
           <p>Nome: {p.name}</p>
-          <button onClick={() => void refresh()}>Verificar aprovação</button>
+          <button onClick={() => void refresh()}>
+            {p.registrationRejectedAt
+              ? "Verificar estado"
+              : "Verificar aprovação"}
+          </button>
           <button
             onClick={async () => {
               await request("/api/auth/logout", {});
@@ -457,6 +480,8 @@ export function Application({
     nav.find((n) => route.startsWith(n.path))?.label ??
     {
       admin: "Administração",
+      ajuda: "Como usar a app",
+      "ajuda/admin": "Manual do administrador",
       "title-fight": "Title Fight",
       campeoes: "Hall of Champions",
       epocas: "Épocas",
@@ -468,6 +493,13 @@ export function Application({
     "Desafio";
   return (
     <>
+      {!route.startsWith("ajuda") && (!admin || route === "admin") && (
+        <FirstVisitWalkthrough
+          key={`${p._id}:${admin}`}
+          playerId={p._id}
+          admin={admin}
+        />
+      )}
       <aside className="sidebar">
         <Link href="/inicio">
           <Logo />
@@ -490,6 +522,7 @@ export function Application({
           { path: "epocas", label: "Épocas", icon: CalendarDays },
           { path: "estatisticas", label: "Estatísticas", icon: Target },
           { path: "regras", label: "Regras", icon: BookOpen },
+          { path: "ajuda", label: "Como usar a app", icon: BookOpen },
           { path: "premios", label: "Prémios", icon: Gift },
           ...(admin
             ? [{ path: "admin", label: "Administração", icon: Shield }]
@@ -593,6 +626,14 @@ export function Application({
             <Profile {...actions} />
           ) : route === "notificacoes" ? (
             <Notifications {...actions} />
+          ) : route === "ajuda" ? (
+            <AppGuide playerId={p._id} />
+          ) : route === "ajuda/admin" ? (
+            admin ? (
+              <AppGuide admin playerId={p._id} />
+            ) : (
+              <Empty text="Esta área é exclusiva dos administradores." />
+            )
           ) : route === "admin" ? (
             admin ? (
               <Admin {...actions} />
@@ -636,6 +677,8 @@ export function Application({
               ["epocas", "Épocas"],
               ["estatisticas", "Estatísticas"],
               ["regras", "Regras"],
+              ["ajuda", "Como usar a app"],
+              ...(admin ? [["ajuda/admin", "Manual do administrador"]] : []),
               ["premios", "Prémios"],
               ...(admin ? [["admin", "Administração"]] : []),
             ].map(([path, label]) => (
@@ -720,13 +763,17 @@ function Auth({
 }) {
   const router = useRouter(),
     [mode, setMode] = useState("login"),
+    [showPassword, setShowPassword] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [ready, setReady] = useState(false),
     [token, setToken] = useState(""),
     [invitation, setInvitation] = useState(""),
-    [invitationSetup, setInvitationSetup] = useState(false);
+    [invitationSetup, setInvitationSetup] = useState(false),
+    [registrationDivisions, setRegistrationDivisions] = useState<
+      { _id: string; name: string }[]
+    >([]);
   useEffect(() => {
     setReady(true);
     const q = new URLSearchParams(location.search),
@@ -737,7 +784,7 @@ function Auth({
     }
     if (q.get("error") === "invite_required")
       setError(
-        "Para criar uma conta, usa o link de inscrição partilhado pelo clube.",
+        "Cria primeiro uma conta com email e palavra-passe. Sem convite, a entrada na liga precisa da aprovação do clube.",
       );
     if (q.get("purpose") === "invite") setInvitationSetup(true);
     if (q.has("password") || q.has("email")) {
@@ -760,6 +807,23 @@ function Auth({
       }
     }
   }, []);
+  useEffect(() => {
+    setShowPassword(false);
+  }, [mode]);
+  useEffect(() => {
+    if (mode !== "register" && !invitationSetup) return;
+    let cancelled = false;
+    void request("/api/auth/divisions")
+      .then((data) => {
+        if (!cancelled) setRegistrationDivisions(data.divisions);
+      })
+      .catch((error) => {
+        if (!cancelled) setError(error.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, invitationSetup]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -833,27 +897,72 @@ function Auth({
             </label>
           )}
           {mode !== "forgot" && (
-            <label>
-              Palavra-passe
-              <input
-                name="password"
-                type="password"
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                required
-                minLength={mode === "login" ? 1 : 10}
-                maxLength={72}
-              />
+            <div className="password-field">
+              <label htmlFor="auth-password">Palavra-passe</label>
+              <div className="password-input">
+                <input
+                  id="auth-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  required
+                  minLength={mode === "login" ? 1 : 10}
+                  maxLength={72}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  aria-label={
+                    showPassword
+                      ? "Ocultar palavra-passe"
+                      : "Mostrar palavra-passe"
+                  }
+                  aria-controls="auth-password"
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} aria-hidden="true" />
+                  ) : (
+                    <Eye size={20} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
               {mode !== "login" && <small>Mínimo de 10 caracteres.</small>}
-            </label>
+            </div>
           )}
           {(mode === "register" || invitationSetup) && (
             <>
+              <label>
+                Categoria / Ranking
+                <select
+                  name="divisionId"
+                  defaultValue=""
+                  required
+                  disabled={!registrationDivisions.length}
+                >
+                  <option value="" disabled>
+                    Escolher categoria
+                  </option>
+                  {registrationDivisions.map((division) => (
+                    <option key={division._id} value={division._id}>
+                      {division.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <small>
+                Escolhe Ouro, Prata ou Bronze. O clube pode rever a categoria ao
+                aprovar a inscrição. Se já tens uma categoria atribuída pelo
+                clube, essa atribuição é mantida.
+              </small>
               {mode === "register" && (
                 <p>
-                  Depois de confirmares o email, o clube aprova a tua entrada na
-                  liga.
+                  {invitation
+                    ? "O convite do clube aprova a tua entrada automaticamente. Confirma o email para começar."
+                    : "Depois de confirmares o email, aguarda a aprovação do clube para entrares na liga."}
                 </p>
               )}
               <label className="check">
@@ -870,7 +979,15 @@ function Auth({
               </label>
             </>
           )}
-          <button disabled={busy || !ready} className="primary wide">
+          <button
+            disabled={
+              busy ||
+              !ready ||
+              ((mode === "register" || invitationSetup) &&
+                !registrationDivisions.length)
+            }
+            className="primary wide"
+          >
             {busy
               ? "Aguarda…"
               : mode === "login"
@@ -1205,69 +1322,141 @@ function RankingTable({
     <>
       <div className="ranking-row ranking-header">
         <span>#</span>
-        <span>Jogador</span>
+        <span>Equipa / Jogador</span>
         <span>V / D</span>
         <span className="hide-mobile">Tendência</span>
         <span className="hide-mobile">Estado</span>
         <span className="right">Desafio</span>
       </div>
-      {s.players
-        .filter(
-          (p) =>
-            p.divisionId === divisionId &&
-            p.status !== "removed" &&
-            !p.awaitingApproval,
-        )
-        .sort((a, b) => a.position - b.position)
+      {rankingEntries(s.players, divisionId)
         .slice(0, limit)
-        .map((x) => (
-          <div
-            className={`ranking-row ${p._id === x._id ? "me" : ""}`}
-            key={x._id}
-          >
-            <span className={`rank-number ${x.position <= 3 ? "top" : ""}`}>
-              {String(x.position).padStart(2, "0")}
-            </span>
-            <div className="row">
-              <Avatar p={x} />
-              <div className="player-name">
-                {x.name} {p._id === x._id && <span className="gold">· Tu</span>}
-                <small>Jogador #{x.number}</small>
+        .map((entry) => {
+          const ownTeam = entry.members.some((member) => member._id === p._id);
+          const options = entry.members.map((member) => ({
+            member,
+            reason: challengeReason(s, p, member),
+          }));
+          const targetMember = ownTeam
+            ? undefined
+            : options.find((option) => !option.reason)?.member;
+          const messages = [
+            ...new Set(options.map((option) => option.reason).filter(Boolean)),
+          ];
+          const teamMessage =
+            ownTeam && entry.members.length > 1
+              ? "A tua equipa"
+              : messages.length === 1
+                ? messages[0]
+                : "Equipa indisponível para este desafio.";
+          const activeTeam = entry.members.every(
+            (member) => member.status === "active",
+          );
+          return (
+            <div
+              className={`ranking-row ${ownTeam ? "me" : ""} ${entry.members.length > 1 ? "ranking-team" : ""}`}
+              key={entry.id}
+              data-ranking-entry={entry.id}
+            >
+              <span
+                className={`rank-number ${entry.position <= 3 ? "top" : ""}`}
+                aria-label={`Posições: ${entry.members.map((member) => member.position).join(", ")}`}
+              >
+                {String(entry.position).padStart(2, "0")}
+                {entry.members.length > 1 && (
+                  <small className="muted">
+                    / {String(entry.members[1].position).padStart(2, "0")}
+                  </small>
+                )}
+              </span>
+              <div className="ranking-member-list">
+                {entry.members.length > 1 && (
+                  <span className="ranking-team-label">Equipa</span>
+                )}
+                {entry.members.map((member) => (
+                  <div className="row ranking-member" key={member._id}>
+                    <Avatar p={member} />
+                    <div className="player-name">
+                      {member.name}{" "}
+                      {member._id === p._id && (
+                        <span className="gold">· Tu</span>
+                      )}
+                      <small>
+                        Jogador #{member.number}
+                        {entry.members.length === 1
+                          ? member.partner
+                            ? ` · Parceiro por confirmar: ${member.partner}`
+                            : " · Sem parceiro atribuído"
+                          : ""}
+                      </small>
+                    </div>
+                  </div>
+                ))}
+                <WeeklyBadge
+                  s={s}
+                  player={entry.members[0]}
+                  team={entry.members}
+                />
+              </div>
+              <div className="ranking-member-list ranking-member-values">
+                {entry.members.map((member) => (
+                  <span
+                    key={member._id}
+                    title={`${member.name}: ${member.wins} vitórias / ${member.losses} derrotas`}
+                  >
+                    {member.wins}
+                    <span className="muted"> / {member.losses}</span>
+                  </span>
+                ))}
+              </div>
+              <div className="hide-mobile ranking-member-list ranking-member-values">
+                {entry.members.map((member) => (
+                  <span key={member._id} title={member.name}>
+                    <Trend p={member} />
+                  </span>
+                ))}
+              </div>
+              <div className="hide-mobile ranking-team-status">
+                <span
+                  className="dot"
+                  style={{
+                    background: activeTeam ? "var(--green)" : "var(--muted)",
+                  }}
+                />{" "}
+                <small>
+                  {entry.members.length > 1
+                    ? activeTeam
+                      ? "Ativa"
+                      : "Indisponível"
+                    : activeTeam
+                      ? "Ativo"
+                      : "Inativo"}
+                </small>
+              </div>
+              <div
+                className="right ranking-team-action"
+                data-team-message={entry.id}
+              >
+                {targetMember ? (
+                  <button
+                    className="small"
+                    style={{ color: "var(--gold)", borderColor: "#e7b85b33" }}
+                    aria-label={
+                      entry.members.length > 1
+                        ? `Desafiar ${entry.members.map((member) => member.name).join(" + ")}`
+                        : undefined
+                    }
+                    onClick={() => setTarget(targetMember)}
+                  >
+                    <Swords size={12} />
+                    Desafiar
+                  </button>
+                ) : (
+                  <small className="muted">{teamMessage}</small>
+                )}
               </div>
             </div>
-            <span style={{ fontSize: 11 }}>
-              {x.wins}
-              <span className="muted"> / {x.losses}</span>
-            </span>
-            <span className="hide-mobile">
-              <Trend p={x} />
-            </span>
-            <span className="hide-mobile">
-              <span
-                className="dot"
-                style={{
-                  background:
-                    x.status === "active" ? "var(--green)" : "var(--muted)",
-                }}
-              />{" "}
-              <small>{x.status === "active" ? "Ativo" : "Inativo"}</small>
-            </span>
-            <div className="right">
-              {!challengeReason(s, p, x) ? (
-                <button
-                  className="small"
-                  style={{ color: "var(--gold)", borderColor: "#e7b85b33" }}
-                  onClick={() => setTarget(x)}
-                >
-                  <Swords size={12} />
-                  Desafiar
-                </button>
-              ) : (
-                <span className="muted">—</span>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       {target && (
         <ChallengeComposer
           s={s}
@@ -1327,7 +1516,9 @@ function Rankings(a: Actions) {
 }
 function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
   const name = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+    terminal.has(effectiveStatus(c))
+      ? (s.players.find((player) => player._id === id)?.name ?? "Jogador")
+      : teamName(s.players, id) || "Jogador";
   const when =
     c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
   return (
@@ -1395,17 +1586,29 @@ function Challenges(a: Actions) {
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const eligible = s.players.filter((x) => !challengeReason(s, p, x));
+  const eligibleTeams = rankingEntries(s.players, p.divisionId)
+    .map((entry) => ({
+      ...entry,
+      target: entry.members.find((member) =>
+        eligible.some((player) => player._id === member._id),
+      ),
+    }))
+    .filter((entry) => entry.target);
   const active = activeChallenges(s, p._id, Date.now());
   const blockedReason =
-    p.status !== "active"
-      ? "A tua conta de jogador não está ativa."
-      : active.length >= s.settings[0].maxActiveChallenges
-        ? `Já tens ${active.length} desafios ativos. O limite é ${s.settings[0].maxActiveChallenges}. Continua um dos desafios abaixo ou pede ao administrador para resolver um pendente.`
-        : p.position === 1
-          ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
-          : eligible.length === 0
-            ? "Os adversários dentro do teu alcance já estão ocupados ou têm um desafio contigo. Consulta os teus desafios em curso."
-            : "";
+    s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
+      ? "A aguardar a publicação do teu papel semanal pelo administrador."
+      : s.settings[0].weeklyCompetition && weeklyRole(s, p._id) === "defense"
+        ? "Esta semana estás em defesa. Consulta os desafios recebidos."
+        : p.status !== "active"
+          ? "A tua conta de jogador não está ativa."
+          : active.length >= s.settings[0].maxActiveChallenges
+            ? `Já tens ${active.length} desafios ativos. O limite é ${s.settings[0].maxActiveChallenges}. Continua um dos desafios abaixo ou pede ao administrador para resolver um pendente.`
+            : p.position === 1
+              ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
+              : eligible.length === 0
+                ? "Os adversários dentro do teu alcance já estão ocupados ou têm um desafio contigo. Consulta os teus desafios em curso."
+                : "";
   return (
     <>
       <Heading
@@ -1413,20 +1616,34 @@ function Challenges(a: Actions) {
         title="Ataque e defesa"
         description="Recebe desafios, escolhe adversários e gere os teus jogos num só lugar."
         right={
-          admin ? (
+          admin && s.settings[0].weeklyCompetition ? (
+            <a className="button primary" href="#weekly-role-assignment">
+              <Sword size={15} />
+              <Shield size={15} />
+              Definir papéis da semana
+            </a>
+          ) : admin ? (
             <button className="primary" onClick={() => setAssign(true)}>
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
           ) : (
-            <a className="button primary" href="#fazer-desafio">
+            <a
+              className="button primary"
+              href={
+                s.settings[0].weeklyCompetition
+                  ? "#weekly-role-assignment"
+                  : "#fazer-desafio"
+              }
+            >
               <Plus size={15} />
               Novo desafio
             </a>
           )
         }
       />
-      {admin ? (
+      <WeeklyRoles s={s} run={a.run} busy={a.busy} onChallenge={setTarget} />
+      {admin && !s.settings[0].weeklyCompetition ? (
         <div className="inset space-top" style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 12 }}>
             Para criar um confronto entre quaisquer jogadores, usa{" "}
@@ -1606,7 +1823,7 @@ function Challenges(a: Actions) {
           <Empty text="Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo." />
         </Section>
       )}
-      {scope === "mine" && (
+      {scope === "mine" && !s.settings[0].weeklyCompetition && (
         <div id="fazer-desafio" className="space-top">
           <Section
             title="Fazer um desafio"
@@ -1618,22 +1835,29 @@ function Challenges(a: Actions) {
             </p>
             {eligible.length ? (
               <div className="challenge-grid">
-                {eligible.map((x) => (
-                  <div className="inset row between" key={x._id}>
-                    <div className="row">
-                      <Avatar p={x} />
-                      <div>
-                        <strong>{x.name}</strong>
-                        <small style={{ display: "block" }}>
-                          #{x.position} ·{" "}
-                          {
-                            s.divisions.find((d) => d._id === x.divisionId)
-                              ?.name
-                          }
-                        </small>
-                      </div>
+                {eligibleTeams.map((entry) => (
+                  <div className="inset row between wrap" key={entry.id}>
+                    <div>
+                      <strong>
+                        {entry.members.map((member) => member.name).join(" + ")}
+                      </strong>
+                      <small style={{ display: "block" }}>
+                        {entry.members.length > 1
+                          ? "Equipa"
+                          : "Jogador sem parceiro"}{" "}
+                        ·{" "}
+                        {
+                          s.divisions.find(
+                            (category) =>
+                              category._id === entry.members[0].divisionId,
+                          )?.name
+                        }
+                      </small>
                     </div>
-                    <button className="small" onClick={() => setTarget(x)}>
+                    <button
+                      className="small"
+                      onClick={() => entry.target && setTarget(entry.target)}
+                    >
                       <Sword size={13} />
                       Desafiar
                     </button>
@@ -2200,6 +2424,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
   return (
     <>
       <Section title="Intervenção administrativa">
+        <AdminMatchActions {...a} c={c} />
         {["pending", "accepted"].includes(c.status) && !c.titleFight && (
           <button className="wide space-top" onClick={() => setAssign(true)}>
             <Sword size={14} />
@@ -2367,12 +2592,16 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
     </>
   );
 }
-function Games({ s }: Actions) {
-  const [all, setAll] = useState(false);
+function Games(a: Actions) {
+  const { s } = a;
+  const [all, setAll] = useState(s.actor.role === "admin");
+  const [week, setWeek] = useState(clubWeek().start);
   const games = s.challenges
     .filter(
       (c) =>
         (c.scheduledAt || c.scheduleProposal) &&
+        clubWeek(c.scheduleProposal?.start ?? c.scheduledAt ?? c.createdAt)
+          .start === week &&
         (all || involves(c, s.actor.playerId)) &&
         !["cancelled", "refused", "expired"].includes(c.status),
     )
@@ -2388,12 +2617,16 @@ function Games({ s }: Actions) {
         title="Agenda de jogos"
         description="Todos os detalhes para chegares preparado ao próximo jogo."
         right={
-          <a className="button" href="/api/calendar">
+          <a className="button" href={`/api/calendar?week=${week}`}>
             <Download size={14} />
             Calendário
           </a>
         }
       />
+      <Section title="Disponibilidade dos campos">
+        <CourtAvailability />
+      </Section>
+      <WeekNavigation week={week} onChange={setWeek} />
       <div className="toolbar">
         <div className="tabs">
           <button
@@ -2410,7 +2643,11 @@ function Games({ s }: Actions) {
       {games.length ? (
         <div className="challenge-grid">
           {games.map((c) => (
-            <ChallengeCard key={c._id} s={s} c={c} />
+            <div key={c._id}>
+              <ChallengeCard s={s} c={c} />
+              <AdminMatchActions {...a} c={c} />
+              {s.actor.role === "admin" && <AdminResultButton {...a} c={c} />}
+            </div>
           ))}
         </div>
       ) : (
@@ -2532,6 +2769,9 @@ function Profile(a: Actions) {
         title="Pronto para competir"
         description="Mantém o perfil atualizado e facilita a marcação dos teus jogos."
       />
+      <Link className="button" href="/ajuda">
+        <BookOpen size={17} /> Como usar a app · Guia passo a passo
+      </Link>
       <div className="detail-grid">
         <div className="stack">
           <Section
@@ -2595,11 +2835,7 @@ function Profile(a: Actions) {
                 </label>
                 <label>
                   Parceiro atual
-                  <input
-                    name="partner"
-                    defaultValue={p.partner}
-                    maxLength={150}
-                  />
+                  <input name="partner" value={p.partner} readOnly />
                 </label>
                 <label>
                   Número de jogador
@@ -2707,7 +2943,7 @@ function Profile(a: Actions) {
               </button>
             </div>
           </Section>
-          <Section title="Exceções de disponibilidade">
+          <Section title="Férias e indisponibilidade">
             <div className="stack">
               {s.exceptions
                 .filter((x) => x.playerId === p._id)
@@ -2715,7 +2951,10 @@ function Profile(a: Actions) {
                   <div className="slot" key={x._id}>
                     <div>
                       {fmtDate(x.from)} → {fmtDate(x.to)}
-                      <p>{x.note}</p>
+                      <p>
+                        {x.vacation ? "Férias · ranking congelado · " : ""}
+                        {x.note}
+                      </p>
                     </div>
                     <button
                       className="icon-button"
@@ -2740,6 +2979,7 @@ function Profile(a: Actions) {
                       {
                         type: "exception.add",
                         ...Object.fromEntries(new FormData(form)),
+                        vacation: new FormData(form).get("vacation") === "on",
                       },
                       "Exceção adicionada.",
                     )
@@ -2757,6 +2997,15 @@ function Profile(a: Actions) {
                     <input type="date" name="to" required />
                   </label>
                 </div>
+                <label className="check">
+                  <input name="vacation" type="checkbox" />
+                  Férias · congelar a posição no ranking
+                </label>
+                <small>
+                  Em férias podes receber desafios. Os jogos ficam para depois
+                  do regresso e a tua posição mantém-se congelada durante a
+                  ausência.
+                </small>
                 <label>
                   Motivo
                   <input
@@ -2885,15 +3134,21 @@ function Admin(a: Actions) {
         title="Painel do administrador"
         description="Tu defines as regras. Os jogadores fazem o jogo."
       />
+      <Link className="button" href="/ajuda/admin">
+        <BookOpen size={17} /> Manual do administrador · Guia passo a passo
+      </Link>
       <div className="tabs toolbar">
         {[
           ["summary", "Resumo"],
           ["players", "Jogadores"],
           ["registration", "Inscrições"],
           ["rankings", "Rankings"],
+          ["weekly", "Papéis semanais"],
+          ["partners", "Parceiros"],
           ["challenges", "Desafios"],
           ["games", "Jogos"],
           ["results", "Resultados"],
+          ["posters", "Cartazes da jornada"],
           ["rules", "Regras"],
           ["courts", "Campos"],
           ["audit", "Auditoria"],
@@ -2995,24 +3250,24 @@ function Admin(a: Actions) {
             )}
           </Section>
         </>
+      ) : tab === "partners" ? (
+        <AdminPartners {...a} />
+      ) : tab === "weekly" ? (
+        <WeeklyRoles s={s} run={a.run} busy={a.busy} />
       ) : tab === "registration" ? (
         <AdminRegistration {...a} />
       ) : tab === "players" ? (
         <AdminPlayers {...a} />
       ) : tab === "rankings" ? (
-        <>
-          <p style={{ marginBottom: 20 }}>
-            Altera as posições em Jogadores. Todos os jogadores deslocados ficam
-            com histórico.
-          </p>
-          <Rankings {...a} />
-        </>
+        <AdminTeamRanking s={s} run={a.run} busy={a.busy} />
       ) : tab === "challenges" ? (
         <AdminChallenges {...a} />
       ) : tab === "games" ? (
         <Games {...a} />
       ) : tab === "results" ? (
         <AdminResults {...a} />
+      ) : tab === "posters" ? (
+        <MatchdayGenerator s={s} />
       ) : tab === "rules" ? (
         <Rules {...a} />
       ) : tab === "courts" ? (
@@ -3064,6 +3319,170 @@ function Admin(a: Actions) {
         </Section>
       )}
     </>
+  );
+}
+function AdminMatchActions(a: Actions & { c: Challenge }) {
+  const { s, c, run, busy, notify } = a;
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  if (s.actor.role !== "admin") return null;
+  const editable = ["scheduled", "schedule_pending", "completed"].includes(
+    c.status,
+  );
+  const start = c.scheduleProposal?.start ?? c.scheduledAt;
+  const localStart = start
+    ? new Date(Date.parse(start) - new Date(start).getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16)
+    : "";
+  return (
+    <div className="stack space-top">
+      {editable && (
+        <button onClick={() => setEditing(true)}>Editar jogo</button>
+      )}
+      <button
+        className="danger"
+        disabled={busy}
+        onClick={() => setDeleting(true)}
+      >
+        Eliminar jogo
+      </button>
+      {deleting && (
+        <Modal
+          title={`Eliminar jogo #${c.number}`}
+          close={() => setDeleting(false)}
+        >
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              const result = await run(
+                {
+                  type: "admin.match.delete",
+                  challengeId: c._id,
+                  note: data.get("note"),
+                },
+                "",
+              );
+              if (!result) return;
+              setDeleting(false);
+              notify(
+                result.rankingReview || result.championReview
+                  ? "Jogo eliminado e estatísticas corrigidas. Revê o ranking e o campeão: a reposição automática não foi possível."
+                  : "Jogo e dados associados eliminados. Estatísticas e classificação atualizadas.",
+              );
+              if (location.pathname === `/desafios/${c._id}`)
+                router.replace("/jogos");
+            }}
+          >
+            <p>
+              <strong>
+                {s.players.find((p) => p._id === c.challengerId)?.name} vs{" "}
+                {s.players.find((p) => p._id === c.defenderId)?.name}
+              </strong>
+            </p>
+            <p>
+              Esta ação elimina o desafio, a reserva, o resultado, as
+              disponibilidades do desafio, as mensagens e as notificações
+              associadas. Fica apenas o registo administrativo da eliminação.
+            </p>
+            {c.status === "completed" && (
+              <p>
+                As vitórias e derrotas são corrigidas. O ranking e o campeão são
+                repostos quando não existem alterações posteriores; caso
+                contrário, precisas de os rever.
+              </p>
+            )}
+            <label>
+              Motivo da eliminação
+              <textarea name="note" minLength={3} maxLength={2000} required />
+            </label>
+            <label className="check">
+              <input type="checkbox" required />
+              Confirmo a eliminação definitiva deste jogo e dos dados
+              associados.
+            </label>
+            <button className="danger" disabled={busy}>
+              Eliminar definitivamente
+            </button>
+          </form>
+        </Modal>
+      )}
+      {editing && (
+        <Modal title="Editar jogo" close={() => setEditing(false)}>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              const result = await run(
+                {
+                  type: "admin.match.update",
+                  challengeId: c._id,
+                  start: new Date(String(data.get("start"))).toISOString(),
+                  courtId: data.get("courtId"),
+                  minutes: Number(data.get("minutes")),
+                  note: data.get("note"),
+                },
+                "Jogo atualizado. Os jogadores foram notificados.",
+              );
+              if (result) setEditing(false);
+            }}
+          >
+            <p>
+              O clube confirma a alteração diretamente e avisa os dois
+              jogadores.
+            </p>
+            <label>
+              Data e hora
+              <input
+                name="start"
+                type="datetime-local"
+                defaultValue={localStart}
+                required
+              />
+            </label>
+            <small>
+              Fuso horário: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </small>
+            <label>
+              Campo
+              <select
+                name="courtId"
+                defaultValue={c.scheduleProposal?.courtId ?? c.courtId}
+                required
+              >
+                {s.courts
+                  .filter((court) => court.active)
+                  .map((court) => (
+                    <option key={court._id} value={court._id}>
+                      {court.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Duração · minutos
+              <input
+                name="minutes"
+                type="number"
+                min={15}
+                max={240}
+                defaultValue={c.scheduleProposal?.minutes ?? c.durationMinutes}
+                required
+              />
+            </label>
+            <label>
+              Motivo da alteração
+              <textarea name="note" minLength={3} maxLength={2000} required />
+            </label>
+            <button className="primary" disabled={busy}>
+              Guardar alterações
+            </button>
+          </form>
+        </Modal>
+      )}
+    </div>
   );
 }
 function AdminResultButton(a: Actions & { c: Challenge }) {
@@ -3192,9 +3611,10 @@ function AdminRegistration(a: Actions) {
     <Section title="Inscrições pelo grupo de WhatsApp">
       <div className="stack">
         <p>
-          Cria um link e partilha-o no grupo. Cada pessoa cria a própria conta,
-          confirma o email e aguarda a aprovação do clube. Quem tiver o link
-          pode pedir inscrição; o link não prova que pertence ao grupo.
+          Cria um link e partilha-o com quem queres aceitar na liga. Quem se
+          inscrever com um convite válido fica aprovado automaticamente e só
+          precisa de confirmar o email. As inscrições feitas diretamente no
+          site, sem convite, ficam a aguardar a aprovação do clube.
         </p>
         <form
           onSubmit={async (e) => {
@@ -3315,9 +3735,9 @@ function AdminRegistration(a: Actions) {
           </div>
         ))}
         <p>
-          As novas inscrições aparecem em Administração → Jogadores → Novas
-          inscrições. Aprovar ativa o jogador; podes ajustar a divisão e posição
-          ao editar.
+          As novas inscrições aparecem em Administração → Jogadores → Pendentes.
+          Podes aprovar ou recusar cada pedido. Aprovar ativa o jogador; podes
+          ajustar a divisão e posição ao editar.
         </p>
       </div>
     </Section>
@@ -3473,17 +3893,34 @@ function AdminChallenges(a: Actions) {
 function AdminPlayers(a: Actions) {
   const { s, run, busy, notify, refresh } = a,
     [filter, setFilter] = useState("all"),
+    [registrationFilter, setRegistrationFilter] = useState("approved"),
     [search, setSearch] = useState(""),
     [editing, setEditing] = useState<Player | "new" | null>(null),
     [history, setHistory] = useState<Player | null>(null),
+    [vacationPlayer, setVacationPlayer] = useState<Player | null>(null),
     [link, setLink] = useState("");
-  const list = s.players
+  const registrationCounts = {
+    approved: s.players.filter(
+      (p) => !p.awaitingApproval && !p.registrationRejectedAt,
+    ).length,
+    pending: s.players.filter(
+      (p) => p.awaitingApproval && !p.registrationRejectedAt,
+    ).length,
+    rejected: s.players.filter((p) => !!p.registrationRejectedAt).length,
+  };
+  const registrationPlayers = s.players.filter((p) =>
+    registrationFilter === "pending"
+      ? p.awaitingApproval && !p.registrationRejectedAt
+      : registrationFilter === "rejected"
+        ? !!p.registrationRejectedAt
+        : !p.awaitingApproval && !p.registrationRejectedAt,
+  );
+  const matchesPlayerFilter = (p: Player, value: string) =>
+    value === "all" || p.divisionId === value || p.status === value;
+  const list = registrationPlayers
     .filter(
       (p) =>
-        (filter === "all" ||
-          (filter === "approval" && p.awaitingApproval) ||
-          p.divisionId === filter ||
-          p.status === filter) &&
+        matchesPlayerFilter(p, filter) &&
         (p.name + " " + p.email).toLowerCase().includes(search.toLowerCase()),
     )
     .sort(
@@ -3506,6 +3943,34 @@ function AdminPlayers(a: Actions) {
   }
   return (
     <>
+      <div className="tabs toolbar" aria-label="Estado das inscrições">
+        {(
+          [
+            ["approved", "Aprovadas"],
+            ["pending", "Pendentes"],
+            ["rejected", "Recusadas"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            className={registrationFilter === value ? "active" : ""}
+            aria-pressed={registrationFilter === value}
+            onClick={() => {
+              setRegistrationFilter(value);
+              setFilter("all");
+            }}
+          >
+            {label} ({registrationCounts[value]})
+          </button>
+        ))}
+      </div>
+      {registrationFilter === "rejected" && (
+        <p className="space-bottom">
+          As contas recusadas são eliminadas automaticamente 2 dias após a
+          recusa. Podes aprovar uma inscrição antes dessa data para impedir a
+          eliminação.
+        </p>
+      )}
       <div className="toolbar">
         <div className="tabs">
           {[
@@ -3513,7 +3978,6 @@ function AdminPlayers(a: Actions) {
             ...s.divisions.map((d) => [d._id, d.name]),
             ["active", "Ativos"],
             ["suspended", "Suspensos"],
-            ["approval", "Novas inscrições"],
             ["removed", "Removidos"],
           ].map(([v, l]) => (
             <button
@@ -3521,7 +3985,12 @@ function AdminPlayers(a: Actions) {
               className={filter === v ? "active" : ""}
               onClick={() => setFilter(v)}
             >
-              {l}
+              {l} (
+              {
+                registrationPlayers.filter((p) => matchesPlayerFilter(p, v))
+                  .length
+              }
+              )
             </button>
           ))}
         </div>
@@ -3579,7 +4048,9 @@ function AdminPlayers(a: Actions) {
         Colunas: Nome, Email, Telefone, Divisão, Posição, Parceiro, Estado.
         Emails existentes atualizam o jogador sem duplicar o histórico.
       </p>
-      <Section title={`Jogadores · ${list.length}`}>
+      <Section
+        title={`${registrationFilter === "pending" ? "Inscrições pendentes" : registrationFilter === "rejected" ? "Inscrições recusadas" : "Jogadores aprovados"} · ${list.length}`}
+      >
         <div className="table-scroll">
           <table>
             <thead>
@@ -3587,6 +4058,9 @@ function AdminPlayers(a: Actions) {
                 <th>Jogador</th>
                 <th>Divisão / Posição</th>
                 <th>Estado</th>
+                {registrationFilter === "rejected" && (
+                  <th>Eliminação automática</th>
+                )}
                 <th>Ações</th>
               </tr>
             </thead>
@@ -3611,16 +4085,38 @@ function AdminPlayers(a: Actions) {
                   </td>
                   <td>
                     <span className="badge">
-                      {p.awaitingApproval
-                        ? "Por aprovar"
-                        : {
-                            active: "Ativo",
-                            inactive: "Inativo",
-                            suspended: "Suspenso",
-                            removed: "Removido",
-                          }[p.status]}
+                      {p.registrationRejectedAt
+                        ? "Inscrição recusada"
+                        : p.awaitingApproval
+                          ? "Por aprovar"
+                          : {
+                              active: "Ativo",
+                              inactive: "Inativo",
+                              suspended: "Suspenso",
+                              removed: "Removido",
+                            }[p.status]}
                     </span>
+                    {frozenRanking(s, p._id) && (
+                      <small className="gold" style={{ display: "block" }}>
+                        Ranking congelado
+                      </small>
+                    )}
                   </td>
+                  {registrationFilter === "rejected" && (
+                    <td>
+                      {p.registrationRejectedAt &&
+                        (() => {
+                          const expiry = new Date(
+                            Date.parse(p.registrationRejectedAt) + 2 * 86400000,
+                          ).toISOString();
+                          return (
+                            <span>
+                              {fmtDate(expiry)} · {fmtTime(expiry)}
+                            </span>
+                          );
+                        })()}
+                    </td>
+                  )}
                   <td>
                     <div className="table-actions">
                       <button className="small" onClick={() => setEditing(p)}>
@@ -3635,7 +4131,7 @@ function AdminPlayers(a: Actions) {
                         onClick={() => {
                           if (
                             confirm(
-                              `${p.awaitingApproval ? "Aprovar inscrição" : p.status === "active" ? "Suspender" : "Reativar"} ${p.name}?`,
+                              `${p.awaitingApproval || p.registrationRejectedAt ? "Aprovar inscrição" : p.status === "active" ? "Suspender" : "Reativar"} ${p.name}?`,
                             )
                           )
                             void run(
@@ -3647,18 +4143,64 @@ function AdminPlayers(a: Actions) {
                                   p.status === "active"
                                     ? "suspended"
                                     : "active",
-                                position: Math.max(1, p.position),
+                                position: p.registrationRejectedAt
+                                  ? s.players.filter(
+                                      (other) =>
+                                        other.divisionId === p.divisionId &&
+                                        other.status !== "removed",
+                                    ).length + 1
+                                  : Math.max(1, p.position),
                               },
                               "Estado atualizado.",
                             );
                         }}
                       >
-                        {p.awaitingApproval
+                        {p.awaitingApproval || p.registrationRejectedAt
                           ? "Aprovar inscrição"
                           : p.status === "active"
                             ? "Suspender"
                             : "Reativar"}
                       </button>
+                      {p.awaitingApproval && (
+                        <button
+                          className="small danger"
+                          disabled={busy}
+                          onClick={() => {
+                            if (
+                              confirm(
+                                `Recusar a inscrição de ${p.name}? Esta pessoa não terá acesso à liga e a conta será eliminada automaticamente após 2 dias.`,
+                              )
+                            )
+                              void run(
+                                {
+                                  type: "admin.registration.reject",
+                                  playerId: p._id,
+                                },
+                                "Inscrição recusada.",
+                              );
+                          }}
+                        >
+                          Recusar inscrição
+                        </button>
+                      )}
+                      {(p.status === "active" ||
+                        s.exceptions.some(
+                          (entry) =>
+                            entry.playerId === p._id &&
+                            entry.vacation &&
+                            entry.to >= clubDay(Date.now()),
+                        )) &&
+                        !p.awaitingApproval &&
+                        !p.registrationRejectedAt && (
+                          <button
+                            className="small"
+                            onClick={() => setVacationPlayer(p)}
+                          >
+                            {frozenRanking(s, p._id)
+                              ? "Gerir congelamento"
+                              : "Congelar ranking"}
+                          </button>
+                        )}
                       <button className="small" onClick={() => setHistory(p)}>
                         Histórico
                       </button>
@@ -3679,7 +4221,28 @@ function AdminPlayers(a: Actions) {
             </tbody>
           </table>
         </div>
+        {!list.length && (
+          <Empty
+            text={
+              registrationFilter === "pending"
+                ? "Não existem inscrições pendentes."
+                : registrationFilter === "rejected"
+                  ? "Não existem inscrições recusadas."
+                  : "Não existem jogadores com estes filtros."
+            }
+          />
+        )}
       </Section>
+      {vacationPlayer && (
+        <AdminVacationDialog
+          {...a}
+          player={
+            s.players.find((p) => p._id === vacationPlayer._id) ??
+            vacationPlayer
+          }
+          close={() => setVacationPlayer(null)}
+        />
+      )}
       {editing && (
         <PlayerEditor
           {...a}
@@ -3721,6 +4284,192 @@ function AdminPlayers(a: Actions) {
         </Modal>
       )}
     </>
+  );
+}
+function AdminVacationDialog(
+  a: Actions & { player: Player; close: () => void },
+) {
+  const { s, run, busy, player, close } = a;
+  const periods = s.exceptions.filter(
+    (entry) =>
+      entry.playerId === player._id &&
+      entry.vacation &&
+      entry.to >= clubDay(Date.now()),
+  );
+  return (
+    <Modal title={`Congelar ranking · ${player.name}`} close={close}>
+      <div className="stack">
+        <p>
+          O jogador mantém a posição durante as férias, pode receber desafios e
+          joga após o regresso. Se já tiver um jogo confirmado nesse período,
+          altera a marcação primeiro.
+        </p>
+        {periods.map((entry) => (
+          <div className="inset stack" key={entry._id}>
+            <strong>
+              {fmtDate(entry.from)} → {fmtDate(entry.to)}
+            </strong>
+            {entry.note && <small>{entry.note}</small>}
+            <button
+              className="small"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  confirm(`Terminar este período de férias de ${player.name}?`)
+                )
+                  void run(
+                    { type: "exception.delete", exceptionId: entry._id },
+                    "Período de férias removido. O estado do ranking foi atualizado.",
+                  );
+              }}
+            >
+              Terminar congelamento
+            </button>
+          </div>
+        ))}
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const result = await run(
+              {
+                type: "exception.add",
+                playerId: player._id,
+                vacation: true,
+                from: data.get("from"),
+                to: data.get("to"),
+                note: String(data.get("note") ?? ""),
+              },
+              "Férias registadas. O ranking fica congelado nas datas indicadas.",
+            );
+            if (result) close();
+          }}
+        >
+          <div className="form-grid">
+            <label>
+              Início do congelamento
+              <input
+                name="from"
+                type="date"
+                defaultValue={clubDay(Date.now())}
+                required
+              />
+            </label>
+            <label>
+              Fim do congelamento
+              <input
+                name="to"
+                type="date"
+                defaultValue={addClubDays(clubDay(Date.now()), 7)}
+                required
+              />
+            </label>
+          </div>
+          <label>
+            Motivo do congelamento
+            <input name="note" maxLength={2000} defaultValue="Férias" />
+          </label>
+          <button className="primary" disabled={busy}>
+            Guardar congelamento
+          </button>
+        </form>
+      </div>
+    </Modal>
+  );
+}
+function AdminPartners(a: Actions) {
+  const { s, run, busy } = a;
+  const [division, setDivision] = useState(s.divisions[0]?._id ?? "");
+  const players = s.players
+    .filter(
+      (p) =>
+        p.divisionId === division &&
+        p.status !== "removed" &&
+        !p.awaitingApproval &&
+        !p.registrationRejectedAt,
+    )
+    .sort((a, b) => a.position - b.position);
+  return (
+    <Section title="Parceiros por categoria">
+      <div className="stack">
+        <p>
+          Escolhe um parceiro da mesma categoria para cada jogador. Ao guardar,
+          a atribuição é aplicada automaticamente aos dois jogadores. O próprio
+          jogador fica excluído das opções.
+        </p>
+        <label>
+          Categoria dos parceiros
+          <select
+            value={division}
+            onChange={(event) => setDivision(event.target.value)}
+          >
+            {s.divisions.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {players.map((p) => (
+          <form
+            className="inset"
+            key={`${p._id}:${p.partnerId ?? p.partner}`}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              await run(
+                {
+                  type: "admin.partner.set",
+                  playerId: p._id,
+                  partnerId: String(data.get("partner")).trim(),
+                },
+                "Parceiro atualizado.",
+              );
+            }}
+          >
+            <div className="row between wrap">
+              <strong>
+                #{p.position} · {p.name}
+              </strong>
+              {p.partner && <small>Parceiro atual: {p.partner}</small>}
+            </div>
+            <label>
+              Parceiro de {p.name}
+              <select
+                name="partner"
+                aria-label={`Parceiro de ${p.name}`}
+                defaultValue={
+                  p.partnerId ??
+                  (players.filter(
+                    (other) => other._id !== p._id && other.name === p.partner,
+                  ).length === 1
+                    ? players.find(
+                        (other) =>
+                          other._id !== p._id && other.name === p.partner,
+                      )!._id
+                    : "")
+                }
+              >
+                <option value="">Sem parceiro</option>
+                {players
+                  .filter((other) => other._id !== p._id)
+                  .map((other) => (
+                    <option key={other._id} value={other._id}>
+                      #{other.position} · {other.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button className="small" disabled={busy}>
+              Guardar parceiro
+            </button>
+          </form>
+        ))}
+        {!players.length && (
+          <Empty text="Não existem jogadores aprovados nesta categoria." />
+        )}
+      </div>
+    </Section>
   );
 }
 function playerData(p: Player) {
@@ -3787,8 +4536,12 @@ function PlayerEditor({
             Divisão
             <select
               name="divisionId"
-              defaultValue={p?.divisionId ?? s.divisions[2]._id}
+              defaultValue={p?.divisionId ?? ""}
+              required
             >
+              <option value="" disabled>
+                Escolher categoria
+              </option>
               {s.divisions.map((d) => (
                 <option value={d._id} key={d._id}>
                   {d.name}
@@ -3859,6 +4612,7 @@ const settingLabels: Record<
   keyof Omit<Settings, "_id" | "rulesText" | "prizes">,
   string
 > = {
+  weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
   maxPositionsAbove: "Posições que pode desafiar acima",
@@ -4013,6 +4767,7 @@ function Courts({ s, run, busy }: Actions) {
   return (
     <Section title="Campos e reservas">
       <div className="stack">
+        <CourtAvailability />
         <p style={{ fontSize: 12 }}>
           Reservas de desafios impedem sobreposição no mesmo campo. Abre um
           desafio para marcar manualmente.
@@ -4468,21 +5223,27 @@ function Seasons({ s, run, busy }: Actions) {
             {s.divisions.map((d) => (
               <div key={d._id}>
                 <h3 className="gold">{d.name}</h3>
-                {selected
-                  .archivedRankings!.filter(
-                    (p) => p.divisionId === d._id && p.status !== "removed",
-                  )
-                  .sort((a, b) => a.position - b.position)
-                  .map((p) => (
-                    <div className="slot" key={p._id}>
-                      <span>
-                        #{p.position} · {p.name}
-                      </span>
-                      <small>
-                        {p.wins} V / {p.losses} D
-                      </small>
+                {rankingEntries(selected.archivedRankings!, d._id).map(
+                  (entry) => (
+                    <div className="slot" key={entry.id}>
+                      <div className="stack">
+                        {entry.members.length > 1 && (
+                          <span className="badge">Equipa</span>
+                        )}
+                        {entry.members.map((member) => (
+                          <div className="row between wrap" key={member._id}>
+                            <span>
+                              #{member.position} · {member.name}
+                            </span>
+                            <small>
+                              {member.wins} V / {member.losses} D
+                            </small>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  ),
+                )}
               </div>
             ))}
           </div>
@@ -4616,7 +5377,12 @@ function ChallengeComposer(
   const { s, target, close, run, busy, notify } = a,
     p = s.players.find((p) => p._id === s.actor.playerId)!,
     router = useRouter();
-  const [proposals, setProposals] = useState(() => initialProposals(s, p)),
+  const weeklyWindowValue = s.settings[0].weeklyCompetition
+    ? weeklyWindow(s, [p._id, target._id])
+    : undefined;
+  const [proposals, setProposals] = useState(() =>
+      initialProposals(s, p, Date.now(), weeklyWindowValue),
+    ),
     [include, setInclude] = useState(true);
   const selected = proposals.filter((p) => p.selected);
   return (
@@ -4655,11 +5421,11 @@ function ChallengeComposer(
         <div className="inset row between wrap">
           <span className="role-label gold">
             <Sword size={16} />
-            {p.name} · #{p.position}
+            {teamName(s.players, p._id)}
           </span>
           <span className="role-label">
             <Shield size={16} />
-            {target.name} · #{target.position}
+            {teamName(s.players, target._id)}
           </span>
         </div>
         <p style={{ fontSize: 12 }}>
@@ -4667,6 +5433,13 @@ function ChallengeComposer(
           marcação. O adversário tem {s.settings[0].acceptHours} horas para
           responder e pode aceitar logo um horário.
         </p>
+        {weeklyWindowValue && (
+          <p className="inset">
+            {weeklyWindowValue.deferredUntil
+              ? `Desafio adiado por férias: o jogo pode realizar-se a partir de ${weeklyWindowValue.deferredUntil}.`
+              : "Um jogo por jogador nesta semana. Só podes desafiar defensores atribuídos pelo administrador."}
+          </p>
+        )}
         <label className="check">
           <input
             type="checkbox"
@@ -4783,9 +5556,16 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
     [division, setDivision] = useState(c?.divisionId ?? s.divisions[0]._id),
     [attacker, setAttacker] = useState(c?.challengerId ?? ""),
     [defender, setDefender] = useState(c?.defenderId ?? "");
-  const players = s.players
-    .filter((p) => p.divisionId === division && p.status === "active")
-    .sort((a, b) => a.position - b.position);
+  const teams = rankingEntries(s.players, division).filter((entry) =>
+    entry.members.some((member) => member.status === "active"),
+  );
+  const representative = (members: Player[], selected: string) =>
+    members.find(
+      (member) => member._id === selected && member.status === "active",
+    ) ?? members.find((member) => member.status === "active")!;
+  const attackerIds = teamMembers(s.players, attacker).map(
+    (member) => member._id,
+  );
   return (
     <Modal title="Atribuir ataque e defesa" close={close}>
       <form
@@ -4841,13 +5621,21 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
             value={attacker}
             onChange={(e) => {
               setAttacker(e.target.value);
-              if (defender === e.target.value) setDefender("");
+              if (
+                teamMembers(s.players, e.target.value).some(
+                  (member) => member._id === defender,
+                )
+              )
+                setDefender("");
             }}
           >
             <option value="">Escolher atacante</option>
-            {players.map((p) => (
-              <option key={p._id} value={p._id}>
-                #{p.position} · {p.name}
+            {teams.map((entry) => (
+              <option
+                key={entry.id}
+                value={representative(entry.members, attacker)._id}
+              >
+                {entry.members.map((member) => member.name).join(" + ")}
               </option>
             ))}
           </select>
@@ -4864,11 +5652,19 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
             onChange={(e) => setDefender(e.target.value)}
           >
             <option value="">Escolher defensor</option>
-            {players
-              .filter((p) => p._id !== attacker)
-              .map((p) => (
-                <option key={p._id} value={p._id}>
-                  #{p.position} · {p.name}
+            {teams
+              .filter(
+                (entry) =>
+                  !entry.members.some((member) =>
+                    attackerIds.includes(member._id),
+                  ),
+              )
+              .map((entry) => (
+                <option
+                  key={entry.id}
+                  value={representative(entry.members, defender)._id}
+                >
+                  {entry.members.map((member) => member.name).join(" + ")}
                 </option>
               ))}
           </select>
@@ -4918,6 +5714,14 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
       setEditing(false);
   }
   const rulesItems = [
+    ...(rules.weeklyCompetition
+      ? [
+          [
+            "Competição semanal",
+            "Semana de segunda a domingo, com um jogo por jogador. O administrador publica os papéis de ataque e defesa antes dos desafios. Em férias, a posição fica congelada e os desafios podem ser jogados após o regresso.",
+          ],
+        ]
+      : []),
     [
       "Confirmação da marcação",
       rules.requireClubConfirmation
@@ -5216,18 +6020,12 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
     anchor =
       c.scheduleProposal?.start ??
       c.scheduledAt ??
+      (c.deferredUntil ? c.deferredUntil + "T12:00:00Z" : undefined) ??
       slots.slice().sort((a, b) => a.start.localeCompare(b.start))[0]?.start ??
       new Date().toISOString();
-  const [month, setMonth] = useState(() => clubDay(anchor).slice(0, 7)),
+  const [week, setWeek] = useState(() => clubWeek(anchor).start),
     [selected, setSelected] = useState(() => clubDay(anchor)),
     [adding, setAdding] = useState(false);
-  const first = new Date(month + "-01T12:00:00Z"),
-    offset = (first.getUTCDay() + 6) % 7,
-    days = new Date(
-      first.getUTCFullYear(),
-      first.getUTCMonth() + 1,
-      0,
-    ).getDate();
   const canPropose =
     (mine || admin) &&
     (status === "accepted" ||
@@ -5248,11 +6046,6 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
       (s.actor.playerId === c.challengerId
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed);
-  const shift = (n: number) => {
-    const d = new Date(month + "-01T12:00:00Z");
-    d.setUTCMonth(d.getUTCMonth() + n);
-    setMonth(d.toISOString().slice(0, 7));
-  };
   const name = (id: string) =>
     s.players.find((p) => p._id === id)?.name ?? "Jogador";
   return (
@@ -5338,43 +6131,24 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
             <CourtAvailability c={c} />
           )}
           <div className="calendar-month">
-            <div className="row between">
-              <button
-                className="icon-button"
-                aria-label="Mês anterior"
-                onClick={() => shift(-1)}
-              >
-                <ArrowLeft size={17} />
-              </button>
-              <h3 aria-live="polite">
-                {first.toLocaleDateString("pt-PT", {
-                  month: "long",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
-              </h3>
-              <button
-                className="icon-button"
-                aria-label="Mês seguinte"
-                onClick={() => shift(1)}
-              >
-                <ArrowRight size={17} />
-              </button>
-            </div>
+            <WeekNavigation
+              week={week}
+              onChange={(value) => {
+                setWeek(value);
+                setSelected(value);
+              }}
+            />
             <div
               className="calendar-days"
-              aria-label="Calendário mensal do desafio"
+              aria-label="Calendário semanal do desafio"
             >
               {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((w) => (
                 <span className="calendar-weekday" key={w}>
                   {w}
                 </span>
               ))}
-              {Array.from({ length: offset }, (_, i) => (
-                <span key={"blank" + i} />
-              ))}
-              {Array.from({ length: days }, (_, i) => {
-                const day = month + "-" + String(i + 1).padStart(2, "0"),
+              {Array.from({ length: 7 }, (_, i) => {
+                const day = addClubDays(week, i),
                   hasAttack = slots.some(
                     (x) =>
                       x.playerId === c.challengerId && clubDay(x.start) === day,
@@ -5399,7 +6173,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                     className={`calendar-day ${selected === day ? "selected" : ""} ${isMatch ? "match" : ""} ${day === clubDay(Date.now()) ? "today" : ""}`}
                     onClick={() => setSelected(day)}
                   >
-                    <span>{i + 1}</span>
+                    <span>{Number(day.slice(-2))}</span>
                     <span className="calendar-markers">
                       {hasAttack && <span className="attack-dot" />}
                       {hasDefense && <span className="defense-dot" />}

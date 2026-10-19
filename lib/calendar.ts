@@ -45,20 +45,29 @@ export function initialProposals(
   s: View,
   p: Player,
   now = Date.now(),
+  weekly?: { deferredUntil?: string; playBy: string },
 ): Proposal[] {
   const count = s.settings[0].initialSuggestionCount,
     items: Proposal[] = [],
     availability = s.availability.filter((w) => w.playerId === p._id);
   const today = wallTime(now).day;
   const deadline = Math.min(
-    now + s.settings[0].playDays * 86400000,
+    weekly ? Date.parse(weekly.playBy) : Infinity,
+    weekly?.deferredUntil ? Infinity : now + s.settings[0].playDays * 86400000,
     Date.parse(
       (s.seasons.find((x) => x.status === "active")?.end ?? "9999-12-31") +
         "T23:59:59Z",
     ),
   );
-  for (let i = 1; i <= s.settings[0].playDays && items.length < count; i++) {
-    const date = new Date(today + "T12:00:00Z");
+  const firstDay = weekly?.deferredUntil ?? today;
+  const horizon = weekly
+    ? Math.max(
+        s.settings[0].playDays,
+        Math.ceil((Date.parse(weekly.playBy) - now) / 86400000),
+      )
+    : s.settings[0].playDays;
+  for (let i = 0; i <= horizon && items.length < count; i++) {
+    const date = new Date(firstDay + "T12:00:00Z");
     date.setUTCDate(date.getUTCDate() + i);
     const day = date.toISOString().slice(0, 10);
     if (
@@ -78,10 +87,34 @@ export function initialProposals(
     if (availability.length && !window) continue;
     const start = window?.start ?? "19:00",
       end = window?.end ?? "22:00";
-    if (Date.parse(clubDateTime(day, end)) > deadline) continue;
+    if (
+      Date.parse(clubDateTime(day, end)) > deadline ||
+      Date.parse(clubDateTime(day, start)) <= now
+    )
+      continue;
     items.push({ day, start, end, selected: true });
   }
   while (items.length < count)
     items.push({ day: "", start: "19:00", end: "22:00", selected: true });
   return items;
+}
+
+export function addClubDays(day: string, amount: number) {
+  const date = new Date(day + "T12:00:00Z");
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+export function clubWeek(value: string | number = Date.now()) {
+  const day =
+    typeof value === "string" && value.length === 10 ? value : clubDay(value);
+  const offset = (new Date(day + "T12:00:00Z").getUTCDay() + 6) % 7;
+  const start = addClubDays(day, -offset);
+  const end = addClubDays(start, 6);
+  return {
+    start,
+    end,
+    endsAt: new Date(
+      Date.parse(clubDateTime(addClubDays(start, 7), "00:00")) - 1,
+    ).toISOString(),
+  };
 }

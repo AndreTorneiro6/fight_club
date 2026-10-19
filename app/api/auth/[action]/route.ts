@@ -18,7 +18,7 @@ import {
 import { database, transaction } from "@/lib/db";
 import { failure, sameOrigin } from "@/lib/http";
 import { ensure } from "@/lib/rules";
-import type { Player, User } from "@/lib/types";
+import type { Division, Player, User } from "@/lib/types";
 
 export const runtime = "nodejs";
 export async function POST(
@@ -129,6 +129,18 @@ export async function GET(
 ) {
   try {
     const { action } = await params;
+    if (action === "divisions") {
+      const { db } = await database();
+      const divisions = await db
+        .collection<Division>("divisions")
+        .find({}, { projection: { _id: 1, name: 1, code: 1, tier: 1 } })
+        .sort({ tier: 1 })
+        .toArray();
+      return NextResponse.json(
+        { divisions },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const appUrl = process.env.APP_URL ?? new URL(request.url).origin;
     ensure(
       process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,

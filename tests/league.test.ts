@@ -1,7 +1,13 @@
+import { clubWeek } from "../lib/calendar";
+import { frozenRanking, weeklyBookingReason } from "../lib/weekly";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execute, processDeadlines } from "../lib/engine";
-import { canRefuse, compatibleStarts } from "../lib/rules";
+import {
+  execute,
+  processDeadlines,
+  expireRejectedRegistrations,
+} from "../lib/engine";
+import { challengeReason, canRefuse, compatibleStarts } from "../lib/rules";
 import {
   collections,
   defaultSettings,
@@ -1312,4 +1318,1023 @@ test("admin result maths use configured leapfrog and award a title without score
   assert.equal(s.players[7].wins, 1);
   assert.equal(s.results[0].score, "");
   assert(s.champions.some((x) => x.playerId === "p8" && !x.until));
+});
+
+test("admins edit match reservations with conflict checks and audit history", () => {
+  const s = fixture(),
+    c = schedule(s);
+  const update = {
+    type: "admin.match.update",
+    challengeId: c._id,
+    start: iso(2),
+    courtId: "c1",
+    minutes: 120,
+    note: "Alteração pedida pelos jogadores",
+  };
+  assert.throws(() => execute(s, actor(8), update, time), /administradores/);
+  execute(s, actor(1, "admin"), update, time);
+  assert.equal(c.scheduledAt, iso(2));
+  assert.equal(c.durationMinutes, 120);
+  assert.equal(c.status, "scheduled");
+  assert.equal(c.scheduleProposal, undefined);
+  assert.equal(s.matches.filter((m) => m.challengeId === c._id).length, 1);
+  assert.equal(s.matches.find((m) => m.challengeId === c._id)?.end, iso(2, 2));
+  assert(s.audit.some((entry) => entry.action === "admin.match.updated"));
+  const other = schedule(s, 7, 5);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        { ...update, start: other.scheduledAt },
+        time,
+      ),
+    /campo já reservado/,
+  );
+  assert.equal(c.scheduledAt, iso(2));
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...update, start: iso(-1) }, time),
+    /futuro/,
+  );
+});
+
+test("deleting a match removes only its related data and requires admin permission", () => {
+  const s = fixture(),
+    c = schedule(s);
+  s.courts.push({ _id: "c2", name: "Campo 2", active: true });
+  const other = schedule(s, 7, 5, "c2");
+  s.messages.push({
+    _id: "chat",
+    challengeId: c._id,
+    playerId: "p8",
+    text: "Match chat",
+    createdAt: iso(0),
+  });
+  const command = {
+    type: "admin.match.delete",
+    challengeId: c._id,
+    note: "Jogo criado por engano",
+  };
+  assert.throws(() => execute(s, actor(8), command, time), /administradores/);
+  const result = execute(s, actor(1, "admin"), command, time);
+  assert("deleted" in result && result.deleted);
+  assert(!s.challenges.some((entry) => entry._id === c._id));
+  for (const entries of [
+    s.matches,
+    s.slots,
+    s.messages,
+    s.notifications,
+    s.results,
+    s.history,
+  ])
+    assert(!entries.some((entry) => entry.challengeId === c._id));
+  assert(s.challenges.some((entry) => entry._id === other._id));
+  assert(s.matches.some((entry) => entry.challengeId === other._id));
+  assert(s.audit.some((entry) => entry.action === "admin.match.deleted"));
+  assert.throws(
+    () => execute(s, actor(1, "admin"), command, time),
+    /não encontrado/,
+  );
+});
+
+test("deleting the latest completed match reverses statistics and ranking changes", () => {
+  const s = fixture(),
+    c = schedule(s);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: "p8",
+      score: "6-4 / 6-4",
+    },
+    time + 2 * 86400000,
+  );
+  assert.equal(s.players.find((p) => p._id === "p8")?.position, 6);
+  // Completed scheduling edits preserve the result and cannot move it into the future.
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.match.update",
+      challengeId: c._id,
+      start: iso(1, 3),
+      courtId: "c1",
+      minutes: 60,
+      note: "Corrigir hora real",
+    },
+    time + 2 * 86400000,
+  );
+  assert.equal(c.status, "completed");
+  assert.equal(s.results.length, 1);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.match.update",
+          challengeId: c._id,
+          start: iso(3),
+          courtId: "c1",
+          minutes: 60,
+          note: "Hora inválida",
+        },
+        time + 2 * 86400000,
+      ),
+    /passado/,
+  );
+  const result = execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.match.delete",
+      challengeId: c._id,
+      note: "Resultado de teste",
+    },
+    time + 2 * 86400000,
+  );
+  assert("rankingReview" in result && !result.rankingReview);
+  assert.equal(s.players.find((p) => p._id === "p8")?.position, 8);
+  assert.equal(s.players.find((p) => p._id === "p6")?.position, 6);
+  assert.equal(s.players.find((p) => p._id === "p8")?.wins, 0);
+  assert.equal(s.players.find((p) => p._id === "p6")?.losses, 0);
+  assert.equal(s.results.length, 0);
+});
+
+test("deleting older results preserves later ranking changes and flags review", () => {
+  const s = fixture(),
+    c = schedule(s);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: "p8",
+      score: "",
+    },
+    time + 2 * 86400000,
+  );
+  s.history.push({
+    _id: "later",
+    playerId: "p8",
+    divisionId: "ouro",
+    oldPosition: 6,
+    newPosition: 6,
+    reason: "Later administrative review",
+    createdAt: iso(3),
+  });
+  const result = execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.match.delete",
+      challengeId: c._id,
+      note: "Eliminar jogo antigo",
+    },
+    time + 4 * 86400000,
+  );
+  assert("rankingReview" in result && result.rankingReview);
+  assert.equal(s.players.find((p) => p._id === "p8")?.position, 6);
+  assert.equal(s.players.find((p) => p._id === "p8")?.wins, 0);
+  assert(s.history.some((entry) => entry._id === "later"));
+});
+
+test("deleting a completed title match restores its previous champion", () => {
+  const s = fixture(),
+    c = schedule(s);
+  c.titleFight = true;
+  s.champions.push({
+    _id: "original",
+    divisionId: "ouro",
+    playerId: "p6",
+    since: iso(-1),
+    defenses: 2,
+    seasonId: "s1",
+  });
+  const before = structuredClone(s.champions);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: "p8",
+      score: "",
+    },
+    time + 2 * 86400000,
+  );
+  assert.equal(s.champions.find((entry) => !entry.until)?.playerId, "p8");
+  const result = execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.match.delete",
+      challengeId: c._id,
+      note: "Eliminar combate de teste",
+    },
+    time + 3 * 86400000,
+  );
+  assert("championReview" in result && !result.championReview);
+  assert.deepEqual(s.champions, before);
+});
+
+test("admins reject pending registrations and can later approve them again", () => {
+  const s = fixture(),
+    p = s.players.find((entry) => entry._id === "p6")!;
+  p.awaitingApproval = true;
+  p.status = "inactive";
+  const command = { type: "admin.registration.reject", playerId: p._id };
+  assert.throws(() => execute(s, actor(8), command, time), /administradores/);
+  assert.equal(p.awaitingApproval, true);
+  execute(s, actor(1, "admin"), command, time);
+  assert.equal(p.awaitingApproval, false);
+  assert.equal(p.registrationRejectedAt, iso(0));
+  assert.equal(p.status, "removed");
+  assert.equal(p.position, 0);
+  assert.equal(s.players.find((entry) => entry._id === "p7")?.position, 6);
+  assert(s.audit.some((entry) => entry.action === "registration.rejected"));
+  assert(
+    s.notifications.some(
+      (entry) =>
+        entry.playerId === p._id && entry.title === "Inscrição recusada",
+    ),
+  );
+  assert.throws(
+    () => execute(s, actor(1, "admin"), command, time),
+    /aguardar aprovação/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(6),
+        { type: "challenge.create", defenderId: "p5" },
+        time,
+      ),
+    /não está ativa/,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.player.save",
+      playerId: p._id,
+      name: p.name,
+      email: p.email,
+      phone: p.phone,
+      photo: p.photo,
+      partner: p.partner,
+      divisionId: p.divisionId,
+      position: 8,
+      status: "active",
+    },
+    time + 1000,
+  );
+  assert.equal(p.registrationRejectedAt, undefined);
+  assert.equal(p.awaitingApproval, false);
+  assert.equal(p.status, "active");
+  assert.equal(p.position, 8);
+  assert(s.audit.some((entry) => entry.action === "registration.approved"));
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...command, playerId: "p8" }, time),
+    /aguardar aprovação/,
+  );
+});
+
+test("refused registrations expire at 48 hours while pending and approved players survive", () => {
+  const s = fixture();
+  const rejected = s.players.find((p) => p._id === "p6")!;
+  rejected.awaitingApproval = true;
+  rejected.status = "inactive";
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.registration.reject", playerId: rejected._id },
+    time,
+  );
+  s.availability.push({
+    _id: "rejected-availability",
+    playerId: rejected._id,
+    weekday: 1,
+    start: "18:00",
+    end: "20:00",
+  });
+  s.exceptions.push({
+    _id: "rejected-exception",
+    playerId: rejected._id,
+    from: "2026-10-15",
+    to: "2026-10-16",
+    note: "Test",
+  });
+  const pending = s.players.find((p) => p._id === "p7")!;
+  pending.awaitingApproval = true;
+  pending.status = "inactive";
+  assert.equal(
+    expireRejectedRegistrations(s, time + 2 * 86400000 - 1).length,
+    0,
+  );
+  assert(s.players.some((p) => p._id === rejected._id));
+  const expired = expireRejectedRegistrations(s, time + 2 * 86400000);
+  assert.equal(expired.length, 1);
+  assert.equal(expired[0]._id, rejected._id);
+  assert(!s.players.some((p) => p._id === rejected._id));
+  assert(!s.notifications.some((entry) => entry.playerId === rejected._id));
+  assert(!s.availability.some((entry) => entry.playerId === rejected._id));
+  assert(!s.exceptions.some((entry) => entry.playerId === rejected._id));
+  assert(s.players.some((p) => p._id === pending._id));
+  assert(s.players.some((p) => p._id === "p8"));
+  assert(s.audit.some((entry) => entry.action === "registration.deleted"));
+  assert(s.history.some((entry) => entry.playerId === rejected._id));
+  assert.equal(expireRejectedRegistrations(s, time + 3 * 86400000).length, 0);
+});
+
+test("approving a refused registration cancels automatic removal", () => {
+  const s = fixture(),
+    p = s.players.find((entry) => entry._id === "p6")!;
+  p.awaitingApproval = true;
+  p.status = "inactive";
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.registration.reject", playerId: p._id },
+    time,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.player.save",
+      playerId: p._id,
+      name: p.name,
+      email: p.email,
+      phone: p.phone,
+      photo: p.photo,
+      partner: p.partner,
+      divisionId: p.divisionId,
+      position: 8,
+      status: "active",
+    },
+    time + 86400000,
+  );
+  assert.equal(expireRejectedRegistrations(s, time + 3 * 86400000).length, 0);
+  assert(s.players.some((entry) => entry._id === p._id));
+});
+
+function publishWeek(s: State, timestamp = time) {
+  s.settings[0].weeklyCompetition = true;
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: clubWeek(timestamp).start,
+      publish: true,
+      assignments: s.players
+        .filter((p) => p.status === "active")
+        .map((p) => ({
+          playerId: p._id,
+          role: ["p8", "p7", "p16", "p24"].includes(p._id)
+            ? "attack"
+            : "defense",
+        })),
+    },
+    timestamp,
+  );
+}
+test("weekly roles must be published and only attackers can challenge assigned defenders", () => {
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  assert.throws(() => create(s), /publicação/);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(8),
+        {
+          type: "admin.week.save",
+          weekStart: clubWeek(time).start,
+          publish: true,
+          assignments: [],
+        },
+        time,
+      ),
+    /administradores/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.week.save",
+          weekStart: clubWeek(time).start,
+          publish: true,
+          assignments: [],
+        },
+        time,
+      ),
+    /Atribui/,
+  );
+  publishWeek(s);
+  assert.throws(() => create(s, 6, 5), /defesa/);
+  assert.throws(() => create(s, 8, 7), /não está em defesa/);
+  const c = create(s);
+  assert.equal(c.weekStart, "2026-10-12");
+  assert.equal(c.playBy, clubWeek(time).endsAt);
+  assert.throws(() => create(s, 8, 5), /desafio atribuído/);
+  assert.throws(() => create(s, 7, 6), /defensor já tem/);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.week.save",
+          weekStart: clubWeek(time).start,
+          publish: true,
+          assignments: s.weeklyRounds[0].assignments.map((entry) => ({
+            ...entry,
+            role: entry.playerId === "p8" ? "defense" : entry.role,
+          })),
+        },
+        time,
+      ),
+    /Mantém os papéis/,
+  );
+  assert.ok(create(s, 7, 5));
+});
+
+test("vacation players can be challenged and their weekly game is deferred until return", () => {
+  const s = fixture();
+  publishWeek(s);
+  execute(
+    s,
+    actor(6),
+    {
+      type: "exception.add",
+      from: "2026-10-15",
+      to: "2026-10-25",
+      note: "Férias",
+      vacation: true,
+    },
+    time,
+  );
+  assert.equal(frozenRanking(s, "p6", time), true);
+  assert.equal(challengeReason(s, s.players[7], s.players[5], time), null);
+  const c = create(s);
+  assert.equal(c.deferredUntil, "2026-10-26");
+  assert.equal(c.playBy, clubWeek("2026-10-26").endsAt);
+  execute(
+    s,
+    actor(6),
+    { type: "challenge.respond", challengeId: c._id, accept: true },
+    time,
+  );
+  assert.equal(c.scheduleBy, c.playBy);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.schedule",
+          challengeId: c._id,
+          start: iso(1),
+          courtId: "c1",
+          minutes: 90,
+        },
+        time,
+      ),
+    /regresso/,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.schedule",
+      challengeId: c._id,
+      start: "2026-10-26T19:00:00Z",
+      courtId: "c1",
+      minutes: 90,
+    },
+    time,
+  );
+  assert.equal(c.scheduleProposal?.start, "2026-10-26T19:00:00Z");
+});
+
+test("weekly scheduling rejects a second game even when deferred challenges came from different weeks", () => {
+  const s = fixture(),
+    c = schedule(s);
+  const other = create(s, 7, 5);
+  other.challengerId = c.challengerId;
+  other.deferredUntil = "2026-10-15";
+  s.settings[0].weeklyCompetition = true;
+  assert.match(
+    weeklyBookingReason(s, other, iso(1), time)!,
+    /um jogo por semana/,
+  );
+  assert.match(
+    weeklyBookingReason(
+      s,
+      { ...other, deferredUntil: undefined, weekStart: "2026-10-12" },
+      iso(7),
+      time,
+    )!,
+    /semana do desafio/,
+  );
+});
+
+test("leapfrog results preserve the exact ranking position of vacation players", () => {
+  const s = fixture();
+  s.settings[0].rankingModel = "leapfrog";
+  execute(
+    s,
+    actor(6),
+    {
+      type: "exception.add",
+      from: "2026-10-15",
+      to: "2026-10-19",
+      note: "Férias",
+      vacation: true,
+    },
+    time,
+  );
+  const c = schedule(s, 8, 5);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: "p8",
+      score: "",
+    },
+    time + 2 * 86400000,
+  );
+  assert.equal(s.players.find((p) => p._id === "p6")!.position, 6);
+  assert.equal(s.players.find((p) => p._id === "p8")!.position, 5);
+  assert.equal(s.players.find((p) => p._id === "p5")!.position, 7);
+  assert.equal(s.players.find((p) => p._id === "p7")!.position, 8);
+  assert.deepEqual(
+    s.players
+      .filter((p) => p.divisionId === "ouro")
+      .map((p) => p.position)
+      .sort((a, b) => a - b),
+    [1, 2, 3, 4, 5, 6, 7, 8],
+  );
+  assert.equal(frozenRanking(s, "p6", time + 5 * 86400000), false);
+});
+
+test("admins freeze and unfreeze another player's ranking while players cannot change other players' vacations", () => {
+  const s = fixture();
+  publishWeek(s);
+  const c = create(s);
+  const freeze = {
+    type: "exception.add",
+    playerId: "p6",
+    vacation: true,
+    from: "2026-10-15",
+    to: "2026-10-25",
+    note: "Férias registadas pelo clube",
+  };
+  assert.throws(() => execute(s, actor(8), freeze, time), /administrador/);
+  assert.equal(s.exceptions.length, 0);
+  execute(s, actor(1, "admin"), freeze, time);
+  const period = s.exceptions.find((entry) => entry.playerId === "p6")!;
+  assert(period);
+  assert.equal(frozenRanking(s, "p6", time), true);
+  assert.equal(frozenRanking(s, "p1", time), false);
+  assert.equal(c.deferredUntil, "2026-10-26");
+  assert(
+    s.audit.some(
+      (entry) =>
+        entry.userId === "u1" &&
+        entry.action === "availability.exception.added" &&
+        JSON.parse(entry.details).playerId === "p6",
+    ),
+  );
+  assert(
+    s.notifications.some(
+      (entry) =>
+        entry.playerId === "p6" &&
+        entry.title === "Férias registadas pelo clube",
+    ),
+  );
+  const unfreeze = { type: "exception.delete", exceptionId: period._id };
+  assert.throws(() => execute(s, actor(8), unfreeze, time), /permissão/);
+  assert.equal(frozenRanking(s, "p6", time), true);
+  execute(s, actor(1, "admin"), unfreeze, time);
+  assert.equal(frozenRanking(s, "p6", time), false);
+  assert.equal(s.exceptions.length, 0);
+  assert.equal(c.deferredUntil, "2026-10-15");
+  assert(
+    s.audit.some(
+      (entry) =>
+        entry.userId === "u1" &&
+        entry.action === "availability.exception.deleted",
+    ),
+  );
+});
+
+test("admin vacation freezes require rescheduling overlapping confirmed games first", () => {
+  const s = fixture(),
+    c = schedule(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "exception.add",
+          playerId: c.defenderId,
+          vacation: true,
+          from: "2026-10-15",
+          to: "2026-10-20",
+          note: "Férias",
+        },
+        time,
+      ),
+    /jogo confirmado/,
+  );
+  assert.equal(s.exceptions.length, 0);
+  assert.equal(c.status, "scheduled");
+});
+
+test("weekly publication rejects opposite roles within a partner team", () => {
+  const s = fixture();
+  s.players[5].partner = s.players[6].name;
+  s.settings[0].weeklyCompetition = true;
+  assert.throws(() => publishWeek(s), /mesmo papel semanal/);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: clubWeek(time).start,
+      publish: true,
+      assignments: s.players.map((p) => ({
+        playerId: p._id,
+        role: ["p8", "p7", "p6", "p16", "p24"].includes(p._id)
+          ? "attack"
+          : "defense",
+      })),
+    },
+    time,
+  );
+  assert.equal(
+    s.weeklyRounds[0].assignments.find((entry) => entry.playerId === "p6")
+      ?.role,
+    "attack",
+  );
+  assert.equal(
+    s.weeklyRounds[0].assignments.find((entry) => entry.playerId === "p7")
+      ?.role,
+    "attack",
+  );
+});
+
+test("weekly teams cannot challenge themselves or create separate challenges through each partner", () => {
+  const s = fixture();
+  s.players[6].partner = s.players[7].name;
+  s.players[4].partner = s.players[5].name;
+  publishWeek(s);
+  assert.throws(() => create(s, 8, 7), /própria equipa/);
+  assert.ok(create(s, 8, 6));
+  assert.throws(() => create(s, 7, 5), /desafio atribuído/);
+  // A different attacker also cannot use the other defender's account for a second challenge.
+  s.weeklyRounds[0].assignments.find((entry) => entry.playerId === "p4")!.role =
+    "attack";
+  assert.throws(() => create(s, 4, 5), /defensor já tem/);
+});
+
+test("a partner's vacation defers the team's weekly challenge until return", () => {
+  const s = fixture();
+  s.players[6].partner = s.players[7].name;
+  publishWeek(s);
+  execute(
+    s,
+    actor(7),
+    {
+      type: "exception.add",
+      from: "2026-10-15",
+      to: "2026-10-25",
+      note: "Férias do parceiro",
+      vacation: true,
+    },
+    time,
+  );
+  const c = create(s, 8, 6);
+  assert.equal(c.deferredUntil, "2026-10-26");
+});
+
+function assignPair(s: State, from: number, to?: number) {
+  return execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.partner.set",
+      playerId: `p${from}`,
+      partnerId: to ? `p${to}` : "",
+    },
+    time,
+  );
+}
+test("one partner assignment updates both players and records both changes", () => {
+  const s = fixture();
+  assignPair(s, 1, 2);
+  assert.equal(s.players[0].partnerId, "p2");
+  assert.equal(s.players[0].partner, s.players[1].name);
+  assert.equal(s.players[1].partnerId, "p1");
+  assert.equal(s.players[1].partner, s.players[0].name);
+  assert.equal(JSON.parse(s.audit.at(-1)!.details).changes.length, 2);
+});
+test("reassigning paired players clears both previous partners without changing their rankings", () => {
+  const s = fixture();
+  assignPair(s, 1, 2);
+  assignPair(s, 3, 4);
+  assignPair(s, 1, 3);
+  assert.equal(s.players[0].partnerId, "p3");
+  assert.equal(s.players[2].partnerId, "p1");
+  for (const index of [1, 3]) {
+    assert.equal(s.players[index].partner, "");
+    assert.equal(s.players[index].partnerId, undefined);
+  }
+  assert.deepEqual(
+    s.players.slice(0, 4).map((p) => p.position),
+    [1, 2, 3, 4],
+  );
+});
+test("clearing either side removes both partner assignments, including old one-sided data", () => {
+  const s = fixture();
+  assignPair(s, 1, 2);
+  assignPair(s, 2);
+  assert.equal(s.players[0].partner, "");
+  assert.equal(s.players[1].partner, "");
+  s.players[0].partner = s.players[1].name;
+  assignPair(s, 2);
+  assert.equal(s.players[0].partner, "");
+  assert.equal(s.players[1].partner, "");
+});
+test("partner assignment validates admin permission, category, approval and self selection", () => {
+  const s = fixture();
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1),
+        { type: "admin.partner.set", playerId: "p1", partnerId: "p2" },
+        time,
+      ),
+    /administradores/,
+  );
+  assert.throws(() => assignPair(s, 1, 1), /outro jogador/);
+  assert.throws(() => assignPair(s, 1, 9), /mesma categoria/);
+  s.players[1].awaitingApproval = true;
+  assert.throws(() => assignPair(s, 1, 2), /aprovado/);
+});
+test("general admin editing and account renaming preserve the reciprocal partner link", () => {
+  const s = fixture();
+  const p = s.players[0];
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.player.save",
+      playerId: p._id,
+      ...p,
+      partner: s.players[1].name,
+    },
+    time,
+  );
+  assert.equal(s.players[1].partnerId, p._id);
+  execute(
+    s,
+    actor(1),
+    {
+      type: "profile.save",
+      name: "Novo Nome",
+      phone: p.phone,
+      photo: p.photo,
+      partner: p.partner,
+    },
+    time,
+  );
+  assert.equal(s.players[1].partner, "Novo Nome");
+  assert.equal(s.players[1].partnerId, p._id);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1),
+        {
+          type: "profile.save",
+          name: p.name,
+          phone: p.phone,
+          photo: p.photo,
+          partner: "",
+        },
+        time,
+      ),
+    /atribuído pelo administrador/,
+  );
+});
+test("partner changes cannot replace the participants of an active challenge indirectly", () => {
+  const s = fixture();
+  create(s, 8, 6);
+  assert.throws(() => assignPair(s, 8, 7), /desafios ativos/);
+  assert.equal(s.players[7].partnerId, undefined);
+  assert.equal(s.players[6].partnerId, undefined);
+});
+
+test("editing the recipient of a legacy one-sided assignment preserves and completes the pair", () => {
+  const s = fixture();
+  s.players[0].partner = s.players[1].name;
+  const p = s.players[1];
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.player.save",
+      playerId: p._id,
+      ...p,
+      name: "Parceiro Renomeado",
+    },
+    time,
+  );
+  assert.equal(s.players[0].partnerId, p._id);
+  assert.equal(s.players[0].partner, "Parceiro Renomeado");
+  assert.equal(p.partnerId, "p1");
+});
+
+test("admin team ranking moves both partners together and records every displaced position", () => {
+  const s = fixture();
+  assignPair(s, 1, 2);
+  assignPair(s, 3, 4);
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.ranking.move", playerId: "p3", targetPlayerId: "p1" },
+    time,
+  );
+  assert.deepEqual(
+    s.players.slice(0, 4).map((p) => p.position),
+    [3, 4, 1, 2],
+  );
+  assert.equal(
+    s.history.filter(
+      (entry) =>
+        entry.reason === "Posição da equipa alterada pelo administrador",
+    ).length,
+    4,
+  );
+  assert.equal(s.audit.at(-1)!.action, "ranking.team.moved");
+});
+test("team ranking movement preserves frozen positions and rejects non-admin/cross-category moves", () => {
+  const s = fixture();
+  assignPair(s, 1, 2);
+  assignPair(s, 3, 4);
+  execute(
+    s,
+    actor(1),
+    {
+      type: "exception.add",
+      from: "2026-10-15",
+      to: "2026-10-25",
+      note: "Férias",
+      vacation: true,
+    },
+    time,
+  );
+  const positions = s.players.map((p) => p.position);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        { type: "admin.ranking.move", playerId: "p3", targetPlayerId: "p1" },
+        time,
+      ),
+    /congelada/,
+  );
+  assert.deepEqual(
+    s.players.map((p) => p.position),
+    positions,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(3),
+        { type: "admin.ranking.move", playerId: "p3", targetPlayerId: "p1" },
+        time,
+      ),
+    /administradores/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        { type: "admin.ranking.move", playerId: "p3", targetPlayerId: "p9" },
+        time,
+      ),
+    /mesma categoria/,
+  );
+});
+test("team ranking movement keeps positions reserved by pending registrations", () => {
+  const s = fixture();
+  s.players[1].awaitingApproval = true;
+  s.players[1].status = "inactive";
+  assignPair(s, 3, 4);
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.ranking.move", playerId: "p3", targetPlayerId: "p1" },
+    time,
+  );
+  assert.equal(s.players[1].position, 2);
+  assert.deepEqual(
+    [s.players[2].position, s.players[3].position, s.players[0].position],
+    [1, 3, 4],
+  );
+});
+test("new challenges preserve both team names for future result posters", () => {
+  const s = fixture();
+  assignPair(s, 7, 8);
+  assignPair(s, 5, 6);
+  const c = create(s, 8, 6);
+  assert.deepEqual(c.challengerTeam?.map((member) => member.playerId).sort(), [
+    "p7",
+    "p8",
+  ]);
+  assert.deepEqual(c.defenderTeam?.map((member) => member.playerId).sort(), [
+    "p5",
+    "p6",
+  ]);
+  const saved = c.challengerTeam?.map((member) => member.name);
+  s.players[6].name = "Nome atualizado";
+  assert.deepEqual(
+    c.challengerTeam?.map((member) => member.name),
+    saved,
+  );
+});
+
+test("weekly boundary roles follow teams in each division and reject drafts and publication", () => {
+  const s = fixture();
+  s.players[0].partner = s.players[1].name;
+  s.players[6].partner = s.players[7].name;
+  for (const publish of [false, true]) {
+    for (const [playerId, role, message] of [
+      ["p1", "attack", /primeira equipa/],
+      ["p2", "attack", /primeira equipa/],
+      ["p7", "defense", /última equipa/],
+      ["p8", "defense", /última equipa/],
+      ["p9", "attack", /primeira equipa/],
+      ["p16", "defense", /última equipa/],
+      ["p17", "attack", /primeira equipa/],
+      ["p24", "defense", /última equipa/],
+    ] as const) {
+      assert.throws(
+        () =>
+          execute(
+            s,
+            actor(1, "admin"),
+            {
+              type: "admin.week.save",
+              weekStart: clubWeek(time).start,
+              publish,
+              assignments: s.players.map((p) => ({
+                playerId: p._id,
+                role:
+                  p._id === playerId ||
+                  (["p1", "p2"].includes(playerId) &&
+                    ["p1", "p2"].includes(p._id)) ||
+                  (["p7", "p8"].includes(playerId) &&
+                    ["p7", "p8"].includes(p._id))
+                    ? role
+                    : ["p7", "p8", "p16", "p24"].includes(p._id)
+                      ? "attack"
+                      : "defense",
+              })),
+            },
+            time,
+          ),
+        message,
+      );
+      assert.equal(s.weeklyRounds.length, 0);
+    }
+  }
+});
+
+test("new challenges reject obsolete boundary roles after ranking changes", () => {
+  const s = fixture();
+  publishWeek(s);
+  s.players.find((p) => p._id === "p8")!.position = 0;
+  assert.throws(() => create(s), /primeira equipa/);
+  s.players.find((p) => p._id === "p8")!.position = 8;
+  s.players.find((p) => p._id === "p6")!.position = 9;
+  assert.throws(() => create(s), /última equipa/);
 });

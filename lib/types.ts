@@ -15,6 +15,7 @@ export interface Entity {
 }
 export interface Player extends Entity {
   awaitingApproval?: boolean;
+  registrationRejectedAt?: string;
   notificationPreferences?: {
     email: boolean;
     whatsapp: boolean;
@@ -31,6 +32,7 @@ export interface Player extends Entity {
   previousPosition: number;
   status: "active" | "inactive" | "suspended" | "removed";
   partner: string;
+  partnerId?: string;
   wins: number;
   losses: number;
   challengesWon: number;
@@ -44,6 +46,7 @@ export interface Division extends Entity {
   capacity: number;
 }
 export interface Settings extends Entity {
+  weeklyCompetition: boolean;
   requireClubConfirmation: boolean;
   initialSuggestionCount: 3 | 4;
   rulesText: string;
@@ -78,6 +81,10 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  challengerTeam?: { playerId: string; name: string }[];
+  defenderTeam?: { playerId: string; name: string }[];
+  weekStart?: string;
+  deferredUntil?: string;
   scheduleProposal?: ScheduleProposal;
   number: number;
   seasonId: string;
@@ -131,6 +138,7 @@ export interface Availability extends Entity {
   end: string;
 }
 export interface Exception extends Entity {
+  vacation?: boolean;
   playerId: string;
   from: string;
   to: string;
@@ -180,6 +188,8 @@ export interface Match extends Entity {
   seasonId: string;
 }
 export interface Result extends Entity {
+  championsBefore?: Champion[];
+  championsAfter?: Champion[];
   challengeId: string;
   winnerId: string;
   loserId: string;
@@ -213,7 +223,13 @@ export interface RegistrationLink extends Entity {
   active: boolean;
   createdAt: string;
 }
+export interface WeeklyRound extends Entity {
+  weekStart: string;
+  publishedAt?: string;
+  assignments: { playerId: string; role: "attack" | "defense" }[];
+}
 export interface State {
+  weeklyRounds: WeeklyRound[];
   registrationLinks: RegistrationLink[];
   players: Player[];
   divisions: Division[];
@@ -233,6 +249,7 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "weeklyRounds",
   "registrationLinks",
   "players",
   "divisions",
@@ -276,6 +293,7 @@ export interface View extends State {
 }
 
 export const defaultSettings: Settings = {
+  weeklyCompetition: false,
   requireClubConfirmation: true,
   _id: "league",
   initialSuggestionCount: 4,

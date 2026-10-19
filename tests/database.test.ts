@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
-import { database, mutate, view } from "../lib/db";
-import { resetAccount } from "../lib/auth";
+import { database, mutate, view, transaction } from "../lib/db";
+import { register, resetAccount } from "../lib/auth";
 import { seed } from "../scripts/seed";
-import type { Actor, User } from "../lib/types";
+import type { Actor, Player, User } from "../lib/types";
 
 test("MongoDB transactions serialize simultaneous court bookings and preserve permissions", async () => {
   const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
@@ -53,6 +53,44 @@ test("MongoDB transactions serialize simultaneous court bookings and preserve pe
         playerId: "player-1",
         role: "admin",
       };
+    await mutate(admin, {
+      type: "admin.partner.set",
+      playerId: "player-2",
+      partnerId: "player-3",
+    });
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: "player-2" }))
+        ?.partnerId,
+      "player-3",
+    );
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: "player-3" }))
+        ?.partnerId,
+      "player-2",
+    );
+    await assert.rejects(
+      mutate(admin, {
+        type: "admin.partner.set",
+        playerId: "player-2",
+        partnerId: "player-9",
+      }),
+      /mesma categoria/,
+    );
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: "player-2" }))
+        ?.partnerId,
+      "player-3",
+    );
+    await mutate(admin, {
+      type: "admin.partner.set",
+      playerId: "player-3",
+      partnerId: "",
+    });
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: "player-2" }))
+        ?.partner,
+      "",
+    );
     const r = await mutate(a, {
       type: "challenge.create",
       defenderId: "player-5",
@@ -222,6 +260,255 @@ test("MongoDB transactions serialize simultaneous court bookings and preserve pe
     assert.equal(
       confirmed.players.find((p) => p._id === a.playerId)!.position,
       5,
+    );
+    // Public signups wait for approval; valid club invitations grant entry.
+    const signup = {
+      name: "Public Applicant",
+      divisionId: "prata",
+      email: "public-applicant@example.test",
+      password: "SecurePassword2026!",
+      privacyAccepted: true,
+    };
+    const applicant = await register(signup, true);
+    const pendingPlayer = await db
+      .collection<Player>("players")
+      .findOne({ userId: applicant._id });
+    assert.equal(pendingPlayer?.awaitingApproval, true);
+    assert.equal(pendingPlayer?.status, "inactive");
+    assert.equal(pendingPlayer?.divisionId, "prata");
+    await assert.rejects(
+      register(
+        {
+          ...signup,
+          email: "missing-category@example.test",
+          divisionId: undefined,
+        },
+        true,
+      ),
+    );
+    await assert.rejects(
+      register(
+        {
+          ...signup,
+          email: "invalid-category@example.test",
+          divisionId: "missing",
+        },
+        true,
+      ),
+      /categoria válida/,
+    );
+    assert.equal(
+      await db
+        .collection("users")
+        .countDocuments({ email: "invalid-category@example.test" }),
+      0,
+    );
+    const pendingActor: Actor = {
+      userId: applicant._id,
+      playerId: pendingPlayer!._id,
+      role: "player",
+    };
+    const pendingView = await view(pendingActor);
+    assert.equal(pendingView.players.length, 1);
+    assert.equal(pendingView.challenges.length, 0);
+    await assert.rejects(
+      mutate(pendingActor, {
+        type: "challenge.create",
+        defenderId: a.playerId,
+      }),
+    );
+
+    await mutate(admin, {
+      type: "admin.registration.reject",
+      playerId: pendingPlayer!._id,
+    });
+    const rejectedView = await view(pendingActor);
+    assert.equal(rejectedView.players.length, 1);
+    assert.ok(rejectedView.players[0].registrationRejectedAt);
+    assert.equal(rejectedView.players[0].status, "removed");
+    assert.equal(rejectedView.challenges.length, 0);
+    assert.equal(rejectedView.settings.length, 0);
+    const otherView = await view(a);
+    assert(
+      !otherView.players.some((entry) => entry._id === pendingPlayer!._id),
+    );
+    await assert.rejects(
+      mutate(pendingActor, {
+        type: "challenge.create",
+        defenderId: a.playerId,
+      }),
+    );
+    const invitation = await mutate(admin, {
+      type: "admin.registration.create",
+      label: "Approved players",
+      expiryDays: 1,
+      maxUses: 1,
+    });
+    assert.ok("token" in invitation);
+    assert.ok(invitation.token);
+    const invitedUser = await register(
+      {
+        ...signup,
+        email: "club-invited@example.test",
+        divisionId: "ouro",
+        invite: invitation.token,
+      },
+      true,
+    );
+    const invitedPlayer = await db
+      .collection("players")
+      .findOne({ userId: invitedUser._id });
+    assert.equal(invitedPlayer?.awaitingApproval, false);
+    assert.equal(invitedPlayer?.status, "active");
+    assert.equal(invitedPlayer?.divisionId, "ouro");
+    assert.equal(
+      (
+        await db.collection("registrationLinks").findOne({
+          tokenHash: createHash("sha256")
+            .update(invitation.token)
+            .digest("hex"),
+        })
+      )?.uses,
+      1,
+    );
+    await assert.rejects(
+      register(
+        {
+          ...signup,
+          email: "exhausted-invite@example.test",
+          invite: invitation.token,
+        },
+        true,
+      ),
+      /convite/,
+    );
+    await assert.rejects(
+      register(
+        {
+          ...signup,
+          email: "invalid-invite@example.test",
+          invite: "f".repeat(64),
+        },
+        true,
+      ),
+      /convite/,
+    );
+    assert.equal(
+      await db.collection("users").countDocuments({
+        email: {
+          $in: ["exhausted-invite@example.test", "invalid-invite@example.test"],
+        },
+      }),
+      0,
+    );
+    const matchNotification = await db
+      .collection("notifications")
+      .findOne({ challengeId: cid });
+    assert.ok(matchNotification);
+    await db.collection("notification_deliveries").insertOne({
+      notificationId: matchNotification._id,
+      status: "pending",
+      channel: "push",
+    });
+    await mutate(admin, {
+      type: "admin.match.delete",
+      challengeId: cid,
+      note: "Eliminar jogo e dados de entrega",
+    });
+    assert.equal(
+      await db.collection("challenges").countDocuments({ _id: cid as never }),
+      0,
+    );
+    assert.equal(
+      await db.collection("matches").countDocuments({ challengeId: cid }),
+      0,
+    );
+    assert.equal(
+      await db.collection("results").countDocuments({ challengeId: cid }),
+      0,
+    );
+    assert.equal(
+      await db
+        .collection("notification_deliveries")
+        .countDocuments({ notificationId: matchNotification._id }),
+      0,
+    );
+    // The minute worker uses this same transaction path for 48-hour retention.
+    await db.collection<Player>("players").updateOne(
+      { _id: pendingPlayer!._id },
+      {
+        $set: {
+          registrationRejectedAt: new Date(
+            Date.now() - 2 * 86400000 - 1000,
+          ).toISOString(),
+        },
+      },
+    );
+    await db.collection("sessions").insertOne({
+      userId: applicant._id,
+      expiresAt: new Date(Date.now() + 86400000),
+    });
+    await db.collection("tokens").insertOne({
+      email: applicant.email,
+      purpose: "reset",
+      expiresAt: new Date(Date.now() + 86400000),
+    });
+    await db
+      .collection("push_subscriptions")
+      .insertOne({ userId: applicant._id, playerId: pendingPlayer!._id });
+    await db.collection("photos").insertOne({ owner: applicant._id });
+    await db.collection("notification_deliveries").insertOne({
+      userId: applicant._id,
+      playerId: pendingPlayer!._id,
+      status: "pending",
+    });
+    await transaction(() => undefined);
+    assert.equal(
+      await db
+        .collection<Player>("players")
+        .countDocuments({ _id: pendingPlayer!._id }),
+      0,
+    );
+    assert.equal(
+      await db.collection<User>("users").countDocuments({ _id: applicant._id }),
+      0,
+    );
+    for (const collection of [
+      "sessions",
+      "push_subscriptions",
+      "notification_deliveries",
+    ])
+      assert.equal(
+        await db
+          .collection(collection)
+          .countDocuments({ userId: applicant._id }),
+        0,
+      );
+    assert.equal(
+      await db.collection("tokens").countDocuments({ email: applicant.email }),
+      0,
+    );
+    assert.equal(
+      await db.collection("photos").countDocuments({ owner: applicant._id }),
+      0,
+    );
+    assert.equal(
+      await db
+        .collection("notifications")
+        .countDocuments({ playerId: pendingPlayer!._id }),
+      0,
+    );
+    assert.equal(
+      await db
+        .collection<User>("users")
+        .countDocuments({ _id: invitedUser._id }),
+      1,
+    );
+    assert.equal(
+      await db
+        .collection("audit")
+        .countDocuments({ action: "registration.deleted" }),
+      1,
     );
     await client.close();
   } finally {

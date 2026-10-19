@@ -1,3 +1,12 @@
+import { rankingEntries, teamMembers } from "./ranking-groups";
+import {
+  weeklyPositionReason,
+  frozenRanking,
+  weeklyReason,
+  weeklyWindow,
+  weeklyBookingReason,
+} from "./weekly";
+import { clubWeek, clubDay } from "./calendar";
 import { whatsappNumber } from "./notification-delivery";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -55,6 +64,7 @@ const playerFields = {
   partner: short,
 };
 export const settingsSchema = z.object({
+  weeklyCompetition: z.boolean().default(false),
   requireClubConfirmation: z.boolean().default(true),
   initialSuggestionCount: z.union([z.literal(3), z.literal(4)]).default(4),
   rulesText: z.string().trim().max(12000).default(""),
@@ -84,11 +94,30 @@ export const settingsSchema = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("admin.ranking.move"),
+    playerId: id,
+    targetPlayerId: id,
+  }),
+  z.object({
+    type: z.literal("admin.partner.set"),
+    playerId: id,
+    partnerId: z.union([id, z.literal("")]),
+  }),
+  z.object({
+    type: z.literal("admin.week.save"),
+    weekStart: day,
+    publish: z.boolean(),
+    assignments: z
+      .array(z.object({ playerId: id, role: z.enum(["attack", "defense"]) }))
+      .max(1000),
+  }),
+  z.object({
     type: z.literal("admin.registration.create"),
     label: short.min(2),
     expiryDays: z.number().int().min(1).max(90),
     maxUses: z.number().int().min(1).max(500),
   }),
+  z.object({ type: z.literal("admin.registration.reject"), playerId: id }),
   z.object({ type: z.literal("admin.registration.revoke"), linkId: id }),
   z.object({
     type: z.literal("admin.result.record"),
@@ -169,6 +198,19 @@ export const commandSchema = z.discriminatedUnion("type", [
     note: text.min(3),
   }),
   z.object({
+    type: z.literal("admin.match.delete"),
+    challengeId: id,
+    note: text.min(3),
+  }),
+  z.object({
+    type: z.literal("admin.match.update"),
+    challengeId: id,
+    start: date,
+    courtId: id,
+    minutes: z.number().int().min(15).max(240),
+    note: text.min(3),
+  }),
+  z.object({
     type: z.literal("admin.match.approve"),
     challengeId: id,
     proposalId: id,
@@ -218,6 +260,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("exception.add"),
+    playerId: id.optional(),
+    vacation: z.boolean().default(false),
     from: day,
     to: day,
     note: text,
@@ -330,6 +374,98 @@ export function execute(
       details: JSON.stringify(details),
       createdAt: now,
     });
+  const eligiblePartner = (candidate: Player) =>
+    candidate.status !== "removed" &&
+    !candidate.awaitingApproval &&
+    !candidate.registrationRejectedAt;
+  const pair = (
+    p: Player,
+    target?: Player,
+    previous?: Player,
+    legacyLabel = "",
+  ) => {
+    if (target)
+      ensure(
+        target._id !== p._id &&
+          target.divisionId === p.divisionId &&
+          eligiblePartner(p) &&
+          eligiblePartner(target),
+        "Escolhe outro jogador aprovado da mesma categoria.",
+      );
+    const before = s.players.map((member) =>
+      member._id === p._id && previous ? { ...previous } : { ...member },
+    );
+    const patches = new Map<string, { partner: string; partnerId?: string }>();
+    for (const subject of [
+      before.find((member) => member._id === p._id)!,
+      ...(target ? [before.find((member) => member._id === target._id)!] : []),
+    ]) {
+      patches.set(subject._id, { partner: "" });
+      const uniqueName =
+        before.filter(
+          (member) =>
+            member.divisionId === subject.divisionId &&
+            member.name === subject.name &&
+            eligiblePartner(member),
+        ).length === 1;
+      for (const other of before) {
+        if (
+          other._id !== subject._id &&
+          (other.partnerId === subject._id ||
+            (!other.partnerId &&
+              uniqueName &&
+              other.divisionId === subject.divisionId &&
+              other.partner === subject.name))
+        )
+          patches.set(other._id, { partner: "" });
+      }
+    }
+    patches.set(
+      p._id,
+      target
+        ? { partner: target.name, partnerId: target._id }
+        : { partner: legacyLabel },
+    );
+    if (target) patches.set(target._id, { partner: p.name, partnerId: p._id });
+    const after = s.players.map((member) => ({
+      ...member,
+      ...(patches.get(member._id) ?? {}),
+      ...(patches.has(member._id) && !patches.get(member._id)!.partnerId
+        ? { partnerId: undefined }
+        : {}),
+    }));
+    const membersOf = (pool: Player[], pid: string) => {
+      const member = pool.find((row) => row._id === pid)!;
+      return (
+        rankingEntries(pool, member.divisionId)
+          .find((entry) => entry.members.some((row) => row._id === pid))
+          ?.members.map((row) => row._id)
+          .sort()
+          .join(":") ?? pid
+      );
+    };
+    for (const pid of patches.keys())
+      if (membersOf(before, pid) !== membersOf(after, pid))
+        ensure(
+          !activeChallenges(s, pid, timestamp).length,
+          "Resolve os desafios ativos antes de alterar os parceiros da equipa.",
+        );
+    const changes = [];
+    for (const [pid, patch] of patches) {
+      const member = player(pid),
+        old = before.find((row) => row._id === pid)!;
+      if (old.partner !== patch.partner || old.partnerId !== patch.partnerId)
+        changes.push({
+          playerId: pid,
+          before: { partner: old.partner, partnerId: old.partnerId },
+          after: patch,
+        });
+      member.partner = patch.partner;
+      if (patch.partnerId) member.partnerId = patch.partnerId;
+      else delete member.partnerId;
+    }
+    if (changes.length) log("partners.updated", { changes });
+  };
   const notify = (
     pid: string,
     title: string,
@@ -397,17 +533,27 @@ export function execute(
     return season;
   };
   const compact = (divisionId: string, reason: string) => {
-    s.players
-      .filter((p) => p.divisionId === divisionId && p.status !== "removed")
-      .sort((a, b) => a.position - b.position)
-      .forEach((p, i) => {
-        if (p.position !== i + 1) {
-          const old = p.position;
-          p.previousPosition = old;
-          p.position = i + 1;
-          history(p, old, reason);
-        }
-      });
+    const players = s.players.filter(
+      (p) => p.divisionId === divisionId && p.status !== "removed",
+    );
+    const locked = new Set(
+      players
+        .filter((p) => frozenRanking(s, p._id, timestamp))
+        .map((p) => p.position),
+    );
+    let position = 1;
+    for (const p of players
+      .filter((p) => !frozenRanking(s, p._id, timestamp))
+      .sort((a, b) => a.position - b.position)) {
+      while (locked.has(position)) position++;
+      if (p.position !== position) {
+        const old = p.position;
+        p.previousPosition = old;
+        p.position = position;
+        history(p, old, reason);
+      }
+      position++;
+    }
   };
   const movePosition = (
     p: Player,
@@ -415,26 +561,60 @@ export function execute(
     reason: string,
     cid?: string,
   ) => {
+    ensure(
+      !frozenRanking(s, p._id, timestamp),
+      "A posição deste jogador está congelada durante as férias.",
+    );
+    const locked = new Set(
+      s.players
+        .filter(
+          (x) =>
+            x.divisionId === p.divisionId &&
+            x.status !== "removed" &&
+            frozenRanking(s, x._id, timestamp),
+        )
+        .map((x) => x.position),
+    );
+    ensure(
+      !locked.has(pos),
+      "Esta posição está congelada por férias de outro jogador.",
+    );
+    if (
+      p.position === pos &&
+      !s.players.some(
+        (other) =>
+          other._id !== p._id &&
+          other.divisionId === p.divisionId &&
+          other.status !== "removed" &&
+          other.position === pos,
+      )
+    )
+      return;
     const others = s.players
       .filter(
         (x) =>
           x.divisionId === p.divisionId &&
           x.status !== "removed" &&
-          x._id !== p._id,
+          x._id !== p._id &&
+          !frozenRanking(s, x._id, timestamp),
       )
       .sort((a, b) => a.position - b.position);
-    ensure(
-      pos <= others.length + 1,
-      "Posição superior ao número de jogadores.",
-    );
-    others.splice(pos - 1, 0, p);
-    for (const [i, x] of others.entries())
-      if (x.position !== i + 1) {
+    const free = [];
+    for (let value = 1; free.length < others.length + 1; value++)
+      if (!locked.has(value)) free.push(value);
+    ensure(free.includes(pos), "Posição superior ao número de jogadores.");
+    others.splice(free.indexOf(pos), 0, p);
+    let next = 1;
+    for (const x of others) {
+      while (locked.has(next)) next++;
+      if (x.position !== next) {
         const old = x.position;
         x.previousPosition = old;
-        x.position = i + 1;
+        x.position = next;
         history(x, old, reason, cid);
       }
+      next++;
+    }
   };
   const crown = (divisionId: string, pid: string, seasonId: string) => {
     const current = s.champions.find(
@@ -468,6 +648,14 @@ export function execute(
     ensure(
       w.divisionId === c.divisionId && l.divisionId === c.divisionId,
       "Os jogadores mudaram de divisão. Resolve a classificação antes de confirmar.",
+    );
+    ensure(
+      !frozenRanking(s, w._id, timestamp) &&
+        !frozenRanking(s, l._id, timestamp),
+      "O ranking está congelado durante as férias. Regista o resultado após o regresso.",
+    );
+    const championsBefore = structuredClone(
+      s.champions.filter((entry) => entry.divisionId === c.divisionId),
     );
     w.wins++;
     w.challengesWon++;
@@ -505,6 +693,14 @@ export function execute(
       score,
       confirmedAt: now,
       seasonId: c.seasonId,
+      ...(c.titleFight && rules.titleChangesOnWin
+        ? {
+            championsBefore,
+            championsAfter: structuredClone(
+              s.champions.filter((entry) => entry.divisionId === c.divisionId),
+            ),
+          }
+        : {}),
     });
     notify(
       w._id,
@@ -532,9 +728,22 @@ export function execute(
     minutes: number,
     manual: boolean,
     commit = true,
+    completed = false,
   ) => {
     const end = new Date(Date.parse(start) + minutes * 60000).toISOString();
-    ensure(Date.parse(start) > timestamp, "Escolhe um horário futuro.");
+    const weeklyBooking = weeklyBookingReason(s, c, start, timestamp);
+    ensure(!weeklyBooking, weeklyBooking ?? "Jogo semanal inválido.");
+    if (rules.weeklyCompetition)
+      ensure(
+        clubWeek(start).start === clubWeek(Date.parse(end) - 1).start,
+        "O jogo deve começar e terminar na mesma semana.",
+      );
+    ensure(
+      completed ? Date.parse(end) <= timestamp : Date.parse(start) > timestamp,
+      completed
+        ? "Um jogo concluído tem de terminar no passado."
+        : "Escolhe um horário futuro.",
+    );
     ensure(
       Date.parse(end) <= Date.parse(c.playBy),
       "O jogo termina depois do prazo.",
@@ -545,6 +754,7 @@ export function execute(
         "schedule_pending",
         "scheduled",
         ...(manual ? ["pending"] : []),
+        ...(completed ? ["completed"] : []),
       ].includes(c.status),
       "Não é possível marcar este desafio.",
     );
@@ -610,7 +820,7 @@ export function execute(
     c.scheduledAt = start;
     c.courtId = courtId;
     c.durationMinutes = minutes;
-    c.status = "scheduled";
+    c.status = completed ? "completed" : "scheduled";
     notifyAdmins(
       "Jogo marcado",
       `Desafio #${c.number}: ${new Date(start).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}.`,
@@ -742,6 +952,167 @@ export function execute(
     );
 
   switch (cmd.type) {
+    case "admin.ranking.move": {
+      const source = player(cmd.playerId),
+        target = player(cmd.targetPlayerId);
+      ensure(
+        source.divisionId === target.divisionId,
+        "Move equipas dentro da mesma categoria.",
+      );
+      const entries = rankingEntries(s.players, source.divisionId);
+      const from = entries.findIndex((entry) =>
+        entry.members.some((member) => member._id === source._id),
+      );
+      const to = entries.findIndex((entry) =>
+        entry.members.some((member) => member._id === target._id),
+      );
+      ensure(
+        from >= 0 && to >= 0,
+        "Escolhe equipas aprovadas para alterar o ranking.",
+      );
+      if (from === to) return { id: source._id };
+      ensure(
+        !entries[from].members.some((member) =>
+          frozenRanking(s, member._id, timestamp),
+        ),
+        "O ranking desta equipa está congelado durante as férias.",
+      );
+      const before = entries.flatMap((entry) =>
+        entry.members.map((member) => ({
+          playerId: member._id,
+          position: member.position,
+        })),
+      );
+      const slots = before
+        .map((member) => member.position)
+        .sort((a, b) => a - b);
+      ensure(
+        new Set(slots).size === slots.length &&
+          slots.every((position) => position > 0),
+        "Revê as posições atuais antes de ordenar as equipas.",
+      );
+      const [moved] = entries.splice(from, 1);
+      entries.splice(to, 0, moved);
+      const ordered = entries.flatMap((entry) => entry.members);
+      for (const [index, member] of ordered.entries())
+        ensure(
+          !frozenRanking(s, member._id, timestamp) ||
+            member.position === slots[index],
+          "Esta alteração deslocaria uma posição congelada. Mantém as equipas em férias na posição atual.",
+        );
+      for (const [index, member] of ordered.entries())
+        if (member.position !== slots[index]) {
+          const old = member.position;
+          member.previousPosition = old;
+          member.position = slots[index];
+          history(member, old, "Posição da equipa alterada pelo administrador");
+        }
+      log("ranking.team.moved", {
+        divisionId: source.divisionId,
+        team: moved.members.map((member) => member._id),
+        before,
+        after: ordered.map((member) => ({
+          playerId: member._id,
+          position: member.position,
+        })),
+      });
+      return { id: source._id };
+    }
+    case "admin.partner.set": {
+      pair(
+        player(cmd.playerId),
+        cmd.partnerId ? player(cmd.partnerId) : undefined,
+      );
+      return { id: cmd.playerId };
+    }
+    case "admin.week.save": {
+      ensure(
+        clubWeek(cmd.weekStart).start === cmd.weekStart,
+        "A semana deve começar numa segunda-feira.",
+      );
+      ensure(
+        cmd.weekStart >= clubWeek(timestamp).start,
+        "Não podes alterar os papéis de semanas anteriores.",
+      );
+      const ids = cmd.assignments.map((entry) => entry.playerId);
+      ensure(
+        new Set(ids).size === ids.length,
+        "Cada jogador só pode ter um papel semanal.",
+      );
+      for (const entry of cmd.assignments)
+        ensure(
+          player(entry.playerId).status === "active" &&
+            !player(entry.playerId).awaitingApproval,
+          "Só podes atribuir papéis a jogadores aprovados e ativos.",
+        );
+      for (const division of s.divisions) {
+        for (const team of rankingEntries(s.players, division._id)) {
+          const roles = team.members
+            .map(
+              (member) =>
+                cmd.assignments.find((entry) => entry.playerId === member._id)
+                  ?.role,
+            )
+            .filter(Boolean);
+          ensure(
+            new Set(roles).size <= 1,
+            "Os parceiros da mesma equipa devem ter o mesmo papel semanal.",
+          );
+        }
+      }
+      if (cmd.publish)
+        for (const p of s.players.filter(
+          (p) => p.status === "active" && !p.awaitingApproval,
+        ))
+          ensure(
+            ids.includes(p._id),
+            `Atribui ataque ou defesa a ${p.name} antes de publicar.`,
+          );
+      for (const c of s.challenges.filter(
+        (c) =>
+          (c.weekStart ?? clubWeek(c.createdAt).start) === cmd.weekStart &&
+          !["cancelled", "refused", "expired"].includes(c.status),
+      )) {
+        ensure(
+          cmd.assignments.find((entry) => entry.playerId === c.challengerId)
+            ?.role === "attack" &&
+            cmd.assignments.find((entry) => entry.playerId === c.defenderId)
+              ?.role === "defense",
+          "Mantém os papéis dos jogadores que já têm desafios nesta semana.",
+        );
+      }
+      for (const entry of cmd.assignments) {
+        const reason = weeklyPositionReason(
+          s.players,
+          entry.playerId,
+          entry.role,
+        );
+        ensure(!reason, reason ?? "Papel inválido para esta posição.");
+      }
+      const round = {
+        _id: cmd.weekStart,
+        weekStart: cmd.weekStart,
+        assignments: cmd.assignments,
+        ...(cmd.publish ? { publishedAt: now } : {}),
+      };
+      s.weeklyRounds = [
+        ...s.weeklyRounds.filter((entry) => entry.weekStart !== cmd.weekStart),
+        round,
+      ];
+      if (cmd.publish)
+        for (const entry of cmd.assignments)
+          notify(
+            entry.playerId,
+            "Papel semanal publicado",
+            `Semana de ${cmd.weekStart}: ${entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
+          );
+      log("week.roles.saved", {
+        weekStart: cmd.weekStart,
+        published: cmd.publish,
+        assignments: cmd.assignments,
+      });
+      break;
+    }
     case "admin.registration.create": {
       const token = randomBytes(32).toString("hex");
       const link = {
@@ -765,6 +1136,37 @@ export function execute(
       });
       return { id: link._id, token };
     }
+    case "admin.registration.reject": {
+      const p = player(cmd.playerId);
+      ensure(
+        p.awaitingApproval,
+        "Esta inscrição já não está a aguardar aprovação.",
+      );
+      ensure(
+        !activeChallenges(s, p._id, timestamp).length,
+        "Resolve os desafios ativos antes de recusar a inscrição.",
+      );
+      const before = { ...p };
+      const oldPosition = p.position;
+      p.awaitingApproval = false;
+      p.registrationRejectedAt = now;
+      p.status = "removed";
+      p.position = 0;
+      p.previousPosition = oldPosition;
+      history(p, oldPosition, "Inscrição recusada");
+      compact(p.divisionId, "Inscrição recusada");
+      notify(
+        p._id,
+        "Inscrição recusada",
+        "O clube não aprovou a tua inscrição. Contacta o clube se precisares de esclarecimentos.",
+      );
+      log("registration.rejected", {
+        playerId: p._id,
+        before,
+        after: { ...p },
+      });
+      break;
+    }
     case "admin.registration.revoke": {
       const link = s.registrationLinks.find((x) => x._id === cmd.linkId);
       ensure(link, "Convite não encontrado.", 404);
@@ -781,6 +1183,11 @@ export function execute(
             : me(),
         d = player(cmd.defenderId);
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
+      const weekly = weeklyReason(s, p, d, timestamp);
+      ensure(!weekly, weekly ?? "Desafio semanal inválido.");
+      const window = rules.weeklyCompetition
+        ? weeklyWindow(s, [p._id, d._id], timestamp)
+        : null;
       if (cmd.type === "challenge.create") {
         const reason = challengeReason(s, p, d, timestamp, titleFight);
         ensure(!reason, reason ?? "Desafio inválido.");
@@ -824,6 +1231,14 @@ export function execute(
         divisionId: p.divisionId,
         challengerId: p._id,
         defenderId: d._id,
+        challengerTeam: teamMembers(s.players, p._id).map((member) => ({
+          playerId: member._id,
+          name: member.name,
+        })),
+        defenderTeam: teamMembers(s.players, d._id).map((member) => ({
+          playerId: member._id,
+          name: member.name,
+        })),
         challengerPosition: p.position,
         defenderPosition: d.position,
         status: "pending",
@@ -842,7 +1257,22 @@ export function execute(
         ).toISOString(),
         durationMinutes: rules.matchMinutes,
         titleFight,
+        ...(window
+          ? { weekStart: window.weekStart, deferredUntil: window.deferredUntil }
+          : {}),
       };
+      if (window) {
+        c.playBy = new Date(
+          Math.min(
+            Date.parse(window.playBy),
+            Date.parse(currentSeason.end + "T23:59:59Z"),
+          ),
+        ).toISOString();
+        c.scheduleBy = c.playBy;
+        c.respondBy = new Date(
+          Math.min(Date.parse(c.respondBy), Date.parse(c.playBy)),
+        ).toISOString();
+      }
       if (cmd.initialSlots) {
         const seen = new Set<string>();
         for (const slot of cmd.initialSlots) {
@@ -947,6 +1377,8 @@ export function execute(
         attacker.status === "active" && defender.status === "active",
         "Os jogadores devem estar ativos.",
       );
+      const weekly = weeklyReason(s, attacker, defender, timestamp, c._id);
+      ensure(!weekly, weekly ?? "Papéis semanais inválidos.");
       ensure(
         c.challengerId !== attacker._id || c.defenderId !== defender._id,
         "Os papéis já estão atribuídos.",
@@ -972,6 +1404,14 @@ export function execute(
         message.audienceIds ??= [before.challengerId, before.defenderId];
       c.challengerId = attacker._id;
       c.defenderId = defender._id;
+      c.challengerTeam = teamMembers(s.players, attacker._id).map((member) => ({
+        playerId: member._id,
+        name: member.name,
+      }));
+      c.defenderTeam = teamMembers(s.players, defender._id).map((member) => ({
+        playerId: member._id,
+        name: member.name,
+      }));
       c.challengerPosition = attacker.position;
       c.defenderPosition = defender.position;
       c.status = "pending";
@@ -1128,6 +1568,8 @@ export function execute(
         accept: cmd.accept,
         reason: cmd.reason,
       });
+      if (rules.weeklyCompetition && c.status === "accepted")
+        c.scheduleBy = c.playBy;
       break;
     }
     case "challenge.cancel": {
@@ -1493,6 +1935,11 @@ export function execute(
       break;
     }
     case "profile.save": {
+      ensure(
+        cmd.partner === me().partner,
+        "O parceiro é atribuído pelo administrador.",
+      );
+      const previousName = me().name;
       if (me().notificationPreferences?.whatsapp && me().phone !== cmd.phone) {
         me().notificationPreferences!.whatsapp = false;
         me().notificationPreferences!.whatsappConsentAt = undefined;
@@ -1500,9 +1947,32 @@ export function execute(
       Object.assign(me(), {
         name: cmd.name,
         phone: cmd.phone,
-        partner: cmd.partner,
         photo: cmd.photo,
       });
+      if (previousName !== cmd.name) {
+        const changes = [];
+        for (const other of s.players)
+          if (
+            other.partnerId === me()._id ||
+            (!other.partnerId &&
+              other.divisionId === me().divisionId &&
+              other.partner === previousName &&
+              s.players.filter(
+                (row) =>
+                  row._id !== me()._id &&
+                  row.divisionId === me().divisionId &&
+                  row.name === previousName,
+              ).length === 0)
+          ) {
+            changes.push({
+              playerId: other._id,
+              before: other.partner,
+              after: cmd.name,
+            });
+            other.partner = cmd.name;
+          }
+        if (changes.length) log("partners.renamed", { changes });
+      }
       break;
     }
     case "availability.save": {
@@ -1521,20 +1991,120 @@ export function execute(
       break;
     }
     case "exception.add": {
+      const target = cmd.playerId ? player(cmd.playerId) : me();
+      ensure(
+        target._id === actor.playerId || admin,
+        "Só o administrador pode gerir as férias de outro jogador.",
+        403,
+      );
       ensure(cmd.from <= cmd.to, "Intervalo de datas inválido.");
+      if (cmd.vacation) {
+        ensure(
+          target.status === "active",
+          "Só jogadores ativos podem registar férias.",
+        );
+        ensure(
+          !s.matches.some(
+            (m) =>
+              s.challenges.some(
+                (c) =>
+                  c._id === m.challengeId &&
+                  involves(c, target._id) &&
+                  !terminal.has(c.status),
+              ) &&
+              clubDay(m.start) <= cmd.to &&
+              clubDay(Date.parse(m.end) - 1) >= cmd.from,
+          ),
+          "Já tens um jogo confirmado durante as férias. Pede ao clube para o alterar primeiro.",
+        );
+      }
       s.exceptions.push({
         _id: uid(),
-        playerId: actor.playerId,
+        playerId: target._id,
         from: cmd.from,
         to: cmd.to,
         note: cmd.note,
+        vacation: cmd.vacation,
+      });
+      if (cmd.vacation && rules.weeklyCompetition)
+        for (const c of s.challenges.filter(
+          (c) =>
+            involves(c, target._id) &&
+            !terminal.has(c.status) &&
+            !c.scheduledAt,
+        )) {
+          const window = weeklyWindow(
+            s,
+            [c.challengerId, c.defenderId],
+            timestamp,
+          );
+          if (window.deferredUntil) {
+            c.deferredUntil = window.deferredUntil;
+            c.playBy = window.playBy;
+            c.scheduleBy = window.playBy;
+            if (c.scheduleProposal) {
+              c.status = c.scheduleProposal.previousStatus;
+              delete c.scheduleProposal;
+            }
+            notifyAdmins(
+              "Desafio adiado por férias",
+              `Desafio #${c.number}: jogar a partir de ${window.deferredUntil}.`,
+              c._id,
+            );
+          }
+        }
+      if (admin && target._id !== actor.playerId && cmd.vacation)
+        notify(
+          target._id,
+          "Férias registadas pelo clube",
+          `A tua posição fica congelada de ${cmd.from} a ${cmd.to}. Os desafios podem ser jogados após o regresso.`,
+        );
+      log("availability.exception.added", {
+        playerId: target._id,
+        from: cmd.from,
+        to: cmd.to,
+        vacation: cmd.vacation,
       });
       break;
     }
     case "exception.delete": {
       const e = s.exceptions.find((x) => x._id === cmd.exceptionId);
-      ensure(e && e.playerId === actor.playerId, "Sem permissão.", 403);
+      ensure(
+        e && (e.playerId === actor.playerId || admin),
+        "Sem permissão.",
+        403,
+      );
       s.exceptions = s.exceptions.filter((x) => x._id !== cmd.exceptionId);
+      if (e.vacation && rules.weeklyCompetition)
+        for (const c of s.challenges.filter(
+          (c) =>
+            involves(c, e.playerId) &&
+            c.deferredUntil &&
+            !terminal.has(c.status) &&
+            !c.scheduledAt,
+        )) {
+          const window = weeklyWindow(
+            s,
+            [c.challengerId, c.defenderId],
+            timestamp,
+          );
+          c.deferredUntil = window.deferredUntil ?? clubDay(timestamp);
+          c.playBy = window.playBy;
+          c.scheduleBy = window.playBy;
+        }
+      log("availability.exception.deleted", {
+        playerId: e.playerId,
+        exceptionId: e._id,
+        vacation: !!e.vacation,
+        from: e.from,
+        to: e.to,
+      });
+      if (admin && e.playerId !== actor.playerId && e.vacation)
+        notify(
+          e.playerId,
+          "Férias atualizadas pelo clube",
+          "O clube removeu um período de férias. Consulta o teu perfil para verificar as datas em vigor.",
+        );
       break;
     }
     case "notifications.read": {
@@ -1585,6 +2155,13 @@ export function execute(
           activeChallenges(s, existing._id, timestamp).length === 0,
           "Resolve os desafios ativos antes de mudar a divisão ou remover o jogador.",
         );
+      if (existing && frozenRanking(s, existing._id, timestamp))
+        ensure(
+          data.divisionId === existing.divisionId &&
+            data.position === existing.position &&
+            data.status !== "removed",
+          "A posição deste jogador está congelada durante as férias.",
+        );
       const before = existing ? { ...existing } : null;
       let p = existing;
       if (!p) {
@@ -1611,8 +2188,12 @@ export function execute(
           p.notificationPreferences.whatsapp = false;
           p.notificationPreferences.whatsappConsentAt = undefined;
         }
-        if (p.awaitingApproval && data.status === "active") {
+        if (
+          (p.awaitingApproval || p.registrationRejectedAt) &&
+          data.status === "active"
+        ) {
           p.awaitingApproval = false;
+          delete p.registrationRejectedAt;
           notify(
             p._id,
             "Inscrição aprovada",
@@ -1653,8 +2234,54 @@ export function execute(
           compact(oldDivision, "Remoção da época");
         }
       }
-      if (data.status !== "removed")
+      if (data.status !== "removed" && !frozenRanking(s, p._id, timestamp))
         movePosition(p, data.position, "Alteração do administrador");
+      const priorPool = s.players.map((member) =>
+        member._id === p!._id && before ? before : member,
+      );
+      const inferredPartner = rankingEntries(
+        priorPool,
+        before?.divisionId ?? p.divisionId,
+      )
+        .find((entry) => entry.members.some((member) => member._id === p!._id))
+        ?.members.find((member) => member._id !== p!._id);
+      const preservedPartnerId =
+        before?.partnerId ??
+        (!before?.partner && !data.partner ? inferredPartner?._id : undefined);
+      const samePartner =
+        preservedPartnerId &&
+        data.partner === (before?.partner ?? "") &&
+        (!before || before.divisionId === p.divisionId);
+      const matches = s.players.filter(
+        (other) =>
+          other._id !== p!._id &&
+          other.divisionId === p!.divisionId &&
+          eligiblePartner(other) &&
+          other.name === data.partner,
+      );
+      const target =
+        p.status === "removed"
+          ? undefined
+          : samePartner
+            ? s.players.find(
+                (other) =>
+                  other._id === preservedPartnerId &&
+                  other.divisionId === p!.divisionId &&
+                  eligiblePartner(other),
+              )
+            : matches.length === 1
+              ? matches[0]
+              : undefined;
+      pair(
+        p,
+        target,
+        before ?? { ...p, partner: "", partnerId: undefined },
+        p.status === "removed" || (before && before.divisionId !== p.divisionId)
+          ? ""
+          : target
+            ? ""
+            : data.partner,
+      );
       log("player.saved", { before, after: p });
       return { id: p._id };
     }
@@ -1778,6 +2405,113 @@ export function execute(
       log("admin.resolve", cmd);
       for (const pid of [c.challengerId, c.defenderId])
         notify(pid, "Desafio atualizado pelo administrador", cmd.action, c._id);
+      break;
+    }
+    case "admin.match.delete": {
+      const c = challenge(cmd.challengeId);
+      const results = s.results.filter((entry) => entry.challengeId === c._id);
+      const matchHistory = s.history.filter(
+        (entry) => entry.challengeId === c._id,
+      );
+      let rankingReview = false;
+      let championReview = false;
+      if (matchHistory.length) {
+        const lastIndex = s.history.reduce(
+          (last, entry, index) => (entry.challengeId === c._id ? index : last),
+          -1,
+        );
+        const canRestore =
+          !s.history
+            .slice(lastIndex + 1)
+            .some((entry) => entry.divisionId === c.divisionId) &&
+          matchHistory.every((entry) => {
+            const p = player(entry.playerId);
+            return (
+              p.divisionId === entry.divisionId &&
+              p.position === entry.newPosition &&
+              p.status !== "removed" &&
+              !frozenRanking(s, p._id, timestamp)
+            );
+          });
+        if (canRestore) {
+          for (const entry of matchHistory) {
+            const p = player(entry.playerId);
+            const old = p.position;
+            p.position = entry.oldPosition;
+            p.previousPosition = entry.oldPosition;
+            history(p, old, "Reposição após eliminação de jogo");
+          }
+        } else rankingReview = true;
+      }
+      for (const result of results) {
+        const winner = player(result.winnerId),
+          loser = player(result.loserId);
+        winner.wins = Math.max(0, winner.wins - 1);
+        winner.challengesWon = Math.max(0, winner.challengesWon - 1);
+        loser.losses = Math.max(0, loser.losses - 1);
+        loser.challengesLost = Math.max(0, loser.challengesLost - 1);
+        if (result.championsBefore && result.championsAfter) {
+          const current = s.champions.filter(
+            (entry) => entry.divisionId === c.divisionId,
+          );
+          if (
+            JSON.stringify(current) === JSON.stringify(result.championsAfter)
+          ) {
+            s.champions = [
+              ...s.champions.filter(
+                (entry) => entry.divisionId !== c.divisionId,
+              ),
+              ...structuredClone(result.championsBefore),
+            ];
+          } else championReview = true;
+        } else if (c.titleFight) championReview = true;
+      }
+      const notificationIds = s.notifications
+        .filter((entry) => entry.challengeId === c._id)
+        .map((entry) => entry._id);
+      log("admin.match.deleted", {
+        challengeId: c._id,
+        number: c.number,
+        note: cmd.note,
+        challenge: c,
+        results,
+        rankingReview,
+        championReview,
+      });
+      s.challenges = s.challenges.filter((entry) => entry._id !== c._id);
+      s.matches = s.matches.filter((entry) => entry.challengeId !== c._id);
+      s.slots = s.slots.filter((entry) => entry.challengeId !== c._id);
+      s.messages = s.messages.filter((entry) => entry.challengeId !== c._id);
+      s.notifications = s.notifications.filter(
+        (entry) => entry.challengeId !== c._id,
+      );
+      s.history = s.history.filter((entry) => entry.challengeId !== c._id);
+      s.results = s.results.filter((entry) => entry.challengeId !== c._id);
+      return { deleted: true, notificationIds, rankingReview, championReview };
+    }
+    case "admin.match.update": {
+      const c = challenge(cmd.challengeId);
+      ensure(
+        ["scheduled", "schedule_pending", "completed"].includes(c.status),
+        "Só podes editar jogos marcados, concluídos ou a aguardar confirmação.",
+      );
+      const before = { ...c };
+      schedule(
+        c,
+        cmd.start,
+        cmd.courtId,
+        cmd.minutes,
+        true,
+        true,
+        c.status === "completed",
+      );
+      delete c.scheduleProposal;
+      log("admin.match.updated", {
+        challengeId: c._id,
+        before,
+        after: { ...c },
+        note: cmd.note,
+      });
       break;
     }
     case "admin.schedule": {
@@ -2127,4 +2861,39 @@ export function processDeadlines(s: State, timestamp = Date.now()) {
           `match:${c._id}:${c.scheduledAt}`,
         );
   }
+}
+
+/** Remove refused applications after 48 hours; approvals clear the rejection timestamp. */
+export function expireRejectedRegistrations(s: State, timestamp = Date.now()) {
+  const cutoff = timestamp - 2 * 86400000;
+  const expired = s.players.filter(
+    (p) =>
+      p.registrationRejectedAt &&
+      Date.parse(p.registrationRejectedAt) <= cutoff &&
+      p.status !== "active" &&
+      !p.awaitingApproval &&
+      !s.challenges.some((c) => involves(c, p._id)) &&
+      !s.champions.some((c) => c.playerId === p._id),
+  );
+  const ids = new Set(expired.map((p) => p._id));
+  if (!ids.size) return expired;
+  s.players = s.players.filter((p) => !ids.has(p._id));
+  s.availability = s.availability.filter((entry) => !ids.has(entry.playerId));
+  s.exceptions = s.exceptions.filter((entry) => !ids.has(entry.playerId));
+  s.slots = s.slots.filter((entry) => !ids.has(entry.playerId));
+  s.messages = s.messages.filter((entry) => !ids.has(entry.playerId));
+  s.notifications = s.notifications.filter((entry) => !ids.has(entry.playerId));
+  for (const p of expired)
+    s.audit.push({
+      _id: uid(),
+      userId: "system",
+      action: "registration.deleted",
+      details: JSON.stringify({
+        playerId: p._id,
+        rejectedAt: p.registrationRejectedAt,
+        retentionHours: 48,
+      }),
+      createdAt: new Date(timestamp).toISOString(),
+    });
+  return expired;
 }

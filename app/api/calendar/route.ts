@@ -1,3 +1,5 @@
+import { clubWeek } from "@/lib/calendar";
+import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { view } from "@/lib/db";
 import { failure } from "@/lib/http";
@@ -12,10 +14,14 @@ const stamp = (s: string) =>
     .toISOString()
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}/, "");
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const actor = await requireActor(),
       s = await view(actor);
+    const requestedWeek = new URL(request.url).searchParams.get("week");
+    const week = requestedWeek
+      ? clubWeek(z.iso.date().parse(requestedWeek)).start
+      : clubWeek().start;
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -26,6 +32,7 @@ export async function GET() {
       const c = s.challenges.find((c) => c._id === m.challengeId);
       if (
         !c ||
+        clubWeek(m.start).start !== week ||
         ![c.challengerId, c.defenderId].includes(actor.playerId) ||
         ["cancelled", "expired", "refused"].includes(c.status)
       )

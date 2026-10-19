@@ -1346,7 +1346,7 @@ td .row {
   --accent-secondary: var(--gold);
   --theme-danger: #f08c8d;
 }
-html[data-theme="fight-night"] {
+html[data-theme="fight-club"] {
   --bg: #0c0a09;
   --surface: #191513;
   --surface-raised: #28201b;
@@ -1455,21 +1455,21 @@ html[data-theme] .belt {
     ),
     var(--surface);
 }
-html[data-theme="fight-night"] .next-card {
+html[data-theme="fight-club"] .next-card {
   border-color: color-mix(in srgb, var(--accent-secondary) 38%, transparent);
   box-shadow: inset 0 1px var(--accent-secondary);
 }
-html[data-theme="fight-night"] .logo-mark {
+html[data-theme="fight-club"] .logo-mark {
   background: linear-gradient(145deg, var(--gold), var(--accent-secondary));
 }
-html[data-theme="fight-night"] .challenge-card {
+html[data-theme="fight-club"] .challenge-card {
   border-left: 2px solid
     color-mix(in srgb, var(--theme-danger) 70%, transparent);
 }
-html[data-theme="fight-night"] .landing-hero:before {
+html[data-theme="fight-club"] .landing-hero:before {
   background:
     linear-gradient(0deg, var(--bg), transparent 80%),
-    url("/fight-night-reference.png") center top/cover;
+    url("/fight-club-reference.png") center top/cover;
   border: 0;
   border-radius: 20px;
   opacity: 0.16;
@@ -1732,4 +1732,476 @@ html[data-theme="fight-night"] .landing-hero:before {
     font-size: 9px;
     padding: 4px;
   }
+}
+
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.password-input {
+  position: relative;
+}
+.password-input input {
+  padding-right: 52px;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.password-toggle:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+/* In-app demonstrations use sample data and never trigger league actions. */
+.guide-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.guide-lessons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.guide-lessons button {
+  text-align: left;
+  white-space: normal;
+  justify-content: flex-start;
+}
+.guide-lessons button.active {
+  border-color: var(--gold, #d5b36a);
+  color: var(--gold, #d5b36a);
+}
+.guide-demo {
+  border: 1px solid #837041;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #111816;
+  color: #eee;
+}
+.guide-demo-header {
+  padding: 16px 20px;
+  background: #1c2521;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.guide-demo-header span {
+  color: #d5b36a;
+}
+.guide-scene {
+  padding: 24px;
+  min-height: 270px;
+}
+.guide-scene h3 {
+  color: #fff;
+  margin: 0 0 20px;
+}
+.guide-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+  margin: 10px 0;
+  border: 1px solid #354039;
+  border-radius: 9px;
+  background: #202923;
+  font-size: 14px;
+}
+.guide-option span {
+  flex: 1;
+}
+.guide-focus {
+  border-color: #ddbc73;
+  background: #383323;
+  box-shadow: 0 0 0 3px #ddbc7320;
+}
+.is-playing .guide-focus {
+  animation: guide-highlight 1.6s ease-in-out infinite;
+}
+.guide-progress {
+  display: flex;
+  gap: 6px;
+  padding: 0 24px 20px;
+}
+.guide-progress span {
+  height: 4px;
+  flex: 1;
+  background: #3b453f;
+  border-radius: 2px;
+}
+.guide-progress .done {
+  background: #ddbc73;
+}
+.guide-explanation {
+  min-height: 155px;
+}
+.guide-explanation h3 {
+  margin: 8px 0;
+}
+.guide-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.guide-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-written {
+  padding-left: 24px;
+}
+.guide-written li {
+  margin: 18px 0;
+}
+.guide-written button {
+  text-align: left;
+  white-space: normal;
+}
+.app-guide summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+@keyframes guide-highlight {
+  50% {
+    box-shadow: 0 0 0 6px #ddbc7338;
+    transform: translateX(3px);
+  }
+}
+@media (max-width: 800px) {
+  .guide-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .guide-lessons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 12px;
+  }
+  .guide-scene {
+    padding: 18px;
+  }
+  .guide-explanation {
+    min-height: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-guide *,
+  .app-guide *::before,
+  .app-guide *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.walkthrough-dialog {
+  width: min(560px, calc(100% - 24px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  margin: auto;
+  padding: 24px;
+  border: 1px solid #837041;
+  border-radius: 16px;
+  background: var(--panel, #151b18);
+  color: var(--text, #eee);
+  box-shadow: 0 24px 100px #0009;
+}
+.walkthrough-dialog::backdrop {
+  background: #000b;
+  backdrop-filter: blur(4px);
+}
+.walkthrough-dialog .guide-scene {
+  min-height: 0;
+  padding: 12px 18px;
+  animation: walkthrough-enter 0.25s ease-out;
+}
+.walkthrough-dialog .guide-demo-header {
+  letter-spacing: 0;
+}
+.walkthrough-dialog .guide-demo-header span {
+  text-align: right;
+}
+.walkthrough-dialog h2 {
+  margin: 12px 0 20px;
+}
+.walkthrough-description {
+  line-height: 1.6;
+}
+@keyframes walkthrough-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 480px) {
+  .walkthrough-dialog {
+    padding: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough-dialog * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.walkthrough-exercise .guide-option {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  color: #eee;
+}
+.walkthrough-exercise button.guide-option {
+  cursor: pointer;
+  justify-content: flex-start;
+}
+.walkthrough-exercise .guide-practice-target {
+  outline: 2px solid #ddbc73;
+  outline-offset: 3px;
+}
+.guide-practice-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 0;
+}
+.practice-task {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+.practice-task svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.practice-success {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #4e9c70;
+  padding: 12px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.practice-success svg {
+  flex-shrink: 0;
+  color: #69c68e;
+}
+.practice-hint {
+  border-left: 3px solid #ddbc73;
+  padding-left: 12px;
+}
+.walkthrough-exercise .guide-scene label {
+  color: #eee;
+  display: grid;
+  gap: 8px;
+}
+.walkthrough-exercise .guide-scene input,
+.walkthrough-exercise .guide-scene select {
+  color: #eee;
+  background: #202923;
+  border: 1px solid #6e786e;
+  width: 100%;
+  min-height: 44px;
+  color-scheme: dark;
+}
+.walkthrough-exercise .guide-scene button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ranking-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.ranking-member {
+  min-height: 48px;
+}
+.ranking-member-values > span,
+.ranking-member-values > div {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  gap: 3px;
+}
+.ranking-member-values.right > div {
+  justify-content: flex-end;
+}
+.ranking-team .ranking-member-values {
+  padding-top: 20px;
+}
+.ranking-team-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  line-height: 8px;
+}
+.ranking-team .rank-number small {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.ranking-action-name {
+  font-size: 10px;
+}
+@media (max-width: 700px) {
+  .ranking-action-name {
+    display: none;
+  }
+  .ranking-team .ranking-member-values {
+    padding-top: 20px;
+  }
+  .ranking-member-values {
+    font-size: 11px;
+  }
+}
+
+.weekly-team {
+  align-items: flex-start;
+}
+.weekly-team > .stack {
+  flex: 1;
+  min-width: min(220px, 100%);
+}
+.weekly-team strong {
+  overflow-wrap: anywhere;
+}
+
+.matchday-preview {
+  width: min(100%, 540px);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.matchday-generator summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+
+.team-ranking-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.team-ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.team-ranking-item[draggable="true"] {
+  cursor: grab;
+}
+.team-ranking-item.drag-over {
+  border-color: var(--gold);
+  box-shadow: 0 -3px 0 var(--gold);
+}
+.team-ranking-item.dragging {
+  opacity: 0.5;
+}
+.team-ranking-names {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.team-ranking-names small {
+  display: block;
+  margin-top: 5px;
+}
+@media (max-width: 600px) {
+  .team-ranking-item {
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  .team-ranking-item > svg {
+    width: 14px;
+    flex-shrink: 0;
+  }
+  .team-ranking-item .rank-number {
+    font-size: 22px;
+  }
+  .team-ranking-item .row {
+    gap: 3px;
+  }
+  .team-ranking-names strong {
+    font-size: 12px;
+  }
+}
+
+.court-day-scroll {
+  max-width: 100%;
+  max-height: 650px;
+  overflow: auto;
+}
+.court-day-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+.court-day-table caption {
+  text-align: left;
+  padding: 8px;
+}
+.court-day-table th,
+.court-day-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.court-day-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel, #171717);
+  z-index: 2;
+}
+.court-day-table tbody th {
+  white-space: nowrap;
+}
+.court-day-table a {
+  display: block;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.court-day-busy {
+  background: rgba(220, 65, 65, 0.14);
+}
+.court-day-clear {
+  background: rgba(55, 165, 100, 0.12);
+}
+.court-day-past {
+  opacity: 0.6;
 }

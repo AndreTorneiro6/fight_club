@@ -13,7 +13,11 @@ import {
   type State,
   type View,
 } from "./types";
-import { execute, processDeadlines } from "./engine";
+import {
+  execute,
+  processDeadlines,
+  expireRejectedRegistrations,
+} from "./engine";
 import { ensure } from "./rules";
 
 const globalDb = globalThis as unknown as {
@@ -146,6 +150,42 @@ export async function transaction<T>(
         const state = await readState(db, session),
           before = structuredClone(state);
         const result = await fn(state, db, session);
+        const expired = expireRejectedRegistrations(state);
+        if (expired.length) {
+          const playerIds = expired.map((p) => p._id);
+          const userIds = expired.flatMap((p) => (p.userId ? [p.userId] : []));
+          const emails = expired.map((p) => p.email).filter(Boolean);
+          await db.collection("notification_deliveries").deleteMany(
+            {
+              $or: [
+                { playerId: { $in: playerIds } },
+                { userId: { $in: userIds } },
+              ],
+            },
+            { session },
+          );
+          await db.collection("push_subscriptions").deleteMany(
+            {
+              $or: [
+                { playerId: { $in: playerIds } },
+                { userId: { $in: userIds } },
+              ],
+            },
+            { session },
+          );
+          await db
+            .collection("sessions")
+            .deleteMany({ userId: { $in: userIds } }, { session });
+          await db
+            .collection("tokens")
+            .deleteMany({ email: { $in: emails } }, { session });
+          await db
+            .collection("photos")
+            .deleteMany({ owner: { $in: userIds } }, { session });
+          await db
+            .collection<Entity>("users")
+            .deleteMany({ _id: { $in: userIds } }, { session });
+        }
         await saveState(db, before, state, session);
         return result;
       },
@@ -160,6 +200,15 @@ export async function mutate(actor: Actor, command: unknown) {
     ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
     processDeadlines(s);
     const result = execute(s, actor, command);
+    if ("deleted" in result && result.deleted && "notificationIds" in result) {
+      await db
+        .collection("notification_deliveries")
+        .deleteMany(
+          { notificationId: { $in: result.notificationIds } },
+          { session },
+        );
+    }
+
     // Admin profile/email edits must keep the linked authentication account consistent.
     for (const p of s.players.filter((p) => p.userId))
       await db
@@ -177,7 +226,10 @@ export async function view(actor: Actor): Promise<View> {
   const s = await readState(db);
   ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
   const me = s.players.find((p) => p._id === actor.playerId);
-  if (me?.awaitingApproval && actor.role !== "admin") {
+  if (
+    (me?.awaitingApproval || me?.registrationRejectedAt) &&
+    actor.role !== "admin"
+  ) {
     const empty = Object.fromEntries(
       collections.map((key) => [key, []]),
     ) as unknown as State;
@@ -203,7 +255,11 @@ export async function view(actor: Actor): Promise<View> {
     .map((c) => c._id);
   if (actor.role !== "admin") {
     s.players = s.players
-      .filter((p) => !p.awaitingApproval || p._id === actor.playerId)
+      .filter(
+        (p) =>
+          (!p.awaitingApproval && !p.registrationRejectedAt) ||
+          p._id === actor.playerId,
+      )
       .map((p) =>
         p._id === actor.playerId
           ? p
@@ -215,10 +271,15 @@ export async function view(actor: Actor): Promise<View> {
               notificationPreferences: undefined,
             },
       );
+    s.weeklyRounds = s.weeklyRounds.filter((round) => round.publishedAt);
     s.availability = s.availability.filter(
       (x) => x.playerId === actor.playerId,
     );
-    s.exceptions = s.exceptions.filter((x) => x.playerId === actor.playerId);
+    s.exceptions = s.exceptions
+      .filter((x) => x.playerId === actor.playerId || x.vacation)
+      .map((x) =>
+        x.playerId === actor.playerId ? x : { ...x, note: "Férias" },
+      );
     s.slots = s.slots.filter((x) => mine.includes(x.challengeId));
     s.messages = s.messages.filter(
       (x) =>

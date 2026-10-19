@@ -108,6 +108,8 @@ test("providers submit email and approved WhatsApp template with correct recipie
     assert.match(captured, /To: player@example.test/);
     assert.match(captured, /https:\/\/league.example.test\/desafios\/abc/);
     assert.match(captured, /Novo desafio/);
+    assert.match(captured, /Message-ID: <[^>]+@example\.test>/i);
+    assert.doesNotMatch(captured, /@fightclub\.notifications/);
     process.env.TWILIO_ACCOUNT_SID = "AC" + "a".repeat(32);
     process.env.TWILIO_AUTH_TOKEN = "test-token";
     process.env.TWILIO_WHATSAPP_FROM = "whatsapp:+351900000000";

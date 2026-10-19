@@ -8,7 +8,11 @@ export const metadata: Metadata = {
   },
   description: "Desafia. Marca. Vence. A liga de padel do Neiva Padel Club.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/favicon.ico", apple: "/icons/player-180.png" },
+  icons: {
+    icon: { url: "/neiva-club-transparent.ico", type: "image/x-icon" },
+    shortcut: "/neiva-club-transparent.ico",
+    apple: "/icons/player-180.png",
+  },
   appleWebApp: {
     capable: true,
     title: "Fight Club",
@@ -27,7 +31,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('fightclub-theme');if(['arena','fight-night','forest','ocean','violet'].includes(t))document.documentElement.dataset.theme=t}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('fightclub-theme');if(t==='fight-night'){t='fight-club';localStorage.setItem('fightclub-theme',t)}if(['arena','fight-club','forest','ocean','violet'].includes(t))document.documentElement.dataset.theme=t}catch(e){}`,
           }}
         />
       </head>

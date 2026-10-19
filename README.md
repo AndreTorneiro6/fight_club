@@ -59,7 +59,7 @@ Use `MONGODB_URI=mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true
 - Proposing availability on a player's behalf does not confirm that player's attendance. Administrative time proposals require both players to accept. A changed proposal gets a new ID, so an old confirmation cannot approve a replacement. Refusing a time reopens availability without a ranking penalty; club approval rechecks court/player conflicts inside the transaction. Previously confirmed games are retained; a rescheduling proposal does not release the old reservation before the replacement is confirmed.
 - The challenge hub opens on active challenges for players and league-wide management for admins. Reaching the active-challenge limit shows the reason and direct links to existing challenges rather than only an empty opponent list.
 - Public-to-players rule and prize pages. Administrators publish supplementary rules and prize descriptions; numerical competition rules remain in settings.
-- Five device-persistent color themes, including a Fight Night palette inspired by the supplied card (black, gold, orange, red and silver). Choose with the floating palette button on any page.
+- Five device-persistent color themes, including a Fight Club palette inspired by the supplied card (black, gold, orange, red and silver). Choose with the floating palette button on any page.
 - Optional set scores, opponent confirmation/dispute, transactional results/rankings and statistics.
 - Admin player creation/editing, division/position changes, suspension/reactivation, removal from current competition, invitations, account recovery, complete history and CSV/XLSX import/export.
 - Admin scheduling, dispute resolution, cancellation, extensions and replay. Correcting a previously confirmed result updates statistics and preserves an audit record; administrators explicitly review rankings/champions because later games may depend on the old result.
@@ -145,9 +145,9 @@ The production stack runs a backup sidecar using the same MongoDB image. It make
 
 ##### Raspberry Pi with the existing WBGLabs Traefik
 
-The Fight Night Pi deployment uses `compose.pi.yaml` to reuse the existing Traefik container, Docker network (`web-app_default`) and ACME store at `/etc/traefik/acme/acme.json`. This avoids a second Traefik trying to bind ports 80 and 443. Start the existing Traefik from its current project directory (`/home/andre/Desktop/WBGLabs/atlas/web-app`) so its bind mount points to the existing `traefik.toml`; do not replace or truncate the ACME file. The ACME store currently contains the `atlas.wbglabs.io` certificate; Traefik will request `fight-night.wbglabs.io` when the Fight Night route starts.
+The Fight Club Pi deployment uses `compose.pi.yaml` to reuse the existing Traefik container, Docker network (`web-app_default`) and ACME store at `/etc/traefik/acme/acme.json`. This avoids a second Traefik trying to bind ports 80 and 443. Start the existing Traefik from its current project directory (`/home/andre/Desktop/WBGLabs/atlas/web-app`) so its bind mount points to the existing `traefik.toml`; do not replace or truncate the ACME file. The ACME store currently contains the `atlas.wbglabs.io` certificate; Traefik will request `fight-club.wbglabs.io` when the Fight Club route starts.
 
-Use both Compose files for all Fight Night commands on the Pi:
+Use both Compose files for all Fight Club commands on the Pi:
 
 ```sh
 docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml config
@@ -157,11 +157,11 @@ docker compose --env-file .env.production -f compose.production.yaml -f compose.
 docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml up -d
 ```
 
-Run the seed command only when initializing Fight Night's new database for the first time. It does not use or modify the separate Atlas MongoDB database.
+Run the seed command only when initializing Fight Club's new database for the first time. It does not use or modify the separate Atlas MongoDB database.
 
 On the Pi, mount a USB SSD at a stable path (for example `/mnt/club-ssd`) and set `BACKUP_PATH=/mnt/club-ssd/fight-club-backups` in `.env.production`. Create that directory and set `BACKUP_UID` and `BACKUP_GID` in the same file to the IDs of the user who owns it (`id -u` and `id -g` on the Pi). Make sure the SSD is mounted before Docker starts; otherwise the host may write backups to the SD card's mount directory. Copy backups to a separate device or encrypted remote storage as well; a backup on the Pi cannot protect against losing the Pi or its attached disk.
 
-Before starting the stack, create an A record for your domain pointing to the server and allow inbound TCP ports 80 and 443. Use `fight-night.wbglabs.io` in `.env.production`, and set `LETSENCRYPT_EMAIL`, `ADMIN_EMAIL` and `VAPID_SUBJECT` to addresses you control. Keep `.env.production` and `.secrets/mongo-keyfile` private; both are ignored by Git and contain generated secrets. The VAPID key pair is already generated in `.env.production` for this installation. Configure SMTP and any optional Google/WhatsApp credentials there when ready.
+Before starting the stack, create an A record for your domain pointing to the server and allow inbound TCP ports 80 and 443. Use `fight-club.wbglabs.io` in `.env.production`, and set `LETSENCRYPT_EMAIL`, `ADMIN_EMAIL` and `VAPID_SUBJECT` to addresses you control. Keep `.env.production` and `.secrets/mongo-keyfile` private; both are ignored by Git and contain generated secrets. The VAPID key pair is already generated in `.env.production` for this installation. Configure SMTP and any optional Google/WhatsApp credentials there when ready.
 
 On the Docker host, from the project directory, run:
 
@@ -185,7 +185,7 @@ docker compose --env-file .env.production -f compose.production.yaml up -d app w
 
 Test a restore on a separate MongoDB instance before relying on these backups. Keep a copy of `.env.production` and `.secrets/mongo-keyfile` with the backup: the dump contains league data, but the environment/keyfile are needed to operate the deployment securely.
 
-When the real domain is set, rebuild the app so its HTTPS security headers are generated for the production origin. If you change it later, update `APP_DOMAIN` and `APP_URL` together and recreate the stack. The local `.env.production` is configured for `fight-night.wbglabs.io`; the domain must resolve to the server and inbound ports 80 and 443 must reach the Pi before Traefik can obtain a public certificate.
+When the real domain is set, rebuild the app so its HTTPS security headers are generated for the production origin. If you change it later, update `APP_DOMAIN` and `APP_URL` together and recreate the stack. The local `.env.production` is configured for `fight-club.wbglabs.io`; the domain must resolve to the server and inbound ports 80 and 443 must reach the Pi before Traefik can obtain a public certificate.
 
 ## External services and original data
 
@@ -225,7 +225,7 @@ Uma fila MongoDB (`notification_deliveries`) é criada **na mesma transação** 
 
 ### Playtomic occupancy checks
 
-The challenge detail screen can check court occupancy using the official, read-only Playtomic Third Party API; it does not scrape the public website. The club obtains the client ID and secret from Playtomic Manager → Settings → Developer tools and configures `PLAYTOMIC_CLIENT_ID`, `PLAYTOMIC_CLIENT_SECRET` and `PLAYTOMIC_VENUE_ID` on the server. The administrator maps each court by setting its Playtomic resource ID under **Admin → Settings → Courts**. Credentials never go to the browser. The connector caches results briefly, checks the configured venue and only reports whether a booking occupies a mapped resource; a clear slot still needs confirmation in Playtomic/the club, and this app does not reserve it. See [Playtomic API setup](https://third-party.playtomic.io/), [OAuth](https://third-party.playtomic.io/endpoints/auth/) and [bookings](https://third-party.playtomic.io/endpoints/bookings/).
+The Games page, Admin → Courts and challenge detail screen can check court occupancy using the official, read-only Playtomic Third Party API; it does not scrape the public website. The club obtains the client ID and secret from Playtomic Manager → Settings → Developer tools and configures `PLAYTOMIC_CLIENT_ID`, `PLAYTOMIC_CLIENT_SECRET` and `PLAYTOMIC_VENUE_ID` on the server. The administrator maps each court by setting its Playtomic resource ID under **Admin → Settings → Courts**. Credentials never go to the browser. Players choose a date to see all courts over the entire Lisbon calendar day in selectable 60- or 90-minute blocks (90 minutes by default). The timetable loads automatically and accounts for daylight-saving changes. Courts show league occupancy, Playtomic occupancy or unknown status if the provider cannot be checked. Past blocks are shown without booking links. Unoccupied courts offer **Reservar no Playtomic**, which opens the club page; the user must select and confirm the booking there. The official API cannot create, change or cancel reservations. The connector caches results briefly, checks the configured venue and only reports whether a booking occupies a mapped resource; a clear slot still needs confirmation in Playtomic/the club, and this app does not reserve it. See [Playtomic API setup](https://third-party.playtomic.io/), [OAuth](https://third-party.playtomic.io/endpoints/auth/) and [bookings](https://third-party.playtomic.io/endpoints/bookings/).
 
 Em produção, manter um worker ativo:
 

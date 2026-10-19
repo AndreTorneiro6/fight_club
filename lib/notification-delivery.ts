@@ -178,7 +178,6 @@ export async function sendDelivery(job: Delivery, to: string) {
         to,
         subject: `Fight Club · ${job.title.replace(/[\r\n]/g, " ")}`,
         text: `${job.title}\n\n${job.body}\n\nAbrir na aplicação: ${url}\n\nGere os teus alertas no Perfil da aplicação.`,
-        messageId: `<${Buffer.from(job._id).toString("base64url")}@fightclub.notifications>`,
       });
       return String(info.messageId);
     } catch (e) {

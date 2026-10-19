@@ -1,3 +1,4 @@
+import { weeklyReason } from "./weekly";
 import type { Challenge, Player, Settings, Slot, State } from "./types";
 
 export class LeagueError extends Error {
@@ -52,6 +53,8 @@ export function challengeReason(
   title = false,
 ): string | null {
   const rules = s.settings[0];
+  const weekly = weeklyReason(s, me, defender, now);
+  if (weekly) return weekly;
   if (me._id === defender._id) return "Não podes desafiar-te a ti próprio.";
   if (me.status !== "active" || defender.status !== "active")
     return "Jogador indisponível.";
