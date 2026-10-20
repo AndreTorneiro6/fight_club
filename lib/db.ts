@@ -254,6 +254,8 @@ export async function view(actor: Actor): Promise<View> {
     )
     .map((c) => c._id);
   if (actor.role !== "admin") {
+    s.players = s.players.map(({ membershipPayment, ...p }) => p);
+    s.challenges = s.challenges.map(({ courtPayments, ...c }) => c);
     s.players = s.players
       .filter(
         (p) =>
@@ -305,6 +307,7 @@ export async function view(actor: Actor): Promise<View> {
         phone: "",
         userId: undefined,
         notificationPreferences: undefined,
+        membershipPayment: undefined,
       })),
     }));
   }

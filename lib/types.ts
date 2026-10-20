@@ -13,7 +13,13 @@ export type ChallengeStatus =
 export interface Entity {
   _id: string;
 }
+export interface PaymentStatus {
+  paid: boolean;
+  updatedAt: string;
+  updatedBy: string;
+}
 export interface Player extends Entity {
+  membershipPayment?: PaymentStatus;
   awaitingApproval?: boolean;
   registrationRejectedAt?: string;
   notificationPreferences?: {
@@ -81,6 +87,7 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  courtPayments?: (PaymentStatus & { playerId: string })[];
   challengerTeam?: { playerId: string; name: string }[];
   defenderTeam?: { playerId: string; name: string }[];
   weekStart?: string;

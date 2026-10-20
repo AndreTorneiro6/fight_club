@@ -338,6 +338,26 @@ const adminLessons: Lesson[] = [
       ),
     ],
   },
+  {
+    title: "Gerir pagamentos separados",
+    href: "/admin",
+    steps: [
+      step(
+        "Atualizar a quota",
+        "Em Administração → Pagamentos → Quotas, procura o jogador e usa Marcar pago ou Marcar não pago. Também podes fazê-lo na coluna Quota da lista de jogadores.",
+        "Quotas",
+        ["Escolher jogador", "Marcar pago", "Filtrar por pagar"],
+        1,
+      ),
+      step(
+        "Dividir o pagamento do campo",
+        "Em Pagamentos → Campos, escolhe a semana e o jogo. Cada participante tem o seu próprio estado. Marca apenas quem pagou a sua parte; a quota não é alterada.",
+        "Partes do campo",
+        ["Jogador A · Pago", "Jogador B · Por pagar", "1/2 partes pagas"],
+        1,
+      ),
+    ],
+  },
 ];
 
 // Versioned and scoped by player: shared devices keep each account's choice separate.

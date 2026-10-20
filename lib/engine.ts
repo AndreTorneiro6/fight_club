@@ -1,3 +1,4 @@
+import { courtPaymentPlayers } from "./payments";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import {
   weeklyPositionReason,
@@ -271,6 +272,21 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("notifications.read"),
     notificationId: id.optional(),
   }),
+  z.discriminatedUnion("kind", [
+    z.object({
+      type: z.literal("admin.payment.set"),
+      kind: z.literal("membership"),
+      playerId: id,
+      paid: z.boolean(),
+    }),
+    z.object({
+      type: z.literal("admin.payment.set"),
+      kind: z.literal("court"),
+      playerId: id,
+      challengeId: id,
+      paid: z.boolean(),
+    }),
+  ]),
   z.object({
     type: z.literal("admin.player.save"),
     playerId: id.optional(),
@@ -1359,6 +1375,10 @@ export function execute(
         attacker = player(cmd.challengerId),
         defender = player(cmd.defenderId);
       ensure(
+        !c.courtPayments?.some((entry) => entry.paid),
+        "Revê os pagamentos do campo antes de alterar os participantes.",
+      );
+      ensure(
         ["pending", "accepted"].includes(c.status) &&
           effectiveStatus(c, timestamp) !== "expired",
         "Só é possível atribuir papéis antes da marcação.",
@@ -2115,6 +2135,62 @@ export function execute(
           (!cmd.notificationId || n._id === cmd.notificationId)
         )
           n.read = true;
+      break;
+    }
+    case "admin.payment.set": {
+      const p = player(cmd.playerId);
+      let previous;
+      if (cmd.kind === "membership") {
+        ensure(
+          !p.awaitingApproval &&
+            !p.registrationRejectedAt &&
+            p.status !== "removed",
+          "Só podes registar quotas de jogadores aprovados.",
+        );
+        previous = p.membershipPayment;
+        if ((previous?.paid ?? false) === cmd.paid) break;
+        p.membershipPayment = {
+          paid: cmd.paid,
+          updatedAt: now,
+          updatedBy: actor.userId,
+        };
+      } else {
+        const c = challenge(cmd.challengeId);
+        ensure(
+          [
+            "schedule_pending",
+            "scheduled",
+            "result_pending",
+            "disputed",
+            "completed",
+          ].includes(c.status),
+          "Escolhe um jogo com horário proposto ou já marcado.",
+        );
+        ensure(
+          courtPaymentPlayers(s, c).some((member) => member.playerId === p._id),
+          "Este jogador não participa neste jogo.",
+        );
+        previous = c.courtPayments?.find((entry) => entry.playerId === p._id);
+        if ((previous?.paid ?? false) === cmd.paid) break;
+        c.courtPayments = [
+          ...(c.courtPayments ?? []).filter(
+            (entry) => entry.playerId !== p._id,
+          ),
+          {
+            playerId: p._id,
+            paid: cmd.paid,
+            updatedAt: now,
+            updatedBy: actor.userId,
+          },
+        ];
+      }
+      log("payment.updated", {
+        kind: cmd.kind,
+        playerId: p._id,
+        ...("challengeId" in cmd ? { challengeId: cmd.challengeId } : {}),
+        previousPaid: previous?.paid ?? false,
+        paid: cmd.paid,
+      });
       break;
     }
     case "admin.player.save": {

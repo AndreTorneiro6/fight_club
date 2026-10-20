@@ -17,6 +17,7 @@ const adminTasks = [
   "Escolhe um parceiro para o Jogador A e guarda a atribuição.",
   "Seleciona o vencedor e guarda o resultado de treino.",
   "Define as datas e guarda o congelamento de treino.",
+  "Marca a quota e apenas a parte do campo do Jogador A como pagas. A parte do Jogador B fica por pagar.",
 ];
 
 export default function WalkthroughExercise({
@@ -198,6 +199,43 @@ export default function WalkthroughExercise({
                 </div>
               )}
             </>
+          )}
+          {admin && index === 5 && (
+            <div className="stack">
+              <div className="guide-option">
+                Quota do Jogador A · {choice === "paid" ? "Pago" : "Por pagar"}
+              </div>
+              <button
+                disabled={done || choice === "paid"}
+                className="guide-practice-target"
+                onClick={() => {
+                  setChoice("paid");
+                  if (second === "paid")
+                    complete(
+                      "Quota e parte do campo do Jogador A pagas. A parte do Jogador B continua por pagar.",
+                    );
+                }}
+              >
+                Marcar quota paga · treino
+              </button>
+              <div className="guide-option">
+                Campo · Jogador A · {second === "paid" ? "Pago" : "Por pagar"}
+              </div>
+              <div className="guide-option">Campo · Jogador B · Por pagar</div>
+              <button
+                disabled={done || second === "paid"}
+                className="guide-practice-target"
+                onClick={() => {
+                  setSecond("paid");
+                  if (choice === "paid")
+                    complete(
+                      "Quota e parte do campo do Jogador A pagas. A parte do Jogador B continua por pagar.",
+                    );
+                }}
+              >
+                Marcar parte do campo paga · treino
+              </button>
+            </div>
           )}
           {admin && index === 0 && (
             <form

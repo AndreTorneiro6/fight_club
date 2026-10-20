@@ -174,11 +174,10 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await player.goto("/ranking");
   await expect(player.locator(".ranking-row.me .rank-number")).toHaveText("05");
   await admin.goto("/admin");
-  if (await admin.getByRole("dialog").isVisible())
-    await admin
-      .getByRole("dialog")
-      .getByRole("button", { name: "Saltar visita" })
-      .click();
+  await admin
+    .getByRole("dialog")
+    .getByRole("button", { name: "Saltar visita" })
+    .click();
   await admin.getByRole("button", { name: "Jogadores", exact: true }).click();
   await admin.getByRole("button", { name: "Adicionar jogador" }).click();
   const modal = admin.getByRole("dialog");
@@ -186,6 +185,9 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await modal
     .getByLabel("Email", { exact: true })
     .fill("browser-test@example.com");
+  await modal
+    .getByRole("combobox", { name: "Divisão", exact: true })
+    .selectOption("ouro");
   await modal.getByRole("button", { name: "Guardar jogador" }).click();
   await expect(
     admin.getByText("Jogador guardado.", { exact: true }),
@@ -211,6 +213,7 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   const testPlayerRow = admin
     .getByRole("row")
     .filter({ hasText: "browser-test@example.com" });
+  await testPlayerRow.getByText("Mais ações", { exact: true }).click();
   await testPlayerRow
     .getByRole("button", { name: "Convidar", exact: true })
     .click();
@@ -222,8 +225,16 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await invited.goto(inviteUrl);
   await invited.getByLabel("Nome", { exact: true }).fill("Jogador de teste");
   await invited.locator('input[name="password"]').fill("NovoAcesso2026!");
+  await invited
+    .getByRole("combobox", { name: "Categoria / Ranking", exact: true })
+    .selectOption("ouro");
+  await invited.locator('input[name="privacyAccepted"]').check();
   await invited.getByRole("button", { name: "Guardar e entrar" }).click();
   await expect(invited).toHaveURL(/\/inicio/);
+  await invited
+    .getByRole("dialog")
+    .getByRole("button", { name: "Saltar visita" })
+    .click();
   await expect(
     invited.getByRole("heading", { name: "Vamos a jogo, Jogador." }),
   ).toBeVisible();
@@ -232,6 +243,7 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
     headers: { Origin: "http://localhost:3100" },
     data: {
       token: new URL(inviteUrl).searchParams.get("token"),
+      privacyAccepted: true,
       password: "OutroAcesso2026!",
       name: "Jogador de teste",
     },
@@ -367,7 +379,7 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
   await playerContext.close();
 });
 
-test("admin sees monthly calendar on existing challenges and players see why new challenges are blocked", async ({
+test("admin sees weekly calendar on existing challenges and players see why new challenges are blocked", async ({
   browser,
 }) => {
   const adminContext = await browser.newContext({
@@ -404,7 +416,7 @@ test("admin sees monthly calendar on existing challenges and players see why new
   await expect(
     admin.getByRole("heading", { name: "Calendário do desafio", exact: true }),
   ).toBeVisible();
-  await expect(admin.getByLabel("Calendário mensal do desafio")).toBeVisible();
+  await expect(admin.getByLabel("Calendário semanal do desafio")).toBeVisible();
   await admin
     .getByRole("button", { name: "Aceitar desafio pelo defensor", exact: true })
     .click();
@@ -634,7 +646,7 @@ test("players can install the mobile app and choose alerts while admins monitor 
   await club.goto("/notificacoes");
   await expect(
     club.getByRole("heading", {
-      name: "Email e WhatsApp · Envios",
+      name: "Notificações externas · Envios",
       exact: true,
     }),
   ).toBeVisible();
@@ -650,7 +662,7 @@ test("players can install the mobile app and choose alerts while admins monitor 
       name: "Instalar app dos jogadores",
       exact: true,
     }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   // Offline fallback never displays cached private league data or offers offline writes.
   await playerContext.setOffline(true);
   await player.goto("/ranking");

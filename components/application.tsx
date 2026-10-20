@@ -18,6 +18,11 @@ import {
   PushNotificationSettings,
 } from "./notification-settings";
 import CourtAvailability from "./court-availability";
+import AdminNavigation from "./admin-navigation";
+import AdminPayments, {
+  MembershipPaymentControl,
+  CourtPaymentDetails,
+} from "./admin-payments";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -3126,7 +3131,19 @@ function PlayerHistory({ s, p }: { s: View; p: Player }) {
 
 function Admin(a: Actions) {
   const { s } = a,
-    [tab, setTab] = useState("summary");
+    [tab, setTab] = useState("summary"),
+    [playersStatus, setPlayersStatus] = useState("approved");
+  const clubPending = s.challenges.filter(
+    (c) =>
+      c.status === "schedule_pending" &&
+      c.scheduleProposal?.challengerConfirmed &&
+      c.scheduleProposal?.defenderConfirmed,
+  );
+  const needsAttention = s.challenges.filter(
+    (c) =>
+      ["disputed", "result_pending", "expired"].includes(effectiveStatus(c)) ||
+      clubPending.some((entry) => entry._id === c._id),
+  );
   return (
     <>
       <Heading
@@ -3137,119 +3154,164 @@ function Admin(a: Actions) {
       <Link className="button" href="/ajuda/admin">
         <BookOpen size={17} /> Manual do administrador · Guia passo a passo
       </Link>
-      <div className="tabs toolbar">
-        {[
-          ["summary", "Resumo"],
-          ["players", "Jogadores"],
-          ["registration", "Inscrições"],
-          ["rankings", "Rankings"],
-          ["weekly", "Papéis semanais"],
-          ["partners", "Parceiros"],
-          ["challenges", "Desafios"],
-          ["games", "Jogos"],
-          ["results", "Resultados"],
-          ["posters", "Cartazes da jornada"],
-          ["rules", "Regras"],
-          ["courts", "Campos"],
-          ["audit", "Auditoria"],
-        ].map(([v, l]) => (
-          <button
-            key={v}
-            className={tab === v ? "active" : ""}
-            onClick={() => setTab(v)}
-          >
-            {l}
-          </button>
-        ))}
+      <AdminNavigation
+        tab={tab === "approvals" ? "games" : tab}
+        onSelect={(value) => {
+          setTab(value);
+          if (value === "players") setPlayersStatus("approved");
+        }}
+      />
+      <div className="row wrap admin-secondary-links">
         <Link href="/title-fight">Title Fights ↗</Link>
         <Link href="/epocas">Épocas ↗</Link>
       </div>
       {tab === "summary" ? (
         <>
-          <div className="stats-grid">
-            {[
-              {
-                label: "JOGADORES ATIVOS",
-                v: s.players.filter((p) => p.status === "active").length,
-              },
-              {
-                label: "DESAFIOS ATIVOS",
-                v: s.challenges.filter((c) => !terminal.has(effectiveStatus(c)))
-                  .length,
-              },
-              {
-                label: "JOGOS MARCADOS",
-                v: s.challenges.filter((c) => c.status === "scheduled").length,
-              },
-              {
-                label: "CONFIRMAÇÕES DO CLUBE",
-                v: s.challenges.filter(
-                  (c) =>
-                    c.status === "schedule_pending" &&
-                    c.scheduleProposal?.challengerConfirmed &&
-                    c.scheduleProposal?.defenderConfirmed,
-                ).length,
-              },
-              {
-                label: "RESULTADOS PENDENTES",
-                v: s.challenges.filter((c) => c.status === "result_pending")
-                  .length,
-              },
-              {
-                label: "EM DISPUTA",
-                v: s.challenges.filter((c) => c.status === "disputed").length,
-              },
-              {
-                label: "EXPIRADOS",
-                v: s.challenges.filter((c) => effectiveStatus(c) === "expired")
-                  .length,
-              },
-              {
-                label: "A MARCAR",
-                v: s.challenges.filter((c) => effectiveStatus(c) === "accepted")
-                  .length,
-              },
-              {
-                label: "A AGUARDAR RESPOSTA",
-                v: s.challenges.filter((c) => effectiveStatus(c) === "pending")
-                  .length,
-              },
-            ].map((x) => (
-              <div className="stat-card" key={x.label}>
-                <div>
-                  <div className="eyebrow muted">{x.label}</div>
-                  <div className="value">{x.v}</div>
+          <Section title="O que precisas de fazer">
+            <div className="admin-priority-grid">
+              {[
+                {
+                  label: "Inscrições por aprovar",
+                  count: s.players.filter(
+                    (p) => p.awaitingApproval && !p.registrationRejectedAt,
+                  ).length,
+                  action: "Rever inscrições",
+                  open: () => {
+                    setPlayersStatus("pending");
+                    setTab("players");
+                  },
+                },
+                {
+                  label: "Campos por confirmar",
+                  count: s.challenges.filter(
+                    (c) =>
+                      c.status === "schedule_pending" &&
+                      c.scheduleProposal?.challengerConfirmed &&
+                      c.scheduleProposal?.defenderConfirmed,
+                  ).length,
+                  action: "Rever jogos",
+                  open: () => setTab("approvals"),
+                },
+                {
+                  label: "Resultados pendentes",
+                  count: s.challenges.filter(
+                    (c) => c.status === "result_pending",
+                  ).length,
+                  action: "Rever resultados",
+                  open: () => setTab("results"),
+                },
+                {
+                  label: "Disputas",
+                  count: s.challenges.filter((c) => c.status === "disputed")
+                    .length,
+                  action: "Rever desafios",
+                  open: () => setTab("challenges"),
+                },
+              ].map((task) => (
+                <div className="inset stack" key={task.label}>
+                  <strong>{task.label}</strong>
+                  <span className="admin-priority-count">{task.count}</span>
+                  <button onClick={task.open}>{task.action}</button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Section>
+          <details className="panel admin-league-stats">
+            <summary>Estado geral da liga</summary>
+            <div className="stats-grid">
+              {[
+                {
+                  label: "JOGADORES ATIVOS",
+                  v: s.players.filter(
+                    (p) =>
+                      p.status === "active" &&
+                      !p.awaitingApproval &&
+                      !p.registrationRejectedAt,
+                  ).length,
+                },
+                {
+                  label: "DESAFIOS ATIVOS",
+                  v: s.challenges.filter(
+                    (c) => !terminal.has(effectiveStatus(c)),
+                  ).length,
+                },
+                {
+                  label: "JOGOS MARCADOS",
+                  v: s.challenges.filter((c) => c.status === "scheduled")
+                    .length,
+                },
+                {
+                  label: "CONFIRMAÇÕES DO CLUBE",
+                  v: s.challenges.filter(
+                    (c) =>
+                      c.status === "schedule_pending" &&
+                      c.scheduleProposal?.challengerConfirmed &&
+                      c.scheduleProposal?.defenderConfirmed,
+                  ).length,
+                },
+                {
+                  label: "RESULTADOS PENDENTES",
+                  v: s.challenges.filter((c) => c.status === "result_pending")
+                    .length,
+                },
+                {
+                  label: "EM DISPUTA",
+                  v: s.challenges.filter((c) => c.status === "disputed").length,
+                },
+                {
+                  label: "EXPIRADOS",
+                  v: s.challenges.filter(
+                    (c) => effectiveStatus(c) === "expired",
+                  ).length,
+                },
+                {
+                  label: "A MARCAR",
+                  v: s.challenges.filter(
+                    (c) => effectiveStatus(c) === "accepted",
+                  ).length,
+                },
+                {
+                  label: "A AGUARDAR RESPOSTA",
+                  v: s.challenges.filter(
+                    (c) => effectiveStatus(c) === "pending",
+                  ).length,
+                },
+              ].map((x) => (
+                <div className="stat-card" key={x.label}>
+                  <div>
+                    <div className="eyebrow muted">{x.label}</div>
+                    <div className="value">{x.v}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
           <Section title="Requer a tua atenção">
             <div className="challenge-grid">
-              {s.challenges
-                .filter((c) =>
-                  [
-                    "disputed",
-                    "result_pending",
-                    "expired",
-                    "schedule_pending",
-                  ].includes(effectiveStatus(c)),
-                )
-                .map((c) => (
-                  <ChallengeCard s={s} c={c} key={c._id} />
-                ))}
+              {needsAttention.map((c) => (
+                <ChallengeCard s={s} c={c} key={c._id} />
+              ))}
             </div>
-            {!s.challenges.some((c) =>
-              [
-                "disputed",
-                "result_pending",
-                "expired",
-                "schedule_pending",
-              ].includes(effectiveStatus(c)),
-            ) && (
+            {!needsAttention.length && (
               <Empty text="Tudo a correr bem. A liga está nas mãos dos jogadores." />
             )}
           </Section>
         </>
+      ) : tab === "approvals" ? (
+        <Section title="Campos por confirmar">
+          <p>
+            Abre o jogo para consultar a disponibilidade diária e confirmar o
+            campo.
+          </p>
+          <div className="challenge-grid">
+            {clubPending.map((c) => (
+              <ChallengeCard s={s} c={c} key={c._id} />
+            ))}
+          </div>
+          {!clubPending.length && <Empty text="Não há campos por confirmar." />}
+        </Section>
+      ) : tab === "payments" ? (
+        <AdminPayments s={s} run={a.run} busy={a.busy} />
       ) : tab === "partners" ? (
         <AdminPartners {...a} />
       ) : tab === "weekly" ? (
@@ -3257,7 +3319,7 @@ function Admin(a: Actions) {
       ) : tab === "registration" ? (
         <AdminRegistration {...a} />
       ) : tab === "players" ? (
-        <AdminPlayers {...a} />
+        <AdminPlayers {...a} initialRegistrationFilter={playersStatus} />
       ) : tab === "rankings" ? (
         <AdminTeamRanking s={s} run={a.run} busy={a.busy} />
       ) : tab === "challenges" ? (
@@ -3338,6 +3400,7 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
     : "";
   return (
     <div className="stack space-top">
+      <CourtPaymentDetails s={s} c={c} run={run} busy={busy} />
       {editable && (
         <button onClick={() => setEditing(true)}>Editar jogo</button>
       )}
@@ -3890,10 +3953,12 @@ function AdminChallenges(a: Actions) {
     </>
   );
 }
-function AdminPlayers(a: Actions) {
+function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
   const { s, run, busy, notify, refresh } = a,
     [filter, setFilter] = useState("all"),
-    [registrationFilter, setRegistrationFilter] = useState("approved"),
+    [registrationFilter, setRegistrationFilter] = useState(
+      a.initialRegistrationFilter ?? "approved",
+    ),
     [search, setSearch] = useState(""),
     [editing, setEditing] = useState<Player | "new" | null>(null),
     [history, setHistory] = useState<Player | null>(null),
@@ -4058,6 +4123,7 @@ function AdminPlayers(a: Actions) {
                 <th>Jogador</th>
                 <th>Divisão / Posição</th>
                 <th>Estado</th>
+                {registrationFilter === "approved" && <th>Quota</th>}
                 {registrationFilter === "rejected" && (
                   <th>Eliminação automática</th>
                 )}
@@ -4102,6 +4168,15 @@ function AdminPlayers(a: Actions) {
                       </small>
                     )}
                   </td>
+                  {registrationFilter === "approved" && (
+                    <td>
+                      {p.status !== "removed" ? (
+                        <MembershipPaymentControl p={p} run={run} busy={busy} />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  )}
                   {registrationFilter === "rejected" && (
                     <td>
                       {p.registrationRejectedAt &&
@@ -4121,9 +4196,6 @@ function AdminPlayers(a: Actions) {
                     <div className="table-actions">
                       <button className="small" onClick={() => setEditing(p)}>
                         Editar
-                      </button>
-                      <button className="small" onClick={() => setEditing(p)}>
-                        Divisão / posição
                       </button>
                       <button
                         className="small"
@@ -4183,37 +4255,45 @@ function AdminPlayers(a: Actions) {
                           Recusar inscrição
                         </button>
                       )}
-                      {(p.status === "active" ||
-                        s.exceptions.some(
-                          (entry) =>
-                            entry.playerId === p._id &&
-                            entry.vacation &&
-                            entry.to >= clubDay(Date.now()),
-                        )) &&
-                        !p.awaitingApproval &&
-                        !p.registrationRejectedAt && (
+                      <details className="admin-player-more">
+                        <summary>Mais ações</summary>
+                        <div className="stack">
+                          {(p.status === "active" ||
+                            s.exceptions.some(
+                              (entry) =>
+                                entry.playerId === p._id &&
+                                entry.vacation &&
+                                entry.to >= clubDay(Date.now()),
+                            )) &&
+                            !p.awaitingApproval &&
+                            !p.registrationRejectedAt && (
+                              <button
+                                className="small"
+                                onClick={() => setVacationPlayer(p)}
+                              >
+                                {frozenRanking(s, p._id)
+                                  ? "Gerir congelamento"
+                                  : "Congelar ranking"}
+                              </button>
+                            )}
                           <button
                             className="small"
-                            onClick={() => setVacationPlayer(p)}
+                            onClick={() => setHistory(p)}
                           >
-                            {frozenRanking(s, p._id)
-                              ? "Gerir congelamento"
-                              : "Congelar ranking"}
+                            Histórico
                           </button>
-                        )}
-                      <button className="small" onClick={() => setHistory(p)}>
-                        Histórico
-                      </button>
-                      {p.email && (
-                        <button
-                          className="small"
-                          onClick={() =>
-                            account(p, p.userId ? "reset-player" : "invite")
-                          }
-                        >
-                          {p.userId ? "Recuperar acesso" : "Convidar"}
-                        </button>
-                      )}
+                          {p.email && (
+                            <button
+                              className="small"
+                              onClick={() =>
+                                account(p, p.userId ? "reset-player" : "invite")
+                              }
+                            >
+                              {p.userId ? "Recuperar acesso" : "Convidar"}
+                            </button>
+                          )}
+                        </div>
+                      </details>
                     </div>
                   </td>
                 </tr>

@@ -183,7 +183,30 @@ test("MongoDB transactions serialize simultaneous court bookings and preserve pe
       .collection("matches")
       .countDocuments({ courtId: "campo-1", start });
     assert.equal(count, 1);
+    await mutate(admin, {
+      type: "admin.payment.set",
+      kind: "membership",
+      playerId: "player-5",
+      paid: true,
+    });
+    const paymentMatch = (await view(admin)).challenges.find(
+      (c) => c.status === "scheduled",
+    )!;
+    await mutate(admin, {
+      type: "admin.payment.set",
+      kind: "court",
+      playerId: paymentMatch.challengerId,
+      challengeId: paymentMatch._id,
+      paid: true,
+    });
     const sanitized = await view(a);
+    assert(sanitized.players.every((p) => p.membershipPayment === undefined));
+    assert(sanitized.challenges.every((c) => c.courtPayments === undefined));
+    assert.equal(
+      (await view(admin)).players.find((p) => p._id === "player-5")
+        ?.membershipPayment?.paid,
+      true,
+    );
     assert.equal(
       sanitized.players.find((p) => p._id === "player-5")!.email,
       "",

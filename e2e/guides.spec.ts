@@ -217,6 +217,23 @@ test("admin walkthrough requires practice actions without modifying league data"
   await tour
     .getByRole("button", { name: "Guardar congelamento de treino" })
     .click();
+  await next().click();
+  await expect(
+    tour.getByRole("button", { name: "Concluir visita", exact: true }),
+  ).toBeDisabled();
+  await tour
+    .getByRole("button", { name: "Marcar quota paga · treino", exact: true })
+    .click();
+  await expect(
+    tour.getByRole("button", { name: "Concluir visita", exact: true }),
+  ).toBeDisabled();
+  await tour
+    .getByRole("button", {
+      name: "Marcar parte do campo paga · treino",
+      exact: true,
+    })
+    .click();
+  await expect(tour).toContainText("Campo · Jogador B · Por pagar");
   await tour
     .getByRole("button", { name: "Concluir visita", exact: true })
     .click();

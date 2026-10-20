@@ -2338,3 +2338,94 @@ test("new challenges reject obsolete boundary roles after ranking changes", () =
   s.players.find((p) => p._id === "p6")!.position = 9;
   assert.throws(() => create(s), /última equipa/);
 });
+
+test("membership and individual court shares are independent, admin-only and audited", () => {
+  const s = fixture();
+  const c = create(s);
+  c.status = "scheduled";
+  c.scheduledAt = iso(1);
+  c.challengerTeam = [s.players[6], s.players[7]].map((p) => ({
+    playerId: p._id,
+    name: p.name,
+  }));
+  c.defenderTeam = [s.players[4], s.players[5]].map((p) => ({
+    playerId: p._id,
+    name: p.name,
+  }));
+  const membership = {
+    type: "admin.payment.set",
+    kind: "membership",
+    playerId: "p7",
+    paid: true,
+  };
+  assert.throws(
+    () => execute(s, actor(7), membership, time),
+    /administradores/,
+  );
+  execute(s, actor(1, "admin"), membership, time);
+  assert.equal(s.players[6].membershipPayment?.paid, true);
+  assert.equal(Boolean(c.courtPayments), false);
+  const court = {
+    type: "admin.payment.set",
+    kind: "court",
+    playerId: "p7",
+    challengeId: c._id,
+    paid: true,
+  };
+  assert.throws(() => execute(s, actor(7), court, time), /administradores/);
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...court, playerId: "p3" }, time),
+    /não participa/,
+  );
+  execute(s, actor(1, "admin"), court, time);
+  assert.deepEqual(
+    c.courtPayments?.map((p) => p.playerId),
+    ["p7"],
+  );
+  assert.equal(c.courtPayments?.[0].paid, true);
+  const auditCount = s.audit.length;
+  execute(s, actor(1, "admin"), court, time);
+  assert.equal(s.audit.length, auditCount);
+  execute(s, actor(1, "admin"), { ...court, paid: false }, time + 1000);
+  assert.equal(c.courtPayments?.[0].paid, false);
+  assert.equal(s.players[6].membershipPayment?.paid, true);
+  execute(s, actor(1, "admin"), { ...court, playerId: "p6" }, time);
+  assert.equal(c.courtPayments?.find((p) => p.playerId === "p6")?.paid, true);
+  assert.equal(
+    c.courtPayments?.find((p) => p.playerId === "p5"),
+    undefined,
+  );
+  assert.equal(s.audit.at(-1)?.action, "payment.updated");
+  assert.equal(JSON.parse(s.audit.at(-1)!.details).playerId, "p6");
+});
+
+test("payments reject unapproved members and unscheduled or cancelled matches", () => {
+  const s = fixture();
+  s.players[2].awaitingApproval = true;
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.payment.set",
+          kind: "membership",
+          playerId: "p3",
+          paid: true,
+        },
+        time,
+      ),
+    /aprovados/,
+  );
+  const c = create(s);
+  const command = {
+    type: "admin.payment.set",
+    kind: "court",
+    playerId: "p8",
+    challengeId: c._id,
+    paid: true,
+  };
+  assert.throws(() => execute(s, actor(1, "admin"), command, time), /horário/);
+  c.status = "cancelled";
+  assert.throws(() => execute(s, actor(1, "admin"), command, time), /horário/);
+});

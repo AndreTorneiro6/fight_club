@@ -249,3 +249,9 @@ Sem credenciais SMTP e WhatsApp Business configuradas, a implementação está p
 - Faz uma sessão real de ponta a ponta com uma conta admin e duas contas de jogador de teste antes de abrir inscrições ao grupo.
 
 A integração Playtomic usa a API oficial de terceiros, com credenciais emitidas ao clube e acesso limitado à ocupação. Não recolhe dados por raspagem do site. [Documentação oficial da API](https://third-party.playtomic.io/).
+
+### Manual payment tracking
+
+Admin → Payments separates membership status from court payments. Membership can also be changed in the Players table. Court shares are recorded independently for each participant using the match’s saved team members; changing a membership status never changes court shares. These are manual paid/unpaid records, with no payment collection or automatic recurring reset. New records start unpaid. Every change is audited; only administrators can change or view payment records. Payments embedded in a deleted match are deleted with that match, while audit entries remain.
+
+The admin overview links directly to pending registrations, club confirmations, results and disputes. Navigation is grouped into People, Competition and Configuration; invitation links are under Convites and secondary player actions are under Mais ações.
