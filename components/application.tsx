@@ -34,6 +34,15 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  ChevronDown,
+  CirclePause,
+  CirclePlay,
+  Ellipsis,
+  KeyRound,
+  MailPlus,
+  Pencil,
+  Snowflake,
+  UserRoundCheck,
   Clock3,
   Crown,
   Download,
@@ -4193,9 +4202,9 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                     </td>
                   )}
                   <td>
-                    <div className="table-actions">
+                    <div className="table-actions admin-player-actions">
                       <button className="small" onClick={() => setEditing(p)}>
-                        Editar
+                        <Pencil size={15} aria-hidden="true" /> Editar
                       </button>
                       <button
                         className="small"
@@ -4227,6 +4236,13 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                             );
                         }}
                       >
+                        {p.awaitingApproval || p.registrationRejectedAt ? (
+                          <UserRoundCheck size={15} aria-hidden="true" />
+                        ) : p.status === "active" ? (
+                          <CirclePause size={15} aria-hidden="true" />
+                        ) : (
+                          <CirclePlay size={15} aria-hidden="true" />
+                        )}
                         {p.awaitingApproval || p.registrationRejectedAt
                           ? "Aprovar inscrição"
                           : p.status === "active"
@@ -4252,12 +4268,20 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                               );
                           }}
                         >
-                          Recusar inscrição
+                          <X size={15} aria-hidden="true" /> Recusar inscrição
                         </button>
                       )}
                       <details className="admin-player-more">
-                        <summary>Mais ações</summary>
-                        <div className="stack">
+                        <summary>
+                          <Ellipsis size={15} aria-hidden="true" />
+                          <span>Mais ações</span>
+                          <ChevronDown
+                            size={13}
+                            className="admin-player-actions-chevron"
+                            aria-hidden="true"
+                          />
+                        </summary>
+                        <div className="admin-player-action-list">
                           {(p.status === "active" ||
                             s.exceptions.some(
                               (entry) =>
@@ -4271,6 +4295,7 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                                 className="small"
                                 onClick={() => setVacationPlayer(p)}
                               >
+                                <Snowflake size={15} aria-hidden="true" />
                                 {frozenRanking(s, p._id)
                                   ? "Gerir congelamento"
                                   : "Congelar ranking"}
@@ -4280,7 +4305,7 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                             className="small"
                             onClick={() => setHistory(p)}
                           >
-                            Histórico
+                            <History size={15} aria-hidden="true" /> Histórico
                           </button>
                           {p.email && (
                             <button
@@ -4289,6 +4314,11 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
                                 account(p, p.userId ? "reset-player" : "invite")
                               }
                             >
+                              {p.userId ? (
+                                <KeyRound size={15} aria-hidden="true" />
+                              ) : (
+                                <MailPlus size={15} aria-hidden="true" />
+                              )}
                               {p.userId ? "Recuperar acesso" : "Convidar"}
                             </button>
                           )}

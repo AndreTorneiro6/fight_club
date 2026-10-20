@@ -2287,3 +2287,65 @@ html[data-theme="fight-club"] .landing-hero:before {
 .admin-player-more[open] > summary {
   margin-bottom: 8px;
 }
+
+.admin-player-actions {
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 165px;
+  max-width: 220px;
+  gap: 2px;
+}
+.admin-player-actions > button,
+.admin-player-action-list > button,
+.admin-player-actions .admin-player-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-align: left;
+}
+.admin-player-actions > button:hover,
+.admin-player-action-list > button:hover,
+.admin-player-actions .admin-player-more > summary:hover {
+  background: var(--panel2);
+}
+.admin-player-actions svg {
+  flex-shrink: 0;
+}
+.admin-player-actions .admin-player-more {
+  width: 100%;
+}
+.admin-player-actions .admin-player-more > summary {
+  list-style: none;
+}
+.admin-player-actions .admin-player-more > summary::-webkit-details-marker {
+  display: none;
+}
+.admin-player-actions-chevron {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+.admin-player-more[open] .admin-player-actions-chevron {
+  transform: rotate(180deg);
+}
+.admin-player-actions .admin-player-more[open] > summary {
+  margin-bottom: 2px;
+}
+.admin-player-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 4px 8px;
+  border-left: 1px solid var(--border);
+  margin-left: 14px;
+}
