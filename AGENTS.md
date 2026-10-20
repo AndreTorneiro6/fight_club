@@ -6,6 +6,11 @@
 - MongoDB requires a replica set (Atlas or the included local demo runner).
 - Run `npm run typecheck`, `npm test` and `npm run build` after substantive changes.
 
+## Saved project status
+
+- Before starting work, read `docs/PROJECT_STATUS.md` for the saved feature, deployment, testing and outstanding-issue context.
+- Check current Git/live state rather than treating that dated snapshot as live data. Update the handoff when meaningful project state changes, without storing secrets.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know
