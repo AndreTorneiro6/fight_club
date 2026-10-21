@@ -1,3 +1,4 @@
+import { emailSchema, normalizeEmail, EMAIL_IN_USE } from "./email";
 import { courtPaymentPlayers } from "./payments";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import {
@@ -34,7 +35,7 @@ const text = z.string().trim().max(2000);
 const short = z.string().trim().max(150);
 const date = z.iso.datetime({ offset: true });
 const day = z.iso.date();
-const email = z.email().transform((v) => v.toLowerCase());
+const email = emailSchema;
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const prizeSchema = z.object({
   title: short.min(2),
@@ -287,6 +288,11 @@ export const commandSchema = z.discriminatedUnion("type", [
       paid: z.boolean(),
     }),
   ]),
+  z.object({
+    type: z.literal("admin.player.delete"),
+    playerId: id,
+    confirmation: z.literal("ELIMINAR"),
+  }),
   z.object({
     type: z.literal("admin.player.save"),
     playerId: id.optional(),
@@ -2193,6 +2199,70 @@ export function execute(
       });
       break;
     }
+    case "admin.player.delete": {
+      const p = player(cmd.playerId);
+      ensure(
+        p._id !== actor.playerId && p.userId !== actor.userId,
+        "Não podes eliminar a tua própria conta.",
+        403,
+      );
+      const referencesPlayer = (row: { playerId: string }) =>
+        row.playerId === p._id;
+      const hasCompetitionHistory =
+        s.challenges.some(
+          (c) =>
+            c.challengerId === p._id ||
+            c.defenderId === p._id ||
+            c.winnerId === p._id ||
+            c.reportedBy === p._id ||
+            c.scheduleProposal?.proposedBy === p._id ||
+            c.challengerTeam?.some(referencesPlayer) ||
+            c.defenderTeam?.some(referencesPlayer) ||
+            c.courtPayments?.some(referencesPlayer),
+        ) ||
+        s.results.some(
+          (result) =>
+            result.winnerId === p._id ||
+            result.loserId === p._id ||
+            result.championsBefore?.some(referencesPlayer) ||
+            result.championsAfter?.some(referencesPlayer),
+        ) ||
+        s.champions.some(referencesPlayer) ||
+        s.messages.some(referencesPlayer) ||
+        s.seasons.some((season) =>
+          season.archivedRankings?.some((member) => member._id === p._id),
+        );
+      ensure(
+        !hasCompetitionHistory,
+        "Este jogador tem histórico de competição. Usa Remover jogador para preservar os jogos e os registos.",
+        409,
+      );
+      ensure(
+        !frozenRanking(s, p._id, timestamp),
+        "A posição deste jogador está congelada durante as férias.",
+      );
+      const before = { ...p };
+      pair(p);
+      const oldPosition = p.position;
+      p.position = 0;
+      history(p, oldPosition, "Jogador eliminado");
+      s.players = s.players.filter((member) => member._id !== p._id);
+      s.availability = s.availability.filter((row) => row.playerId !== p._id);
+      s.exceptions = s.exceptions.filter((row) => row.playerId !== p._id);
+      s.slots = s.slots.filter((row) => row.playerId !== p._id);
+      s.notifications = s.notifications.filter((row) => row.playerId !== p._id);
+      for (const round of s.weeklyRounds)
+        round.assignments = round.assignments.filter(
+          (row) => row.playerId !== p._id,
+        );
+      compact(p.divisionId, "Eliminação de jogador");
+      log("player.deleted", {
+        playerId: p._id,
+        before,
+        accountDeleted: !!p.userId,
+      });
+      return { deletedPlayerId: p._id };
+    }
     case "admin.player.save": {
       const { type, playerId, ...data } = cmd;
       const existing = playerId ? player(playerId) : undefined;
@@ -2207,9 +2277,10 @@ export function execute(
       ensure(
         !data.email ||
           !s.players.some(
-            (p) => p._id !== playerId && p.email.toLowerCase() === data.email,
+            (p) => p._id !== playerId && normalizeEmail(p.email) === data.email,
           ),
-        "Já existe um jogador com este email.",
+        EMAIL_IN_USE,
+        409,
       );
       const division = s.divisions.find((d) => d._id === data.divisionId)!;
       if (
@@ -2370,7 +2441,9 @@ export function execute(
         }
         const existing = row.playerId
           ? s.players.find((p) => p._id === row.playerId)
-          : s.players.find((p) => row.email && p.email === row.email);
+          : s.players.find(
+              (p) => row.email && normalizeEmail(p.email) === row.email,
+            );
         execute(
           s,
           actor,

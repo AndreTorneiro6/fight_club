@@ -8,6 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { rankingEntries, teamMembers, teamName } from "@/lib/ranking-groups";
+import DataRows from "./data-rows";
+import { teamRecord } from "@/lib/ranking-groups";
+import { useLeagueUpdates } from "./use-league-updates";
 import AdminTeamRanking from "./admin-team-ranking";
 import MatchdayGenerator from "./matchday-generator";
 import AppGuide, { FirstVisitWalkthrough } from "./app-guide";
@@ -43,6 +46,8 @@ import {
   Pencil,
   Snowflake,
   UserRoundCheck,
+  UserRoundMinus,
+  Trash2,
   Clock3,
   Crown,
   Download,
@@ -220,7 +225,7 @@ function Heading({
     </div>
   );
 }
-function Trend({ p }: { p: Player }) {
+function Trend({ p }: { p: Pick<Player, "position" | "previousPosition"> }) {
   const diff = p.previousPosition - p.position;
   return (
     <span
@@ -340,9 +345,6 @@ export function Application({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [menu, setMenu] = useState(false),
-    [chatConnection, setChatConnection] = useState<
-      "connecting" | "live" | "reconnecting"
-    >("connecting"),
     [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
   const notify = useCallback(
     (text: string, bad = false) => setToast({ text, bad }),
@@ -357,6 +359,7 @@ export function Application({
       setS(next);
       setError("");
     } catch (e) {
+      if (sequence !== refreshSequence.current) return;
       if ((e as { status: number }).status === 401) {
         router.replace("/auth");
         return;
@@ -364,6 +367,10 @@ export function Application({
       setError((e as Error).message);
     }
   }, [router]);
+  const { connection: chatConnection, updateAvailable } = useLeagueUpdates(
+    !!route && !["auth", "inscricao"].includes(route),
+    refresh,
+  );
   useEffect(() => {
     if (!route || ["auth", "inscricao"].includes(route)) return;
     void refresh();
@@ -371,28 +378,6 @@ export function Application({
       if (document.visibilityState === "visible") void refresh();
     }, 30000);
     return () => clearInterval(timer);
-  }, [route, refresh]);
-  useEffect(() => {
-    if (!route.startsWith("desafios/")) return;
-    setChatConnection("connecting");
-    const source = new EventSource(
-      `/api/challenges/${encodeURIComponent(route.split("/")[1])}/events`,
-    );
-    const update = () => {
-      void refresh();
-    };
-    source.addEventListener("ready", () => {
-      setChatConnection("live");
-      update();
-    });
-    source.addEventListener("change", update);
-    source.addEventListener("revoked", () => {
-      source.close();
-      setChatConnection("reconnecting");
-      update();
-    });
-    source.onerror = () => setChatConnection("reconnecting");
-    return () => source.close();
   }, [route, refresh]);
   useEffect(() => {
     if (toast) {
@@ -584,6 +569,24 @@ export function Application({
             <strong>{title}</strong>
           </div>
           <div className="row">
+            <span
+              className="live-status"
+              data-live-connection={chatConnection}
+              title={
+                chatConnection === "live"
+                  ? "Atualizações em direto"
+                  : "A restabelecer atualizações"
+              }
+            >
+              <span className="dot" />
+              <span className="hide-mobile">
+                {chatConnection === "live"
+                  ? "Atualizado em direto"
+                  : chatConnection === "connecting"
+                    ? "A ligar…"
+                    : "A restabelecer…"}
+              </span>
+            </span>
             <button
               className="icon-button mobile-only"
               aria-label="Menu da liga"
@@ -625,6 +628,17 @@ export function Application({
         </header>
         <main className="content">
           <PlayerAppRegistration />
+          {updateAvailable && (
+            <div
+              className="inset row between wrap app-update-banner"
+              role="status"
+            >
+              <span>Nova versão disponível.</span>
+              <button onClick={() => window.location.reload()}>
+                Recarregar aplicação
+              </button>
+            </div>
+          )}
           {error && <div className="error">{error}</div>}
           {route === "inicio" ? (
             <Dashboard {...actions} />
@@ -1332,6 +1346,15 @@ function RankingTable({
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     [target, setTarget] = useState<Player | null>(null),
     router = useRouter();
+  const previousPositions = new Map(
+    rankingEntries(
+      s.players.map((member) => ({
+        ...member,
+        position: member.previousPosition,
+      })),
+      divisionId,
+    ).map((entry, index) => [entry.id, index + 1]),
+  );
   return (
     <>
       <div className="ranking-row ranking-header">
@@ -1343,8 +1366,10 @@ function RankingTable({
         <span className="right">Desafio</span>
       </div>
       {rankingEntries(s.players, divisionId)
+        .map((entry, index) => ({ ...entry, teamPosition: index + 1 }))
         .slice(0, limit)
         .map((entry) => {
+          const record = teamRecord(s.challenges, entry.members);
           const ownTeam = entry.members.some((member) => member._id === p._id);
           const options = entry.members.map((member) => ({
             member,
@@ -1372,15 +1397,10 @@ function RankingTable({
               data-ranking-entry={entry.id}
             >
               <span
-                className={`rank-number ${entry.position <= 3 ? "top" : ""}`}
-                aria-label={`Posições: ${entry.members.map((member) => member.position).join(", ")}`}
+                className={`rank-number ${entry.teamPosition <= 3 ? "top" : ""}`}
+                aria-label={`Posição da equipa: ${entry.teamPosition}`}
               >
-                {String(entry.position).padStart(2, "0")}
-                {entry.members.length > 1 && (
-                  <small className="muted">
-                    / {String(entry.members[1].position).padStart(2, "0")}
-                  </small>
-                )}
+                {String(entry.teamPosition).padStart(2, "0")}
               </span>
               <div className="ranking-member-list">
                 {entry.members.length > 1 && (
@@ -1411,23 +1431,26 @@ function RankingTable({
                   team={entry.members}
                 />
               </div>
-              <div className="ranking-member-list ranking-member-values">
-                {entry.members.map((member) => (
-                  <span
-                    key={member._id}
-                    title={`${member.name}: ${member.wins} vitórias / ${member.losses} derrotas`}
-                  >
-                    {member.wins}
-                    <span className="muted"> / {member.losses}</span>
-                  </span>
-                ))}
+              <div
+                className="ranking-member-list ranking-member-values"
+                title="Vitórias / derrotas da equipa"
+              >
+                <span>
+                  {record.wins}
+                  <span className="muted"> / {record.losses}</span>
+                </span>
               </div>
-              <div className="hide-mobile ranking-member-list ranking-member-values">
-                {entry.members.map((member) => (
-                  <span key={member._id} title={member.name}>
-                    <Trend p={member} />
-                  </span>
-                ))}
+              <div
+                className="hide-mobile ranking-team-trend"
+                aria-label="Tendência da equipa"
+              >
+                <Trend
+                  p={{
+                    position: entry.teamPosition,
+                    previousPosition:
+                      previousPositions.get(entry.id) ?? entry.teamPosition,
+                  }}
+                />
               </div>
               <div className="hide-mobile ranking-team-status">
                 <span
@@ -1453,7 +1476,10 @@ function RankingTable({
                 {targetMember ? (
                   <button
                     className="small"
-                    style={{ color: "var(--gold)", borderColor: "#e7b85b33" }}
+                    style={{
+                      color: "var(--gold)",
+                      borderColor: "#e7b85b33",
+                    }}
                     aria-label={
                       entry.members.length > 1
                         ? `Desafiar ${entry.members.map((member) => member.name).join(" + ")}`
@@ -2638,7 +2664,7 @@ function Games(a: Actions) {
         }
       />
       <Section title="Disponibilidade dos campos">
-        <CourtAvailability />
+        <CourtAvailability revision={JSON.stringify([s.courts, s.matches])} />
       </Section>
       <WeekNavigation week={week} onChange={setWeek} />
       <div className="toolbar">
@@ -3225,8 +3251,8 @@ function Admin(a: Actions) {
               ))}
             </div>
           </Section>
-          <details className="panel admin-league-stats">
-            <summary>Estado geral da liga</summary>
+          <section className="panel admin-league-stats">
+            <h2>Estado geral da liga</h2>
             <div className="stats-grid">
               {[
                 {
@@ -3294,7 +3320,7 @@ function Admin(a: Actions) {
                 </div>
               ))}
             </div>
-          </details>
+          </section>
           <Section title="Requer a tua atenção">
             <div className="challenge-grid">
               {needsAttention.map((c) => (
@@ -3345,45 +3371,54 @@ function Admin(a: Actions) {
         <Courts {...a} />
       ) : (
         <Section title="Registo de atividade">
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Ação</th>
-                  <th>Autor</th>
-                  <th>Detalhes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {s.audit
-                  .slice()
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                  .map((x) => (
-                    <tr key={x._id}>
-                      <td>
-                        {fmtDate(x.createdAt)} {fmtTime(x.createdAt)}
-                      </td>
-                      <td>{x.action}</td>
-                      <td>
-                        {s.players.find((p) => p.userId === x.userId)?.name ??
-                          x.userId.slice(0, 12)}
-                      </td>
-                      <td
-                        style={{
-                          whiteSpace: "normal",
-                          minWidth: 250,
-                          maxWidth: 450,
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {x.details}
-                      </td>
+          <DataRows
+            data={s.audit
+              .slice()
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
+            searchText={(x) =>
+              `${x.action} ${x.details} ${s.players.find((p) => p.userId === x.userId)?.name ?? x.userId} ${fmtDate(x.createdAt)}`
+            }
+            label="atividade"
+          >
+            {(rows) => (
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Ação</th>
+                      <th>Autor</th>
+                      <th>Detalhes</th>
                     </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {rows.map((x) => (
+                      <tr key={x._id}>
+                        <td>
+                          {fmtDate(x.createdAt)} {fmtTime(x.createdAt)}
+                        </td>
+                        <td>{x.action}</td>
+                        <td>
+                          {s.players.find((p) => p.userId === x.userId)?.name ??
+                            x.userId.slice(0, 12)}
+                        </td>
+                        <td
+                          style={{
+                            whiteSpace: "normal",
+                            minWidth: 250,
+                            maxWidth: 450,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {x.details}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataRows>
           {!s.audit.length && (
             <Empty text="As ações administrativas vão aparecer aqui." />
           )}
@@ -3972,6 +4007,7 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
     [editing, setEditing] = useState<Player | "new" | null>(null),
     [history, setHistory] = useState<Player | null>(null),
     [vacationPlayer, setVacationPlayer] = useState<Player | null>(null),
+    [deleting, setDeleting] = useState<Player | null>(null),
     [link, setLink] = useState("");
   const registrationCounts = {
     approved: s.players.filter(
@@ -3999,7 +4035,8 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
     )
     .sort(
       (a, b) =>
-        a.divisionId.localeCompare(b.divisionId) || a.position - b.position,
+        a.name.localeCompare(b.name, "pt-PT", { sensitivity: "base" }) ||
+        a._id.localeCompare(b._id),
     );
   async function account(p: Player, action: string) {
     try {
@@ -4125,212 +4162,273 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
       <Section
         title={`${registrationFilter === "pending" ? "Inscrições pendentes" : registrationFilter === "rejected" ? "Inscrições recusadas" : "Jogadores aprovados"} · ${list.length}`}
       >
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Jogador</th>
-                <th>Divisão / Posição</th>
-                <th>Estado</th>
-                {registrationFilter === "approved" && <th>Quota</th>}
-                {registrationFilter === "rejected" && (
-                  <th>Eliminação automática</th>
-                )}
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((p) => (
-                <tr key={p._id}>
-                  <td>
-                    <div className="row">
-                      <Avatar p={p} />
-                      <div>
-                        <strong>{p.name}</strong>
-                        <small style={{ display: "block" }}>
-                          {p.email || "Sem email"} ·{" "}
-                          {p.userId ? "Com conta" : "Sem conta"}
-                        </small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <DivisionBadge s={s} id={p.divisionId} />{" "}
-                    <strong>#{p.position}</strong>
-                  </td>
-                  <td>
-                    <span className="badge">
-                      {p.registrationRejectedAt
-                        ? "Inscrição recusada"
-                        : p.awaitingApproval
-                          ? "Por aprovar"
-                          : {
-                              active: "Ativo",
-                              inactive: "Inativo",
-                              suspended: "Suspenso",
-                              removed: "Removido",
-                            }[p.status]}
-                    </span>
-                    {frozenRanking(s, p._id) && (
-                      <small className="gold" style={{ display: "block" }}>
-                        Ranking congelado
-                      </small>
+        <DataRows
+          data={list}
+          searchText={(p) => `${p.name} ${p.email} ${p.number}`}
+          label="jogadores"
+        >
+          {(rows) => (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Jogador</th>
+                    <th>Divisão / Posição</th>
+                    <th>Estado</th>
+                    {registrationFilter === "approved" && <th>Quota</th>}
+                    {registrationFilter === "rejected" && (
+                      <th>Eliminação automática</th>
                     )}
-                  </td>
-                  {registrationFilter === "approved" && (
-                    <td>
-                      {p.status !== "removed" ? (
-                        <MembershipPaymentControl p={p} run={run} busy={busy} />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  )}
-                  {registrationFilter === "rejected" && (
-                    <td>
-                      {p.registrationRejectedAt &&
-                        (() => {
-                          const expiry = new Date(
-                            Date.parse(p.registrationRejectedAt) + 2 * 86400000,
-                          ).toISOString();
-                          return (
-                            <span>
-                              {fmtDate(expiry)} · {fmtTime(expiry)}
-                            </span>
-                          );
-                        })()}
-                    </td>
-                  )}
-                  <td>
-                    <div className="table-actions admin-player-actions">
-                      <button className="small" onClick={() => setEditing(p)}>
-                        <Pencil size={15} aria-hidden="true" /> Editar
-                      </button>
-                      <button
-                        className="small"
-                        disabled={busy}
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `${p.awaitingApproval || p.registrationRejectedAt ? "Aprovar inscrição" : p.status === "active" ? "Suspender" : "Reativar"} ${p.name}?`,
-                            )
-                          )
-                            void run(
-                              {
-                                type: "admin.player.save",
-                                playerId: p._id,
-                                ...playerData(p),
-                                status:
-                                  p.status === "active"
-                                    ? "suspended"
-                                    : "active",
-                                position: p.registrationRejectedAt
-                                  ? s.players.filter(
-                                      (other) =>
-                                        other.divisionId === p.divisionId &&
-                                        other.status !== "removed",
-                                    ).length + 1
-                                  : Math.max(1, p.position),
-                              },
-                              "Estado atualizado.",
-                            );
-                        }}
-                      >
-                        {p.awaitingApproval || p.registrationRejectedAt ? (
-                          <UserRoundCheck size={15} aria-hidden="true" />
-                        ) : p.status === "active" ? (
-                          <CirclePause size={15} aria-hidden="true" />
-                        ) : (
-                          <CirclePlay size={15} aria-hidden="true" />
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => (
+                    <tr key={p._id}>
+                      <td>
+                        <div className="row">
+                          <Avatar p={p} />
+                          <div>
+                            <strong>{p.name}</strong>
+                            <small style={{ display: "block" }}>
+                              {p.email || "Sem email"} ·{" "}
+                              {p.userId ? "Com conta" : "Sem conta"}
+                            </small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <DivisionBadge s={s} id={p.divisionId} />{" "}
+                        <strong>#{p.position}</strong>
+                      </td>
+                      <td>
+                        <span className="badge">
+                          {p.registrationRejectedAt
+                            ? "Inscrição recusada"
+                            : p.awaitingApproval
+                              ? "Por aprovar"
+                              : {
+                                  active: "Ativo",
+                                  inactive: "Inativo",
+                                  suspended: "Suspenso",
+                                  removed: "Removido",
+                                }[p.status]}
+                        </span>
+                        {frozenRanking(s, p._id) && (
+                          <small className="gold" style={{ display: "block" }}>
+                            Ranking congelado
+                          </small>
                         )}
-                        {p.awaitingApproval || p.registrationRejectedAt
-                          ? "Aprovar inscrição"
-                          : p.status === "active"
-                            ? "Suspender"
-                            : "Reativar"}
-                      </button>
-                      {p.awaitingApproval && (
-                        <button
-                          className="small danger"
-                          disabled={busy}
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `Recusar a inscrição de ${p.name}? Esta pessoa não terá acesso à liga e a conta será eliminada automaticamente após 2 dias.`,
-                              )
-                            )
-                              void run(
-                                {
-                                  type: "admin.registration.reject",
-                                  playerId: p._id,
-                                },
-                                "Inscrição recusada.",
-                              );
-                          }}
-                        >
-                          <X size={15} aria-hidden="true" /> Recusar inscrição
-                        </button>
+                      </td>
+                      {registrationFilter === "approved" && (
+                        <td>
+                          {p.status !== "removed" ? (
+                            <MembershipPaymentControl
+                              p={p}
+                              run={run}
+                              busy={busy}
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                       )}
-                      <details className="admin-player-more">
-                        <summary>
-                          <Ellipsis size={15} aria-hidden="true" />
-                          <span>Mais ações</span>
-                          <ChevronDown
-                            size={13}
-                            className="admin-player-actions-chevron"
-                            aria-hidden="true"
-                          />
-                        </summary>
-                        <div className="admin-player-action-list">
-                          {(p.status === "active" ||
-                            s.exceptions.some(
-                              (entry) =>
-                                entry.playerId === p._id &&
-                                entry.vacation &&
-                                entry.to >= clubDay(Date.now()),
-                            )) &&
-                            !p.awaitingApproval &&
-                            !p.registrationRejectedAt && (
-                              <button
-                                className="small"
-                                onClick={() => setVacationPlayer(p)}
-                              >
-                                <Snowflake size={15} aria-hidden="true" />
-                                {frozenRanking(s, p._id)
-                                  ? "Gerir congelamento"
-                                  : "Congelar ranking"}
-                              </button>
-                            )}
+                      {registrationFilter === "rejected" && (
+                        <td>
+                          {p.registrationRejectedAt &&
+                            (() => {
+                              const expiry = new Date(
+                                Date.parse(p.registrationRejectedAt) +
+                                  2 * 86400000,
+                              ).toISOString();
+                              return (
+                                <span>
+                                  {fmtDate(expiry)} · {fmtTime(expiry)}
+                                </span>
+                              );
+                            })()}
+                        </td>
+                      )}
+                      <td>
+                        <div className="table-actions admin-player-actions">
                           <button
                             className="small"
-                            onClick={() => setHistory(p)}
+                            onClick={() => setEditing(p)}
                           >
-                            <History size={15} aria-hidden="true" /> Histórico
+                            <Pencil size={15} aria-hidden="true" /> Editar
                           </button>
-                          {p.email && (
+                          <button
+                            className="small"
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `${p.awaitingApproval || p.registrationRejectedAt ? "Aprovar inscrição" : p.status === "active" ? "Suspender" : "Reativar"} ${p.name}?`,
+                                )
+                              )
+                                void run(
+                                  {
+                                    type: "admin.player.save",
+                                    playerId: p._id,
+                                    ...playerData(p),
+                                    status:
+                                      p.status === "active"
+                                        ? "suspended"
+                                        : "active",
+                                    position: p.registrationRejectedAt
+                                      ? s.players.filter(
+                                          (other) =>
+                                            other.divisionId === p.divisionId &&
+                                            other.status !== "removed",
+                                        ).length + 1
+                                      : Math.max(1, p.position),
+                                  },
+                                  "Estado atualizado.",
+                                );
+                            }}
+                          >
+                            {p.awaitingApproval || p.registrationRejectedAt ? (
+                              <UserRoundCheck size={15} aria-hidden="true" />
+                            ) : p.status === "active" ? (
+                              <CirclePause size={15} aria-hidden="true" />
+                            ) : (
+                              <CirclePlay size={15} aria-hidden="true" />
+                            )}
+                            {p.awaitingApproval || p.registrationRejectedAt
+                              ? "Aprovar inscrição"
+                              : p.status === "active"
+                                ? "Suspender"
+                                : "Reativar"}
+                          </button>
+                          {p.awaitingApproval && (
                             <button
-                              className="small"
-                              onClick={() =>
-                                account(p, p.userId ? "reset-player" : "invite")
-                              }
+                              className="small danger"
+                              disabled={busy}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Recusar a inscrição de ${p.name}? Esta pessoa não terá acesso à liga e a conta será eliminada automaticamente após 2 dias.`,
+                                  )
+                                )
+                                  void run(
+                                    {
+                                      type: "admin.registration.reject",
+                                      playerId: p._id,
+                                    },
+                                    "Inscrição recusada.",
+                                  );
+                              }}
                             >
-                              {p.userId ? (
-                                <KeyRound size={15} aria-hidden="true" />
-                              ) : (
-                                <MailPlus size={15} aria-hidden="true" />
-                              )}
-                              {p.userId ? "Recuperar acesso" : "Convidar"}
+                              <X size={15} aria-hidden="true" /> Recusar
+                              inscrição
                             </button>
                           )}
+                          <details className="admin-player-more">
+                            <summary>
+                              <Ellipsis size={15} aria-hidden="true" />
+                              <span>Mais ações</span>
+                              <ChevronDown
+                                size={13}
+                                className="admin-player-actions-chevron"
+                                aria-hidden="true"
+                              />
+                            </summary>
+                            <div className="admin-player-action-list">
+                              {(p.status === "active" ||
+                                s.exceptions.some(
+                                  (entry) =>
+                                    entry.playerId === p._id &&
+                                    entry.vacation &&
+                                    entry.to >= clubDay(Date.now()),
+                                )) &&
+                                !p.awaitingApproval &&
+                                !p.registrationRejectedAt && (
+                                  <button
+                                    className="small"
+                                    onClick={() => setVacationPlayer(p)}
+                                  >
+                                    <Snowflake size={15} aria-hidden="true" />
+                                    {frozenRanking(s, p._id)
+                                      ? "Gerir congelamento"
+                                      : "Congelar ranking"}
+                                  </button>
+                                )}
+                              <button
+                                className="small"
+                                onClick={() => setHistory(p)}
+                              >
+                                <History size={15} aria-hidden="true" />{" "}
+                                Histórico
+                              </button>
+                              {p.status !== "removed" &&
+                                !p.awaitingApproval &&
+                                !p.registrationRejectedAt && (
+                                  <button
+                                    className="small danger"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `Remover ${p.name} da liga? O jogador sai do ranking. Os jogos e o histórico ficam guardados.`,
+                                        )
+                                      )
+                                        void run(
+                                          {
+                                            type: "admin.player.save",
+                                            playerId: p._id,
+                                            ...playerData(p),
+                                            status: "removed",
+                                          },
+                                          "Jogador removido da liga.",
+                                        );
+                                    }}
+                                  >
+                                    <UserRoundMinus
+                                      size={15}
+                                      aria-hidden="true"
+                                    />{" "}
+                                    Remover jogador
+                                  </button>
+                                )}
+                              {p._id !== s.actor.playerId && (
+                                <button
+                                  className="small danger"
+                                  disabled={busy}
+                                  onClick={() => setDeleting(p)}
+                                >
+                                  <Trash2 size={15} aria-hidden="true" />{" "}
+                                  Eliminar jogador e conta
+                                </button>
+                              )}
+                              {p.email && (
+                                <button
+                                  className="small"
+                                  onClick={() =>
+                                    account(
+                                      p,
+                                      p.userId ? "reset-player" : "invite",
+                                    )
+                                  }
+                                >
+                                  {p.userId ? (
+                                    <KeyRound size={15} aria-hidden="true" />
+                                  ) : (
+                                    <MailPlus size={15} aria-hidden="true" />
+                                  )}
+                                  {p.userId ? "Recuperar acesso" : "Convidar"}
+                                </button>
+                              )}
+                            </div>
+                          </details>
                         </div>
-                      </details>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataRows>
         {!list.length && (
           <Empty
             text={
@@ -4343,6 +4441,13 @@ function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
           />
         )}
       </Section>
+      {deleting && (
+        <PlayerDeleteDialog
+          {...a}
+          player={deleting}
+          close={() => setDeleting(null)}
+        />
+      )}
       {vacationPlayer && (
         <AdminVacationDialog
           {...a}
@@ -4490,6 +4595,9 @@ function AdminVacationDialog(
 function AdminPartners(a: Actions) {
   const { s, run, busy } = a;
   const [division, setDivision] = useState(s.divisions[0]?._id ?? "");
+  const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const players = s.players
     .filter(
       (p) =>
@@ -4523,11 +4631,11 @@ function AdminPartners(a: Actions) {
         {players.map((p) => (
           <form
             className="inset"
-            key={`${p._id}:${p.partnerId ?? p.partner}`}
+            key={p._id}
             onSubmit={async (event) => {
               event.preventDefault();
               const data = new FormData(event.currentTarget);
-              await run(
+              const result = await run(
                 {
                   type: "admin.partner.set",
                   playerId: p._id,
@@ -4535,6 +4643,12 @@ function AdminPartners(a: Actions) {
                 },
                 "Parceiro atualizado.",
               );
+              if (result)
+                setPartnerDrafts((drafts) => {
+                  const next = { ...drafts };
+                  delete next[p._id];
+                  return next;
+                });
             }}
           >
             <div className="row between wrap">
@@ -4548,7 +4662,14 @@ function AdminPartners(a: Actions) {
               <select
                 name="partner"
                 aria-label={`Parceiro de ${p.name}`}
-                defaultValue={
+                onChange={(event) =>
+                  setPartnerDrafts((drafts) => ({
+                    ...drafts,
+                    [p._id]: event.target.value,
+                  }))
+                }
+                value={
+                  partnerDrafts[p._id] ??
                   p.partnerId ??
                   (players.filter(
                     (other) => other._id !== p._id && other.name === p.partner,
@@ -4582,6 +4703,64 @@ function AdminPartners(a: Actions) {
     </Section>
   );
 }
+function PlayerDeleteDialog({
+  player,
+  run,
+  busy,
+  close,
+}: Actions & { player: Player; close: () => void }) {
+  const [confirmation, setConfirmation] = useState("");
+  return (
+    <Modal title="Eliminar jogador e conta" close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const result = await run(
+            { type: "admin.player.delete", playerId: player._id, confirmation },
+            "Jogador e conta eliminados.",
+          );
+          if (result?.deletedPlayerId) close();
+        }}
+      >
+        <p>
+          <strong>{player.name}</strong>
+          <br />
+          {player.email || "Sem email"}
+        </p>
+        <p>
+          Esta ação é permanente: elimina o perfil e a conta de acesso, termina
+          as sessões e liberta o email para uma nova inscrição. Os registos de
+          auditoria são preservados.
+        </p>
+        <p>
+          Jogadores com jogos, títulos ou rankings arquivados devem usar Remover
+          jogador para manter o histórico de competição.
+        </p>
+        <label>
+          Escreve ELIMINAR para confirmar
+          <input
+            autoComplete="off"
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            required
+          />
+        </label>
+        <div className="row wrap">
+          <button type="button" onClick={close} disabled={busy}>
+            Cancelar
+          </button>
+          <button
+            className="danger"
+            disabled={busy || confirmation !== "ELIMINAR"}
+          >
+            Eliminar definitivamente
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function playerData(p: Player) {
   return {
     name: p.name,
@@ -4750,6 +4929,15 @@ const settingLabels: Record<
 };
 function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState(s.settings[0]);
+  const incomingSettings = JSON.stringify(s.settings[0]);
+  const settingsBaseline = useRef(incomingSettings);
+  useEffect(() => {
+    const previous = settingsBaseline.current;
+    settingsBaseline.current = incomingSettings;
+    setSettings((draft) =>
+      JSON.stringify(draft) === previous ? JSON.parse(incomingSettings) : draft,
+    );
+  }, [incomingSettings]);
   const options: Record<string, [string, string][]> = {
     promotionPlacement: [
       ["top", "Topo da nova divisão"],
@@ -4877,7 +5065,7 @@ function Courts({ s, run, busy }: Actions) {
   return (
     <Section title="Campos e reservas">
       <div className="stack">
-        <CourtAvailability />
+        <CourtAvailability revision={JSON.stringify([s.courts, s.matches])} />
         <p style={{ fontSize: 12 }}>
           Reservas de desafios impedem sobreposição no mesmo campo. Abre um
           desafio para marcar manualmente.
@@ -6238,7 +6426,10 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
             </div>
           )}
           {(mine || admin) && !terminal.has(c.status) && (
-            <CourtAvailability c={c} />
+            <CourtAvailability
+              c={c}
+              revision={JSON.stringify([s.courts, s.matches])}
+            />
           )}
           <div className="calendar-month">
             <WeekNavigation

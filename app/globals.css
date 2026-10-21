@@ -1062,9 +1062,17 @@ td .row {
 .sr-only {
   position: absolute;
   clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
   overflow: hidden;
+}
+.toolbar input.sr-only {
+  width: 1px;
 }
 .footer-note {
   text-align: center;
@@ -2348,4 +2356,64 @@ html[data-theme="fight-club"] .landing-hero:before {
   padding: 4px 0 4px 8px;
   border-left: 1px solid var(--border);
   margin-left: 14px;
+}
+
+.admin-league-stats {
+  margin-top: 32px;
+  margin-bottom: 28px;
+}
+.admin-league-stats > h2 {
+  margin-bottom: 20px;
+}
+.data-table-controls {
+  gap: 16px;
+  margin-block: 16px;
+}
+.data-table-controls label {
+  display: grid;
+  gap: 6px;
+}
+@media (max-width: 600px) {
+  .data-table-controls > .row {
+    flex-wrap: wrap;
+  }
+}
+
+.court-availability-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(130px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+.court-availability-refresh {
+  min-height: 42px;
+  align-self: end;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .court-availability-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .court-availability-refresh {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.live-status .dot {
+  background: var(--gold);
+}
+.live-status[data-live-connection="live"] .dot {
+  background: var(--green);
+}
+.app-update-banner {
+  margin-bottom: 16px;
 }

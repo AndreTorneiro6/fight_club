@@ -1,3 +1,4 @@
+import { EMAIL_IN_USE } from "./email";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { LeagueError } from "./rules";
@@ -23,7 +24,15 @@ export function failure(error: unknown) {
     error.code === 11000
   )
     return NextResponse.json(
-      { error: "Já existe um registo com estes dados." },
+      {
+        error:
+          "keyPattern" in error &&
+          error.keyPattern &&
+          typeof error.keyPattern === "object" &&
+          "email" in error.keyPattern
+            ? EMAIL_IN_USE
+            : "Já existe um registo com estes dados.",
+      },
       { status: 409 },
     );
   console.error(

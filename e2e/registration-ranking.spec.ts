@@ -64,7 +64,7 @@ test("registration requires an explicit ranking category and approval preserves 
     },
   });
   expect(result.ok(), await result.text()).toBe(true);
-  await page.getByRole("button", { name: "Verificar aprovação" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })

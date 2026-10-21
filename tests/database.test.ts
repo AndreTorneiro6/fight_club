@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { database, mutate, view, transaction } from "../lib/db";
-import { register, resetAccount } from "../lib/auth";
+import { register, resetAccount, createAccount } from "../lib/auth";
 import { seed } from "../scripts/seed";
 import type { Actor, Player, User } from "../lib/types";
 
@@ -533,6 +533,244 @@ test("MongoDB transactions serialize simultaneous court bookings and preserve pe
         .countDocuments({ action: "registration.deleted" }),
       1,
     );
+    // Email identity is shared by accounts and player profiles, including legacy formatting.
+    const accountData = {
+      email: "unique@example.test",
+      name: "Unique Applicant",
+      divisionId: "prata",
+      passwordHash: "test-only",
+      verified: true,
+      privacyAccepted: true as const,
+    };
+    await assert.rejects(
+      createAccount({ ...accountData, email: "  ADMIN@FIGHTCLUB.LOCAL  " }),
+      { status: 409 },
+    );
+    const reserved = await db
+      .collection<Player>("players")
+      .findOne({ _id: "player-2" });
+    assert.ok(reserved && !reserved.userId);
+    await assert.rejects(
+      register(
+        {
+          ...signup,
+          email: `  ${reserved.email.toUpperCase()}  `,
+          invitedPlayerId: reserved._id,
+        },
+        true,
+      ),
+      { status: 409 },
+    );
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: reserved._id }))
+        ?.userId,
+      undefined,
+    );
+    // Only the emailed invitation setup can associate the existing profile, without duplicating it.
+    const profileCount = await db.collection("players").countDocuments();
+    const attached = await createAccount({
+      ...accountData,
+      email: reserved.email,
+      invitedPlayerId: reserved._id,
+    });
+    assert.equal(await db.collection("players").countDocuments(), profileCount);
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: reserved._id }))
+        ?.userId,
+      attached._id,
+    );
+    await assert.rejects(
+      createAccount({
+        ...accountData,
+        email: reserved.email.toUpperCase(),
+        invitedPlayerId: reserved._id,
+      }),
+      { status: 409 },
+    );
+    // Concurrent variants result in exactly one account and one profile.
+    const outcomes = await Promise.allSettled([
+      createAccount(accountData),
+      createAccount({ ...accountData, email: "  UNIQUE@EXAMPLE.TEST  " }),
+    ]);
+    assert.equal(
+      outcomes.filter((result) => result.status === "fulfilled").length,
+      1,
+    );
+    assert.equal(
+      outcomes.filter((result) => result.status === "rejected").length,
+      1,
+    );
+    assert.equal(
+      await db.collection("users").countDocuments({ email: accountData.email }),
+      1,
+    );
+    assert.equal(
+      await db
+        .collection("players")
+        .countDocuments({ email: accountData.email }),
+      1,
+    );
+    // Accounts without an associated player still reserve their email in admin creation/edit/import.
+    await db.collection<User>("users").insertOne({
+      ...attached,
+      _id: "orphan-account",
+      email: "  RESERVED@EXAMPLE.TEST  ",
+    });
+    const unchanged = await db
+      .collection<Player>("players")
+      .findOne({ _id: "player-3" });
+    assert.ok(unchanged);
+    await assert.rejects(
+      mutate(admin, {
+        ...unchanged,
+        type: "admin.player.save",
+        playerId: unchanged._id,
+        email: "reserved@example.test",
+      }),
+      { status: 409 },
+    );
+    await assert.rejects(
+      mutate(admin, {
+        ...row,
+        type: "admin.player.save",
+        email: "reserved@example.test",
+      }),
+      { status: 409 },
+    );
+    await assert.rejects(
+      mutate(admin, {
+        type: "admin.players.import",
+        rows: [{ ...row, email: "reserved@example.test" }],
+      }),
+      { status: 409 },
+    );
+    assert.equal(
+      (await db.collection<Player>("players").findOne({ _id: unchanged._id }))
+        ?.email,
+      unchanged.email,
+    );
+    await assert.rejects(
+      createAccount({ ...accountData, email: "reserved@example.test" }),
+      { status: 409 },
+    );
+    // Permanent deletion revokes every account credential atomically and preserves its audit trail.
+    const deletionUser = await createAccount({
+      ...accountData,
+      email: "delete-account@example.test",
+    });
+    const deletionPlayer = await db
+      .collection<Player>("players")
+      .findOne({ userId: deletionUser._id });
+    assert.ok(deletionPlayer);
+    await db
+      .collection("sessions")
+      .insertOne({
+        userId: deletionUser._id,
+        expiresAt: new Date(Date.now() + 3600000),
+      });
+    await db
+      .collection("tokens")
+      .insertOne({
+        email: deletionUser.email,
+        purpose: "invite",
+        expiresAt: new Date(Date.now() + 3600000),
+      });
+    await db.collection("photos").insertOne({ owner: deletionUser._id });
+    await db
+      .collection("push_subscriptions")
+      .insertOne({ userId: deletionUser._id, playerId: deletionPlayer._id });
+    await db
+      .collection("notification_deliveries")
+      .insertOne({ userId: deletionUser._id, playerId: deletionPlayer._id });
+    await transaction((s) => {
+      s.exceptions.push({
+        _id: "delete-frozen",
+        playerId: deletionPlayer._id,
+        vacation: true,
+        from: "2020-01-01",
+        to: "2099-01-01",
+        note: "Fixture",
+      });
+    });
+    await assert.rejects(
+      mutate(admin, {
+        type: "admin.player.delete",
+        playerId: deletionPlayer._id,
+        confirmation: "ELIMINAR",
+      }),
+      /congelada/,
+    );
+    assert.equal(
+      await db
+        .collection("users")
+        .countDocuments({ _id: deletionUser._id as never }),
+      1,
+    );
+    assert.equal(
+      await db
+        .collection("sessions")
+        .countDocuments({ userId: deletionUser._id }),
+      1,
+    );
+    await transaction((s) => {
+      s.exceptions = s.exceptions.filter((row) => row._id !== "delete-frozen");
+    });
+    await mutate(admin, {
+      type: "admin.player.delete",
+      playerId: deletionPlayer._id,
+      confirmation: "ELIMINAR",
+    });
+    assert.equal(
+      await db
+        .collection("players")
+        .countDocuments({ userId: deletionUser._id }),
+      0,
+    );
+    assert.equal(
+      await db
+        .collection("users")
+        .countDocuments({ _id: deletionUser._id as never }),
+      0,
+    );
+    for (const collection of [
+      "sessions",
+      "push_subscriptions",
+      "notification_deliveries",
+    ])
+      assert.equal(
+        await db
+          .collection(collection)
+          .countDocuments({ userId: deletionUser._id }),
+        0,
+      );
+    assert.equal(
+      await db
+        .collection("tokens")
+        .countDocuments({ email: deletionUser.email }),
+      0,
+    );
+    assert.equal(
+      await db.collection("photos").countDocuments({ owner: deletionUser._id }),
+      0,
+    );
+    assert.equal(
+      await db.collection("audit").countDocuments({ action: "player.deleted" }),
+      1,
+    );
+    assert.equal(
+      await db
+        .collection("history")
+        .countDocuments({
+          playerId: deletionPlayer._id,
+          reason: "Jogador eliminado",
+        }),
+      1,
+    );
+    const replacementUser = await createAccount({
+      ...accountData,
+      email: deletionUser.email,
+    });
+    assert.notEqual(replacementUser._id, deletionUser._id);
     await client.close();
   } finally {
     await mongo.stop();

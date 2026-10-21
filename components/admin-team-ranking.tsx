@@ -1,7 +1,8 @@
 "use client";
+import RankingExport from "./ranking-export";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Snowflake } from "lucide-react";
-import { rankingEntries } from "@/lib/ranking-groups";
+import { rankingEntries, teamRecord } from "@/lib/ranking-groups";
 import { frozenRanking } from "@/lib/weekly";
 import type { View } from "@/lib/types";
 
@@ -21,6 +22,7 @@ export default function AdminTeamRanking({
   );
   const [dragging, setDragging] = useState<string | null>(null),
     [over, setOver] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const entries = rankingEntries(s.players, division);
   async function move(playerId: string, targetPlayerId: string) {
     setDragging(null);
@@ -56,8 +58,18 @@ export default function AdminTeamRanking({
           ))}
         </select>
       </label>
+      <button
+        disabled={!entries.length}
+        onClick={() => setExportOpen((value) => !value)}
+      >
+        {exportOpen ? "Fechar exportação" : "Exportar ranking para WhatsApp"}
+      </button>
+      {exportOpen && (
+        <RankingExport key={division} s={s} divisionId={division} />
+      )}
       <ol className="team-ranking-list" aria-label="Ranking de equipas">
         {entries.map((entry, index) => {
+          const record = teamRecord(s.challenges, entry.members);
           const frozen = entry.members.some((member) =>
             frozenRanking(s, member._id),
           );
@@ -108,10 +120,7 @@ export default function AdminTeamRanking({
                 <strong>{label}</strong>
                 <small>
                   {entry.members.length > 1 ? "Equipa" : "Jogador sem parceiro"}{" "}
-                  ·{" "}
-                  {entry.members
-                    .map((member) => `#${member.position}`)
-                    .join(" / ")}
+                  · {record.wins} V / {record.losses} D
                 </small>
                 {frozen && (
                   <small className="role-label">

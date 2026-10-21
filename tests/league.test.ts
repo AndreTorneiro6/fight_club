@@ -2429,3 +2429,137 @@ test("payments reject unapproved members and unscheduled or cancelled matches", 
   c.status = "cancelled";
   assert.throws(() => execute(s, actor(1, "admin"), command, time), /horário/);
 });
+
+test("permanent player deletion unlinks partners, compacts ranking and preserves audit/history", () => {
+  const s = fixture();
+  assignPair(s, 7, 8);
+  s.availability.push({
+    _id: "av-delete",
+    playerId: "p8",
+    weekday: 1,
+    start: "19:00",
+    end: "21:00",
+  });
+  s.notifications.push({
+    _id: "n-delete",
+    playerId: "p8",
+    title: "Aviso",
+    body: "Teste",
+    read: false,
+    createdAt: iso(0),
+  });
+  s.weeklyRounds.push({
+    _id: "round-delete",
+    weekStart: "2026-10-12",
+    assignments: [
+      { playerId: "p8", role: "attack" },
+      { playerId: "p7", role: "attack" },
+    ],
+  });
+  const priorHistory = [...s.history];
+  const result = execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.player.delete", playerId: "p8", confirmation: "ELIMINAR" },
+    time,
+  );
+  assert.deepEqual(result, { deletedPlayerId: "p8" });
+  assert.equal(
+    s.players.some((p) => p._id === "p8"),
+    false,
+  );
+  assert.equal(s.players.find((p) => p._id === "p7")?.partnerId, undefined);
+  assert.equal(
+    s.availability.some((row) => row.playerId === "p8"),
+    false,
+  );
+  assert.equal(
+    s.notifications.some((row) => row.playerId === "p8"),
+    false,
+  );
+  assert.equal(
+    s.weeklyRounds[0].assignments.some((row) => row.playerId === "p8"),
+    false,
+  );
+  assert.ok(priorHistory.every((row) => s.history.includes(row)));
+  assert.ok(
+    s.history.some(
+      (row) => row.playerId === "p8" && row.reason === "Jogador eliminado",
+    ),
+  );
+  assert.equal(s.audit.at(-1)?.action, "player.deleted");
+  assert.equal(
+    JSON.parse(s.audit.at(-1)!.details).before.email,
+    "p8@example.com",
+  );
+  assert.deepEqual(
+    s.players
+      .filter((p) => p.divisionId === "ouro")
+      .map((p) => p.position)
+      .sort((a, b) => a - b),
+    [1, 2, 3, 4, 5, 6, 7],
+  );
+});
+
+test("permanent deletion requires an administrator, explicit confirmation and a different target", () => {
+  const s = fixture();
+  const cmd = {
+    type: "admin.player.delete",
+    playerId: "p8",
+    confirmation: "ELIMINAR",
+  };
+  const before = structuredClone(s);
+  assert.throws(() => execute(s, actor(1), cmd, time), /administradores/);
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...cmd, playerId: "p1" }, time),
+    /própria conta/,
+  );
+  assert.throws(() =>
+    execute(s, actor(1, "admin"), { ...cmd, confirmation: "" }, time),
+  );
+  assert.deepEqual(s, before);
+});
+
+test("permanent deletion protects direct games, team snapshots, titles and archived rankings", () => {
+  const references: ((s: State) => void)[] = [
+    (s) => {
+      create(s, 8, 6);
+    },
+    (s) => {
+      create(s, 4, 3).challengerTeam = [{ playerId: "p8", name: "Jogador 8" }];
+    },
+    (s) => {
+      s.champions.push({
+        _id: "old-title",
+        divisionId: "ouro",
+        playerId: "p8",
+        since: iso(0),
+        defenses: 0,
+        seasonId: "s1",
+      });
+    },
+    (s) => {
+      s.seasons[0].archivedRankings = [structuredClone(s.players[7])];
+    },
+  ];
+  for (const reference of references) {
+    const s = fixture();
+    reference(s);
+    const before = structuredClone(s);
+    assert.throws(
+      () =>
+        execute(
+          s,
+          actor(1, "admin"),
+          {
+            type: "admin.player.delete",
+            playerId: "p8",
+            confirmation: "ELIMINAR",
+          },
+          time,
+        ),
+      /histórico de competição/,
+    );
+    assert.deepEqual(s, before);
+  }
+});

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { courtDayIntervals } from "../lib/court-day";
-import { addClubDays, clubDay } from "../lib/calendar";
+import { addClubDays, clubDay, clubDateTime } from "../lib/calendar";
 
 test("approved players can check courts without a challenge and only unoccupied courts offer booking links", async ({
   page,
@@ -29,7 +29,7 @@ test("approved players can check courts without a challenge and only unoccupied 
   expect(real.ok()).toBe(true);
   const data = await real.json();
   expect(data.courts.length).toBeGreaterThan(0);
-  expect(data.slots).toHaveLength(16);
+  expect(data.slots).toHaveLength(32);
   expect(
     data.courts.every(
       (court: { external: string }) => court.external === "unknown",
@@ -64,19 +64,53 @@ test("approved players can check courts without a challenge and only unoccupied 
         day: queryDay,
         courts,
         slots: courtDayIntervals(queryDay, Number(q.get("minutes"))).map(
-          (slot) => ({ ...slot, courts }),
+          (slot) => ({
+            ...slot,
+            courts: courts.map((court) =>
+              court.id === "a"
+                ? {
+                    ...court,
+                    external:
+                      slot.start >= clubDateTime(queryDay, "19:30") &&
+                      slot.end <= clubDateTime(queryDay, "21:00")
+                        ? "not_blocked"
+                        : "busy",
+                  }
+                : court,
+            ),
+          }),
         ),
       },
     });
   });
   await page.goto("/jogos");
   await page.getByLabel("Dia para consultar").fill(day);
+  await expect(page.getByLabel("Dia para consultar")).toHaveAttribute(
+    "type",
+    "date",
+  );
+  await expect(page.getByLabel("Dia para consultar")).toHaveAttribute(
+    "lang",
+    "pt-PT",
+  );
   await expect(page.locator(".court-day-table caption")).toContainText(
     new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
       timeZone: "UTC",
     }),
   );
-  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(16);
+  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(32);
+  await expect(page.locator(".court-day-table tbody tr").first()).toContainText(
+    "07:00",
+  );
+  await page
+    .getByRole("button", { name: "Atualizar disponibilidade", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Atualizar disponibilidade",
+      exact: true,
+    }),
+  ).toBeEnabled();
   await expect(page.locator('input[type="time"]')).toHaveCount(0);
   await expect(
     page.getByText("Ocupado no Playtomic", { exact: true }).first(),
@@ -89,18 +123,28 @@ test("approved players can check courts without a challenge and only unoccupied 
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /^Reservar Campo 3/ }),
-  ).toHaveCount(16);
+  ).toHaveCount(32);
   await expect(
-    page.getByRole("link", { name: /^Reservar Campo [124]/ }),
+    page.getByRole("link", { name: /^Reservar Campo [24]/ }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: /^Reservar Campo 3/ }).first(),
   ).toHaveAttribute("href", "https://playtomic.com/clubs/neiva-padel-club");
+  const window = page
+    .locator(".court-day-table tbody tr")
+    .filter({ hasText: "19:30" })
+    .filter({ hasText: "21:00" });
+  await expect(
+    window.getByRole("link", { name: /^Reservar Campo 1/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^Reservar Campo 1/ }),
+  ).toHaveCount(1);
   await page.getByLabel("Blocos de horário").selectOption("60");
-  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(24);
+  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(33);
   await expect(
     page.getByRole("link", { name: /^Reservar Campo 3/ }),
-  ).toHaveCount(24);
+  ).toHaveCount(33);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(

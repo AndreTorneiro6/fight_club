@@ -1,3 +1,4 @@
+import { emailSchema } from "@/lib/email";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -73,7 +74,7 @@ export async function POST(
       return NextResponse.json({ ok: true });
     }
     if (action === "forgot") {
-      const email = z.email().parse(data.email).toLowerCase();
+      const email = emailSchema.parse(data.email);
       const { db } = await database();
       if (await db.collection<User>("users").findOne({ email }))
         await accountLink(email, "reset");
@@ -203,7 +204,7 @@ export async function GET(
         info.email_verified && typeof info.email === "string",
         "Email Google não verificado.",
       );
-      const email = z.email().parse(info.email).toLowerCase();
+      const email = emailSchema.parse(info.email);
       const { db } = await database();
       const user = await db.collection<User>("users").findOne({ email });
       if (!user)

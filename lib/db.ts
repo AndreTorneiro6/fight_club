@@ -1,3 +1,4 @@
+import { emailLookup, normalizeEmail, EMAIL_IN_USE } from "./email";
 import { enqueueNotifications } from "./notification-delivery";
 import {
   MongoClient,
@@ -151,10 +152,26 @@ export async function transaction<T>(
           before = structuredClone(state);
         const result = await fn(state, db, session);
         const expired = expireRejectedRegistrations(state);
-        if (expired.length) {
-          const playerIds = expired.map((p) => p._id);
-          const userIds = expired.flatMap((p) => (p.userId ? [p.userId] : []));
-          const emails = expired.map((p) => p.email).filter(Boolean);
+        // Explicit deletions and expired refusals revoke account access in the same transaction.
+        const remainingPlayers = new Set(
+          state.players.map((player) => player._id),
+        );
+        const deletedPlayers = [
+          ...new Map(
+            [
+              ...expired,
+              ...before.players.filter(
+                (player) => !remainingPlayers.has(player._id),
+              ),
+            ].map((player) => [player._id, player]),
+          ).values(),
+        ];
+        if (deletedPlayers.length) {
+          const playerIds = deletedPlayers.map((p) => p._id);
+          const userIds = deletedPlayers.flatMap((p) =>
+            p.userId ? [p.userId] : [],
+          );
+          const emails = deletedPlayers.map((p) => p.email).filter(Boolean);
           await db.collection("notification_deliveries").deleteMany(
             {
               $or: [
@@ -199,7 +216,25 @@ export async function mutate(actor: Actor, command: unknown) {
   return transaction(async (s, db, session) => {
     ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
     processDeadlines(s);
+    const previousEmails = new Map(
+      s.players.map((player) => [player._id, normalizeEmail(player.email)]),
+    );
     const result = execute(s, actor, command);
+    for (const player of s.players) {
+      if (
+        !player.email ||
+        previousEmails.get(player._id) === normalizeEmail(player.email)
+      )
+        continue;
+      const account = await db
+        .collection("users")
+        .findOne(emailLookup(player.email), { session });
+      ensure(
+        !account || String(account._id) === player.userId,
+        EMAIL_IN_USE,
+        409,
+      );
+    }
     if ("deleted" in result && result.deleted && "notificationIds" in result) {
       await db
         .collection("notification_deliveries")

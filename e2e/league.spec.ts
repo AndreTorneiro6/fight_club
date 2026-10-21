@@ -192,6 +192,9 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await expect(
     admin.getByText("Jogador guardado.", { exact: true }),
   ).toBeVisible();
+  await admin
+    .getByLabel("Filtrar jogadores", { exact: true })
+    .fill("browser-test@example.com");
   await expect(
     admin.getByRole("table").getByText("Jogador de teste", { exact: true }),
   ).toBeVisible();

@@ -26,6 +26,27 @@ test("ranking groups assigned partners once on desktop and mobile and restores s
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
+  await expect(
+    admin.getByRole("heading", { name: "Estado geral da liga" }),
+  ).toBeVisible();
+  await admin.getByRole("button", { name: "Jogadores", exact: true }).click();
+  const playerRows = admin.locator("tbody tr");
+  await expect(playerRows).toHaveCount(10);
+  const names = await playerRows
+    .locator("td:first-child strong")
+    .allTextContents();
+  expect(names).toEqual(
+    [...names].sort((a, b) =>
+      a.localeCompare(b, "pt-PT", { sensitivity: "base" }),
+    ),
+  );
+  await admin.getByRole("button", { name: "Seguinte", exact: true }).click();
+  await expect(admin.getByRole("status")).toContainText("11–");
+  await admin
+    .getByLabel("Filtrar jogadores", { exact: true })
+    .fill("Luís Costa");
+  await expect(playerRows).toHaveCount(1);
+  await expect(playerRows).toContainText("Luís Costa");
   await admin.getByRole("button", { name: "Parceiros", exact: true }).click();
   const partner = admin.getByLabel("Parceiro de Luís Costa", { exact: true });
   const form = admin.locator("form").filter({ has: partner });
@@ -49,6 +70,17 @@ test("ranking groups assigned partners once on desktop and mobile and restores s
   await expect(team).toHaveCount(1);
   await expect(team).toContainText("Bruno Martins");
   await expect(team).toContainText("Equipa");
+  await expect(team.locator(".rank-number")).toHaveText("05");
+  await expect(
+    team.locator(".ranking-member-values").first().locator(":scope > span"),
+  ).toHaveCount(1);
+  await expect(page.getByLabel("Filtrar ranking", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByLabel("Paginação: ranking", { exact: true }),
+  ).toHaveCount(0);
+  await expect(team.locator(".ranking-team-trend > span")).toHaveCount(1);
   await expect(team.locator("[data-team-message] button")).toHaveCount(1);
   await expect(team.locator(".ranking-team-status")).toHaveCount(1);
   await expect(rows.filter({ hasText: "Bruno Martins" })).toHaveCount(1);

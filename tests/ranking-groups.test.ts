@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { rankingEntries } from "../lib/ranking-groups";
-import type { Player } from "../lib/types";
+import { rankingEntries, teamRecord } from "../lib/ranking-groups";
+import type { Player, Challenge } from "../lib/types";
 
 function player(
   id: string,
@@ -130,4 +130,36 @@ test("stable partner IDs preserve a pair even when names are duplicated", () => 
     entries.map((entry) => entry.members.map((member) => member._id)),
     [["A", "B"], ["C"]],
   );
+});
+
+test("team results count shared matches once and include legacy participation by either partner", () => {
+  const members = [player("A", 1, "B"), player("B", 2, "A")];
+  const match = (extra: Partial<Challenge>) =>
+    ({
+      challengerId: "A",
+      defenderId: "C",
+      winnerId: "A",
+      status: "completed",
+      challengerTeam: [
+        { playerId: "A", name: "A" },
+        { playerId: "B", name: "B" },
+      ],
+      ...extra,
+    }) as Challenge;
+  const matches = [
+    match({}),
+    match({
+      challengerId: "C",
+      defenderId: "B",
+      winnerId: "C",
+      challengerTeam: undefined,
+    }),
+    match({ status: "result_pending" }),
+    match({ challengerId: "X", defenderId: "Y", challengerTeam: undefined }),
+  ];
+  assert.deepEqual(teamRecord(matches, members), { wins: 1, losses: 1 });
+  assert.deepEqual(teamRecord(matches, [...members].reverse()), {
+    wins: 1,
+    losses: 1,
+  });
 });

@@ -16,7 +16,13 @@ type Result = {
   slots: { start: string; end: string; courts: CourtStatus[] }[];
   clubUrl: string;
 };
-export default function CourtAvailability({ c }: { c?: Challenge }) {
+export default function CourtAvailability({
+  c,
+  revision,
+}: {
+  c?: Challenge;
+  revision?: string;
+}) {
   const [day, setDay] = useState(() => clubDay(Date.now()));
   const [minutes, setMinutes] = useState("90");
   const [refresh, setRefresh] = useState(0);
@@ -50,7 +56,21 @@ export default function CourtAvailability({ c }: { c?: Challenge }) {
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
-  }, [day, minutes, c?._id, refresh]);
+  }, [day, minutes, c?._id, refresh, revision]);
+  useEffect(() => {
+    const update = () => {
+      if (document.visibilityState === "visible")
+        setRefresh((value) => value + 1);
+    };
+    const timer = setInterval(update, 60000);
+    window.addEventListener("online", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
   const time = (value: string) =>
     new Date(value).toLocaleTimeString("pt-PT", {
       timeZone: "Europe/Lisbon",
@@ -62,14 +82,16 @@ export default function CourtAvailability({ c }: { c?: Challenge }) {
     <div className="inset stack">
       <h3>Disponibilidade diária · Playtomic</h3>
       <p>
-        Escolhe o dia para veres todos os campos, em blocos de 1 hora ou 1h30.
-        Horas de Portugal. A reserva é concluída no Playtomic.
+        Escolhe o dia para veres todos os campos a partir das 07:00, em blocos
+        de 1 hora ou 1h30, com início a cada 30 minutos. Horas de Portugal. A
+        reserva é concluída no Playtomic.
       </p>
-      <div className="row wrap">
+      <div className="court-availability-controls">
         <label>
           Dia para consultar
           <input
             type="date"
+            lang="pt-PT"
             value={day}
             min={clubDay(Date.now())}
             max={addClubDays(clubDay(Date.now()), 30)}
@@ -90,6 +112,7 @@ export default function CourtAvailability({ c }: { c?: Challenge }) {
           </select>
         </label>
         <button
+          className="court-availability-refresh"
           disabled={busy}
           onClick={() => setRefresh((value) => value + 1)}
         >

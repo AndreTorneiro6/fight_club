@@ -93,3 +93,29 @@ export function teamName(players: Player[], playerId: string): string {
     .map((member) => member.name)
     .join(" + ");
 }
+
+/** Count each completed match once, including legacy matches without team snapshots. */
+export function teamRecord(
+  challenges: import("./types").Challenge[],
+  members: Player[],
+) {
+  const ids = new Set(members.map((member) => member._id));
+  let wins = 0,
+    losses = 0;
+  for (const match of challenges) {
+    if (match.status !== "completed" || !match.winnerId) continue;
+    const attacking =
+      ids.has(match.challengerId) ||
+      match.challengerTeam?.some((member) => ids.has(member.playerId));
+    const defending =
+      ids.has(match.defenderId) ||
+      match.defenderTeam?.some((member) => ids.has(member.playerId));
+    if ((!attacking && !defending) || (attacking && defending)) continue;
+    const won = attacking
+      ? match.winnerId === match.challengerId
+      : match.winnerId === match.defenderId;
+    if (won) wins++;
+    else losses++;
+  }
+  return { wins, losses };
+}

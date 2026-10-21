@@ -6,6 +6,12 @@ import { database, transaction } from "./db";
 import { ensure } from "./rules";
 import type { Actor, Player, Session, User } from "./types";
 import nodemailer from "nodemailer";
+import {
+  emailSchema,
+  emailLookup,
+  normalizeEmail,
+  EMAIL_IN_USE,
+} from "./email";
 import { isConfiguredAdminEmail } from "./admin-emails";
 
 export const cookieName = "fightclub_session";
@@ -85,7 +91,7 @@ export async function rateLimit(key: string, max = 10) {
   );
 }
 const credentials = z.object({
-  email: z.email().transform((v) => v.toLowerCase().trim()),
+  email: emailSchema,
   password: z.string().min(10).max(72),
 });
 export async function register(raw: unknown, verified = false) {
@@ -112,12 +118,14 @@ export async function createAccount(data: {
   divisionId?: string;
   invite?: string;
   privacyAccepted: true;
+  invitedPlayerId?: string;
 }) {
   ensure(
     data.privacyAccepted === true,
     "Confirma a informação de privacidade.",
     400,
   );
+  data = { ...data, email: emailSchema.parse(data.email) };
   return transaction(async (s, db, session) => {
     ensure(
       s.divisions.length && s.settings.length,
@@ -127,8 +135,17 @@ export async function createAccount(data: {
     ensure(
       !(await db
         .collection<User>("users")
-        .findOne({ email: data.email }, { session })),
-      "Já existe uma conta com este email.",
+        .findOne(emailLookup(data.email), { session })),
+      EMAIL_IN_USE,
+      409,
+    );
+    let p = s.players.find(
+      (player) => normalizeEmail(player.email) === data.email,
+    );
+    ensure(
+      !p || (!p.userId && p._id === data.invitedPlayerId),
+      EMAIL_IN_USE,
+      409,
     );
     const bootstrap = isConfiguredAdminEmail(data.email);
     let invited = false;
@@ -161,9 +178,8 @@ export async function createAccount(data: {
       privacyVersion: data.privacyAccepted ? "2026-10" : undefined,
     };
     await db.collection<User>("users").insertOne(user, { session });
-    let p = s.players.find((x) => x.email.toLowerCase() === data.email);
-    ensure(!p?.userId, "Este jogador já tem uma conta associada.");
     if (p) {
+      p.email = data.email;
       p.userId = user._id;
     } else {
       const div = s.divisions.find(
@@ -232,7 +248,7 @@ const dummyHash =
 export async function login(raw: unknown) {
   const data = z
     .object({
-      email: z.email().transform((v) => v.toLowerCase().trim()),
+      email: emailSchema,
       password: z.string().min(1).max(72),
     })
     .parse(raw);
@@ -346,6 +362,9 @@ export async function resetAccount(raw: unknown) {
     ensure(token.purpose === "invite", "Conta inexistente.");
     user = await createAccount({
       email: token.email,
+      invitedPlayerId: (
+        await db.collection<Player>("players").findOne(emailLookup(token.email))
+      )?._id,
       name: data.name ?? "Jogador",
       divisionId: data.divisionId,
       passwordHash,
