@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 
 test("registration rejects reused emails and an emailed invitation still activates the existing player", async ({
@@ -48,6 +49,7 @@ test("registration rejects reused emails and an emailed invitation still activat
     .fill("FightClub2026!");
   await admin.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(admin).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(admin);
   const before = await (await admin.request.get("/api/league")).json();
   const invite = await admin.request.post("/api/auth/invite", {
     headers: { Origin: "http://localhost:3100" },
@@ -68,6 +70,7 @@ test("registration rejects reused emails and an emailed invitation still activat
     .getByRole("button", { name: "Guardar e entrar", exact: true })
     .click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   const after = await (await admin.request.get("/api/league")).json();
   expect(after.players.length).toBe(before.players.length);
   const player = after.players.find(

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import RankingExport from "./ranking-export";
 import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
@@ -129,6 +130,7 @@ export function WeeklyRoles({
   const admin = s.actor.role === "admin";
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
   const [week, setWeek] = useState(clubWeek().start);
+  const [exportOpen, setExportOpen] = useState(false);
   const [division, setDivision] = useState(admin ? "all" : me.divisionId);
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(round?.assignments ?? []);
@@ -220,6 +222,34 @@ export function WeeklyRoles({
             ))}
           </select>
         </label>
+      )}
+      {admin && (
+        <>
+          <button onClick={() => setExportOpen((value) => !value)}>
+            {exportOpen
+              ? "Fechar exportação dos papéis"
+              : "Exportar papéis semanais para WhatsApp"}
+          </button>
+          {exportOpen && (
+            <RankingExport
+              s={s}
+              kind="weekly"
+              week={week}
+              roles={roles}
+              status={
+                published &&
+                JSON.stringify(Object.entries(roles).sort()) ===
+                  JSON.stringify(
+                    (round?.assignments ?? [])
+                      .map((x) => [x.playerId, x.role])
+                      .sort(),
+                  )
+                  ? "Publicado"
+                  : "Rascunho · guardar e publicar no painel"
+              }
+            />
+          )}
+        </>
       )}
       <div className="stack">
         {visible.map((entry) => {
@@ -362,7 +392,7 @@ export function WeeklyRoles({
               {admin ? (
                 <div className="row wrap">
                   <button
-                    className={role === "attack" ? "primary small" : "small"}
+                    className={`weekly-role-choice ${role === "attack" ? "primary small" : "small"}`}
                     aria-label={`Ataque: ${label}`}
                     aria-pressed={role === "attack"}
                     disabled={
@@ -378,7 +408,7 @@ export function WeeklyRoles({
                     Ataque
                   </button>
                   <button
-                    className={role === "defense" ? "primary small" : "small"}
+                    className={`weekly-role-choice ${role === "defense" ? "primary small" : "small"}`}
                     aria-label={`Defesa: ${label}`}
                     aria-pressed={role === "defense"}
                     disabled={

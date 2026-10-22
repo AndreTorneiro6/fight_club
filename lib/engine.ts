@@ -1,3 +1,12 @@
+import { executeStickerAlbum } from "./sticker-album";
+import { executeAdminNotes } from "./admin-notes";
+import { executePlayerAttributes } from "./player-attributes";
+import {
+  executeCompetition,
+  processCompetitionDeadlines,
+  managedRoundOpen,
+} from "./competition";
+import { executeEngagement } from "./predictions";
 import { emailSchema, normalizeEmail, EMAIL_IN_USE } from "./email";
 import { courtPaymentPlayers } from "./payments";
 import { rankingEntries, teamMembers } from "./ranking-groups";
@@ -344,7 +353,22 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("admin.champion"), divisionId: id, playerId: id }),
   z.object({
+    type: z.literal("admin.champions.clear"),
+    confirmation: z.literal("ESVAZIAR"),
+    reason: short.min(3),
+  }),
+  z.object({
     type: z.literal("admin.season.create"),
+    name: short.min(2),
+    start: day,
+    end: day,
+    pauseStart: z.union([day, z.literal("")]),
+    pauseEnd: z.union([day, z.literal("")]),
+  }),
+  z.object({
+    type: z.literal("admin.season.update"),
+    seasonId: id,
+    expectedVersion: z.number().int().min(0),
     name: short.min(2),
     start: day,
     end: day,
@@ -367,7 +391,120 @@ export function execute(
   raw: unknown,
   timestamp = Date.now(),
 ) {
+  const featureType =
+    raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (featureType.startsWith("admin.stickers."))
+    return executeStickerAlbum(s, actor, raw, timestamp);
+  if (featureType.startsWith("admin.notes."))
+    return executeAdminNotes(s, actor, raw, timestamp);
+  if (featureType === "player.attributes.save")
+    return executePlayerAttributes(
+      s,
+      actor,
+      raw,
+      new Date(timestamp).toISOString(),
+    );
+  if (featureType.startsWith("competition."))
+    return executeCompetition(s, actor, raw, timestamp);
+  if (
+    featureType === "prediction.save" ||
+    featureType === "admin.engagement.settings"
+  )
+    return executeEngagement(s, actor, raw, new Date(timestamp).toISOString());
   const cmd = commandSchema.parse(raw);
+  if (
+    [
+      "admin.ranking.move",
+      "admin.partner.set",
+      "admin.player.save",
+      "admin.players.import",
+      "admin.division.save",
+      "admin.champion",
+      "admin.season.create",
+      "admin.player.delete",
+      "admin.season.status",
+    ].includes(cmd.type)
+  ) {
+    const sourceId =
+      "playerId" in cmd && typeof cmd.playerId === "string"
+        ? cmd.playerId
+        : undefined;
+    const sourceDivision = sourceId
+      ? s.players.find((p) => p._id === sourceId)?.divisionId
+      : undefined;
+    const targetDivision =
+      "divisionId" in cmd && typeof cmd.divisionId === "string"
+        ? cmd.divisionId
+        : undefined;
+    ensure(
+      !(sourceDivision || targetDivision
+        ? [sourceDivision, targetDivision]
+            .filter(Boolean)
+            .some((d) => managedRoundOpen(s, d))
+        : managedRoundOpen(s)),
+      "Uma jornada oficial está por liquidar. Fecha-a antes de alterar equipas ou ranking.",
+    );
+  }
+  if (
+    [
+      "challenge.create",
+      "admin.challenge.create",
+      "admin.challenge.assign",
+    ].includes(cmd.type)
+  ) {
+    const targetId = "challengerId" in cmd ? cmd.challengerId : actor.playerId;
+    const player = s.players.find((p) => p._id === targetId);
+    ensure(
+      !managedRoundOpen(s, player?.divisionId) &&
+        !(s.competitionConfigurations ?? []).some(
+          (c) =>
+            c.enabled &&
+            (s.competitionRounds ?? []).some(
+              (r) =>
+                r.competitionId === c._id &&
+                r.divisionId === player?.divisionId,
+            ),
+        ),
+      "Usa os desafios da jornada oficial em Jornadas.",
+    );
+  }
+  if ("challengeId" in cmd && typeof cmd.challengeId === "string") {
+    const managed = s.challenges.find(
+      (c) => c._id === cmd.challengeId && c.competitionRoundId,
+    );
+    if (
+      managed &&
+      [
+        "admin.resolve",
+        "admin.match.delete",
+        "admin.match.update",
+        "admin.match.approve",
+        "admin.match.reject",
+        "match.schedule",
+        "match.accept_slot",
+        "match.confirm_time",
+        "match.reject_time",
+        "admin.challenge.delete",
+        "admin.challenge.cancel",
+        "admin.challenge.edit",
+        "admin.schedule",
+        "schedule.propose",
+        "schedule.confirm",
+        "challenge.cancel",
+      ].includes(cmd.type)
+    )
+      ensure(
+        false,
+        "Altera o calendário oficial através de uma revisão aprovada e publicada.",
+      );
+    if (managed && cmd.type === "admin.result.correct")
+      ensure(
+        !(s.competitionRounds ?? []).find(
+          (r) => r._id === managed.competitionRoundId,
+        )?.settledAt,
+        "Resultado já liquidado. Exige revisão explícita do ranking e histórico.",
+      );
+  }
   const now = new Date(timestamp).toISOString();
   const rules = s.settings[0];
   const admin = actor.role === "admin";
@@ -658,6 +795,10 @@ export function execute(
   };
   const applyResult = (c: Challenge, winnerId: string, score: string) => {
     ensure(
+      c.competitionRoundId || !managedRoundOpen(s, c.divisionId),
+      "Existe uma jornada oficial por liquidar. Resolve o resultado legado antes de publicar uma jornada.",
+    );
+    ensure(
       !s.results.some((r) => r.challengeId === c._id),
       "Este resultado já foi aplicado.",
     );
@@ -672,8 +813,9 @@ export function execute(
       "Os jogadores mudaram de divisão. Resolve a classificação antes de confirmar.",
     );
     ensure(
-      !frozenRanking(s, w._id, timestamp) &&
-        !frozenRanking(s, l._id, timestamp),
+      !!c.competitionRoundId ||
+        (!frozenRanking(s, w._id, timestamp) &&
+          !frozenRanking(s, l._id, timestamp)),
       "O ranking está congelado durante as férias. Regista o resultado após o regresso.",
     );
     const championsBefore = structuredClone(
@@ -684,6 +826,7 @@ export function execute(
     l.losses++;
     l.challengesLost++;
     if (
+      !c.competitionRoundId &&
       (!c.titleFight || rules.titleAffectsRanking) &&
       w._id === c.challengerId &&
       w.position > l.position &&
@@ -701,12 +844,39 @@ export function execute(
         history(l, lp, "Derrota em desafio", c._id);
       } else movePosition(w, l.position, "Resultado de desafio", c._id);
     }
-    if (c.titleFight && rules.titleChangesOnWin)
+    if (!c.competitionRoundId && c.titleFight && rules.titleChangesOnWin)
       crown(c.divisionId, winnerId, c.seasonId);
     c.winnerId = winnerId;
     c.score = score;
     c.status = "completed";
     c.completedAt = now;
+    if (c.competitionRoundId) {
+      const attackerTeam = (
+        c.challengerTeam?.map((member) => member.playerId) ?? [c.challengerId]
+      )
+        .sort()
+        .join(":");
+      const defenderTeam = (
+        c.defenderTeam?.map((member) => member.playerId) ?? [c.defenderId]
+      )
+        .sort()
+        .join(":");
+      for (const submitted of s.competitionChallenges ?? []) {
+        if (
+          submitted.roundId !== c.competitionRoundId ||
+          submitted.attackerId !== attackerTeam ||
+          submitted.defenderId !== defenderTeam ||
+          submitted.status !== "SCHEDULED"
+        )
+          continue;
+        submitted.status = "COMPLETED";
+        submitted.decisions.push({
+          at: now,
+          actorId: actor.userId,
+          action: `OFFICIAL_RESULT_CONFIRMED:${c._id}`,
+        });
+      }
+    }
     s.results.push({
       _id: uid(),
       challengeId: c._id,
@@ -714,6 +884,7 @@ export function execute(
       loserId: l._id,
       score,
       confirmedAt: now,
+      approvedBy: actor.userId,
       seasonId: c.seasonId,
       ...(c.titleFight && rules.titleChangesOnWin
         ? {
@@ -727,13 +898,17 @@ export function execute(
     notify(
       w._id,
       "Vitória confirmada 🏆",
-      "O resultado e o ranking foram atualizados.",
+      c.competitionRoundId
+        ? "Resultado validado. O ranking será atualizado na liquidação da jornada."
+        : "O resultado e o ranking foram atualizados.",
       c._id,
     );
     notify(
       l._id,
       "Resultado confirmado",
-      "O resultado e o ranking foram atualizados.",
+      c.competitionRoundId
+        ? "Resultado validado. O ranking será atualizado na liquidação da jornada."
+        : "O resultado e o ranking foram atualizados.",
       c._id,
     );
     notifyAdmins(
@@ -1210,7 +1385,13 @@ export function execute(
       const window = rules.weeklyCompetition
         ? weeklyWindow(s, [p._id, d._id], timestamp)
         : null;
-      if (cmd.type === "challenge.create") {
+      if (
+        [
+          "challenge.create",
+          "admin.challenge.create",
+          "admin.challenge.assign",
+        ].includes(cmd.type)
+      ) {
         const reason = challengeReason(s, p, d, timestamp, titleFight);
         ensure(!reason, reason ?? "Desafio inválido.");
       } else {
@@ -2056,6 +2237,7 @@ export function execute(
         for (const c of s.challenges.filter(
           (c) =>
             involves(c, target._id) &&
+            !c.competitionRoundId &&
             !terminal.has(c.status) &&
             !c.scheduledAt,
         )) {
@@ -2208,7 +2390,26 @@ export function execute(
       );
       const referencesPlayer = (row: { playerId: string }) =>
         row.playerId === p._id;
+      const referencesTeam = (teamId: string) =>
+        teamId.split(":").includes(p._id);
       const hasCompetitionHistory =
+        (s.competitionSchedules ?? []).some((schedule) =>
+          schedule.snapshot.some((team) => team.members.some(referencesPlayer)),
+        ) ||
+        (s.competitionChallenges ?? []).some(
+          (c) => referencesTeam(c.attackerId) || referencesTeam(c.defenderId),
+        ) ||
+        (s.competitionAbsences ?? []).some((absence) =>
+          referencesTeam(absence.teamId),
+        ) ||
+        (s.competitionRecoveries ?? []).some((recovery) =>
+          recovery.teamIds.some(referencesTeam),
+        ) ||
+        (s.predictions ?? []).some(
+          (prediction) =>
+            prediction.playerId === p._id ||
+            (!!p.userId && prediction.userId === p.userId),
+        ) ||
         s.challenges.some(
           (c) =>
             c.challengerId === p._id ||
@@ -2733,6 +2934,22 @@ export function execute(
         );
       break;
     }
+    case "admin.champions.clear": {
+      const removed = structuredClone(s.champions);
+      if (!removed.length) return { cleared: 0 };
+      for (const playerId of new Set(removed.map((entry) => entry.playerId))) {
+        const affected = s.players.find((entry) => entry._id === playerId);
+        if (affected)
+          history(
+            affected,
+            affected.position,
+            "Hall of Champions limpo pelo administrador",
+          );
+      }
+      s.champions = [];
+      log("champions.cleared", { reason: cmd.reason, removed });
+      return { cleared: removed.length };
+    }
     case "admin.champion": {
       const p = player(cmd.playerId);
       ensure(
@@ -2772,6 +2989,124 @@ export function execute(
       log("season.created", cmd);
       break;
     }
+    case "admin.season.update": {
+      const target = s.seasons.find((season) => season._id === cmd.seasonId);
+      ensure(target, "Época inexistente.", 404);
+      ensure(
+        target.status !== "completed",
+        "Uma época arquivada conserva os seus dados históricos.",
+        409,
+      );
+      ensure(
+        (target.version ?? 0) === cmd.expectedVersion,
+        "Outro administrador alterou esta época. Atualiza antes de guardar.",
+        409,
+      );
+      ensure(cmd.start < cmd.end, "Datas da época inválidas.");
+      ensure(
+        (!cmd.pauseStart && !cmd.pauseEnd) ||
+          (cmd.pauseStart >= cmd.start &&
+            cmd.pauseEnd <= cmd.end &&
+            cmd.pauseStart <= cmd.pauseEnd),
+        "Período de pausa inválido.",
+      );
+      const datesChanged = target.start !== cmd.start || target.end !== cmd.end;
+      const pauseChanged =
+        target.pauseStart !== cmd.pauseStart ||
+        target.pauseEnd !== cmd.pauseEnd;
+      const seasonChallenges = s.challenges.filter(
+        (c) => c.seasonId === target._id,
+      );
+      const reservations = s.matches.filter(
+        (m) =>
+          m.seasonId === target._id &&
+          seasonChallenges.some(
+            (c) =>
+              c._id === m.challengeId &&
+              !["cancelled", "refused", "expired"].includes(c.status),
+          ),
+      );
+      const starts = [
+        ...reservations.map((m) => m.start),
+        ...seasonChallenges
+          .filter(
+            (c) => !["cancelled", "refused", "expired"].includes(c.status),
+          )
+          .flatMap((c) => (c.scheduledAt ? [c.scheduledAt] : [])),
+      ];
+      if (datesChanged)
+        ensure(
+          starts.every(
+            (start) => clubDay(start) >= cmd.start && clubDay(start) <= cmd.end,
+          ),
+          "As novas datas excluem jogos já marcados. Revê os jogos antes de alterar o período.",
+          409,
+        );
+      const configIds = new Set(
+        (s.competitionConfigurations ?? [])
+          .filter((c) => c.seasonId === target._id)
+          .map((c) => c._id),
+      );
+      const publishedIds = new Set(
+        (s.competitionSchedules ?? [])
+          .filter((schedule) => schedule.status === "PUBLISHED")
+          .map((schedule) => schedule.roundId),
+      );
+      if (datesChanged)
+        ensure(
+          (s.competitionRounds ?? [])
+            .filter(
+              (round) =>
+                configIds.has(round.competitionId) &&
+                publishedIds.has(round._id),
+            )
+            .every(
+              (round) =>
+                clubDay(round.startsAt) >= cmd.start &&
+                clubDay(new Date(Date.parse(round.endsAt) - 1).toISOString()) <=
+                  cmd.end,
+            ),
+          "As novas datas excluem uma jornada publicada. As jornadas oficiais não são alteradas automaticamente.",
+          409,
+        );
+      if (pauseChanged && cmd.pauseStart)
+        ensure(
+          seasonChallenges
+            .filter(
+              (c) =>
+                !["completed", "cancelled", "refused", "expired"].includes(
+                  c.status,
+                ),
+            )
+            .every((c) => {
+              const start =
+                c.scheduledAt ??
+                reservations.find((m) => m.challengeId === c._id)?.start;
+              return (
+                !start ||
+                clubDay(start) < cmd.pauseStart ||
+                clubDay(start) > cmd.pauseEnd
+              );
+            }),
+          "A pausa coincide com jogos já marcados. Revê-os antes de alterar a pausa.",
+          409,
+        );
+      const before = { ...target };
+      Object.assign(target, {
+        name: cmd.name,
+        start: cmd.start,
+        end: cmd.end,
+        pauseStart: cmd.pauseStart,
+        pauseEnd: cmd.pauseEnd,
+        version: (target.version ?? 0) + 1,
+      });
+      log("season.updated", {
+        seasonId: target._id,
+        before,
+        after: { ...target },
+      });
+      break;
+    }
     case "admin.season.status": {
       const target = s.seasons.find((x) => x._id === cmd.seasonId);
       ensure(target, "Época inexistente.");
@@ -2794,6 +3129,7 @@ export function execute(
           "Resolve os desafios ativos antes de terminar a época.",
         );
         target.archivedRankings = structuredClone(s.players);
+        target.archivedDivisions = structuredClone(s.divisions);
         if (cmd.promote) {
           const divisions = [...s.divisions].sort((a, b) => a.tier - b.tier);
           const lists = divisions.map((d) =>
@@ -2889,6 +3225,7 @@ export function execute(
         }
       }
       target.status = cmd.status;
+      target.version = (target.version ?? 0) + 1;
       log("season.status", cmd);
       break;
     }
@@ -2907,6 +3244,7 @@ export function lisbonDay(timestamp: number) {
 }
 
 export function processDeadlines(s: State, timestamp = Date.now()) {
+  processCompetitionDeadlines(s, timestamp);
   const now = new Date(timestamp).toISOString(),
     rules = s.settings[0] ?? defaultSettings;
   const add = (
@@ -2957,7 +3295,11 @@ export function processDeadlines(s: State, timestamp = Date.now()) {
         );
       continue;
     }
-    if (effectiveStatus(c, timestamp) === "expired" && c.status !== "expired") {
+    if (
+      !c.competitionRoundId &&
+      effectiveStatus(c, timestamp) === "expired" &&
+      c.status !== "expired"
+    ) {
       c.expiredFrom = c.status;
       c.status = "expired";
       s.audit.push({

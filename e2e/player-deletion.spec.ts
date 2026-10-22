@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 
 test("admin permanently deletes the selected duplicate, revokes its session and keeps the other account", async ({
@@ -44,6 +45,7 @@ test("admin permanently deletes the selected duplicate, revokes its session and 
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   await page.goto("/admin");
   await page
     .getByRole("dialog")

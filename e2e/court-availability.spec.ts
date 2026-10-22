@@ -30,6 +30,12 @@ test("approved players can check courts without a challenge and only unoccupied 
   const data = await real.json();
   expect(data.courts.length).toBeGreaterThan(0);
   expect(data.slots).toHaveLength(32);
+  expect(data.timeline.courts).toHaveLength(data.courts.length);
+  expect(
+    data.timeline.courts.every((c: any) =>
+      c.segments.every((segment: any) => segment.status !== "clear"),
+    ),
+  ).toBe(true);
   expect(
     data.courts.every(
       (court: { external: string }) => court.external === "unknown",
@@ -63,6 +69,45 @@ test("approved players can check courts without a challenge and only unoccupied 
         clubUrl: "https://playtomic.com/clubs/neiva-padel-club",
         day: queryDay,
         courts,
+        timeline: {
+          start: clubDateTime(queryDay, "07:00"),
+          end: clubDateTime(addClubDays(queryDay, 1), "00:00"),
+          courts: courts.map((c) => ({
+            id: c.id,
+            name: c.name,
+            segments:
+              c.id === "a"
+                ? [
+                    {
+                      start: clubDateTime(queryDay, "07:00"),
+                      end: clubDateTime(queryDay, "19:30"),
+                      status: "busy",
+                    },
+                    {
+                      start: clubDateTime(queryDay, "19:30"),
+                      end: clubDateTime(queryDay, "21:00"),
+                      status: "clear",
+                    },
+                    {
+                      start: clubDateTime(queryDay, "21:00"),
+                      end: clubDateTime(addClubDays(queryDay, 1), "00:00"),
+                      status: "busy",
+                    },
+                  ]
+                : [
+                    {
+                      start: clubDateTime(queryDay, "07:00"),
+                      end: clubDateTime(addClubDays(queryDay, 1), "00:00"),
+                      status:
+                        c.id === "b"
+                          ? "league"
+                          : c.id === "c"
+                            ? "clear"
+                            : "unknown",
+                    },
+                  ],
+          })),
+        },
         slots: courtDayIntervals(queryDay, Number(q.get("minutes"))).map(
           (slot) => ({
             ...slot,
@@ -93,15 +138,20 @@ test("approved players can check courts without a challenge and only unoccupied 
     "lang",
     "pt-PT",
   );
-  await expect(page.locator(".court-day-table caption")).toContainText(
+  await expect(page.locator(".court-timeline-date")).toContainText(
     new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
       timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     }),
   );
-  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(32);
-  await expect(page.locator(".court-day-table tbody tr").first()).toContainText(
-    "07:00",
-  );
+  await expect(
+    page.locator(".court-timeline-row[data-timeline-court]"),
+  ).toHaveCount(4);
+  await expect(page.locator(".court-timeline-axis")).toContainText("07:00");
+  await expect(page.locator(".court-timeline-axis")).toContainText("24:00");
+  await expect(page.locator(".court-day-scroll table")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Atualizar disponibilidade", exact: true })
     .click();
@@ -121,34 +171,69 @@ test("approved players can check courts without a challenge and only unoccupied 
   await expect(
     page.getByText("Por confirmar", { exact: true }).first(),
   ).toBeVisible();
+  await page.locator('[data-timeline-court="c"] [data-status="clear"]').click();
   await expect(
     page.getByRole("link", { name: /^Reservar Campo 3/ }),
   ).toHaveCount(32);
   await expect(
-    page.getByRole("link", { name: /^Reservar Campo [24]/ }),
-  ).toHaveCount(0);
-  await expect(
     page.getByRole("link", { name: /^Reservar Campo 3/ }).first(),
   ).toHaveAttribute("href", "https://playtomic.com/clubs/neiva-padel-club");
-  const window = page
-    .locator(".court-day-table tbody tr")
-    .filter({ hasText: "19:30" })
-    .filter({ hasText: "21:00" });
   await expect(
-    window.getByRole("link", { name: /^Reservar Campo 1/ }),
-  ).toBeVisible();
+    page.getByRole("link", { name: /^Reservar Campo [24]/ }),
+  ).toHaveCount(0);
+  const gap = page.locator('[data-timeline-court="a"] [data-status="clear"]');
+  await expect(gap).toHaveAttribute(
+    "aria-label",
+    "Campo 1 · 19:30–21:00 · Sem ocupação",
+  );
+  await gap.click();
   await expect(
     page.getByRole("link", { name: /^Reservar Campo 1/ }),
   ).toHaveCount(1);
-  await page.getByLabel("Blocos de horário").selectOption("60");
-  await expect(page.locator(".court-day-table tbody tr")).toHaveCount(33);
   await expect(
-    page.getByRole("link", { name: /^Reservar Campo 3/ }),
-  ).toHaveCount(33);
+    page.getByRole("link", { name: /^Reservar Campo 1/ }),
+  ).toContainText("19:30–21:00");
+  await page.getByLabel("Blocos de horário").selectOption("60");
+  await expect(
+    page.getByRole("link", { name: /^Reservar Campo 1/ }),
+  ).toHaveCount(2);
+  await page
+    .locator('[data-timeline-court="d"] [data-status="unknown"]')
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Detalhes do horário" }),
+  ).toContainText("A informação externa está indisponível");
+  await expect(
+    page.getByRole("link", { name: /^Reservar Campo [1234]/ }),
+  ).toHaveCount(0);
+  await page
+    .locator('[data-timeline-court="b"] [data-status="league"]')
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Detalhes do horário" }),
+  ).toContainText("Ocupado na liga");
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".court-day-scroll")).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  expect(
+    await page
+      .locator(".court-day-scroll")
+      .evaluate((el) => el.scrollWidth > el.clientWidth),
+  ).toBe(true);
+  await page.locator(".court-day-scroll").evaluate((el) => {
+    el.scrollLeft = 500;
+  });
+  const nameBox = await page
+    .locator('[data-timeline-court="a"] .court-timeline-name')
+    .boundingBox();
+  const scrollBox = await page.locator(".court-day-scroll").boundingBox();
+  expect(Math.abs(nameBox!.x - scrollBox!.x)).toBeLessThan(3);
+  await page.screenshot({
+    path: test.info().outputPath("court-timeline-mobile.png"),
+    fullPage: true,
+  });
 });

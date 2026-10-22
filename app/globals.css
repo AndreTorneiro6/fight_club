@@ -2172,47 +2172,6 @@ html[data-theme="fight-club"] .landing-hero:before {
   max-height: 650px;
   overflow: auto;
 }
-.court-day-table {
-  width: 100%;
-  min-width: 620px;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12px;
-}
-.court-day-table caption {
-  text-align: left;
-  padding: 8px;
-}
-.court-day-table th,
-.court-day-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: center;
-}
-.court-day-table thead th {
-  position: sticky;
-  top: 0;
-  background: var(--panel, #171717);
-  z-index: 2;
-}
-.court-day-table tbody th {
-  white-space: nowrap;
-}
-.court-day-table a {
-  display: block;
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.court-day-busy {
-  background: rgba(220, 65, 65, 0.14);
-}
-.court-day-clear {
-  background: rgba(55, 165, 100, 0.12);
-}
-.court-day-past {
-  opacity: 0.6;
-}
 
 .admin-navigation {
   display: grid;
@@ -2417,3 +2376,334 @@ html[data-theme="fight-club"] .landing-hero:before {
 .app-update-banner {
   margin-bottom: 16px;
 }
+
+.assistant-panel {
+  min-width: 0;
+}
+.assistant-messages {
+  display: grid;
+  gap: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 1.25rem 0;
+  padding: 0.25rem;
+}
+.assistant-message {
+  padding: 1rem;
+  border: 1px solid var(--border, #333);
+  border-radius: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.assistant-message.user {
+  margin-left: min(10%, 4rem);
+  background: rgba(255, 255, 255, 0.04);
+}
+.assistant-message.assistant {
+  margin-right: min(5%, 2rem);
+}
+.assistant-message p {
+  white-space: pre-wrap;
+}
+.assistant-proposal {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #cfa83e;
+  border-radius: 0.5rem;
+}
+.assistant-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.assistant-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+.assistant-welcome {
+  padding: 1rem 0;
+}
+@media (max-width: 760px) {
+  .topbar .hide-mobile {
+    display: none;
+  }
+}
+
+.poster-selections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+}
+.poster-selections legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+.poster-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  cursor: pointer;
+}
+.poster-choice.selected {
+  border-color: var(--gold);
+  background: #e7b85b12;
+}
+.poster-choice input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--gold);
+  flex-shrink: 0;
+}
+.poster-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.poster-preview img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display: block;
+}
+.poster-actions {
+  align-items: start;
+}
+.weekly-role-choice[aria-pressed="true"] svg {
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-sizing: content-box;
+  padding: 4px;
+}
+@media (max-width: 760px) {
+  .poster-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .poster-actions {
+    align-items: stretch;
+  }
+  .poster-choice {
+    flex: 1 1 40%;
+  }
+}
+
+.court-timeline-view {
+  min-width: 0;
+}
+.court-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.court-timeline-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.court-timeline-key {
+  width: 13px;
+  height: 13px;
+  display: inline-block;
+  border: 1px solid #87939d;
+  border-radius: 2px;
+}
+.court-timeline-key.clear,
+.court-timeline-block.clear {
+  background: #e7efe9;
+}
+.court-timeline-key.busy,
+.court-timeline-block.busy {
+  background: #929ba3;
+}
+.court-timeline-key.league,
+.court-timeline-block.league {
+  background: #c19567;
+}
+.court-timeline-key.unknown,
+.court-timeline-block.unknown {
+  background: repeating-linear-gradient(
+    135deg,
+    #55505b 0 6px,
+    #77717b 6px 12px
+  );
+}
+.court-timeline-key.past {
+  background: repeating-linear-gradient(45deg, #8a969e 0 4px, #e8eeef 4px 8px);
+}
+.court-timeline-grid {
+  --court-label: 136px;
+  width: 100%;
+  min-width: 896px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: clip;
+}
+.court-timeline-row {
+  display: grid;
+  grid-template-columns: var(--court-label) minmax(760px, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.court-timeline-row:last-child {
+  border-bottom: none;
+}
+.court-timeline-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.court-timeline-heading {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+.court-timeline-axis {
+  position: relative;
+  height: 40px;
+  background: var(--panel);
+}
+.court-timeline-axis > span {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.court-timeline-axis > span.first {
+  transform: none;
+  padding-left: 3px;
+}
+.court-timeline-axis > span.last {
+  transform: translateX(-100%);
+  padding-right: 3px;
+}
+.court-timeline-track {
+  position: relative;
+  height: 56px;
+  isolation: isolate;
+  background: var(--panel);
+}
+.court-timeline-track:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff50 0 1px,
+    transparent 1px calc(100% / 17)
+  );
+  pointer-events: none;
+}
+button.court-timeline-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  transition: none;
+}
+button.court-timeline-block:hover {
+  filter: brightness(1.15);
+}
+button.court-timeline-block:active {
+  transform: none;
+}
+button.court-timeline-block.selected,
+button.court-timeline-block:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: -3px;
+  z-index: 1;
+}
+.court-timeline-past {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  background: repeating-linear-gradient(
+    45deg,
+    #10203570 0 8px,
+    #ffffff44 8px 16px
+  );
+  pointer-events: none;
+}
+.court-timeline-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #496cff;
+  z-index: 3;
+  pointer-events: none;
+}
+.court-timeline-detail {
+  min-width: 0;
+}
+.competition-management {
+  min-width: 0;
+}
+.competition-management .card {
+  min-width: 0;
+  padding: clamp(16px, 3vw, 28px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+}
+.competition-management details > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 700;
+}
+.competition-management details[open] > summary {
+  margin-bottom: 12px;
+}
+.competition-management input:not([type="checkbox"]),
+.competition-management select,
+.competition-management textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.competition-management p {
+  overflow-wrap: anywhere;
+}
+.competition-management button {
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .court-timeline-grid {
+    --court-label: 116px;
+    min-width: 876px;
+  }
+}
+
+.workspace-choice { width: min(660px, 100%); padding: clamp(24px, 5vw, 48px); }
+.workspace-choice h1 { margin-bottom: 0; }
+.workspace-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+.workspace-options button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 14px; padding: 24px; min-height: 205px; white-space: normal; }
+.workspace-options button strong { font-size: 17px; }
+.workspace-options button span { color: var(--muted); line-height: 1.6; font-weight: 400; }
+.workspace-switcher { position: relative; }
+.workspace-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 230px; z-index: 60; box-shadow: 0 14px 35px #0008; padding: 16px; }
+.workspace-dropdown button { justify-content: flex-start; }
+@media (max-width: 560px) { .workspace-options { grid-template-columns: 1fr; } .workspace-options button { min-height: 145px; } .workspace-current { display: none; } }

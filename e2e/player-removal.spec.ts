@@ -1,3 +1,4 @@
+import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 
 test("admin can cancel or confirm removing a player while retaining their history", async ({
@@ -10,6 +11,7 @@ test("admin can cancel or confirm removing a player while retaining their histor
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   const pair = await page.request.post("/api/league", {
     headers: { Origin: "http://localhost:3100" },
     data: {
@@ -63,6 +65,12 @@ test("admin can cancel or confirm removing a player while retaining their histor
         entry.playerId === "player-3" && entry.reason === "Removido da época",
     ),
   ).toBe(true);
+  await switchWorkspace(page, "player");
+  const playerTour = page.getByRole("dialog", {
+    name: "Bem-vindo ao Fight Club",
+  });
+  if (await playerTour.isVisible())
+    await playerTour.getByRole("button", { name: "Saltar visita" }).click();
   await page.goto("/ranking");
   await expect(
     page.locator("[data-ranking-entry]").filter({ hasText: "Rui Santos" }),

@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { addClubDays } from "../lib/calendar";
 import type { View } from "../lib/types";
@@ -10,6 +11,7 @@ async function login(page: Page, email: string) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   if (email !== "admin@fightclub.local")
     await page
       .getByRole("dialog")

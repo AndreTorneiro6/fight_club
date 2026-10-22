@@ -13,6 +13,7 @@ const groups = [
   {
     label: "Competição",
     items: [
+      ["matchmaking", "Jornadas e emparelhamento"],
       ["weekly", "Papéis semanais"],
       ["rankings", "Rankings"],
       ["challenges", "Desafios"],
@@ -24,6 +25,10 @@ const groups = [
   {
     label: "Configuração",
     items: [
+      ["notes", "Ideias"],
+      ["assistant", "Assistente"],
+      ["engagement", "Cartões e palpites"],
+      ["album", "Caderneta"],
       ["rules", "Regras"],
       ["courts", "Campos"],
       ["audit", "Auditoria"],

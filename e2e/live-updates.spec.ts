@@ -1,3 +1,4 @@
+import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import type { View } from "../lib/types";
 
@@ -9,6 +10,7 @@ async function adminPage(page: Page) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   await expect(page.locator("[data-live-connection]")).toHaveAttribute(
     "data-live-connection",
     "live",
@@ -119,6 +121,10 @@ test("two admin sessions see payments, registrations and ranking changes live wi
     confirmation: "ELIMINAR",
   });
   await expect(pending).toHaveText("0", { timeout: 5000 });
+  await switchWorkspace(b, "player");
+  const playerTour = b.getByRole("dialog", { name: "Bem-vindo ao Fight Club" });
+  if (await playerTour.isVisible())
+    await playerTour.getByRole("button", { name: "Saltar visita" }).click();
   await b.goto("/ranking");
   await command(a, {
     type: "admin.partner.set",

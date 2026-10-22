@@ -58,15 +58,10 @@ export default function AdminTeamRanking({
           ))}
         </select>
       </label>
-      <button
-        disabled={!entries.length}
-        onClick={() => setExportOpen((value) => !value)}
-      >
+      <button onClick={() => setExportOpen((value) => !value)}>
         {exportOpen ? "Fechar exportação" : "Exportar ranking para WhatsApp"}
       </button>
-      {exportOpen && (
-        <RankingExport key={division} s={s} divisionId={division} />
-      )}
+      {exportOpen && <RankingExport s={s} />}
       <ol className="team-ranking-list" aria-label="Ranking de equipas">
         {entries.map((entry, index) => {
           const record = teamRecord(s.challenges, entry.members);

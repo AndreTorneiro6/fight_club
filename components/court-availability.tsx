@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CourtTimelineView, { type CourtTimeline } from "./court-timeline";
 import { addClubDays, clubDay } from "@/lib/calendar";
 import type { Challenge } from "@/lib/types";
 type CourtStatus = {
@@ -15,6 +16,7 @@ type Result = {
   courts: CourtStatus[];
   slots: { start: string; end: string; courts: CourtStatus[] }[];
   clubUrl: string;
+  timeline: CourtTimeline;
 };
 export default function CourtAvailability({
   c,
@@ -33,7 +35,7 @@ export default function CourtAvailability({
     const controller = new AbortController();
     setBusy(true);
     setError("");
-    setResult(null);
+    setResult((previous) => (previous?.day === day ? previous : null));
     const query = new URLSearchParams({
       day,
       minutes,
@@ -50,7 +52,10 @@ export default function CourtAvailability({
         if (!controller.signal.aborted) setResult(data);
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setError(error.message);
+        if (!controller.signal.aborted) {
+          setError(error.message);
+          setResult(null);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setBusy(false);
@@ -71,20 +76,13 @@ export default function CourtAvailability({
       document.removeEventListener("visibilitychange", update);
     };
   }, []);
-  const time = (value: string) =>
-    new Date(value).toLocaleTimeString("pt-PT", {
-      timeZone: "Europe/Lisbon",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
   return (
     <div className="inset stack">
       <h3>Disponibilidade diária · Playtomic</h3>
       <p>
-        Escolhe o dia para veres todos os campos a partir das 07:00, em blocos
-        de 1 hora ou 1h30, com início a cada 30 minutos. Horas de Portugal. A
-        reserva é concluída no Playtomic.
+        Escolhe o dia para veres a ocupação por campo entre as 07:00 e as 24:00.
+        Seleciona um bloco sem ocupação para veres os inícios possíveis para a
+        duração escolhida. Horas de Portugal.
       </p>
       <div className="court-availability-controls">
         <label>
@@ -128,82 +126,15 @@ export default function CourtAvailability({
             Sem ocupação encontrada não garante abertura do clube ou reserva.
             Confirma a duração total do jogo no Playtomic.
           </small>
-          <div
-            className="court-day-scroll"
-            tabIndex={0}
-            role="region"
-            aria-label="Ocupação de todos os campos ao longo do dia"
-          >
-            <table className="court-day-table">
-              <caption>
-                Ocupação de{" "}
-                {new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
-                  timeZone: "UTC",
-                })}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Hora</th>
-                  {result.courts.map((court) => (
-                    <th scope="col" key={court.id}>
-                      {court.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {result.slots.map((slot) => {
-                  const past = Date.parse(slot.start) <= Date.now();
-                  return (
-                    <tr
-                      key={slot.start}
-                      className={past ? "court-day-past" : ""}
-                    >
-                      <th scope="row">
-                        {time(slot.start)} – {time(slot.end)}
-                      </th>
-                      {slot.courts.map((court) => {
-                        const occupied =
-                          court.localBusy || court.external === "busy";
-                        const known = court.external === "not_blocked";
-                        const label = court.localBusy
-                          ? "Ocupado na liga"
-                          : occupied
-                            ? "Ocupado no Playtomic"
-                            : known
-                              ? "Sem ocupação"
-                              : "Por confirmar";
-                        return (
-                          <td
-                            key={court.id}
-                            className={
-                              occupied
-                                ? "court-day-busy"
-                                : known
-                                  ? "court-day-clear"
-                                  : ""
-                            }
-                          >
-                            {!occupied && known && !past ? (
-                              <a
-                                href={result.clubUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Reservar ${court.name} às ${time(slot.start)} no Playtomic`}
-                              >
-                                {label} ↗
-                              </a>
-                            ) : (
-                              <span>{label}</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div inert={busy} aria-busy={busy}>
+            <CourtTimelineView
+              key={day}
+              timeline={result.timeline}
+              slots={result.slots}
+              clubUrl={result.clubUrl}
+              minutes={minutes}
+              day={day}
+            />
           </div>
           <small>
             Consulta:{" "}

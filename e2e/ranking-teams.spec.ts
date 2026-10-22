@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page, email: string) {
@@ -8,6 +9,7 @@ async function login(page: Page, email: string) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   if (email !== "admin@fightclub.local")
     await page
       .getByRole("dialog")
@@ -109,12 +111,8 @@ test("ranking groups assigned partners once on desktop and mobile and restores s
   await expect(rows).toHaveCount(8);
   await page.getByRole("button", { name: "OURO", exact: true }).click();
   await expect(rows).toHaveCount(7);
-  await admin.goto("/ranking");
-  const blocked = admin
-    .locator("[data-ranking-entry]")
-    .filter({ hasText: "Luís Costa" });
-  await expect(blocked.locator("[data-team-message] small")).toHaveCount(1);
-  await expect(blocked.locator("[data-team-message] button")).toHaveCount(0);
+  // Administration stays in its management workspace; the player checks the public ranking above.
+  await admin.goto("/admin");
   await page.goto("/inicio");
   await expect(page.locator("[data-ranking-entry]")).toHaveCount(5);
   await expect(

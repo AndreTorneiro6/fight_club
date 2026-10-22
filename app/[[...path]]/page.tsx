@@ -1,5 +1,8 @@
 import { Application } from "@/components/application";
-import { notFound } from "next/navigation";
+import { requireActor } from "@/lib/auth";
+import { adminOnlyRoutes } from "@/lib/workspace-routes";
+import { LeagueError } from "@/lib/rules";
+import { redirect, notFound } from "next/navigation";
 const routes = new Set([
   "",
   "auth",
@@ -20,6 +23,9 @@ const routes = new Set([
   "estatisticas",
   "regras",
   "premios",
+  "jornadas",
+  "cartoes",
+  "palpites",
 ]);
 export default async function Page({
   params,
@@ -29,6 +35,20 @@ export default async function Page({
   const { path = [] } = await params;
   const route = path.join("/");
   if (!routes.has(route) && !/^desafios\/[^/]+$/.test(route)) notFound();
+  if (adminOnlyRoutes.has(route)) {
+    let actor;
+    try {
+      actor = await requireActor();
+    } catch (error) {
+      if (
+        error instanceof LeagueError &&
+        (error.status === 401 || error.status === 403)
+      )
+        redirect("/auth");
+      throw error;
+    }
+    if (actor.role !== "admin") redirect("/inicio");
+  }
   if (route === "privacidade")
     return (
       <main className="content">

@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page, email: string, skipTour = true) {
@@ -8,6 +9,7 @@ async function login(page: Page, email: string, skipTour = true) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   const tour = page.getByRole("dialog", { name: "Bem-vindo ao Fight Club" });
   if (skipTour && (await tour.isVisible()))
     await tour.getByRole("button", { name: "Saltar visita" }).click();
@@ -46,9 +48,7 @@ test("player guide supports playback, replay, manual steps and mobile reduced mo
     ),
   ).toBe(true);
   await page.goto("/ajuda/admin");
-  await expect(
-    page.getByText("Esta área é exclusiva dos administradores."),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/inicio/);
   await expect(
     page.getByRole("heading", { name: "Manual do administrador" }),
   ).toHaveCount(0);

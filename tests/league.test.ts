@@ -2563,3 +2563,89 @@ test("permanent deletion protects direct games, team snapshots, titles and archi
     assert.deepEqual(s, before);
   }
 });
+
+test("clearing the Hall of Champions removes current/former reigns while preserving ranking and match data", () => {
+  const s = fixture();
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.champion", divisionId: "ouro", playerId: "p1" },
+    time,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.champion", divisionId: "ouro", playerId: "p2" },
+    time + 1,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.champion", divisionId: "prata", playerId: "p9" },
+    time + 2,
+  );
+  create(s, 8, 6);
+  const removed = structuredClone(s.champions),
+    players = structuredClone(s.players),
+    challenges = structuredClone(s.challenges),
+    results = structuredClone(s.results);
+  const result = execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.champions.clear",
+      confirmation: "ESVAZIAR",
+      reason: "Limpeza inicial",
+    },
+    time + 3,
+  );
+  assert.deepEqual(result, { cleared: 3 });
+  assert.deepEqual(s.champions, []);
+  assert.deepEqual(s.players, players);
+  assert.deepEqual(s.challenges, challenges);
+  assert.deepEqual(s.results, results);
+  assert.deepEqual(JSON.parse(s.audit.at(-1)!.details).removed, removed);
+  assert.equal(s.audit.at(-1)!.action, "champions.cleared");
+  assert.equal(
+    s.history.filter(
+      (row) => row.reason === "Hall of Champions limpo pelo administrador",
+    ).length,
+    3,
+  );
+  const before = structuredClone(s);
+  assert.deepEqual(
+    execute(
+      s,
+      actor(1, "admin"),
+      {
+        type: "admin.champions.clear",
+        confirmation: "ESVAZIAR",
+        reason: "Limpeza inicial",
+      },
+      time + 4,
+    ),
+    { cleared: 0 },
+  );
+  assert.deepEqual(s, before);
+});
+
+test("clearing champions requires administrator access and explicit confirmation", () => {
+  const s = fixture();
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.champion", divisionId: "ouro", playerId: "p1" },
+    time,
+  );
+  const before = structuredClone(s);
+  const command = {
+    type: "admin.champions.clear",
+    confirmation: "ESVAZIAR",
+    reason: "Limpeza inicial",
+  };
+  assert.throws(() => execute(s, actor(2), command, time), /administradores/);
+  assert.throws(() =>
+    execute(s, actor(1, "admin"), { ...command, confirmation: "" }, time),
+  );
+  assert.deepEqual(s, before);
+});

@@ -1,3 +1,19 @@
+import type {
+  StickerSettings,
+  StickerPack,
+  StickerReward,
+} from "./sticker-types";
+import type { AdminNote } from "./admin-notes";
+import type { PlayerAttributes } from "./padel-attributes";
+import type { EngagementSettings, Prediction } from "./predictions";
+import type {
+  CompetitionConfiguration,
+  CompetitionRound,
+  CompetitionSchedule,
+  CompetitionAbsence,
+  CompetitionRecovery,
+  CompetitionChallenge,
+} from "./competition-types";
 export type DivisionCode = "ouro" | "prata" | "bronze";
 export type ChallengeStatus =
   | "pending"
@@ -87,6 +103,14 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  competitionRoundId?: string;
+  predictionCutoffAt?: string;
+  officialPublication?: {
+    roundId: string;
+    scheduleId: string;
+    version: number;
+    publishedAt: string;
+  };
   courtPayments?: (PaymentStatus & { playerId: string })[];
   challengerTeam?: { playerId: string; name: string }[];
   defenderTeam?: { playerId: string; name: string }[];
@@ -195,6 +219,7 @@ export interface Match extends Entity {
   seasonId: string;
 }
 export interface Result extends Entity {
+  approvedBy?: string;
   championsBefore?: Champion[];
   championsAfter?: Champion[];
   challengeId: string;
@@ -213,6 +238,8 @@ export interface Champion extends Entity {
   seasonId: string;
 }
 export interface Season extends Entity {
+  version?: number;
+  archivedDivisions?: Division[];
   name: string;
   start: string;
   end: string;
@@ -236,6 +263,19 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  stickerSettings?: StickerSettings[];
+  stickerPacks?: StickerPack[];
+  stickerRewards?: StickerReward[];
+  adminNotes?: AdminNote[];
+  playerAttributes?: PlayerAttributes[];
+  engagementSettings?: EngagementSettings[];
+  predictions?: Prediction[];
+  competitionConfigurations?: CompetitionConfiguration[];
+  competitionRounds?: CompetitionRound[];
+  competitionSchedules?: CompetitionSchedule[];
+  competitionAbsences?: CompetitionAbsence[];
+  competitionRecoveries?: CompetitionRecovery[];
+  competitionChallenges?: CompetitionChallenge[];
   weeklyRounds: WeeklyRound[];
   registrationLinks: RegistrationLink[];
   players: Player[];
@@ -256,6 +296,19 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "stickerSettings",
+  "stickerPacks",
+  "stickerRewards",
+  "adminNotes",
+  "playerAttributes",
+  "engagementSettings",
+  "predictions",
+  "competitionConfigurations",
+  "competitionRounds",
+  "competitionSchedules",
+  "competitionAbsences",
+  "competitionRecoveries",
+  "competitionChallenges",
   "weeklyRounds",
   "registrationLinks",
   "players",
@@ -275,7 +328,13 @@ export const collections = [
   "champions",
   "seasons",
 ] as const;
+export type Workspace = "admin" | "player";
 export interface Actor {
+  accountRole?: Workspace;
+  workspace?: Workspace;
+  workspaceSelectionRequired?: boolean;
+  /** Internal server-only session identity; never serialized. */
+  sessionId?: string;
   userId: string;
   playerId: string;
   role: "admin" | "player";
@@ -291,6 +350,7 @@ export interface User extends Entity {
   verified?: boolean;
 }
 export interface Session extends Entity {
+  workspace?: Workspace;
   userId: string;
   expiresAt: Date;
 }

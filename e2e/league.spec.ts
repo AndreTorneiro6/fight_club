@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
 test("login never submits credentials in a URL before JavaScript starts", async ({
@@ -27,11 +28,18 @@ async function login(page: Page, email: string) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
   const tour = page.getByRole("dialog", { name: "Bem-vindo ao Fight Club" });
   if (await tour.isVisible())
     await tour.getByRole("button", { name: "Saltar visita" }).click();
   await expect(
-    page.getByRole("heading", { name: /Vamos a jogo/ }),
+    page.getByRole("heading", {
+      name:
+        email === "admin@fightclub.local"
+          ? "Painel do administrador"
+          : /Vamos a jogo/,
+      exact: email === "admin@fightclub.local",
+    }),
   ).toBeVisible();
 }
 test("desktop and mobile league flows with isolated player/admin sessions", async ({

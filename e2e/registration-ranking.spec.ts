@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import type { View } from "../lib/types";
 
@@ -48,6 +49,7 @@ test("registration requires an explicit ranking category and approval preserves 
     .fill("FightClub2026!");
   await admin.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(admin).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(admin);
   const state: View = await (await admin.request.get("/api/league")).json();
   const player = state.players.find(
     (player) => player.email === "ranking-choice@example.test",

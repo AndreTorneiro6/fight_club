@@ -10,3 +10,5 @@ playwright-report
 *.tsbuildinfo
 fight-club-source.zip
 Pasted image.png
+
+.local-ai/

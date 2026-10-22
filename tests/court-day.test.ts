@@ -59,3 +59,47 @@ test("ninety-minute availability includes 19:30–21:00 without overlapping adja
     true,
   );
 });
+
+test("timeline preserves exact booking boundaries and the 19:30–21:00 gap", async () => {
+  const { courtTimelineSegments } = await import("../lib/court-day");
+  const at = (time: string) => clubDateTime("2026-10-21", time);
+  const segments = courtTimelineSegments(
+    at("07:00"),
+    at("23:59"),
+    [
+      { start: at("06:00"), end: at("19:30"), source: "playtomic" },
+      {
+        start: at("21:00"),
+        end: clubDateTime("2026-10-22", "01:00"),
+        source: "playtomic",
+      },
+    ],
+    true,
+  );
+  assert.deepEqual(segments, [
+    { start: at("07:00"), end: at("19:30"), status: "busy" },
+    { start: at("19:30"), end: at("21:00"), status: "clear" },
+    { start: at("21:00"), end: at("23:59"), status: "busy" },
+  ]);
+});
+test("timeline never treats unknown periods as free and merges overlapping bookings", async () => {
+  const { courtTimelineSegments } = await import("../lib/court-day");
+  const at = (time: string) => clubDateTime("2026-10-25", time);
+  const segments = courtTimelineSegments(
+    at("07:00"),
+    at("23:00"),
+    [
+      { start: at("10:00"), end: at("12:00"), source: "playtomic" },
+      { start: at("11:00"), end: at("13:00"), source: "playtomic" },
+      { start: at("11:30"), end: at("12:30"), source: "league" },
+    ],
+    false,
+  );
+  assert.deepEqual(
+    segments.map((s) => s.status),
+    ["unknown", "busy", "league", "busy", "unknown"],
+  );
+  assert.equal(segments[1].end, at("11:30"));
+  assert.equal(segments[3].end, at("13:00"));
+  assert(!segments.some((s) => s.status === "clear"));
+});

@@ -1,5 +1,9 @@
+import { publicActor, workspaceActor } from "./workspace";
+import type { Session, User } from "./types";
 import { emailLookup, normalizeEmail, EMAIL_IN_USE } from "./email";
 import { enqueueNotifications } from "./notification-delivery";
+import { settlePredictions } from "./predictions";
+import { filterFeatureView } from "./feature-view";
 import {
   MongoClient,
   type ClientSession,
@@ -52,6 +56,22 @@ async function indexes(db: Db) {
   await db
     .collection("push_subscriptions")
     .createIndex({ userId: 1, playerId: 1 });
+  await db
+    .collection("playerAttributes")
+    .createIndex({ playerId: 1 }, { unique: true });
+  await db
+    .collection("stickerSettings")
+    .createIndex({ seasonId: 1 }, { unique: true });
+  await db
+    .collection("stickerPacks")
+    .createIndex({ userId: 1, requestId: 1 }, { unique: true });
+  await db
+    .collection("stickerPacks")
+    .createIndex({ userId: 1, seasonId: 1, day: 1 });
+  await db
+    .collection("stickerRewards")
+    .createIndex({ userId: 1, campaignId: 1 }, { unique: true });
+  await db.collection("adminNotes").createIndex({ archived: 1, updatedAt: -1 });
   await db.collection("users").createIndex({ email: 1 }, { unique: true });
   await db
     .collection("sessions")
@@ -76,6 +96,34 @@ async function indexes(db: Db) {
     .createIndex({ challengeId: 1 }, { unique: true });
   await db.collection("matches").createIndex({ courtId: 1, start: 1, end: 1 });
   await db.collection("challenges").createIndex({ seasonId: 1, status: 1 });
+  // Additive indexes: existing seasons and challenges are never backfilled or
+  // interpreted as approved publications when enabling the new features.
+  await db.collection("competitionConfigurations").createIndex({ seasonId: 1 });
+  await db
+    .collection("competitionRounds")
+    .createIndex(
+      { competitionId: 1, divisionId: 1, number: 1 },
+      { unique: true },
+    );
+  await db
+    .collection("competitionSchedules")
+    .createIndex({ roundId: 1, status: 1 });
+  await db
+    .collection("competitionSchedules")
+    .createIndex({ roundId: 1, revision: 1 }, { unique: true });
+  await db
+    .collection("competitionChallenges")
+    .createIndex({ roundId: 1, defenderId: 1, createdAt: 1 });
+  await db
+    .collection("competitionAbsences")
+    .createIndex({ competitionId: 1, divisionId: 1, teamId: 1 });
+  await db.collection("competitionRecoveries").createIndex({ roundId: 1 });
+  await db
+    .collection("predictions")
+    .createIndex({ userId: 1, challengeId: 1 }, { unique: true });
+  await db
+    .collection("predictions")
+    .createIndex({ settlement: 1, playerId: 1 });
   await db
     .collection("notifications")
     .createIndex({ playerId: 1, createdAt: -1 });
@@ -110,11 +158,11 @@ export async function saveState(
 ) {
   for (const key of collections) {
     const old = new Map(
-      (before[key] as Entity[]).map((x) => [x._id, JSON.stringify(x)]),
+      ((before[key] ?? []) as Entity[]).map((x) => [x._id, JSON.stringify(x)]),
     );
-    const next = new Set((after[key] as Entity[]).map((x) => x._id));
+    const next = new Set(((after[key] ?? []) as Entity[]).map((x) => x._id));
     const ops: Document[] = [];
-    for (const entity of after[key])
+    for (const entity of after[key] ?? [])
       if (old.get(entity._id) !== JSON.stringify(entity))
         ops.push({
           replaceOne: {
@@ -123,7 +171,7 @@ export async function saveState(
             upsert: true,
           },
         });
-    for (const entity of before[key])
+    for (const entity of before[key] ?? [])
       if (!next.has(entity._id))
         ops.push({ deleteOne: { filter: { _id: entity._id } } });
     if (ops.length)
@@ -212,14 +260,48 @@ export async function transaction<T>(
     await session.endSession();
   }
 }
+export async function validateActorSession(
+  actor: Actor,
+  db: Db,
+  session: ClientSession,
+) {
+  ensure(
+    !actor.workspaceSelectionRequired,
+    "Escolhe o espaço de trabalho para continuar.",
+    409,
+  );
+  if (!actor.sessionId) return;
+  const active = await db.collection<Session>("sessions").findOne(
+    {
+      _id: actor.sessionId,
+      userId: actor.userId,
+      expiresAt: { $gt: new Date() },
+    },
+    { session },
+  );
+  const user = await db
+    .collection<User>("users")
+    .findOne({ _id: actor.userId }, { session });
+  ensure(active && user?.verified, "Sessão expirada.", 401);
+  const current = workspaceActor(user, active, actor.playerId);
+  ensure(
+    !current.workspaceSelectionRequired &&
+      current.role === actor.role &&
+      current.workspace === actor.workspace,
+    "O espaço de trabalho mudou. Atualiza a página.",
+    409,
+  );
+}
 export async function mutate(actor: Actor, command: unknown) {
   return transaction(async (s, db, session) => {
+    await validateActorSession(actor, db, session);
     ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
     processDeadlines(s);
     const previousEmails = new Map(
       s.players.map((player) => [player._id, normalizeEmail(player.email)]),
     );
     const result = execute(s, actor, command);
+    settlePredictions(s);
     for (const player of s.players) {
       if (
         !player.email ||
@@ -271,7 +353,7 @@ export async function view(actor: Actor): Promise<View> {
     return {
       ...empty,
       players: [me],
-      actor,
+      actor: publicActor(actor),
       demo: process.env.DEMO_MODE === "true",
     };
   }
@@ -279,6 +361,7 @@ export async function view(actor: Actor): Promise<View> {
     actor.role === "admin"
       ? s.registrationLinks.map((x) => ({ ...x, tokenHash: "" }))
       : [];
+  filterFeatureView(s, actor);
   // Expiration is persisted by jobs/commands. Derived UI status stays accurate between scheduler runs.
   const mine = s.challenges
     .filter(
@@ -351,5 +434,9 @@ export async function view(actor: Actor): Promise<View> {
       n.playerId === actor.playerId ||
       (actor.role === "admin" && n.playerId === "__admins__"),
   );
-  return { ...s, actor, demo: process.env.DEMO_MODE === "true" };
+  return {
+    ...s,
+    actor: publicActor(actor),
+    demo: process.env.DEMO_MODE === "true",
+  };
 }

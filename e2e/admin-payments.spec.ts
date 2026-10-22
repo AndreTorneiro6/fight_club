@@ -1,3 +1,4 @@
+import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { addClubDays, clubDay, clubDateTime } from "../lib/calendar";
 import type { View } from "../lib/types";
@@ -9,6 +10,7 @@ async function login(page: Page, email: string) {
     .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
 }
 async function command(page: Page, data: unknown) {
   const r = await page.request.post("/api/league", {

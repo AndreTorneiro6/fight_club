@@ -10,3 +10,10 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+
+.local-ai/
+
+.deploy.lock
+.deployed-revision
+.deployed-image
+.deploy-env-*

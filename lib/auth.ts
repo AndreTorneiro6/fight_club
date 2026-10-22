@@ -1,3 +1,4 @@
+import { workspaceActor } from "./workspace";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { hash, compare } from "bcryptjs";
@@ -17,27 +18,80 @@ import { isConfiguredAdminEmail } from "./admin-emails";
 export const cookieName = "fightclub_session";
 const digest = (v: string) => createHash("sha256").update(v).digest("hex");
 const random = () => randomBytes(32).toString("hex");
-export async function currentUser(): Promise<User | null> {
+async function currentAuthentication() {
   const value = (await cookies()).get(cookieName)?.value;
   if (!value) return null;
   const { db } = await database();
   const session = await db
     .collection<Session>("sessions")
     .findOne({ _id: digest(value), expiresAt: { $gt: new Date() } });
-  return session
-    ? db.collection<User>("users").findOne({ _id: session.userId })
-    : null;
+  if (!session) return null;
+  const user = await db
+    .collection<User>("users")
+    .findOne({ _id: session.userId });
+  return user ? { user, session } : null;
+}
+export async function currentUser(): Promise<User | null> {
+  return (await currentAuthentication())?.user ?? null;
 }
 export async function requireActor(): Promise<Actor> {
-  const user = await currentUser();
-  ensure(user, "Inicia sessão para continuar.", 401);
+  const authentication = await currentAuthentication();
+  ensure(authentication, "Inicia sessão para continuar.", 401);
+  const { user, session } = authentication;
   ensure(user.verified, "Confirma o teu email antes de entrar.", 401);
   const { db } = await database();
   const p = await db
     .collection<Player>("players")
     .findOne({ userId: user._id });
   ensure(p, "Perfil não encontrado.", 403);
-  return { userId: user._id, playerId: p._id, role: user.role };
+  return workspaceActor(user, session, p._id);
+}
+export async function selectWorkspace(raw: unknown) {
+  const { workspace } = z
+    .object({ workspace: z.enum(["admin", "player"]) })
+    .strict()
+    .parse(raw);
+  const authentication = await currentAuthentication();
+  ensure(authentication?.user.verified, "Inicia sessão para continuar.", 401);
+  const { user, session: activeSession } = authentication;
+  ensure(
+    user.role === "admin",
+    "Apenas administradores podem mudar de espaço.",
+    403,
+  );
+  return transaction(async (state, db, session) => {
+    const account = await db
+      .collection<User>("users")
+      .findOne({ _id: user._id }, { session });
+    ensure(
+      account?.role === "admin" && account.verified,
+      "Sem permissão.",
+      403,
+    );
+    const changed = await db
+      .collection<Session>("sessions")
+      .updateOne(
+        {
+          _id: activeSession._id,
+          userId: user._id,
+          expiresAt: { $gt: new Date() },
+        },
+        { $set: { workspace } },
+        { session },
+      );
+    ensure(changed.matchedCount === 1, "Sessão expirada.", 401);
+    state.audit.push({
+      _id: random(),
+      userId: user._id,
+      action: "workspace.changed",
+      createdAt: new Date().toISOString(),
+      details: JSON.stringify({
+        from: activeSession.workspace ?? null,
+        to: workspace,
+      }),
+    });
+    return { ok: true };
+  });
 }
 export async function createSession(userId: string) {
   const { db } = await database(),

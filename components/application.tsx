@@ -1,5 +1,11 @@
 "use client";
 import {
+  adminOnlyRoutes,
+  managementLinks,
+  playerLinks,
+  isManagementRoute,
+} from "@/lib/workspace-routes";
+import {
   useCallback,
   useEffect,
   useRef,
@@ -8,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { rankingEntries, teamMembers, teamName } from "@/lib/ranking-groups";
+import { usesManagedCompetition } from "@/lib/competition-mode";
 import DataRows from "./data-rows";
 import { teamRecord } from "@/lib/ranking-groups";
 import { useLeagueUpdates } from "./use-league-updates";
@@ -21,7 +28,19 @@ import {
   PushNotificationSettings,
 } from "./notification-settings";
 import CourtAvailability from "./court-availability";
+import { StickerAlbum } from "./sticker-album";
+import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
+import AdminAssistant from "./admin-assistant";
+import AdminNotes from "./admin-notes";
+import { AdminPlayerCards } from "./player-attributes";
+import WorkspaceChoice, { WorkspaceSwitcher } from "./workspace-choice";
+import { PlayerCards } from "./player-cards";
+import { EngagementAdmin, PredictionCenter } from "./prediction-center";
+import {
+  CompetitionMatchmaking,
+  PlayerCompetition,
+} from "./competition-matchmaking";
 import AdminPayments, {
   MembershipPaymentControl,
   CourtPaymentDetails,
@@ -380,6 +399,12 @@ export function Application({
     return () => clearInterval(timer);
   }, [route, refresh]);
   useEffect(() => {
+    if (!s || s.actor.workspaceSelectionRequired) return;
+    const adminArea = s.actor.role === "admin";
+    if (adminArea && !isManagementRoute(route)) router.replace("/admin");
+    if (!adminArea && adminOnlyRoutes.has(route)) router.replace("/inicio");
+  }, [s, route, router]);
+  useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 6000);
       return () => clearTimeout(t);
@@ -432,6 +457,14 @@ export function Application({
         )}
       </main>
     );
+  async function chooseWorkspace(workspace: "admin" | "player") {
+    await request("/api/auth/workspace", { workspace });
+    setMenu(false);
+    await refresh();
+    router.replace(workspace === "admin" ? "/admin" : "/inicio");
+  }
+  if (s.actor.workspaceSelectionRequired)
+    return <WorkspaceChoice onSelect={chooseWorkspace} />;
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     admin = s.actor.role === "admin",
     unread = s.notifications.filter((n) => !n.read).length;
@@ -440,6 +473,9 @@ export function Application({
       <main className="center-screen">
         <div className="panel stack">
           <Logo />
+          {s.actor.accountRole === "admin" && (
+            <WorkspaceSwitcher workspace="player" onSelect={chooseWorkspace} />
+          )}
           <h1>
             {p.registrationRejectedAt
               ? "Inscrição recusada"
@@ -467,6 +503,15 @@ export function Application({
         </div>
       </main>
     );
+  if (
+    (admin && !isManagementRoute(route)) ||
+    (!admin && adminOnlyRoutes.has(route))
+  )
+    return (
+      <main className="center-screen">
+        <p role="status">A abrir o teu espaço…</p>
+      </main>
+    );
   const actions: Actions = {
     s,
     run: safeRun,
@@ -488,6 +533,9 @@ export function Application({
       notificacoes: "Notificações",
       regras: "Regras",
       premios: "Prémios",
+      jornadas: "Jornadas oficiais",
+      cartoes: "Cartões de jogador",
+      palpites: "Palpites",
     }[route] ??
     "Desafio";
   return (
@@ -500,42 +548,62 @@ export function Application({
         />
       )}
       <aside className="sidebar">
-        <Link href="/inicio">
+        <Link href={admin ? "/admin" : "/inicio"}>
           <Logo />
         </Link>
-        <div className="nav-label">A TUA ARENA</div>
-        {nav.map((n) => (
-          <Link
-            key={n.path}
-            href={"/" + n.path}
-            className={`nav-link ${route.startsWith(n.path) ? "active" : ""}`}
-          >
-            <n.icon size={17} />
-            {n.label}
-          </Link>
-        ))}
-        <div className="nav-label">A LIGA</div>
-        {[
-          { path: "title-fight", label: "Title Fight", icon: Trophy },
-          { path: "campeoes", label: "Hall of Champions", icon: Crown },
-          { path: "epocas", label: "Épocas", icon: CalendarDays },
-          { path: "estatisticas", label: "Estatísticas", icon: Target },
-          { path: "regras", label: "Regras", icon: BookOpen },
-          { path: "ajuda", label: "Como usar a app", icon: BookOpen },
-          { path: "premios", label: "Prémios", icon: Gift },
-          ...(admin
-            ? [{ path: "admin", label: "Administração", icon: Shield }]
-            : []),
-        ].map((n) => (
-          <Link
-            key={n.path}
-            href={"/" + n.path}
-            className={`nav-link ${route === n.path ? "active" : ""}`}
-          >
-            <n.icon size={17} />
-            {n.label}
-          </Link>
-        ))}
+        {admin ? (
+          <>
+            <div className="nav-label">ESPAÇO DE ADMINISTRAÇÃO</div>
+            {managementLinks.map(([path, label]) => (
+              <Link
+                key={path}
+                href={`/${path}`}
+                className={`nav-link ${route === path ? "active" : ""}`}
+              >
+                <Shield size={17} />
+                {label}
+              </Link>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="nav-label">A TUA ARENA</div>
+            {nav.map((n) => (
+              <Link
+                key={n.path}
+                href={"/" + n.path}
+                className={`nav-link ${route.startsWith(n.path) ? "active" : ""}`}
+              >
+                <n.icon size={17} />
+                {n.label}
+              </Link>
+            ))}
+            <div className="nav-label">INFORMAÇÃO DA LIGA</div>
+            {playerLinks
+              .map(([path, label]) => ({
+                path,
+                label,
+                icon:
+                  path === "cartoes"
+                    ? UserRound
+                    : path === "palpites"
+                      ? Target
+                      : path === "ajuda"
+                        ? BookOpen
+                        : CalendarDays,
+              }))
+              .map((n) => (
+                <Link
+                  key={n.path}
+                  href={"/" + n.path}
+                  className={`nav-link ${route === n.path ? "active" : ""}`}
+                >
+                  <n.icon size={17} />
+                  {n.label}
+                </Link>
+              ))}
+          </>
+        )}
         <div className="sidebar-bottom">
           <div className="row">
             <span className="dot" />
@@ -589,7 +657,7 @@ export function Application({
             </span>
             <button
               className="icon-button mobile-only"
-              aria-label="Menu da liga"
+              aria-label={admin ? "Menu da liga" : "Menu do jogador"}
               onClick={() => setMenu(true)}
             >
               <Menu size={20} />
@@ -599,11 +667,11 @@ export function Application({
               {s.seasons.find((x) => x.status === "active")?.name ??
                 "Época em pausa"}
             </span>
-            {admin && (
-              <Link className="button small" href="/admin">
-                <Shield size={13} />
-                Admin
-              </Link>
+            {s.actor.accountRole === "admin" && (
+              <WorkspaceSwitcher
+                workspace={admin ? "admin" : "player"}
+                onSelect={chooseWorkspace}
+              />
             )}
             <Link
               href="/notificacoes"
@@ -652,6 +720,12 @@ export function Application({
             <Games {...actions} />
           ) : route === "perfil" ? (
             <Profile {...actions} />
+          ) : route === "cartoes" ? (
+            <PlayerCards revision={s} />
+          ) : route === "jornadas" ? (
+            <PlayerCompetition s={s} run={safeRun} busy={busy} />
+          ) : route === "palpites" ? (
+            <PredictionCenter revision={s} />
           ) : route === "notificacoes" ? (
             <Notifications {...actions} />
           ) : route === "ajuda" ? (
@@ -685,31 +759,41 @@ export function Application({
         </main>
       </div>
       <nav className="mobile-nav" aria-label="Menu principal">
-        {nav.map((n) => (
-          <Link
-            key={n.path}
-            href={"/" + n.path}
-            className={route.startsWith(n.path) ? "active" : ""}
-          >
-            <n.icon size={19} />
-            {n.label}
-          </Link>
-        ))}
+        {admin ? (
+          <>
+            <Link href="/admin" className={route === "admin" ? "active" : ""}>
+              <Shield size={19} />
+              Administração
+            </Link>
+            <Link href="/notificacoes">
+              <Bell size={19} />
+              Notificações
+            </Link>
+            <Link href="/perfil">
+              <UserRound size={19} />
+              Conta
+            </Link>
+          </>
+        ) : (
+          nav.map((n) => (
+            <Link
+              key={n.path}
+              href={"/" + n.path}
+              className={route.startsWith(n.path) ? "active" : ""}
+            >
+              <n.icon size={19} />
+              {n.label}
+            </Link>
+          ))
+        )}
       </nav>
       {menu && (
-        <Modal title="A liga" close={() => setMenu(false)}>
+        <Modal
+          title={admin ? "A liga" : "Informação da liga"}
+          close={() => setMenu(false)}
+        >
           <div className="stack">
-            {[
-              ["title-fight", "Title Fight"],
-              ["campeoes", "Hall of Champions"],
-              ["epocas", "Épocas"],
-              ["estatisticas", "Estatísticas"],
-              ["regras", "Regras"],
-              ["ajuda", "Como usar a app"],
-              ...(admin ? [["ajuda/admin", "Manual do administrador"]] : []),
-              ["premios", "Prémios"],
-              ...(admin ? [["admin", "Administração"]] : []),
-            ].map(([path, label]) => (
+            {(admin ? managementLinks : playerLinks).map(([path, label]) => (
               <Link
                 className="button"
                 key={path}
@@ -1219,7 +1303,9 @@ function Dashboard(a: Actions) {
         <div className="quick-grid full">
           {[
             {
-              href: "/ranking",
+              href: usesManagedCompetition(s, p.divisionId)
+                ? "/jornadas"
+                : "/ranking",
               icon: Swords,
               label: "Desafiar",
               sub: "Entra na competição",
@@ -1346,6 +1432,7 @@ function RankingTable({
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     [target, setTarget] = useState<Player | null>(null),
     router = useRouter();
+  const managed = usesManagedCompetition(s, p.divisionId);
   const previousPositions = new Map(
     rankingEntries(
       s.players.map((member) => ({
@@ -1414,14 +1501,13 @@ function RankingTable({
                       {member._id === p._id && (
                         <span className="gold">· Tu</span>
                       )}
-                      <small>
-                        Jogador #{member.number}
-                        {entry.members.length === 1
-                          ? member.partner
-                            ? ` · Parceiro por confirmar: ${member.partner}`
-                            : " · Sem parceiro atribuído"
-                          : ""}
-                      </small>
+                      {entry.members.length === 1 && (
+                        <small>
+                          {member.partner
+                            ? `Parceiro por confirmar: ${member.partner}`
+                            : "Sem parceiro atribuído"}
+                        </small>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1473,7 +1559,11 @@ function RankingTable({
                 className="right ranking-team-action"
                 data-team-message={entry.id}
               >
-                {targetMember ? (
+                {managed && !ownTeam && divisionId === p.divisionId ? (
+                  <Link className="button small" href="/jornadas">
+                    Ver desafios
+                  </Link>
+                ) : targetMember ? (
                   <button
                     className="small"
                     style={{
@@ -1606,6 +1696,7 @@ function Challenges(a: Actions) {
     [state, setState] = useState("all");
   const admin = s.actor.role === "admin",
     p = s.players.find((p) => p._id === s.actor.playerId)!;
+  const managed = usesManagedCompetition(s, p.divisionId);
   const pool = s.challenges.filter(
     (c) => (admin && scope === "league") || involves(c, p._id),
   );
@@ -1656,7 +1747,11 @@ function Challenges(a: Actions) {
         title="Ataque e defesa"
         description="Recebe desafios, escolhe adversários e gere os teus jogos num só lugar."
         right={
-          admin && s.settings[0].weeklyCompetition ? (
+          managed ? (
+            <Link className="button primary" href="/jornadas">
+              Desafios da jornada
+            </Link>
+          ) : admin && s.settings[0].weeklyCompetition ? (
             <a className="button primary" href="#weekly-role-assignment">
               <Sword size={15} />
               <Shield size={15} />
@@ -1682,8 +1777,22 @@ function Challenges(a: Actions) {
           )
         }
       />
-      <WeeklyRoles s={s} run={a.run} busy={a.busy} onChallenge={setTarget} />
-      {admin && !s.settings[0].weeklyCompetition ? (
+      {managed ? (
+        <section className="panel stack">
+          <h2>Desafios da jornada oficial</h2>
+          <p>
+            Consulta os adversários elegíveis e acompanha os desafios em
+            Jornadas. Os jogos só são oficiais depois da aprovação e publicação
+            do administrador.
+          </p>
+          <Link className="button" href="/jornadas">
+            Abrir jornada oficial
+          </Link>
+        </section>
+      ) : (
+        <WeeklyRoles s={s} run={a.run} busy={a.busy} onChallenge={setTarget} />
+      )}
+      {admin && !managed && !s.settings[0].weeklyCompetition ? (
         <div className="inset space-top" style={{ marginBottom: 20 }}>
           <p style={{ fontSize: 12 }}>
             Para criar um confronto entre quaisquer jogadores, usa{" "}
@@ -1693,6 +1802,7 @@ function Challenges(a: Actions) {
           </p>
         </div>
       ) : (
+        !managed &&
         blockedReason && (
           <div
             className="inset stack"
@@ -1863,7 +1973,7 @@ function Challenges(a: Actions) {
           <Empty text="Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo." />
         </Section>
       )}
-      {scope === "mine" && !s.settings[0].weeklyCompetition && (
+      {scope === "mine" && !managed && !s.settings[0].weeklyCompetition && (
         <div id="fazer-desafio" className="space-top">
           <Section
             title="Fazer um desafio"
@@ -3345,6 +3455,19 @@ function Admin(a: Actions) {
           </div>
           {!clubPending.length && <Empty text="Não há campos por confirmar." />}
         </Section>
+      ) : tab === "album" ? (
+        <StickerAlbum revision={s} />
+      ) : tab === "notes" ? (
+        <AdminNotes state={s} run={a.run} busy={a.busy} />
+      ) : tab === "assistant" ? (
+        <AdminAssistant s={s} refresh={a.refresh} />
+      ) : tab === "engagement" ? (
+        <div className="stack">
+          <AdminPlayerCards revision={s} />
+          <EngagementAdmin revision={s} />
+        </div>
+      ) : tab === "matchmaking" ? (
+        <CompetitionMatchmaking s={s} run={a.run} busy={a.busy} />
       ) : tab === "payments" ? (
         <AdminPayments s={s} run={a.run} busy={a.busy} />
       ) : tab === "partners" ? (
@@ -5154,6 +5277,7 @@ function TitleFights(a: Actions) {
   const { s, run, busy } = a,
     p = s.players.find((p) => p._id === s.actor.playerId)!,
     admin = s.actor.role === "admin";
+  const managed = usesManagedCompetition(s, p.divisionId);
   return (
     <>
       <Heading
@@ -5198,30 +5322,41 @@ function TitleFights(a: Actions) {
                   ? `${champion.defenses} defesas · desde ${fmtDate(champion.since)}`
                   : "O administrador define o primeiro campeão."}
               </small>
-              {holder && p.divisionId === d._id && holder._id !== p._id && (
-                <div className="space-top">
-                  <button
-                    className="primary wide"
-                    disabled={busy || !!reason}
-                    title={reason ?? "Desafiar campeão"}
-                    onClick={async () => {
-                      const res = await run(
-                        {
-                          type: "challenge.create",
-                          defenderId: holder._id,
-                          titleFight: true,
-                        },
-                        "Title Fight enviado.",
-                      );
-                      if (res?.id) location.href = "/desafios/" + res.id;
-                    }}
-                  >
-                    <Swords size={14} />
-                    Desafiar campeão
-                  </button>
-                  {reason && <small>{reason}</small>}
-                </div>
+              {managed && p.divisionId === d._id && (
+                <Link
+                  className="button primary wide space-top"
+                  href="/jornadas"
+                >
+                  Consultar jogo do título na jornada
+                </Link>
               )}
+              {!managed &&
+                holder &&
+                p.divisionId === d._id &&
+                holder._id !== p._id && (
+                  <div className="space-top">
+                    <button
+                      className="primary wide"
+                      disabled={busy || !!reason}
+                      title={reason ?? "Desafiar campeão"}
+                      onClick={async () => {
+                        const res = await run(
+                          {
+                            type: "challenge.create",
+                            defenderId: holder._id,
+                            titleFight: true,
+                          },
+                          "Title Fight enviado.",
+                        );
+                        if (res?.id) location.href = "/desafios/" + res.id;
+                      }}
+                    >
+                      <Swords size={14} />
+                      Desafiar campeão
+                    </button>
+                    {reason && <small>{reason}</small>}
+                  </div>
+                )}
               {admin && (
                 <form
                   className="space-top"
@@ -5336,7 +5471,9 @@ function Champions({ s }: Actions) {
 function Seasons({ s, run, busy }: Actions) {
   const admin = s.actor.role === "admin",
     [creating, setCreating] = useState(false),
+    [editing, setEditing] = useState<string | null>(null),
     [archive, setArchive] = useState<string | null>(null);
+  const editingSeason = s.seasons.find((season) => season._id === editing);
   const selected = s.seasons.find((x) => x._id === archive);
   return (
     <>
@@ -5395,6 +5532,12 @@ function Seasons({ s, run, busy }: Actions) {
                   )}
                   {admin && season.status !== "completed" && (
                     <>
+                      <button
+                        disabled={busy}
+                        onClick={() => setEditing(season._id)}
+                      >
+                        <Settings2 size={14} /> Editar época
+                      </button>
                       {season.status !== "active" && (
                         <button
                           className="primary"
@@ -5460,9 +5603,21 @@ function Seasons({ s, run, busy }: Actions) {
                   )}
                 </div>
               </div>
+              <SeasonOverview state={s} season={season} />
             </Section>
           ))}
       </div>
+      {editingSeason && admin && (
+        <Modal title="Editar época" close={() => setEditing(null)}>
+          <SeasonEditor
+            key={editingSeason._id}
+            season={editingSeason}
+            busy={busy}
+            run={run}
+            close={() => setEditing(null)}
+          />
+        </Modal>
+      )}
       {creating && (
         <Modal title="Criar nova época" close={() => setCreating(false)}>
           <form

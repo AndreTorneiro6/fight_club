@@ -1,5 +1,5 @@
 import { addClubDays, clubDay } from "@/lib/calendar";
-import { courtDayIntervals } from "@/lib/court-day";
+import { courtDayIntervals, courtTimelineSegments } from "@/lib/court-day";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireActor, rateLimit } from "@/lib/auth";
@@ -131,6 +131,37 @@ export async function GET(request: Request) {
         courts: courtStatuses(start, end),
         ...(intervals
           ? {
+              timeline: {
+                start,
+                end,
+                courts: courts.map((court) => ({
+                  id: court._id,
+                  name: court.name,
+                  segments: courtTimelineSegments(
+                    start,
+                    end,
+                    [
+                      ...matches
+                        .filter((m) => m.courtId === court._id)
+                        .map((m) => ({
+                          start: m.start,
+                          end: m.end,
+                          source: "league" as const,
+                        })),
+                      ...(external?.occupations ?? [])
+                        .filter(
+                          (b) => b.resourceId === court.playtomicResourceId,
+                        )
+                        .map((b) => ({
+                          start: b.start,
+                          end: b.end,
+                          source: "playtomic" as const,
+                        })),
+                    ],
+                    !!external && !!court.playtomicResourceId,
+                  ),
+                })),
+              },
               slots: intervals.map((slot) => ({
                 ...slot,
                 courts: courtStatuses(slot.start, slot.end),

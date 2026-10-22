@@ -1,0 +1,60 @@
+name: Validate and deploy Fight Club
+
+on:
+  push:
+    branches: [main, deploy]
+  pull_request:
+    branches: [main, deploy]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fight-club-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          TMPDIR: ${{ runner.temp }}
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+  deploy:
+    if: github.ref == 'refs/heads/deploy' && github.event_name != 'pull_request'
+    needs: checks
+    runs-on: [self-hosted, Linux, ARM64, fight-club-production]
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://fight-club.wbglabs.io
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build and deploy directly on the Raspberry Pi
+        run: bash scripts/deploy-production.sh "$GITHUB_WORKSPACE"
+      - name: Verify public health
+        run: curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://fight-club.wbglabs.io/api/health

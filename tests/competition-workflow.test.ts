@@ -1,0 +1,1112 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { execute, processDeadlines } from "../lib/engine";
+import { usesManagedCompetition } from "../lib/competition-mode";
+import {
+  competitionTeams,
+  effectiveCompetitionConfig,
+  competitionPriorities,
+  validateCompetitionSchedule,
+} from "../lib/competition";
+import {
+  collections,
+  defaultSettings,
+  type Actor,
+  type Player,
+  type State,
+} from "../lib/types";
+import {
+  defaultCompetitionWeights,
+  type CompetitionRound,
+  type CompetitionSchedule,
+} from "../lib/competition-types";
+
+const time = Date.parse("2026-10-21T10:00:00Z");
+const iso = (days = 0, hours = 0) =>
+  new Date(time + days * 86400000 + hours * 3600000).toISOString();
+const actor = (
+  n: number,
+  division = "ouro",
+  role: "player" | "admin" = "player",
+): Actor => ({
+  userId: `u-${division}-${n}`,
+  playerId: `${division}-${n}`,
+  role,
+});
+const admin = actor(1, "ouro", "admin");
+function command(s: State, raw: unknown, who = admin, at = time) {
+  return execute(s, who, raw, at);
+}
+function configCommand(s: State, patch: Record<string, unknown> = {}) {
+  const c = s.competitionConfigurations?.[0];
+  return {
+    type: "competition.config.save",
+    competitionId: c?._id,
+    expectedVersion: c?.version ?? 0,
+    seasonId: "season",
+    enabled: true,
+    officialRounds: 10,
+    defaultDistance: 2,
+    leagueDistances: {},
+    championPositions: [2, 3],
+    responseHours: 48,
+    firstOpen: true,
+    finalOpen: true,
+    weights: defaultCompetitionWeights,
+    ...patch,
+  };
+}
+function fixture() {
+  const s = Object.fromEntries(
+    collections.map((c) => [c, []]),
+  ) as unknown as State;
+  s.settings = [{ ...defaultSettings }];
+  s.seasons = [
+    {
+      _id: "season",
+      name: "2026",
+      start: "2026-10-01",
+      end: "2027-04-01",
+      pauseStart: "",
+      pauseEnd: "",
+      status: "active",
+    },
+  ];
+  s.divisions = [
+    { _id: "ouro", code: "ouro", name: "Ouro", tier: 1, capacity: 24 },
+    { _id: "prata", code: "prata", name: "Prata", tier: 2, capacity: 24 },
+    { _id: "bronze", code: "bronze", name: "Bronze", tier: 3, capacity: 20 },
+  ];
+  s.players = s.divisions.flatMap((d) =>
+    Array.from({ length: d.code === "bronze" ? 10 : 12 }, (_, i): Player => ({
+      _id: `${d._id}-${i + 1}`,
+      userId: `u-${d._id}-${i + 1}`,
+      name: `${d.name} ${i + 1}`,
+      number: d.tier * 100 + i,
+      email: `${d._id}${i}@test.local`,
+      phone: "",
+      photo: "",
+      divisionId: d._id,
+      position: i + 1,
+      previousPosition: i + 1,
+      status: "active",
+      partner: "",
+      wins: 0,
+      losses: 0,
+      challengesWon: 0,
+      challengesLost: 0,
+      createdAt: iso(),
+    })),
+  );
+  command(s, configCommand(s));
+  return s;
+}
+function round(
+  s: State,
+  number = 1,
+  divisionId = "ouro",
+  patch: Record<string, unknown> = {},
+) {
+  command(s, {
+    type: "competition.round.save",
+    expectedVersion: 0,
+    competitionId: s.competitionConfigurations![0]._id,
+    divisionId,
+    number,
+    opensAt: iso(-1),
+    closesAt: iso(1),
+    schedulingDeadline: iso(2),
+    startsAt: iso(2),
+    endsAt: iso(8),
+    instructions: "",
+    ...patch,
+  });
+  return s.competitionRounds!.at(-1)!;
+}
+function generate(s: State, r: CompetitionRound) {
+  command(s, {
+    type: "competition.generate",
+    roundId: r._id,
+    expectedVersion: 0,
+  });
+  return s.competitionSchedules!.find((q) => q.roundId === r._id)!;
+}
+function scheduleCommand(
+  s: State,
+  q: CompetitionSchedule,
+  type: string,
+  extra: Record<string, unknown> = {},
+  at = time,
+) {
+  return command(
+    s,
+    { type, scheduleId: q._id, expectedVersion: q.version, ...extra },
+    admin,
+    at,
+  );
+}
+function publish(s: State, q: CompetitionSchedule) {
+  scheduleCommand(s, q, "competition.approve");
+  scheduleCommand(s, q, "competition.publish");
+}
+function timed(s: State, q: CompetitionSchedule) {
+  scheduleCommand(s, q, "competition.edit", {
+    pairs: q.pairs.map((p) => ({ ...p, start: iso(2, 1) })),
+  });
+  return q;
+}
+function challenge(
+  s: State,
+  r: CompetitionRound,
+  attacker: number,
+  defender: number,
+) {
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: `ouro-${defender}`,
+    },
+    actor(attacker),
+  );
+  return s.competitionChallenges!.at(-1)!;
+}
+
+test("independent league sizes, first/final Open Attack and configuration precedence", () => {
+  const s = fixture();
+  command(s, configCommand(s, { leagueDistances: { ouro: 3 } }));
+  const first = round(s),
+    middle = round(s, 5, "ouro", {
+      distanceOverride: 4,
+      weekType: "OPEN_ATTACK",
+    }),
+    final = round(s, 10),
+    silver = round(s, 2, "prata"),
+    bronze = round(s, 2, "bronze");
+  assert.equal(effectiveCompetitionConfig(s, first).weekType, "OPEN_ATTACK");
+  assert.equal(effectiveCompetitionConfig(s, final).weekType, "OPEN_ATTACK");
+  assert.equal(effectiveCompetitionConfig(s, middle).distance, 4);
+  assert.equal(effectiveCompetitionConfig(s, silver).distance, 2);
+  assert.equal(effectiveCompetitionConfig(s, silver).weekType, "NORMAL");
+  assert.equal(generate(s, bronze).pairs.length, 5);
+  assert.equal(generate(s, silver).pairs.length, 6);
+  assert.ok(
+    s.competitionSchedules!.every((q) =>
+      q.snapshot.every((t) =>
+        t.members.every((m) =>
+          m.playerId.startsWith(q.roundId === bronze._id ? "bronze" : "prata"),
+        ),
+      ),
+    ),
+  );
+  assert.throws(
+    () => command(s, configCommand(s, { leagueDistances: { bronze: 10 } })),
+    /Distância/,
+  );
+});
+
+test("champion restrictions remain independent of distance and no role blocks valid initiation", () => {
+  const s = fixture();
+  command(s, configCommand(s, { defaultDistance: 3 }));
+  const r = round(s);
+  challenge(s, r, 3, 1);
+  assert.throws(() => challenge(s, r, 4, 1), /título/);
+  assert.throws(() => challenge(s, r, 1, 2), /abaixo/);
+  challenge(s, r, 12, 11);
+  assert.equal(s.competitionChallenges!.length, 2);
+  assert.equal(s.challenges.length, 0);
+});
+
+test("first valid challenge gets title priority, previous-round contested priority rotates", () => {
+  const s = fixture(),
+    previous = round(s),
+    r = round(s, 2);
+  publish(s, generate(s, previous));
+  const third = challenge(s, r, 3, 1),
+    second = challenge(s, r, 2, 1);
+  assert.equal(competitionPriorities(s, r)[0]._id, third._id);
+  s.competitionChallenges!.push({
+    ...third,
+    _id: "prior",
+    roundId: previous._id,
+    priorityWinner: true,
+    priorityReason: "Primeiro desafio válido disputado",
+    status: "COMPLETED",
+  });
+  assert.equal(competitionPriorities(s, r)[0]._id, second._id);
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.respond",
+          challengeId: third._id,
+          accept: true,
+        },
+        actor(1),
+      ),
+    /prioridade/i,
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: second._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  assert.equal(second.status, "ACCEPTED");
+  assert.equal(
+    s.challenges.filter((c) => c.competitionRoundId === r._id).length,
+    0,
+  );
+});
+
+test("accepted challenges and selected locks survive regeneration", () => {
+  const s = fixture(),
+    r = round(s),
+    c = challenge(s, r, 3, 1);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(1),
+  );
+  const q = generate(s, r);
+  assert.ok(
+    q.pairs.some((p) => p.attackerId === "ouro-3" && p.defenderId === "ouro-1"),
+  );
+  const locked = q.pairs.find((p) => p.attackerId !== "ouro-3")!;
+  scheduleCommand(s, q, "competition.edit", {
+    pairs: q.pairs.map((p) => ({ ...p, locked: p === locked })),
+  });
+  command(s, {
+    type: "competition.generate",
+    roundId: r._id,
+    scheduleId: q._id,
+    expectedVersion: q.version,
+    preserveLocks: true,
+  });
+  assert.ok(
+    q.pairs.some(
+      (p) =>
+        p.locked &&
+        p.attackerId === locked.attackerId &&
+        p.defenderId === locked.defenderId,
+    ),
+  );
+  assert.ok(
+    q.pairs.some(
+      (p) => p.attackerId === c.attackerId && p.defenderId === c.defenderId,
+    ),
+  );
+});
+
+test("draft generation and approval notify no players; publication is separate and idempotent", () => {
+  const s = fixture(),
+    r = round(s),
+    q = generate(s, r);
+  assert.equal(q.status, "DRAFT");
+  assert.equal(s.challenges.length, 0);
+  assert.equal(s.notifications.length, 0);
+  assert.throws(
+    () => scheduleCommand(s, q, "competition.publish"),
+    /aprovação/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.approve",
+          scheduleId: q._id,
+          expectedVersion: q.version,
+        },
+        actor(2),
+      ),
+    /administradores/,
+  );
+  scheduleCommand(s, q, "competition.approve");
+  assert.equal(q.status, "APPROVED");
+  assert.equal(s.notifications.length, 0);
+  assert.equal(s.challenges.length, 0);
+  scheduleCommand(s, q, "competition.publish");
+  assert.equal(q.status, "PUBLISHED");
+  assert.equal(s.challenges.length, 6);
+  assert.equal(s.notifications.length, 12);
+  assert.ok(
+    s.challenges.every((c) => c.officialPublication?.scheduleId === q._id),
+  );
+  assert.throws(() => scheduleCommand(s, q, "competition.publish"), /imutável/);
+  assert.equal(s.notifications.length, 12);
+});
+
+test("editing invalidates approval and stale concurrent edits fail", () => {
+  const s = fixture(),
+    q = generate(s, round(s)),
+    version = q.version;
+  scheduleCommand(s, q, "competition.approve");
+  scheduleCommand(s, q, "competition.edit", { pairs: q.pairs });
+  assert.equal(q.status, "DRAFT");
+  assert.equal(q.approvedVersion, undefined);
+  assert.throws(
+    () => scheduleCommand(s, q, "competition.publish"),
+    /aprovação/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.edit",
+        scheduleId: q._id,
+        expectedVersion: version,
+        pairs: q.pairs,
+      }),
+    /Outro administrador/,
+  );
+});
+
+test("invalid manual pairings and duplicate normal assignments block approval", () => {
+  const s = fixture(),
+    q = generate(s, round(s));
+  scheduleCommand(s, q, "competition.edit", {
+    pairs: [
+      { attackerId: "ouro-1", defenderId: "ouro-2" },
+      { attackerId: "ouro-3", defenderId: "ouro-2" },
+    ],
+  });
+  assert.ok(q.errors.length > 0);
+  assert.throws(
+    () => scheduleCommand(s, q, "competition.approve"),
+    /abaixo|incompatíveis/,
+  );
+});
+
+test("distance reduction explains invalid accepted challenge without cancelling it or rewriting history", () => {
+  const s = fixture();
+  command(s, configCommand(s, { defaultDistance: 3 }));
+  const r = round(s),
+    c = challenge(s, r, 6, 3);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(3),
+  );
+  const history = JSON.stringify(s.history),
+    positions = s.players.map((p) => p.position);
+  command(s, configCommand(s, { defaultDistance: 2 }));
+  assert.equal(c.status, "ACCEPTED");
+  assert.match(c.invalidReason!, /Distância/);
+  const q = generate(s, r);
+  assert.throws(() => scheduleCommand(s, q, "competition.approve"));
+  assert.equal(JSON.stringify(s.history), history);
+  assert.deepEqual(
+    s.players.map((p) => p.position),
+    positions,
+  );
+});
+
+test("approved absence yields a feasible partial round without forfeits or ranking changes", () => {
+  const s = fixture(),
+    r = round(s),
+    before = s.players.map((p) => p.position);
+  command(s, {
+    type: "competition.absence.add",
+    competitionId: r.competitionId,
+    divisionId: r.divisionId,
+    teamId: "ouro-1",
+    from: iso(1),
+    to: iso(4),
+    reason: "Ausência autorizada",
+    roundIds: [r._id],
+    recoveryAllowed: true,
+  });
+  const q = generate(s, r);
+  assert.equal(q.errors.length, 0);
+  assert.ok(q.unmatched.includes("ouro-1"));
+  assert.equal(q.pairs.length, 5);
+  assert.ok(
+    q.pairs.every(
+      (p) => p.attackerId !== "ouro-1" && p.defenderId !== "ouro-1",
+    ),
+  );
+  assert.deepEqual(
+    s.players.map((p) => p.position),
+    before,
+  );
+  assert.equal(s.results.length, 0);
+});
+
+test("official results hold snapshots until deterministic direct-swap settlement", () => {
+  const s = fixture(),
+    r = round(s),
+    accepted = challenge(s, r, 3, 1);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: accepted._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  const q = timed(s, generate(s, r));
+  publish(s, q);
+  const before = competitionTeams(s, "ouro").map((t) => t.id),
+    expected = [...before];
+  for (const c of s.challenges) {
+    const a = expected.indexOf(c.challengerId),
+      d = expected.indexOf(c.defenderId);
+    [expected[a], expected[d]] = [expected[d], expected[a]];
+    command(
+      s,
+      {
+        type: "admin.result.record",
+        challengeId: c._id,
+        winnerId: c.challengerId,
+        score: "6-4 6-2",
+      },
+      admin,
+      time + 3 * 86400000,
+    );
+    assert.deepEqual(
+      competitionTeams(s, "ouro").map((t) => t.id),
+      before,
+    );
+  }
+  command(
+    s,
+    { type: "competition.settle", roundId: r._id, expectedVersion: r.version },
+    admin,
+    time + 4 * 86400000,
+  );
+  assert.deepEqual(
+    competitionTeams(s, "ouro").map((t) => t.id),
+    expected,
+  );
+  assert.equal(r.rankingBefore?.length, 12);
+  assert.equal(r.rankingAfter?.length, 12);
+  assert.ok(r.settledAt);
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.settle",
+        roundId: r._id,
+        expectedVersion: r.version,
+      }),
+    /liquidada/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.result.correct",
+        challengeId: s.challenges[0]._id,
+        winnerId: s.challenges[0].defenderId,
+        score: "6-4 6-2",
+        note: "Correção tardia",
+      }),
+    /liquidado/,
+  );
+});
+
+test("defender wins preserve rankings and unconfirmed results cannot settle", () => {
+  const s = fixture(),
+    r = round(s),
+    q = timed(s, generate(s, r));
+  publish(s, q);
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.settle",
+        roundId: r._id,
+        expectedVersion: r.version,
+      }),
+    /resultado validado/,
+  );
+  const before = competitionTeams(s, "ouro").map((t) => t.id);
+  for (const c of s.challenges)
+    command(
+      s,
+      {
+        type: "admin.result.record",
+        challengeId: c._id,
+        winnerId: c.defenderId,
+        score: "6-2 6-3",
+      },
+      admin,
+      time + 3 * 86400000,
+    );
+  command(s, {
+    type: "competition.settle",
+    roundId: r._id,
+    expectedVersion: r.version,
+  });
+  assert.deepEqual(
+    competitionTeams(s, "ouro").map((t) => t.id),
+    before,
+  );
+  assert.equal(usesManagedCompetition(s, "ouro"), true);
+  assert.throws(
+    () =>
+      command(
+        s,
+        { type: "challenge.create", defenderId: "ouro-5", titleFight: false },
+        actor(7),
+      ),
+    /Jornadas/,
+  );
+  command(s, configCommand(s, { enabled: false }));
+  assert.equal(usesManagedCompetition(s, "ouro"), false);
+});
+
+test("published amendment retains old version and only changed teams receive notifications", () => {
+  const s = fixture(),
+    r = round(s),
+    q = timed(s, generate(s, r));
+  publish(s, q);
+  const old = structuredClone(q),
+    count = s.notifications.length,
+    originalGameCount = s.challenges.length;
+  scheduleCommand(s, q, "competition.amend", {
+    reason: "Ajuste de horário solicitado",
+  });
+  const revision = s.competitionSchedules!.at(-1)!;
+  assert.equal(revision.status, "DRAFT");
+  assert.equal(s.notifications.length, count);
+  scheduleCommand(s, revision, "competition.edit", {
+    pairs: revision.pairs.map((p, i) => (i ? p : { ...p, start: iso(2, 3) })),
+  });
+  publish(s, revision);
+  assert.deepEqual(q, old);
+  assert.equal(s.notifications.length, count + 2);
+  assert.equal(revision.revision, 2);
+  assert.throws(
+    () =>
+      scheduleCommand(s, q, "competition.amend", {
+        reason: "Revisão a partir de versão antiga",
+      }),
+    /última versão/,
+  );
+  assert.equal(s.challenges.length, originalGameCount);
+  assert.equal(
+    s.challenges.find((c) => c._id === revision.pairs[0].challengeId)
+      ?.scheduledAt,
+    iso(2, 3),
+  );
+});
+
+test("completed games cannot be edited through calendar amendment", () => {
+  const s = fixture(),
+    q = timed(s, generate(s, round(s)));
+  publish(s, q);
+  const c = s.challenges[0];
+  command(
+    s,
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: c.defenderId,
+      score: "6-2 6-3",
+    },
+    admin,
+    time + 3 * 86400000,
+  );
+  scheduleCommand(s, q, "competition.amend", {
+    reason: "Revisão dos restantes jogos",
+  });
+  const revision = s.competitionSchedules!.at(-1)!;
+  assert.throws(
+    () =>
+      scheduleCommand(s, revision, "competition.edit", {
+        pairs: revision.pairs.filter((p) => p.challengeId !== c._id),
+      }),
+    /concluído/,
+  );
+});
+
+test("deadline automation generates only a private proposal once", () => {
+  const s = fixture(),
+    r = round(s);
+  processDeadlines(s, time + 86400000 + 1);
+  assert.equal(s.competitionSchedules!.length, 1);
+  assert.equal(s.competitionSchedules![0].status, "DRAFT");
+  assert.equal(s.challenges.length, 0);
+  assert.equal(s.notifications.length, 0);
+  processDeadlines(s, time + 86400000 + 2);
+  assert.equal(s.competitionSchedules!.length, 1);
+  assert.deepEqual(
+    validateCompetitionSchedule(s, s.competitionSchedules![0]).errors,
+    [],
+  );
+  assert.equal(s.competitionSchedules![0].roundId, r._id);
+});
+
+test("managed publication blocks legacy calendar/ranking paths and keeps other leagues independent", () => {
+  const s = fixture(),
+    r = round(s),
+    q = timed(s, generate(s, r));
+  publish(s, q);
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.ranking.move",
+        playerId: "ouro-12",
+        targetPlayerId: "ouro-10",
+      }),
+    /jornada|Jornada/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.schedule",
+        challengeId: s.challenges[0]._id,
+        start: iso(3),
+        minutes: 90,
+        courtId: "court",
+      }),
+    /revisão/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        { type: "challenge.create", defenderId: "ouro-5", titleFight: false },
+        actor(7),
+      ),
+    /Jornadas|jornada/,
+  );
+  command(
+    s,
+    { type: "challenge.create", defenderId: "prata-5", titleFight: false },
+    actor(7, "prata"),
+  );
+  assert.equal(s.challenges.at(-1)?.divisionId, "prata");
+});
+
+test("an audited postponed recovery permits two games, with distinct non-overlapping times", () => {
+  const s = fixture(),
+    source = round(s),
+    c = challenge(s, source, 2, 1);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(1),
+  );
+  command(s, {
+    type: "competition.challenge.cancel",
+    challengeId: c._id,
+    reason: "Adiamento por ausência aprovada",
+  });
+  command(s, {
+    type: "competition.absence.add",
+    competitionId: source.competitionId,
+    divisionId: "ouro",
+    teamId: "ouro-2",
+    from: iso(1),
+    to: iso(4),
+    reason: "Ausência autorizada",
+    roundIds: [source._id],
+    recoveryAllowed: true,
+  });
+  const r = round(s, 2, "ouro", {
+    opensAt: iso(6),
+    closesAt: iso(7),
+    schedulingDeadline: iso(8),
+    startsAt: iso(8),
+    endsAt: iso(14),
+  });
+  command(s, {
+    type: "competition.recovery.approve",
+    roundId: r._id,
+    sourceRoundId: source._id,
+    teamIds: ["ouro-2", "ouro-1"],
+    reason: "Recuperação expressamente aprovada",
+  });
+  const recovery = s.competitionRecoveries!.at(-1)!,
+    q = generate(s, r);
+  const normal = q.pairs.map((p) => ({ ...p, start: iso(9) }));
+  const extra = {
+    attackerId: "ouro-2",
+    defenderId: "ouro-1",
+    recoveryId: recovery._id,
+    start: iso(9, 3),
+  };
+  scheduleCommand(s, q, "competition.edit", { pairs: [...normal, extra] });
+  assert.deepEqual(q.errors, []);
+  scheduleCommand(s, q, "competition.approve");
+  scheduleCommand(s, q, "competition.edit", {
+    pairs: [...normal, { ...extra, start: iso(9) }],
+  });
+  assert.ok(q.errors.some((error) => /sobrepos|horário/i.test(error)));
+  assert.throws(() => scheduleCommand(s, q, "competition.approve"));
+});
+
+test("per-league championship configuration does not alter other league rules", () => {
+  const s = fixture();
+  command(
+    s,
+    configCommand(s, {
+      defaultDistance: 3,
+      leagueOverrides: {
+        ouro: { championPositions: [2], responseHours: 24 },
+        prata: { championPositions: [2, 3] },
+      },
+    }),
+  );
+  const gold = round(s),
+    silver = round(s, 1, "prata");
+  assert.throws(() => challenge(s, gold, 3, 1), /título/);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: silver._id,
+      defenderId: "prata-1",
+    },
+    actor(3, "prata"),
+  );
+  assert.equal(s.competitionChallenges!.at(-1)?.attackerId, "prata-3");
+  assert.equal(effectiveCompetitionConfig(s, gold).config.responseHours, 24);
+});
+
+test("a future proposal cannot be published while a preceding official round is unsettled", () => {
+  const s = fixture(),
+    first = round(s),
+    second = round(s, 2),
+    later = generate(s, second);
+  publish(s, generate(s, first));
+  assert.throws(
+    () => scheduleCommand(s, later, "competition.approve"),
+    /liquida|anteriore/i,
+  );
+});
+
+test("same-round scope and canonical UTC dates prevent cross-round and timezone conflicts", () => {
+  const s = fixture(),
+    first = round(s),
+    second = round(s, 2),
+    q = generate(s, first);
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.generate",
+        roundId: second._id,
+        scheduleId: q._id,
+        expectedVersion: q.version,
+      }),
+    /outra jornada/,
+  );
+  const offsetRound = round(s, 3, "ouro", {
+    opensAt: "2026-10-20T11:00:00+01:00",
+    closesAt: "2026-10-22T11:00:00+01:00",
+  });
+  assert.equal(offsetRound.opensAt, iso(-1));
+  assert.equal(offsetRound.closesAt, iso(1));
+});
+
+test("completed match is implicitly protected when regenerating an amendment", () => {
+  const s = fixture(),
+    r = round(s),
+    q = timed(s, generate(s, r));
+  publish(s, q);
+  const completed = s.challenges[0];
+  command(
+    s,
+    {
+      type: "admin.result.record",
+      challengeId: completed._id,
+      winnerId: completed.defenderId,
+      score: "6-2 6-3",
+    },
+    admin,
+    time + 3 * 86400000,
+  );
+  scheduleCommand(s, q, "competition.amend", {
+    reason: "Reorganizar apenas jogos por disputar",
+  });
+  const revision = s.competitionSchedules!.at(-1)!;
+  command(s, {
+    type: "competition.generate",
+    roundId: r._id,
+    scheduleId: revision._id,
+    expectedVersion: revision.version,
+    preserveLocks: false,
+  });
+  assert.ok(revision.pairs.some((p) => p.challengeId === completed._id));
+  assert.equal(completed.status, "completed");
+});
+
+test("two distinct round numbers cannot authorize two normal matches in the same week", () => {
+  const s = fixture(),
+    first = round(s),
+    q = timed(s, generate(s, first));
+  publish(s, q);
+  for (const c of s.challenges)
+    command(
+      s,
+      {
+        type: "admin.result.record",
+        challengeId: c._id,
+        winnerId: c.defenderId,
+        score: "6-2 6-3",
+      },
+      admin,
+      time + 3 * 86400000,
+    );
+  command(
+    s,
+    {
+      type: "competition.settle",
+      roundId: first._id,
+      expectedVersion: first.version,
+    },
+    admin,
+    time + 3 * 86400000,
+  );
+  const second = round(s, 2),
+    next = generate(s, second);
+  scheduleCommand(s, next, "competition.edit", {
+    pairs: next.pairs.map((p) => ({ ...p, start: iso(2, 4) })),
+  });
+  assert.ok(next.errors.some((error) => /semanal/.test(error)));
+  assert.throws(
+    () => scheduleCommand(s, next, "competition.approve"),
+    /semanal/,
+  );
+});
+
+test("a competition with existing rounds cannot be reassigned to another season", () => {
+  const s = fixture();
+  round(s);
+  s.seasons.push({ ...s.seasons[0], _id: "other-season", name: "2027" });
+  assert.throws(
+    () => command(s, configCommand(s, { seasonId: "other-season" })),
+    /nova competição/,
+  );
+});
+
+test("published rounds retain their effective rules when future defaults change", () => {
+  const s = fixture(),
+    r = round(s, 10),
+    q = generate(s, r);
+  publish(s, q);
+  const publication = structuredClone(q);
+  command(
+    s,
+    configCommand(s, {
+      officialRounds: 12,
+      defaultDistance: 3,
+      championPositions: [2],
+    }),
+  );
+  const historical = effectiveCompetitionConfig(s, r);
+  assert.equal(historical.distance, 2);
+  assert.equal(historical.weekType, "OPEN_ATTACK");
+  assert.deepEqual(historical.config.championPositions, [2, 3]);
+  assert.deepEqual(q, publication);
+  const future = round(s, 11);
+  assert.equal(effectiveCompetitionConfig(s, future).distance, 3);
+  assert.equal(effectiveCompetitionConfig(s, future).weekType, "NORMAL");
+});
+
+test("permanent deletion preserves private competition commitments and prediction history", () => {
+  const s = fixture(),
+    r = round(s);
+  challenge(s, r, 12, 11);
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.player.delete",
+        playerId: "ouro-12",
+        confirmation: "ELIMINAR",
+      }),
+    /histórico de competição/,
+  );
+  const q = timed(s, generate(s, r));
+  publish(s, q);
+  command(
+    s,
+    {
+      type: "prediction.save",
+      challengeId: s.challenges[0]._id,
+      winnerId: s.challenges[0].challengerId,
+      setScore: "2-0",
+    },
+    actor(5, "prata"),
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.player.delete",
+        playerId: "prata-5",
+        confirmation: "ELIMINAR",
+      }),
+    /histórico de competição/,
+  );
+  assert.ok(s.players.some((p) => p._id === "prata-5"));
+  assert.equal(s.predictions?.length, 1);
+});
+
+test("an absence can be approved after an audited amendment removes the published match", () => {
+  const s = fixture(),
+    r = round(s),
+    commitment = challenge(s, r, 2, 1);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: commitment._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  const q = timed(s, generate(s, r));
+  publish(s, q);
+  scheduleCommand(s, q, "competition.amend", {
+    reason: "Adiamento autorizado por ausência",
+  });
+  const revision = s.competitionSchedules!.at(-1)!;
+  scheduleCommand(s, revision, "competition.edit", {
+    pairs: revision.pairs.filter((p) => p.attackerId !== "ouro-2"),
+  });
+  publish(s, revision);
+  assert.equal(commitment.status, "CANCELLED");
+  assert.match(commitment.decisions.at(-1)!.action, /AMENDMENT_CANCELLED/);
+  command(s, {
+    type: "competition.absence.add",
+    competitionId: r.competitionId,
+    divisionId: "ouro",
+    teamId: "ouro-2",
+    from: iso(1),
+    to: iso(4),
+    reason: "Ausência após alteração publicada",
+    roundIds: [r._id],
+    recoveryAllowed: true,
+  });
+  assert.equal(s.competitionAbsences?.length, 1);
+  assert.equal(q.pairs.length, 6);
+  assert.equal(revision.pairs.length, 5);
+});
+
+test("overlapping recovery swaps settle by scheduled order rather than result submission order", () => {
+  const s = fixture(),
+    source = round(s),
+    postponed = challenge(s, source, 3, 1);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: postponed._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  command(s, {
+    type: "competition.challenge.cancel",
+    challengeId: postponed._id,
+    reason: "Adiado com autorização do clube",
+  });
+  command(s, {
+    type: "competition.absence.add",
+    competitionId: source.competitionId,
+    divisionId: "ouro",
+    teamId: "ouro-3",
+    from: iso(1),
+    to: iso(4),
+    reason: "Ausência com recuperação",
+    roundIds: [source._id],
+    recoveryAllowed: true,
+  });
+  const r = round(s, 2, "ouro", {
+    opensAt: iso(6),
+    closesAt: iso(7),
+    schedulingDeadline: iso(8),
+    startsAt: iso(8),
+    endsAt: iso(14),
+  });
+  command(s, {
+    type: "competition.recovery.approve",
+    roundId: r._id,
+    sourceRoundId: source._id,
+    teamIds: ["ouro-3", "ouro-1"],
+    reason: "Recuperação expressamente aprovada",
+  });
+  const q = generate(s, r),
+    recovery = s.competitionRecoveries![0];
+  scheduleCommand(s, q, "competition.edit", {
+    pairs: [
+      ...q.pairs.map((p) => ({ ...p, start: iso(9) })),
+      {
+        attackerId: "ouro-3",
+        defenderId: "ouro-1",
+        recoveryId: recovery._id,
+        start: iso(9, 3),
+      },
+    ],
+  });
+  publish(s, q);
+  const games = s.challenges.filter((c) => c.competitionRoundId === r._id),
+    expected = competitionTeams(s, "ouro").map((t) => t.id);
+  for (const game of [...games].sort(
+    (a, b) =>
+      a.scheduledAt!.localeCompare(b.scheduledAt!) ||
+      a._id.localeCompare(b._id),
+  )) {
+    const a = expected.indexOf(game.challengerId),
+      d = expected.indexOf(game.defenderId);
+    [expected[a], expected[d]] = [expected[d], expected[a]];
+  }
+  for (const game of [...games].reverse())
+    command(
+      s,
+      {
+        type: "admin.result.record",
+        challengeId: game._id,
+        winnerId: game.challengerId,
+        score: "6-2 6-3",
+      },
+      admin,
+      time + 10 * 86400000,
+    );
+  command(
+    s,
+    { type: "competition.settle", roundId: r._id, expectedVersion: r.version },
+    admin,
+    time + 11 * 86400000,
+  );
+  assert.deepEqual(
+    competitionTeams(s, "ouro").map((t) => t.id),
+    expected,
+  );
+  assert.equal(new Set(expected).size, 12);
+});
+
+test("an actual postponed match can recover without absence unless administrators configure that restriction", () => {
+  const s = fixture(),
+    source = round(s),
+    c = challenge(s, source, 3, 1);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(1),
+  );
+  command(s, {
+    type: "competition.challenge.cancel",
+    challengeId: c._id,
+    reason: "Clube sem campo disponível",
+  });
+  const next = round(s, 2),
+    recovery = {
+      type: "competition.recovery.approve",
+      roundId: next._id,
+      sourceRoundId: source._id,
+      teamIds: ["ouro-3", "ouro-1"],
+      reason: "Recuperação aprovada por indisponibilidade de campo",
+    };
+  command(s, configCommand(s, { recoveryRequiresAbsence: true }));
+  assert.throws(() => command(s, recovery), /ausência aprovada/);
+  command(s, configCommand(s, { recoveryRequiresAbsence: false }));
+  command(s, recovery);
+  assert.equal(s.competitionRecoveries?.length, 1);
+  assert.equal(s.competitionAbsences?.length, 0);
+});

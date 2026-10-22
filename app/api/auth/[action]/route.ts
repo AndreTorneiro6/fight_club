@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import {
+  selectWorkspace,
   accountLink,
   createSession,
   login,
@@ -38,6 +39,8 @@ export async function POST(
       action === "register" ? 100 : 1500,
     );
     const data = await readJson(request, 8192);
+    if (action === "workspace")
+      return NextResponse.json(await selectWorkspace(data));
     if (action === "login") {
       await login(data);
       return NextResponse.json({ ok: true });
