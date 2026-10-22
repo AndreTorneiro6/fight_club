@@ -3,6 +3,15 @@
 Last updated: 22 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Global search, profile-photo cards and iPhone safe areas — 22 October 2026
+
+- User requested Ctrl+K search plus a visible search bar, clarified card front photo must be the Perfil photo, cartoon back with drinking/other social properties, and reported iPhone controls overlapping clock/battery. Work is on feature/global-search, following the established tested-feature-branch → PR → deploy workflow.
+- Global authenticated search bar/native keyboard dialog supports Ctrl+K/Cmd+K, arrows/Enter/Escape, focus restoration and role-specific navigation. Shared admin section registry provides direct /admin?tab=... links and named player lookup opens a filtered directory without writes. Index excludes email, note bodies and audit; player workspace has no admin sections and only own/team challenges and published sponsors. Admin query routing is under Suspense per installed Next docs; player directory follows incoming search/registration filters.
+- Gamification front explicitly uses the selected player's profile photo; back is the local illustrated avatar. Face buttons name Fotografia do perfil and Cartoon. Default social labels are now Bebida, Trash talk, Bom parceiro, Fair play; existing saved custom labels are preserved. Gamification remains admin-only and Em implementação; excluded competition modes remain absent.
+- iPhone fix: opaque status-bar metadata for new installs; CSS env safe insets for app/header, login, dialogs, floating controls and bottom navigation, plus a top mask for older translucent installs. Visual viewport height/offset tracking adjusts dialogs with software keyboards. Mobile buttons/icons have 44px touch targets and fields 16px text to avoid automatic zoom; user zoom remains available. This is tested with emulated iPhone sizes/insets/keyboard, not a physical iPhone. User should close/reopen the installed app and verify there.
+- Validation on feature branch: typecheck, all 217 tests, production build, actionlint and all 8 release browser checks pass. Browser coverage includes profile photo upload/reuse, dual-face PNG, Ctrl/Cmd K, direct sections/player lookup, focus/Escape, player isolation, simulated notch/home indicator/keyboard, touch dimensions and existing season/sponsor/coin/album/workspace flows. Guide: docs/APP-SEARCH-AND-IPHONE.md.
+- Awaiting PR CI before deploy integration. No production profile/photo/settings/coin data was changed for tests; keep Gamificar IN_PROGRESS.
+
 ## Gamificar — private admin lab, 22 October 2026
 
 - User requested Gamificar excluding Vale tudo and Dominação, keeping the idea Em implementação, and development away from deploy until tested. Created feature/gamificar before code changes. Updated only the live Gamificar note's implementationStatus through the validated engine/transaction under __operator__ audit, preserving title/body (version 5, IN_PROGRESS). Leave this status in progress after release for the two admins' testing.

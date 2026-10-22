@@ -1,5 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap");
 :root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --bg: #0a1425;
   --panel: #111f32;
   --panel2: #15253a;
@@ -2697,13 +2701,195 @@ button.court-timeline-block:focus-visible {
   }
 }
 
-.workspace-choice { width: min(660px, 100%); padding: clamp(24px, 5vw, 48px); }
-.workspace-choice h1 { margin-bottom: 0; }
-.workspace-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
-.workspace-options button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 14px; padding: 24px; min-height: 205px; white-space: normal; }
-.workspace-options button strong { font-size: 17px; }
-.workspace-options button span { color: var(--muted); line-height: 1.6; font-weight: 400; }
-.workspace-switcher { position: relative; }
-.workspace-dropdown { position: absolute; top: calc(100% + 10px); right: 0; width: 230px; z-index: 60; box-shadow: 0 14px 35px #0008; padding: 16px; }
-.workspace-dropdown button { justify-content: flex-start; }
-@media (max-width: 560px) { .workspace-options { grid-template-columns: 1fr; } .workspace-options button { min-height: 145px; } .workspace-current { display: none; } }
+.workspace-choice {
+  width: min(660px, 100%);
+  padding: clamp(24px, 5vw, 48px);
+}
+.workspace-choice h1 {
+  margin-bottom: 0;
+}
+.workspace-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.workspace-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 14px;
+  padding: 24px;
+  min-height: 205px;
+  white-space: normal;
+}
+.workspace-options button strong {
+  font-size: 17px;
+}
+.workspace-options button span {
+  color: var(--muted);
+  line-height: 1.6;
+  font-weight: 400;
+}
+.workspace-switcher {
+  position: relative;
+}
+.workspace-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 230px;
+  z-index: 60;
+  box-shadow: 0 14px 35px #0008;
+  padding: 16px;
+}
+.workspace-dropdown button {
+  justify-content: flex-start;
+}
+@media (max-width: 560px) {
+  .workspace-options {
+    grid-template-columns: 1fr;
+  }
+  .workspace-options button {
+    min-height: 145px;
+  }
+  .workspace-current {
+    display: none;
+  }
+}
+
+/* Safe areas also protect existing installations using a translucent iOS status bar. */
+.app-main {
+  padding-top: var(--safe-top);
+}
+.center-screen {
+  padding: max(24px, calc(var(--safe-top) + 16px))
+    max(24px, calc(var(--safe-right) + 16px))
+    max(24px, calc(var(--safe-bottom) + 16px))
+    max(24px, calc(var(--safe-left) + 16px));
+}
+.landing {
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.sidebar {
+  top: var(--safe-top);
+  bottom: var(--safe-bottom);
+  left: var(--safe-left);
+}
+.modal-backdrop {
+  padding: max(20px, calc(var(--safe-top) + 12px))
+    max(20px, calc(var(--safe-right) + 12px))
+    max(20px, calc(var(--safe-bottom) + 12px))
+    max(20px, calc(var(--safe-left) + 12px));
+}
+.modal {
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 40px);
+}
+.theme-dialog {
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 40px);
+}
+.theme-trigger {
+  right: calc(18px + var(--safe-right));
+  bottom: calc(20px + var(--safe-bottom));
+}
+.toast {
+  right: calc(26px + var(--safe-right));
+  bottom: calc(30px + var(--safe-bottom));
+}
+@media (max-width: 760px) {
+  .topbar {
+    padding-left: max(12px, var(--safe-left));
+    padding-right: max(12px, var(--safe-right));
+    gap: 8px;
+  }
+  .content {
+    padding-left: max(18px, var(--safe-left));
+    padding-right: max(18px, var(--safe-right));
+    padding-bottom: calc(110px + var(--safe-bottom));
+  }
+  .mobile-nav {
+    padding-left: max(5px, var(--safe-left));
+    padding-right: max(5px, var(--safe-right));
+    padding-bottom: calc(8px + var(--safe-bottom));
+  }
+  .theme-trigger {
+    right: calc(13px + var(--safe-right));
+    bottom: calc(92px + var(--safe-bottom));
+  }
+  .toast {
+    bottom: calc(92px + var(--safe-bottom));
+  }
+  button,
+  .button,
+  .icon-button,
+  .mobile-nav a,
+  .workspace-switcher > button {
+    min-height: 44px;
+  }
+  .icon-button,
+  .workspace-switcher > button {
+    min-width: 44px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .topbar .avatar {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (max-width: 420px) {
+  .topbar .live-status {
+    display: none;
+  }
+  .topbar:before {
+    font-size: 20px;
+  }
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--safe-top);
+  background: var(--bg);
+  z-index: 90;
+  pointer-events: none;
+}
+@media (max-width: 360px) {
+  .topbar:before {
+    font-size: 18px;
+    letter-spacing: 0.06em;
+  }
+}
+
+.app-main {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+.modal-backdrop {
+  top: var(--visual-top, 0px);
+  bottom: auto;
+  height: var(--visual-height, 100dvh);
+}
+.modal,
+.theme-dialog {
+  max-height: calc(
+    var(--visual-height, 100dvh) - var(--safe-top) - var(--safe-bottom) - 40px
+  );
+}
+.theme-dialog {
+  top: calc(var(--visual-top, 0px) + var(--safe-top) + 16px);
+  bottom: auto;
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .app-main {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

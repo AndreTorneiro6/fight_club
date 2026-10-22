@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeSelector from "@/components/theme-selector";
+import ViewportInsets from "@/components/viewport-insets";
 export const metadata: Metadata = {
   title: {
     default: "Fight Club Padel League — Neiva Padel Club",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Fight Club",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "black",
   },
 };
 export const viewport: Viewport = {
@@ -36,6 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
+        <ViewportInsets />
         {children}
         <ThemeSelector />
       </body>

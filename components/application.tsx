@@ -6,6 +6,7 @@ import {
   isManagementRoute,
 } from "@/lib/workspace-routes";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -49,7 +50,9 @@ import AdminPayments, {
   CourtPaymentDetails,
 } from "./admin-payments";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { adminTabs } from "@/lib/admin-sections";
+import GlobalSearch from "./global-search";
 import {
   ArrowDown,
   ArrowLeft,
@@ -698,6 +701,7 @@ export function Application({
             </Link>
           </div>
         </header>
+        <GlobalSearch state={s} />
         <main className="content">
           <PlayerAppRegistration />
           {updateAvailable && (
@@ -742,7 +746,9 @@ export function Application({
             )
           ) : route === "admin" ? (
             admin ? (
-              <Admin {...actions} />
+              <Suspense fallback={<p role="status">A abrir administração…</p>}>
+                <Admin {...actions} />
+              </Suspense>
             ) : (
               <Empty text="Esta área é exclusiva dos administradores." />
             )
@@ -3281,9 +3287,16 @@ function PlayerHistory({ s, p }: { s: View; p: Player }) {
 }
 
 function Admin(a: Actions) {
-  const { s } = a,
-    [tab, setTab] = useState("summary"),
-    [playersStatus, setPlayersStatus] = useState("approved");
+  const { s } = a;
+  const searchParams = useSearchParams(),
+    router = useRouter();
+  const requestedTab = searchParams.get("tab") ?? "summary";
+  const tab = adminTabs.has(requestedTab) ? requestedTab : "summary";
+  const [playersStatus, setPlayersStatus] = useState("approved");
+  const setTab = (value: string) =>
+    router.replace(`/admin?tab=${encodeURIComponent(value)}`, {
+      scroll: false,
+    });
   const clubPending = s.challenges.filter(
     (c) =>
       c.status === "schedule_pending" &&
@@ -3494,7 +3507,13 @@ function Admin(a: Actions) {
       ) : tab === "registration" ? (
         <AdminRegistration {...a} />
       ) : tab === "players" ? (
-        <AdminPlayers {...a} initialRegistrationFilter={playersStatus} />
+        <AdminPlayers
+          {...a}
+          initialRegistrationFilter={
+            searchParams.get("registration") ?? playersStatus
+          }
+          initialSearch={searchParams.get("q") ?? ""}
+        />
       ) : tab === "rankings" ? (
         <AdminTeamRanking s={s} run={a.run} busy={a.busy} />
       ) : tab === "challenges" ? (
@@ -4137,18 +4156,24 @@ function AdminChallenges(a: Actions) {
     </>
   );
 }
-function AdminPlayers(a: Actions & { initialRegistrationFilter?: string }) {
+function AdminPlayers(
+  a: Actions & { initialRegistrationFilter?: string; initialSearch?: string },
+) {
   const { s, run, busy, notify, refresh } = a,
     [filter, setFilter] = useState("all"),
     [registrationFilter, setRegistrationFilter] = useState(
       a.initialRegistrationFilter ?? "approved",
     ),
-    [search, setSearch] = useState(""),
+    [search, setSearch] = useState(a.initialSearch ?? ""),
     [editing, setEditing] = useState<Player | "new" | null>(null),
     [history, setHistory] = useState<Player | null>(null),
     [vacationPlayer, setVacationPlayer] = useState<Player | null>(null),
     [deleting, setDeleting] = useState<Player | null>(null),
     [link, setLink] = useState("");
+  useEffect(() => {
+    setSearch(a.initialSearch ?? "");
+    setRegistrationFilter(a.initialRegistrationFilter ?? "approved");
+  }, [a.initialSearch, a.initialRegistrationFilter]);
   const registrationCounts = {
     approved: s.players.filter(
       (p) => !p.awaitingApproval && !p.registrationRejectedAt,
