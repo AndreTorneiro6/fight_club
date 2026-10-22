@@ -36,7 +36,7 @@ jobs:
           TMPDIR: ${{ runner.temp }}
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts
+      - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 

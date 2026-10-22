@@ -27,6 +27,7 @@ const groups = [
     items: [
       ["notes", "Ideias"],
       ["coins", "Moedas e bar"],
+      ["sponsors", "Patrocínios"],
       ["assistant", "Assistente"],
       ["engagement", "Cartões e palpites"],
       ["album", "Caderneta"],

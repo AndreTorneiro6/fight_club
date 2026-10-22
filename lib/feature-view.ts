@@ -17,11 +17,27 @@ export function filterFeatureView(state: State, actor: Actor) {
     (p) => p.playerId === actor.playerId,
   );
   if (actor.role === "admin") return;
+  state.sponsors = (state.sponsors ?? []).filter(
+    (sponsor) => sponsor.published,
+  );
+  const publishedSponsors = new Set(
+    state.sponsors.map((sponsor) => sponsor._id),
+  );
+  state.settings = state.settings.map((settings) => ({
+    ...settings,
+    prizes: settings.prizes.map((prize) => {
+      if (!prize.sponsorId || publishedSponsors.has(prize.sponsorId))
+        return prize;
+      const { sponsorId: _, ...publicPrize } = prize;
+      return publicPrize;
+    }),
+  }));
   state.adminNotes = [];
   state.audit = state.audit.filter(
     (entry) =>
       !entry.action.startsWith("admin.notes.") &&
-      !entry.action.startsWith("admin.coins."),
+      !entry.action.startsWith("admin.coins.") &&
+      !entry.action.startsWith("admin.sponsors."),
   );
   const ownTeams = new Set(
     state.divisions.flatMap((division) =>

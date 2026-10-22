@@ -3,6 +3,14 @@
 Last updated: 22 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Sponsors and prize associations — 22 October 2026
+
+- Implemented the live “Patrocínios” idea: “Criar um espaço para os patrocinadores e linkar com os prémios”. Admin → Configuração → Patrocínios supports audited/versioned name, description, HTTPS website/logo, support label, display order and publication editing. New sponsors are private; unpublishing retains records and prize associations. No fictional sponsors are seeded.
+- A liga → Patrocínios (`/patrocinios`) is read-only league information for players and admins, showing only published sponsors, website links and their supported prizes. Admin → Prémios → Editar prémios adds a sponsor selector; prize cards link back to published sponsor cards. Stable sponsor IDs preserve links after renaming. Private sponsors and their prize references are removed from player API projections, including admin accounts in player workspace.
+- Additive sponsors collection/index and optional Prize.sponsorId; all writes use the validated domain engine/MongoDB transaction with history and concurrent-edit protection. Prize/rule content editing captures contentVersion; legacy commands remain compatible and general rule changes retain the counter and sponsor links. Rankings, games, coins and results are unaffected.
+- Validation: typecheck, 207 automated tests, production build, workflow lint, sponsor browser flow and existing workspace regression pass. Tests cover draft/public visibility, HTTPS validation, permissions, prize references, concurrent editing, persistence and mobile layout. Added sponsor browser flow to deployment CI. Guide: docs/SPONSORS.md.
+- Ready for deployment on deploy branch; verify the Actions run/live revision before treating this snapshot as deployed. Do not create production test sponsors or prizes.
+
 ## Admin ideas and virtual coins — 22 October 2026
 
 - Read the live private notes at the user's request; implemented the first idea, “Dinheiro virtual”. Other ideas remain unimplemented. Admin → Ideias now has versioned, audited, editable Por implementar / Em implementação / Implementada markers; old notes default to Por implementar without rewriting their text.

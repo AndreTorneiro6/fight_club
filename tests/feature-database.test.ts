@@ -361,6 +361,38 @@ test("additive feature collections preserve legacy data and private drafts acros
       mutate(actor, { ...coinCommand, requestId: randomUUID() }),
       { status: 403 },
     );
+    const sponsorCommand = {
+      type: "admin.sponsors.save",
+      expectedVersion: 0,
+      name: "Parceiro de teste",
+      description: "Apoio",
+      website: "",
+      logo: "",
+      label: "",
+      order: 0,
+      published: false,
+    };
+    const sponsorResult = (await mutate(admin, sponsorCommand)) as {
+      _id: string;
+    };
+    assert.equal((await view(admin)).sponsors?.length, 1);
+    assert.deepEqual((await view(actor)).sponsors, []);
+    const sponsorEdit = {
+      ...sponsorCommand,
+      sponsorId: sponsorResult._id,
+      expectedVersion: 1,
+      published: true,
+    };
+    const sponsorRace = await Promise.allSettled([
+      mutate(admin, sponsorEdit),
+      mutate(secondCollector, { ...sponsorEdit, name: "Outro nome" }),
+    ]);
+    assert.equal(sponsorRace.filter((r) => r.status === "fulfilled").length, 1);
+    assert.equal((await view(actor)).sponsors?.length, 1);
+    await assert.rejects(
+      mutate(actor, { ...sponsorEdit, expectedVersion: 2 }),
+      { status: 403 },
+    );
   } finally {
     await client.close();
     await mongo.stop();

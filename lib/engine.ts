@@ -1,3 +1,4 @@
+import { executeSponsors } from "./sponsors";
 import { executeCoins } from "./coins";
 import { executeStickerAlbum } from "./sticker-album";
 import { executeAdminNotes } from "./admin-notes";
@@ -48,6 +49,7 @@ const day = z.iso.date();
 const email = emailSchema;
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const prizeSchema = z.object({
+  sponsorId: z.string().uuid().optional(),
   title: short.min(2),
   description: text,
   divisionId: z.string().max(100),
@@ -163,6 +165,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("admin.content.save"),
+    expectedContentVersion: z.number().int().min(0).optional(),
     rulesText: z.string().trim().max(12000).optional(),
     prizes: z.array(prizeSchema).max(30).optional(),
   }),
@@ -394,6 +397,8 @@ export function execute(
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (featureType.startsWith("admin.sponsors."))
+    return executeSponsors(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.coins."))
     return executeCoins(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.stickers."))
@@ -1649,6 +1654,18 @@ export function execute(
       break;
     }
     case "admin.content.save": {
+      if (cmd.expectedContentVersion !== undefined)
+        ensure(
+          cmd.expectedContentVersion === (rules.contentVersion ?? 0),
+          "O conteúdo foi alterado por outro administrador. Reabre o editor antes de guardar.",
+          409,
+        );
+      for (const prize of cmd.prizes ?? [])
+        ensure(
+          !prize.sponsorId ||
+            s.sponsors?.some((sponsor) => sponsor._id === prize.sponsorId),
+          "Patrocinador do prémio inválido.",
+        );
       ensure(
         cmd.rulesText !== undefined || cmd.prizes !== undefined,
         "Indica o conteúdo a publicar.",
@@ -1661,6 +1678,7 @@ export function execute(
         );
       if (cmd.rulesText !== undefined) rules.rulesText = cmd.rulesText;
       if (cmd.prizes !== undefined) rules.prizes = cmd.prizes;
+      rules.contentVersion = (rules.contentVersion ?? 0) + 1;
       log("league.content.updated", cmd);
       break;
     }
@@ -2670,6 +2688,7 @@ export function execute(
           ...cmd.settings,
           rulesText: rules.rulesText,
           prizes: rules.prizes,
+          contentVersion: rules.contentVersion,
         },
       ];
       log("settings.updated", cmd.settings);

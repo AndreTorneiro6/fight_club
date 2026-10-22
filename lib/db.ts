@@ -51,15 +51,14 @@ export async function database() {
   return { client, db };
 }
 async function indexes(db: Db) {
-  await db
-    .collection("coinEntries")
-    .createIndex(
-      { requestId: 1 },
-      {
-        unique: true,
-        partialFilterExpression: { requestId: { $type: "string" } },
-      },
-    );
+  await db.collection("sponsors").createIndex({ published: 1, order: 1 });
+  await db.collection("coinEntries").createIndex(
+    { requestId: 1 },
+    {
+      unique: true,
+      partialFilterExpression: { requestId: { $type: "string" } },
+    },
+  );
   await db
     .collection("coinEntries")
     .createIndex({ playerId: 1, createdAt: -1 });

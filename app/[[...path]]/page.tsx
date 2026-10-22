@@ -23,6 +23,7 @@ const routes = new Set([
   "estatisticas",
   "regras",
   "premios",
+  "patrocinios",
   "jornadas",
   "cartoes",
   "palpites",

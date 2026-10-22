@@ -7,6 +7,7 @@ export const leagueInformationLinks = [
   ["estatisticas", "Estatísticas"],
   ["regras", "Regras"],
   ["premios", "Prémios"],
+  ["patrocinios", "Patrocínios"],
 ] as const;
 export const managementLinks = [
   ["admin", "Administração"],

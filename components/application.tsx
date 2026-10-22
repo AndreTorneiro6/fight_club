@@ -34,6 +34,7 @@ import AdminNavigation from "./admin-navigation";
 import AdminAssistant from "./admin-assistant";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
+import { AdminSponsors, SponsorPage, PrizeSponsor } from "./sponsors";
 import { AdminPlayerCards } from "./player-attributes";
 import WorkspaceChoice, { WorkspaceSwitcher } from "./workspace-choice";
 import { PlayerCards } from "./player-cards";
@@ -534,6 +535,7 @@ export function Application({
       notificacoes: "Notificações",
       regras: "Regras",
       premios: "Prémios",
+      patrocinios: "Patrocínios",
       jornadas: "Jornadas oficiais",
       cartoes: "Cartões de jogador",
       palpites: "Palpites",
@@ -749,6 +751,8 @@ export function Application({
             <Champions {...actions} />
           ) : route === "epocas" ? (
             <Seasons {...actions} />
+          ) : route === "patrocinios" ? (
+            <SponsorPage state={s} />
           ) : route === "regras" || route === "premios" ? (
             <LeagueInformation {...actions} page={route} />
           ) : (
@@ -3458,6 +3462,8 @@ function Admin(a: Actions) {
         </Section>
       ) : tab === "album" ? (
         <StickerAlbum revision={s} />
+      ) : tab === "sponsors" ? (
+        <AdminSponsors state={s} run={a.run} busy={a.busy} />
       ) : tab === "coins" ? (
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (
@@ -5024,7 +5030,7 @@ function PlayerEditor({
 }
 
 const settingLabels: Record<
-  keyof Omit<Settings, "_id" | "rulesText" | "prizes">,
+  keyof Omit<Settings, "_id" | "rulesText" | "prizes" | "contentVersion">,
   string
 > = {
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
@@ -6155,6 +6161,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     rules = s.settings[0];
   const [text, setText] = useState(rules.rulesText),
     [prizes, setPrizes] = useState(rules.prizes),
+    [contentVersion, setContentVersion] = useState(rules.contentVersion ?? 0),
     [editing, setEditing] = useState(false);
   const isRules = page === "regras";
   async function save() {
@@ -6162,6 +6169,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
       await run(
         {
           type: "admin.content.save",
+          expectedContentVersion: contentVersion,
           ...(isRules ? { rulesText: text } : { prizes }),
         },
         "Informação da liga publicada.",
@@ -6249,6 +6257,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
               onClick={() => {
                 setText(rules.rulesText);
                 setPrizes(rules.prizes);
+                setContentVersion(rules.contentVersion ?? 0);
                 setEditing(true);
               }}
             >
@@ -6316,6 +6325,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
                 <p style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
                   {p.description}
                 </p>
+                <PrizeSponsor state={s} sponsorId={p.sponsorId} />
               </div>
             </Section>
           ))}
@@ -6416,6 +6426,33 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
                         {s.divisions.map((d) => (
                           <option key={d._id} value={d._id}>
                             {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Patrocinador do prémio
+                      <select
+                        aria-label="Patrocinador do prémio"
+                        value={p.sponsorId ?? ""}
+                        onChange={(e) =>
+                          setPrizes(
+                            prizes.map((x, j) =>
+                              j === i
+                                ? {
+                                    ...x,
+                                    sponsorId: e.target.value || undefined,
+                                  }
+                                : x,
+                            ),
+                          )
+                        }
+                      >
+                        <option value="">Sem patrocinador associado</option>
+                        {(s.sponsors ?? []).map((sponsor) => (
+                          <option key={sponsor._id} value={sponsor._id}>
+                            {sponsor.name}
+                            {sponsor.published ? "" : " · por publicar"}
                           </option>
                         ))}
                       </select>

@@ -1,3 +1,4 @@
+import type { Sponsor } from "./sponsor-types";
 import type { CoinSettings, CoinEntry } from "./coin-types";
 import type {
   StickerSettings,
@@ -74,6 +75,7 @@ export interface Settings extends Entity {
   initialSuggestionCount: 3 | 4;
   rulesText: string;
   prizes: Prize[];
+  contentVersion?: number;
   maxPositionsAbove: number;
   maxActiveChallenges: number;
   minDaysBetween: number;
@@ -98,6 +100,7 @@ export interface Settings extends Entity {
   extendResponseHours: number;
 }
 export interface Prize {
+  sponsorId?: string;
   title: string;
   description: string;
   divisionId: string;
@@ -264,6 +267,7 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  sponsors?: Sponsor[];
   coinSettings?: CoinSettings[];
   coinEntries?: CoinEntry[];
   stickerSettings?: StickerSettings[];
@@ -299,6 +303,7 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "sponsors",
   "coinSettings",
   "coinEntries",
   "stickerSettings",
