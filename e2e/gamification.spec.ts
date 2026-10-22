@@ -17,6 +17,35 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
+  const initial = await (await page.request.get("/api/league")).json();
+  const profile = initial.players.find(
+    (p: { _id: string }) => p._id === initial.actor.playerId,
+  );
+  const origin = new URL(page.url()).origin;
+  const upload = await page.request.post("/api/photos/upload", {
+    headers: { Origin: origin },
+    multipart: {
+      photo: {
+        name: "profile-test.png",
+        mimeType: "image/png",
+        buffer: await readFile("public/icons/player-192.png"),
+      },
+    },
+  });
+  expect(upload.ok()).toBe(true);
+  const photo = (await upload.json()).url;
+  const updated = await page.request.post("/api/league", {
+    headers: { Origin: origin },
+    data: {
+      type: "profile.save",
+      name: profile.name,
+      phone: profile.phone,
+      partner: profile.partner,
+      photo,
+    },
+  });
+  expect(updated.ok()).toBe(true);
+  await page.reload();
   await page.getByRole("button", { name: "Gamificação", exact: true }).click();
   const area = page.getByRole("region", {
     name: "Gamificação em teste privado",
@@ -49,6 +78,11 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
   await area
     .getByRole("button", { name: "Cartas e avatares", exact: true })
     .click();
+  await expect(
+    area
+      .getByRole("article", { name: "Frente da carta", exact: true })
+      .getByRole("img", { name: profile.name, exact: true }),
+  ).toHaveAttribute("src", photo);
   await area
     .getByLabel("Alcunha no verso", { exact: true })
     .fill("Parceiro do clube");

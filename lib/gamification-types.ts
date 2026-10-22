@@ -36,8 +36,8 @@ export const defaultGamificationSettings: GamificationSettings = {
   frontTitle: "Dentro de campo",
   backTitle: "Fora de campo",
   labels: {
-    bar: "Espírito de bar",
-    banter: "Provocação amigável",
+    bar: "Bebida",
+    banter: "Trash talk",
     partner: "Bom parceiro",
     fairplay: "Fair play",
   },

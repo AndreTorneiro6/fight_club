@@ -175,6 +175,14 @@ function Cards({ state, run, busy }: Props) {
       {player ? (
         <div className={styles.columns}>
           <div className="stack">
+            <div className="row wrap" aria-label="Escolher face da carta">
+              <button aria-pressed={!back} onClick={() => setBack(false)}>
+                Frente · Fotografia do perfil
+              </button>
+              <button aria-pressed={back} onClick={() => setBack(true)}>
+                Verso · Cartoon
+              </button>
+            </div>
             <div className={styles.stage}>
               <div className={styles.card} data-face={back ? "back" : "front"}>
                 <article
@@ -186,6 +194,7 @@ function Cards({ state, run, busy }: Props) {
                   <span className="eyebrow">FIGHT CLUB · NEIVA PADEL</span>
                   <h3>{settings.frontTitle}</h3>
                   <span>{division?.name ?? "Liga"}</span>
+                  <span className="eyebrow">FOTOGRAFIA DO PERFIL</span>
                   <Photo player={player} />
                   <h3>{player.name}</h3>
                   <strong className={styles.rating}>
@@ -211,6 +220,7 @@ function Cards({ state, run, busy }: Props) {
                 >
                   <span className="eyebrow">FIGHT CLUB · NEIVA PADEL</span>
                   <h3>{settings.backTitle}</h3>
+                  <span className="eyebrow">CARTOON · ATRIBUTOS SOCIAIS</span>
                   <div className={styles.avatar} ref={avatarRef}>
                     <AvatarIllustration style={value.avatar} />
                   </div>
@@ -402,8 +412,9 @@ function Cards({ state, run, busy }: Props) {
                   : "Pré-visualização; ainda não existe personalização guardada"}
             </span>
             <p>
-              A frente utiliza os atributos de padel já guardados em Admin →
-              Cartões e palpites. Se estiverem por definir, aparecem travessões.
+              A frente utiliza a fotografia real do perfil do jogador e os
+              atributos de padel já guardados em Admin → Cartões e palpites. Se
+              estiverem por definir, aparecem travessões.
             </p>
           </form>
         </div>

@@ -1,43 +1,6 @@
 "use client";
 
-const groups = [
-  {
-    label: "Pessoas",
-    items: [
-      ["players", "Jogadores"],
-      ["registration", "Convites"],
-      ["partners", "Parceiros"],
-      ["payments", "Pagamentos"],
-    ],
-  },
-  {
-    label: "Competição",
-    items: [
-      ["matchmaking", "Jornadas e emparelhamento"],
-      ["weekly", "Papéis semanais"],
-      ["rankings", "Rankings"],
-      ["challenges", "Desafios"],
-      ["games", "Jogos"],
-      ["results", "Resultados"],
-      ["posters", "Cartazes da jornada"],
-    ],
-  },
-  {
-    label: "Configuração",
-    items: [
-      ["notes", "Ideias"],
-      ["coins", "Moedas e bar"],
-      ["gamification", "Gamificação"],
-      ["sponsors", "Patrocínios"],
-      ["assistant", "Assistente"],
-      ["engagement", "Cartões e palpites"],
-      ["album", "Caderneta"],
-      ["rules", "Regras"],
-      ["courts", "Campos"],
-      ["audit", "Auditoria"],
-    ],
-  },
-];
+import { adminGroups as groups } from "@/lib/admin-sections";
 
 export default function AdminNavigation({
   tab,

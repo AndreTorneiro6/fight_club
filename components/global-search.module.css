@@ -1,0 +1,141 @@
+.root {
+  padding: 14px 40px 0;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(680px, 100%);
+  padding: 3px 8px 3px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.bar input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  min-width: 0;
+}
+.bar button {
+  flex-shrink: 0;
+  padding: 8px;
+  background: transparent;
+}
+.bar kbd {
+  font-size: 11px;
+}
+.dialog {
+  padding: 0;
+  width: min(
+    650px,
+    calc(100vw - 32px - var(--safe-left, 0px) - var(--safe-right, 0px))
+  );
+  max-height: calc(
+    var(--visual-height, 100dvh) - var(--safe-top, 0px) -
+      var(--safe-bottom, 0px) - 32px
+  );
+  margin-top: calc(var(--safe-top, 0px) + 16px);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 80px #0009;
+  overflow: hidden;
+}
+.dialog::backdrop {
+  background: #020711bb;
+  backdrop-filter: blur(5px);
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.head input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+.results {
+  max-height: min(54dvh, 450px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+}
+.result {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  white-space: normal;
+  padding: 12px;
+  margin-bottom: 4px;
+  background: transparent;
+  border-color: transparent;
+}
+.result > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.result strong {
+  font-size: 14px;
+}
+.result[aria-selected="true"] {
+  border-color: var(--gold);
+  background: #e7b85b13;
+}
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+}
+.empty {
+  padding: 25px 16px;
+}
+@media (max-width: 760px) {
+  .root {
+    padding: 12px max(18px, var(--safe-right, 0px)) 0
+      max(18px, var(--safe-left, 0px));
+  }
+  .dialog {
+    margin-top: calc(var(--safe-top, 0px) + 12px);
+  }
+  .bar input,
+  .head input {
+    font-size: 16px;
+  }
+  .results {
+    max-height: 48dvh;
+  }
+  .bar kbd {
+    font-size: 10px;
+  }
+}
+
+.dialog {
+  top: var(--visual-top, 0px);
+  bottom: auto;
+}
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.head,
+.footer {
+  flex-shrink: 0;
+}
+.results {
+  flex: 1 1 auto;
+  min-height: 0;
+}
