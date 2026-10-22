@@ -34,6 +34,7 @@ import AdminNavigation from "./admin-navigation";
 import AdminAssistant from "./admin-assistant";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
+import AdminGamification from "./admin-gamification";
 import { AdminSponsors, SponsorPage, PrizeSponsor } from "./sponsors";
 import { AdminPlayerCards } from "./player-attributes";
 import WorkspaceChoice, { WorkspaceSwitcher } from "./workspace-choice";
@@ -3464,6 +3465,13 @@ function Admin(a: Actions) {
         <StickerAlbum revision={s} />
       ) : tab === "sponsors" ? (
         <AdminSponsors state={s} run={a.run} busy={a.busy} />
+      ) : tab === "gamification" ? (
+        <AdminGamification
+          state={s}
+          run={a.run}
+          busy={a.busy}
+          onOpenAlbum={() => setTab("album")}
+        />
       ) : tab === "coins" ? (
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (

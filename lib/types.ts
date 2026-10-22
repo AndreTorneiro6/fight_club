@@ -1,3 +1,7 @@
+import type {
+  GamificationSettings,
+  GamificationProfile,
+} from "./gamification-types";
 import type { Sponsor } from "./sponsor-types";
 import type { CoinSettings, CoinEntry } from "./coin-types";
 import type {
@@ -267,6 +271,8 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  gamificationSettings?: GamificationSettings[];
+  gamificationProfiles?: GamificationProfile[];
   sponsors?: Sponsor[];
   coinSettings?: CoinSettings[];
   coinEntries?: CoinEntry[];
@@ -303,6 +309,8 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "gamificationSettings",
+  "gamificationProfiles",
   "sponsors",
   "coinSettings",
   "coinEntries",

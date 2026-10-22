@@ -1,3 +1,4 @@
+import { executeGamification } from "./gamification";
 import { executeSponsors } from "./sponsors";
 import { executeCoins } from "./coins";
 import { executeStickerAlbum } from "./sticker-album";
@@ -397,6 +398,8 @@ export function execute(
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (featureType.startsWith("admin.gamification."))
+    return executeGamification(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.sponsors."))
     return executeSponsors(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.coins."))
@@ -2414,6 +2417,7 @@ export function execute(
       const referencesTeam = (teamId: string) =>
         teamId.split(":").includes(p._id);
       const hasCompetitionHistory =
+        (s.gamificationProfiles ?? []).some(referencesPlayer) ||
         (s.coinEntries ?? []).some(referencesPlayer) ||
         (s.competitionSchedules ?? []).some((schedule) =>
           schedule.snapshot.some((team) => team.members.some(referencesPlayer)),
