@@ -39,7 +39,7 @@ ConditionPathExists=/home/andre/actions-runner-fight-club/.runner
 
 [Service]
 WorkingDirectory=/home/andre/actions-runner-fight-club
-ExecStart=/home/andre/actions-runner-fight-club/runsvc.sh
+ExecStart=/home/andre/actions-runner-fight-club/bin/runsvc.sh
 Restart=always
 RestartSec=10
 KillSignal=SIGINT
