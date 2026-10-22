@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { coinBalance } from "../lib/coin-types";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
@@ -297,6 +299,67 @@ test("additive feature collections preserve legacy data and private drafts acros
         (entry) => entry.action === "admin.stickers.redeem",
       ).length,
       1,
+    );
+    // Real MongoDB serialization prevents two administrators spending the same balance.
+    const coinRewardId = randomUUID();
+    await mutate(admin, {
+      type: "admin.coins.settings",
+      expectedVersion: 0,
+      enabled: true,
+      name: "Moedas de teste",
+      bookingCoins: 12,
+      rewards: [
+        {
+          id: coinRewardId,
+          title: "Recompensa de teste",
+          cost: 15,
+          active: true,
+        },
+      ],
+    });
+    await mutate(admin, {
+      type: "admin.coins.adjust",
+      playerId: player._id,
+      amount: 20,
+      expectedBalance: 0,
+      reason: "Evento de teste",
+      requestId: randomUUID(),
+    });
+    const coinCommand = {
+      type: "admin.coins.redeem",
+      playerId: player._id,
+      rewardId: coinRewardId,
+      expectedVersion: 1,
+      expectedBalance: 20,
+      requestId: randomUUID(),
+    };
+    await Promise.all([mutate(admin, coinCommand), mutate(admin, coinCommand)]);
+    assert.equal(
+      coinBalance((await readState(db)).coinEntries!, player._id),
+      5,
+    );
+    await mutate(admin, {
+      type: "admin.coins.adjust",
+      playerId: player._id,
+      amount: 15,
+      expectedBalance: 5,
+      reason: "Segundo evento",
+      requestId: randomUUID(),
+    });
+    const spendRace = await Promise.allSettled([
+      mutate(admin, { ...coinCommand, requestId: randomUUID() }),
+      mutate(secondCollector, { ...coinCommand, requestId: randomUUID() }),
+    ]);
+    assert.equal(spendRace.filter((r) => r.status === "fulfilled").length, 1);
+    assert.equal(
+      coinBalance((await readState(db)).coinEntries!, player._id),
+      5,
+    );
+    assert.deepEqual((await view(actor)).coinEntries, []);
+    assert.deepEqual((await view(actor)).coinSettings, []);
+    await assert.rejects(
+      mutate(actor, { ...coinCommand, requestId: randomUUID() }),
+      { status: 403 },
     );
   } finally {
     await client.close();

@@ -11,3 +11,7 @@ Arquivar retira uma ideia da lista ativa sem apagar o seu conteúdo. A opção V
 A coleção opcional `adminNotes` é aditiva e começa vazia, sem alterar dados de competição. Os comandos `admin.notes.save` e `admin.notes.archive` passam pelo motor validado e pela transação MongoDB existente. Cada edição inclui `expectedVersion`; conflitos devolvem HTTP409. Criação e edição exigem uma identidade administrativa efetiva, não apenas uma conta que tenha esse papel disponível.
 
 As notas e os respetivos registos de auditoria não podem ser enviados a jogadores, incluindo administradores que estejam no espaço Jogador. Não afetam rankings, resultados, palpites, notificações a jogadores nem emparelhamentos.
+
+## Estado da implementação
+
+Cada ideia tem um marcador editável: **Por implementar**, **Em implementação** ou **Implementada**. Ideias antigas aparecem como Por implementar até serem classificadas. O estado é guardado com o texto, sujeito à mesma versão, permissões e auditoria. Arquivar é uma ação independente e não indica conclusão. Marcar uma ideia não executa nem publica alterações automaticamente.

@@ -1,0 +1,20 @@
+.root,
+.root > div,
+.root fieldset {
+  min-width: 0;
+}
+.root label {
+  min-width: 0;
+  max-width: 100%;
+}
+.root button {
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .root fieldset {
+    margin: 0;
+  }
+  .root fieldset label {
+    width: 100%;
+  }
+}

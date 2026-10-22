@@ -33,6 +33,7 @@ import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
 import AdminAssistant from "./admin-assistant";
 import AdminNotes from "./admin-notes";
+import AdminCoins from "./admin-coins";
 import { AdminPlayerCards } from "./player-attributes";
 import WorkspaceChoice, { WorkspaceSwitcher } from "./workspace-choice";
 import { PlayerCards } from "./player-cards";
@@ -3457,6 +3458,8 @@ function Admin(a: Actions) {
         </Section>
       ) : tab === "album" ? (
         <StickerAlbum revision={s} />
+      ) : tab === "coins" ? (
+        <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (
         <AdminNotes state={s} run={a.run} busy={a.busy} />
       ) : tab === "assistant" ? (

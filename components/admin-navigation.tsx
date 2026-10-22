@@ -26,6 +26,7 @@ const groups = [
     label: "Configuração",
     items: [
       ["notes", "Ideias"],
+      ["coins", "Moedas e bar"],
       ["assistant", "Assistente"],
       ["engagement", "Cartões e palpites"],
       ["album", "Caderneta"],

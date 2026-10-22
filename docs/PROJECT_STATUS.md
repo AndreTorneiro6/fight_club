@@ -3,6 +3,14 @@
 Last updated: 22 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Admin ideas and virtual coins — 22 October 2026
+
+- Read the live private notes at the user's request; implemented the first idea, “Dinheiro virtual”. Other ideas remain unimplemented. Admin → Ideias now has versioned, audited, editable Por implementar / Em implementação / Implementada markers; old notes default to Por implementar without rewriting their text.
+- Admin → Configuração → Moedas e bar is a private admin-only preview, disabled by default. Editable coin name, per-booking amount, bar reward names/costs/availability, player wallets, manual event credits/corrections with reasons, and staff-confirmed immediate redemption. No purchase, transfer, cash conversion, wagering or connection to prediction points. No player-facing release was added.
+- Additive coinSettings/coinEntries collections; balances derive from immutable movements, with shared MongoDB transaction serialization, unique request IDs, optimistic configuration/balance checks and audit. Cancellations compensate original booking credits (including while disabled); a spent award can create visible debt that blocks spending. Rescheduling preserves original terms and cannot multiply coins. Four snapshot participants earn once per newly confirmed booking; pending rescheduling preserves the old award. No historical booking/result backfill. Player deletion preserves wallets/history via existing removal workflow.
+- Validation: typecheck, all 201 automated tests, production build, workflow lint and two browser scenarios pass. Browser coverage includes configuration, credit/redeem/persistence, mobile layout, idea marker editing and backend denial in player workspace. MongoDB tests cover duplicate requests and concurrent spend attempts. Added coin browser coverage to deployment CI. See docs/VIRTUAL-COINS.md and docs/ADMIN-NOTES.md.
+- Ready for deployment through the deploy branch; verify the workflow and live revision before treating this snapshot as deployed. Do not create production test balances or rewards; admins configure the preview themselves.
+
 ## Deploy branch and direct Pi automation — 22 October 2026
 
 - User requested a dedicated `deploy` branch and deployment directly on the existing Raspberry Pi. The host was verified as Raspberry Pi 4 Model B Rev 1.5, ARM64, Debian 13; it is not a Pico microcontroller.

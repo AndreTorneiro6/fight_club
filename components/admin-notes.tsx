@@ -12,8 +12,19 @@ import {
 import type { View } from "@/lib/types";
 import styles from "./admin-notes.module.css";
 
-type Draft = { id?: string; version: number; title: string; body: string };
-const emptyDraft = (): Draft => ({ version: 0, title: "", body: "" });
+type Draft = {
+  id?: string;
+  version: number;
+  title: string;
+  body: string;
+  implementationStatus: "NOT_IMPLEMENTED" | "IN_PROGRESS" | "IMPLEMENTED";
+};
+const emptyDraft = (): Draft => ({
+  version: 0,
+  title: "",
+  body: "",
+  implementationStatus: "NOT_IMPLEMENTED",
+});
 export default function AdminNotes({
   state,
   run,
@@ -38,6 +49,7 @@ export default function AdminNotes({
         version: current.version,
         title: current.title,
         body: current.body,
+        implementationStatus: current.implementationStatus ?? "NOT_IMPLEMENTED",
       });
   }, [current?._id, current?.version, dirty]);
   useEffect(() => {
@@ -62,6 +74,8 @@ export default function AdminNotes({
             version: note.version,
             title: note.title,
             body: note.body,
+            implementationStatus:
+              note.implementationStatus ?? "NOT_IMPLEMENTED",
           }
         : emptyDraft(),
     );
@@ -76,6 +90,7 @@ export default function AdminNotes({
         expectedVersion: asCopy ? 0 : draft.version,
         title: draft.title,
         body: draft.body,
+        implementationStatus: draft.implementationStatus,
       },
       "Ideia guardada.",
     );
@@ -163,6 +178,18 @@ export default function AdminNotes({
                 onClick={() => select(note._id)}
               >
                 <strong>{note.title}</strong>
+                <span
+                  className={styles.marker}
+                  data-status={note.implementationStatus ?? "NOT_IMPLEMENTED"}
+                >
+                  {
+                    {
+                      NOT_IMPLEMENTED: "Por implementar",
+                      IN_PROGRESS: "Em implementação",
+                      IMPLEMENTED: "Implementada",
+                    }[note.implementationStatus ?? "NOT_IMPLEMENTED"]
+                  }
+                </span>
                 <small>
                   {new Date(note.updatedAt).toLocaleString("pt-PT")}
                 </small>
@@ -204,6 +231,26 @@ export default function AdminNotes({
               </div>
             </div>
           )}
+          <label>
+            Estado da implementação
+            <select
+              aria-label="Estado da implementação"
+              value={draft.implementationStatus}
+              disabled={current?.archived || busy}
+              onChange={(event) => {
+                setDraft({
+                  ...draft,
+                  implementationStatus: event.target
+                    .value as Draft["implementationStatus"],
+                });
+                setDirty(true);
+              }}
+            >
+              <option value="NOT_IMPLEMENTED">Por implementar</option>
+              <option value="IN_PROGRESS">Em implementação</option>
+              <option value="IMPLEMENTED">Implementada</option>
+            </select>
+          </label>
           <label>
             Título
             <input

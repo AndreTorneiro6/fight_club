@@ -1,3 +1,4 @@
+import { reconcileCoins } from "./coins";
 import { publicActor, workspaceActor } from "./workspace";
 import type { Session, User } from "./types";
 import { emailLookup, normalizeEmail, EMAIL_IN_USE } from "./email";
@@ -50,6 +51,18 @@ export async function database() {
   return { client, db };
 }
 async function indexes(db: Db) {
+  await db
+    .collection("coinEntries")
+    .createIndex(
+      { requestId: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { requestId: { $type: "string" } },
+      },
+    );
+  await db
+    .collection("coinEntries")
+    .createIndex({ playerId: 1, createdAt: -1 });
   await db
     .collection("notification_deliveries")
     .createIndex({ status: 1, availableAt: 1 });
@@ -199,6 +212,7 @@ export async function transaction<T>(
         const state = await readState(db, session),
           before = structuredClone(state);
         const result = await fn(state, db, session);
+        reconcileCoins(state, before);
         const expired = expireRejectedRegistrations(state);
         // Explicit deletions and expired refusals revoke account access in the same transaction.
         const remainingPlayers = new Set(

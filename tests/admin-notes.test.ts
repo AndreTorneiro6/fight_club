@@ -163,3 +163,35 @@ test("invalid note IDs, versions and oversized inputs cannot mutate existing not
     assert.throws(() => executeAdminNotes(s, admin, command, now));
   assert.deepEqual(s, snapshot);
 });
+
+test("idea implementation markers default safely, remain editable and preserve text and concurrent protection", () => {
+  const s = state();
+  const first = create(s);
+  assert.equal(s.adminNotes![0].implementationStatus, "NOT_IMPLEMENTED");
+  const cmd = {
+    type: "admin.notes.save",
+    noteId: first._id,
+    expectedVersion: 1,
+    title: s.adminNotes![0].title,
+    body: s.adminNotes![0].body,
+    implementationStatus: "IMPLEMENTED",
+  };
+  executeAdminNotes(s, admin, cmd, now);
+  assert.equal(s.adminNotes![0].implementationStatus, "IMPLEMENTED");
+  assert.equal(s.adminNotes![0].body, "Texto privado\nSegunda linha");
+  assert.throws(() =>
+    executeAdminNotes(
+      s,
+      other,
+      { ...cmd, implementationStatus: "IN_PROGRESS" },
+      now,
+    ),
+  );
+  executeAdminNotes(
+    s,
+    other,
+    { ...cmd, expectedVersion: 2, implementationStatus: "IN_PROGRESS" },
+    now,
+  );
+  assert.equal(s.adminNotes![0].implementationStatus, "IN_PROGRESS");
+});

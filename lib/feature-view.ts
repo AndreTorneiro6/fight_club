@@ -7,6 +7,8 @@ export function filterFeatureView(state: State, actor: Actor) {
     (pack) => actor.role === "admin" && pack.userId === actor.userId,
   );
   if (actor.role !== "admin") {
+    state.coinSettings = [];
+    state.coinEntries = [];
     state.stickerSettings = [];
     state.stickerRewards = [];
   }
@@ -17,7 +19,9 @@ export function filterFeatureView(state: State, actor: Actor) {
   if (actor.role === "admin") return;
   state.adminNotes = [];
   state.audit = state.audit.filter(
-    (entry) => !entry.action.startsWith("admin.notes."),
+    (entry) =>
+      !entry.action.startsWith("admin.notes.") &&
+      !entry.action.startsWith("admin.coins."),
   );
   const ownTeams = new Set(
     state.divisions.flatMap((division) =>

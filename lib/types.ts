@@ -1,3 +1,4 @@
+import type { CoinSettings, CoinEntry } from "./coin-types";
 import type {
   StickerSettings,
   StickerPack,
@@ -263,6 +264,8 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  coinSettings?: CoinSettings[];
+  coinEntries?: CoinEntry[];
   stickerSettings?: StickerSettings[];
   stickerPacks?: StickerPack[];
   stickerRewards?: StickerReward[];
@@ -296,6 +299,8 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "coinSettings",
+  "coinEntries",
   "stickerSettings",
   "stickerPacks",
   "stickerRewards",

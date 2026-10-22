@@ -9,6 +9,7 @@ export interface AdminNote {
   title: string;
   body: string;
   archived: boolean;
+  implementationStatus?: "NOT_IMPLEMENTED" | "IN_PROGRESS" | "IMPLEMENTED";
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -25,6 +26,9 @@ export const adminNoteCommandSchema = z.discriminatedUnion("type", [
     expectedVersion: z.number().int().min(0),
     title: z.string().trim().min(1).max(160),
     body: z.string().max(30000),
+    implementationStatus: z
+      .enum(["NOT_IMPLEMENTED", "IN_PROGRESS", "IMPLEMENTED"])
+      .optional(),
   }),
   z.object({
     type: z.literal("admin.notes.archive"),
@@ -65,6 +69,10 @@ export function executeAdminNotes(
       version: (existing?.version ?? 0) + 1,
       title: command.title,
       body: command.body,
+      implementationStatus:
+        command.implementationStatus ??
+        existing?.implementationStatus ??
+        "NOT_IMPLEMENTED",
       archived: false,
       createdAt: existing?.createdAt ?? now,
       createdBy: existing?.createdBy ?? actor.userId,
@@ -93,6 +101,7 @@ export function executeAdminNotes(
       previous: existing ?? null,
       title: note.title,
       archived: note.archived,
+      implementationStatus: note.implementationStatus,
     }),
     createdAt: now,
   });

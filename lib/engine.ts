@@ -1,3 +1,4 @@
+import { executeCoins } from "./coins";
 import { executeStickerAlbum } from "./sticker-album";
 import { executeAdminNotes } from "./admin-notes";
 import { executePlayerAttributes } from "./player-attributes";
@@ -393,6 +394,8 @@ export function execute(
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (featureType.startsWith("admin.coins."))
+    return executeCoins(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.stickers."))
     return executeStickerAlbum(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.notes."))
@@ -2393,6 +2396,7 @@ export function execute(
       const referencesTeam = (teamId: string) =>
         teamId.split(":").includes(p._id);
       const hasCompetitionHistory =
+        (s.coinEntries ?? []).some(referencesPlayer) ||
         (s.competitionSchedules ?? []).some((schedule) =>
           schedule.snapshot.some((team) => team.members.some(referencesPlayer)),
         ) ||
