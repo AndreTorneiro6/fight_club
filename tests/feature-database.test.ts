@@ -1,3 +1,4 @@
+import { defaultAvatar, defaultSocial } from "../lib/gamification-types";
 import { randomUUID } from "node:crypto";
 import { coinBalance } from "../lib/coin-types";
 import { test } from "node:test";
@@ -391,6 +392,34 @@ test("additive feature collections preserve legacy data and private drafts acros
     assert.equal((await view(actor)).sponsors?.length, 1);
     await assert.rejects(
       mutate(actor, { ...sponsorEdit, expectedVersion: 2 }),
+      { status: 403 },
+    );
+    const gamificationCommand = {
+      type: "admin.gamification.profile",
+      playerId: player._id,
+      expectedVersion: 0,
+      expectedSettingsVersion: 0,
+      nickname: "Teste privado",
+      avatar: defaultAvatar,
+      social: defaultSocial,
+    };
+    const gamificationRace = await Promise.allSettled([
+      mutate(admin, gamificationCommand),
+      mutate(secondCollector, {
+        ...gamificationCommand,
+        nickname: "Outro teste",
+      }),
+    ]);
+    assert.equal(
+      gamificationRace.filter((r) => r.status === "fulfilled").length,
+      1,
+    );
+    assert.equal((await readState(db)).gamificationProfiles?.length, 1);
+    assert.equal((await view(admin)).gamificationProfiles?.length, 1);
+    assert.deepEqual((await view(actor)).gamificationProfiles, []);
+    assert.deepEqual((await view(actor)).gamificationSettings, []);
+    await assert.rejects(
+      mutate(actor, { ...gamificationCommand, expectedVersion: 1 }),
       { status: 403 },
     );
   } finally {

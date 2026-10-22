@@ -3,6 +3,15 @@
 Last updated: 22 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Gamificar — private admin lab, 22 October 2026
+
+- User requested Gamificar excluding Vale tudo and Dominação, keeping the idea Em implementação, and development away from deploy until tested. Created feature/gamificar before code changes. Updated only the live Gamificar note's implementationStatus through the validated engine/transaction under __operator__ audit, preserving title/body (version 5, IN_PROGRESS). Leave this status in progress after release for the two admins' testing.
+- Admin → Configuração → Gamificação adds a private lab: original local vector avatars (skin/hair/shirt/background colors, hair style, expression, glasses/beard), nickname, double-sided flip card and a single PNG export of both faces. Front uses the existing real photo/padel self-assessment; unrecorded padel values are dashes. Back has avatar and four playful self-assessed social values, independent from official competition, coins and prediction points. Default social zeros are unsaved previews until explicit save. Existing player-facing cards are unchanged; no private lab data or commands are available in player workspace.
+- Shared admin settings edit front/back titles and social labels. Defaults: Espírito de bar, Provocação amigável, Bom parceiro, Fair play. Bar e prémios reuses AdminCoins and the same wallets/catalog; links open the existing sticker album and official league prizes. No excluded game modes, external image service, new coin economics or player release are added. Avatar is a customizable illustration, not an automatic photo transformation.
+- Additive gamificationSettings/gamificationProfiles and unique player index, strict enum/hex/integer validation, version checks for both profile and settings, MongoDB transaction serialization, private audit and deletion-history guard. Profile drafts survive other-admin version conflicts; inputs/tab switching are disabled during saves to prevent old-setting edits while a save is pending.
+- Validation on feature branch: typecheck, all 213 tests, production build, workflow lint and 3 browser scenarios pass. Browser tests cover configurable labels, avatar persistence, flip, 1440×1060 PNG export, bar integration, mobile layout and denied player access. MongoDB tests confirm one winner for simultaneous profile edits. Added gamification browser checks to CI. Testing guide: docs/GAMIFICATION.md.
+- Awaiting PR CI before integration into deploy. Do not create real production test profiles or rewards. Preserve admin-only access and the Gamificar IN_PROGRESS note status.
+
 ## Sponsors and prize associations — 22 October 2026
 
 - Implemented the live “Patrocínios” idea: “Criar um espaço para os patrocinadores e linkar com os prémios”. Admin → Configuração → Patrocínios supports audited/versioned name, description, HTTPS website/logo, support label, display order and publication editing. New sponsors are private; unpublishing retains records and prize associations. No fictional sponsors are seeded.

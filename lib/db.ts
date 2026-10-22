@@ -51,6 +51,9 @@ export async function database() {
   return { client, db };
 }
 async function indexes(db: Db) {
+  await db
+    .collection("gamificationProfiles")
+    .createIndex({ playerId: 1 }, { unique: true });
   await db.collection("sponsors").createIndex({ published: 1, order: 1 });
   await db.collection("coinEntries").createIndex(
     { requestId: 1 },

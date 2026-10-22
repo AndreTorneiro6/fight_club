@@ -27,6 +27,7 @@ const groups = [
     items: [
       ["notes", "Ideias"],
       ["coins", "Moedas e bar"],
+      ["gamification", "Gamificação"],
       ["sponsors", "Patrocínios"],
       ["assistant", "Assistente"],
       ["engagement", "Cartões e palpites"],
