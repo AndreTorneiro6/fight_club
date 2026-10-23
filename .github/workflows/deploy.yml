@@ -37,7 +37,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      # ubuntu-24.04 already provides the shared libraries needed for headless
+      # Chromium. Avoid reinstalling fonts/Xvfb and upgrading system libraries
+      # from a slow apt mirror on every run; the browser tests remain mandatory.
+      - name: Install Chromium for browser checks
+        run: npx playwright install chromium
       - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts e2e/gamification.spec.ts e2e/global-search.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
