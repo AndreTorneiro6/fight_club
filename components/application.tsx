@@ -1,4 +1,6 @@
 "use client";
+import AdminPlacement from "./admin-placement";
+import AdminSimulation from "./admin-simulation";
 import {
   adminOnlyRoutes,
   managementLinks,
@@ -3488,12 +3490,15 @@ function Admin(a: Actions) {
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (
         <AdminNotes state={s} run={a.run} busy={a.busy} />
-
       ) : tab === "engagement" ? (
         <div className="stack">
           <AdminPlayerCards revision={s} />
           <EngagementAdmin revision={s} />
         </div>
+      ) : tab === "placement" ? (
+        <AdminPlacement state={s} run={a.run} busy={a.busy} />
+      ) : tab === "simulation" ? (
+        <AdminSimulation state={s} />
       ) : tab === "matchmaking" ? (
         <CompetitionMatchmaking s={s} run={a.run} busy={a.busy} />
       ) : tab === "payments" ? (

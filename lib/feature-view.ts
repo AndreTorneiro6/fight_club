@@ -7,6 +7,7 @@ export function filterFeatureView(state: State, actor: Actor) {
     (pack) => actor.role === "admin" && pack.userId === actor.userId,
   );
   if (actor.role !== "admin") {
+    state.placementEvents = [];
     state.gamificationSettings = [];
     state.gamificationProfiles = [];
     state.coinSettings = [];
@@ -40,7 +41,8 @@ export function filterFeatureView(state: State, actor: Actor) {
       !entry.action.startsWith("admin.notes.") &&
       !entry.action.startsWith("admin.coins.") &&
       !entry.action.startsWith("admin.sponsors.") &&
-      !entry.action.startsWith("admin.gamification."),
+      !entry.action.startsWith("admin.gamification.") &&
+      !entry.action.startsWith("admin.placement."),
   );
   const ownTeams = new Set(
     state.divisions.flatMap((division) =>
