@@ -75,6 +75,12 @@ function Cards({ state, run, busy }: Props) {
     [exporting, setExporting] = useState(false),
     [message, setMessage] = useState("");
   const avatarRef = useRef<HTMLDivElement>(null);
+  const [cartoon, setCartoon] = useState<{
+    source: string;
+    url: string;
+  } | null>(null);
+  const [cartoonError, setCartoonError] = useState("");
+  const [cartoonAttempt, setCartoonAttempt] = useState(0);
   const player = players.find((p) => p._id === playerId),
     saved = state.gamificationProfiles?.find((p) => p.playerId === playerId);
   const live: CardDraft = {
@@ -89,6 +95,39 @@ function Cards({ state, run, busy }: Props) {
       !!draft &&
       ((saved?.version ?? 0) !== draft.version ||
         settings.version !== draft.settingsVersion);
+  const sourcePhoto = player?.photo ?? "";
+  const cartoonUrl = cartoon?.source === sourcePhoto ? cartoon.url : "";
+  useEffect(() => {
+    setCartoonError("");
+    if (!sourcePhoto) return;
+    const match = /^\/api\/photos\/([a-zA-Z0-9-]{1,80})$/.exec(sourcePhoto);
+    if (!match) {
+      setCartoonError("Carrega a fotografia no Perfil para gerar o cartoon.");
+      return;
+    }
+    const controller = new AbortController();
+    let objectUrl = "";
+    void fetch(`/api/photos/${match[1]}/cartoon`, {
+      method: "POST",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error("Não foi possível gerar o cartoon. Tenta novamente.");
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setCartoon({ source: sourcePhoto, url: objectUrl });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setCartoonError("Não foi possível gerar o cartoon. Tenta novamente.");
+      });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [sourcePhoto, cartoonAttempt]);
   const personal = data?.personalCards.find((p) => p.playerId === playerId);
   const division = state.divisions.find((d) => d._id === player?.divisionId);
   const change = (patch: Partial<CardDraft>) =>
@@ -125,14 +164,15 @@ function Cards({ state, run, busy }: Props) {
     setMessage("");
     try {
       const svg = avatarRef.current?.querySelector("svg")?.outerHTML;
-      if (!svg) throw new Error("Avatar indisponível.");
+      if (!svg && !cartoonUrl) throw new Error("Cartoon indisponível.");
       await exportTwoSidedCard(
         player,
         saved,
         settings,
         personal,
-        svg,
+        svg ?? "",
         division?.name ?? "Liga",
+        cartoonUrl,
       );
       setMessage("Imagem com frente e verso descarregada.");
     } catch (e) {
@@ -222,7 +262,33 @@ function Cards({ state, run, busy }: Props) {
                   <h3>{settings.backTitle}</h3>
                   <span className="eyebrow">CARTOON · ATRIBUTOS SOCIAIS</span>
                   <div className={styles.avatar} ref={avatarRef}>
-                    <AvatarIllustration style={value.avatar} />
+                    {sourcePhoto ? (
+                      cartoonUrl ? (
+                        <img
+                          className={styles.photo}
+                          src={cartoonUrl}
+                          alt={`Cartoon de ${player.name}`}
+                        />
+                      ) : (
+                        <p role="status">
+                          {cartoonError ||
+                            "A criar cartoon da fotografia de perfil…"}
+                        </p>
+                      )
+                    ) : (
+                      <AvatarIllustration style={value.avatar} />
+                    )}
+                    {sourcePhoto && cartoonError && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCartoon(null);
+                          setCartoonAttempt((n) => n + 1);
+                        }}
+                      >
+                        Tentar novamente
+                      </button>
+                    )}
                   </div>
                   <h3>{value.nickname || player.name}</h3>
                   <div className={styles.metrics}>
@@ -246,7 +312,14 @@ function Cards({ state, run, busy }: Props) {
               Virar carta · {back ? "ver frente" : "ver verso"}
             </button>
             <button
-              disabled={busy || exporting || !!draft || !saved || !data}
+              disabled={
+                busy ||
+                exporting ||
+                !!draft ||
+                !saved ||
+                !data ||
+                (!!sourcePhoto && !cartoonUrl)
+              }
               onClick={() => void download()}
             >
               Exportar as duas faces (PNG)
@@ -266,9 +339,10 @@ function Cards({ state, run, busy }: Props) {
           >
             <h3>Personalizar avatar e carta</h3>
             <p>
-              Um avatar ilustrado construído na app. Os atributos sociais são
-              brincadeira e não são estatísticas verificadas nem avaliações de
-              outros jogadores.
+              O verso usa um cartoon gerado localmente da fotografia do Perfil.
+              Sem foto, usa o avatar personalizável abaixo. Os atributos sociais
+              são brincadeira e não são estatísticas verificadas nem avaliações
+              de outros jogadores.
             </p>
             {conflict && (
               <div className="inset stack" role="alert">
@@ -548,7 +622,9 @@ export default function AdminGamification(
         </p>
         <div className={`stack gap-sm ${styles.guide}`}>
           <strong>Como testar</strong>
-          <p>1. Escolhe um jogador, personaliza o avatar e guarda.</p>
+          <p>
+            1. Escolhe um jogador com fotografia no Perfil e guarda a carta.
+          </p>
           <p>2. Vira a carta para ver o verso e exporta as duas faces.</p>
           <p>
             3. No Bar e prémios, configura moedas/recompensas e testa as trocas.

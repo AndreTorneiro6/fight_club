@@ -13,6 +13,7 @@ export async function exportTwoSidedCard(
   attributes: PlayerAttributes | undefined,
   avatarSvg: string,
   division: string,
+  cartoonUrl?: string,
 ) {
   const canvas = document.createElement("canvas");
   canvas.width = 1440;
@@ -81,7 +82,8 @@ export async function exportTwoSidedCard(
   }
   if (!photo) text(initials, 360, 390, 110);
   const avatar = await load(
-    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(avatarSvg)}`,
+    cartoonUrl ||
+      `data:image/svg+xml;charset=utf-8,${encodeURIComponent(avatarSvg)}`,
   );
   ctx.drawImage(avatar, 890, 210, 380, 356);
   text(player.name, 360, 580, 35);

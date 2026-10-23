@@ -1,7 +1,13 @@
 # Fight Club — project handoff
 
-Last updated: 22 October 2026 (Europe/Lisbon).
+Last updated: 23 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
+
+## Profile-photo cartoon — 23 October 2026
+
+- On feature/profile-cartoon, private admin card back now uses a deterministic Python/Pillow cartoon filter of the uploaded Perfil photo, including two-face export. Front keeps the original; no-photo fallback keeps the existing manual avatar. No external image service or fetching arbitrary URLs. MongoDB photoCartoons stores versioned derived PNGs; originals and derivatives never go in public/. Authenticated same-origin POST enforces effective admin workspace even for cached images. Bounded/coalesced subprocesses, decode limits and timeouts protect the host. Docker and CI include Pillow. Guide: docs/PROFILE-CARTOON.md. Not deployed; production photos/data untouched.
+- Validation: typecheck, all 218 tests, production build and the gamification browser scenario pass. Browser verifies a 512px cartoon from the uploaded photo, export and player-workspace 403.
+- WhatsApp test bot was preserved separately on feature/whatsapp-test-bot, commit caaab0a. It remains unlinked: user does not want to connect their personal account and has no separate number.
 
 ## Global search, profile-photo cards and iPhone safe areas — 22 October 2026
 
@@ -10,7 +16,7 @@ This is a saved snapshot, not a substitute for checking Git and live service sta
 - Gamification front explicitly uses the selected player's profile photo; back is the local illustrated avatar. Face buttons name Fotografia do perfil and Cartoon. Default social labels are now Bebida, Trash talk, Bom parceiro, Fair play; existing saved custom labels are preserved. Gamification remains admin-only and Em implementação; excluded competition modes remain absent.
 - iPhone fix: opaque status-bar metadata for new installs; CSS env safe insets for app/header, login, dialogs, floating controls and bottom navigation, plus a top mask for older translucent installs. Visual viewport height/offset tracking adjusts dialogs with software keyboards. Mobile buttons/icons have 44px touch targets and fields 16px text to avoid automatic zoom; user zoom remains available. This is tested with emulated iPhone sizes/insets/keyboard, not a physical iPhone. User should close/reopen the installed app and verify there.
 - Validation on feature branch: typecheck, all 217 tests, production build, actionlint and all 8 release browser checks pass. Browser coverage includes profile photo upload/reuse, dual-face PNG, Ctrl/Cmd K, direct sections/player lookup, focus/Escape, player isolation, simulated notch/home indicator/keyboard, touch dimensions and existing season/sponsor/coin/album/workspace flows. Guide: docs/APP-SEARCH-AND-IPHONE.md.
-- Awaiting PR CI before deploy integration. No production profile/photo/settings/coin data was changed for tests; keep Gamificar IN_PROGRESS.
+- Released after [PR #2](https://github.com/AndreTorneiro6/fight_club/pull/2) CI passed in run 39773831916 (deploy skipped). Merge revision `ac4803ef7a61c05658d2dc7ae24388e15fdea671` deployed via [run 39774194905, attempt 2](https://github.com/AndreTorneiro6/fight_club/actions/runs/39774194905/attempts/2). Attempt 1 stalled installing browser dependencies and was cancelled before deployment; the fresh attempt passed all checks and deployment. Live image `sha256:0fe77a58ee233568909c5c57aefdd7fd491a0b52f49ec8e9ab2e405d38e91533`; public health OK, app healthy and worker zero restarts. Other services were not restarted. Live /auth metadata confirms statusBarStyle black. Gamificar remains IN_PROGRESS version 5. No production profile/photo/settings/coin data was changed for tests. This handoff-only follow-up is committed on feature/global-search without changing deploy or deploying again. Physical iPhone confirmation remains with the user after closing/reopening the installed app.
 
 ## Gamificar — private admin lab, 22 October 2026
 
