@@ -57,3 +57,9 @@ O aviso inicial à dupla defensora indica o prazo já configurado no administrad
 Enquanto o desafio estiver pendente, a dupla defensora recebe lembretes quando faltam **12, 6, 3 e 1 horas**. O worker verifica a cada minuto; se esteve parado, envia apenas o marco mais próximo em vez de acumular avisos antigos. Cada marco é deduplicado por desafio, prazo e destinatário. Aceitar, recusar ou cancelar termina os lembretes. Se o prazo terminar sem resposta, ambas as duplas e a organização recebem o aviso de expiração, sem criar um resultado fictício.
 
 A fila volta a verificar o estado e o prazo antes de enviar, descartando avisos desatualizados após resposta, prolongamento ou expiração. O tempo de retenção do push de um lembrete não ultrapassa o prazo de resposta. Os membros guardados no snapshot de ambas as duplas têm acesso à respetiva entrega; não se assumem apenas os dois representantes. Desafios novos continuam bloqueados no servidor até à publicação dos papéis semanais.
+
+## Duplas sem desafios
+
+**Admin → Jornadas e emparelhamento → Participação nos desafios** mostra, por liga e jornada, as duplas que ainda não enviaram desafios e as que ainda não receberam desafios, além do total sem qualquer desafio. Cada entrada mostra a posição, nomes da dupla, papel e estado (aguarda resposta, aceite, jogo oficial, ausência ou inscrição inativa/pendente). As listas contam submissões reais, incluindo as posteriormente recusadas, expiradas ou canceladas; o estado distingue atividade passada de um compromisso atual. As duplas em DEFESA não são tratadas como obrigadas a iniciar desafios.
+
+No modo semanal anterior, o mesmo acompanhamento está em **Papéis semanais → Duplas sem desafios enviados ou recebidos**, usando a semana e a categoria selecionadas. As listas são exclusivas do administrador e atualizam-se com o estado em direto existente. Não criam desafios, notificações ou alterações ao ranking.

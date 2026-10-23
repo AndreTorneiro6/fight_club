@@ -1,4 +1,5 @@
 "use client";
+import RoundChallengeCoverage from "./round-challenge-coverage";
 import ChallengeTimeProposal from "./challenge-time-proposal";
 import { RoundRoles, PlayerRoundChallenges } from "./round-challenge-roles";
 import { useState } from "react";
@@ -718,6 +719,7 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
             run={run}
             busy={busy}
           />
+          <RoundChallengeCoverage s={s} round={round} />
           <div className="card">
             <h3>Desafios e prioridades</h3>
             <p role="status">

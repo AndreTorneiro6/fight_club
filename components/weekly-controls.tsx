@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usesManagedCompetition } from "@/lib/competition-mode";
+import RoundChallengeCoverage from "./round-challenge-coverage";
 import RankingExport from "./ranking-export";
 import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
@@ -377,6 +378,27 @@ export function WeeklyRoles({
             />
           )}
         </>
+      )}
+      {admin && (
+        <details>
+          <summary>Duplas sem desafios enviados ou recebidos</summary>
+          <div className="stack">
+            {s.divisions
+              .filter(
+                (d) =>
+                  (division === "all" || division === d._id) &&
+                  !usesManagedCompetition(s, d._id),
+              )
+              .map((d) => (
+                <RoundChallengeCoverage
+                  key={d._id}
+                  s={s}
+                  weekStart={week}
+                  divisionId={d._id}
+                />
+              ))}
+          </div>
+        </details>
       )}
       <div className="stack">
         {visible.map((entry) => {

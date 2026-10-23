@@ -3,6 +3,12 @@
 Last updated: 23 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Administrator challenge participation lists — 23 October 2026
+
+- Added admin-only lists of teams that have not sent and teams that have not received a challenge, scoped to the selected league/round; also shows teams with neither. Reuses the published ranking/team snapshot and all real challenge submissions, including refused/expired/cancelled history, with separate current commitment status. Shows team members, rank, role, approved absence/current registration status and accepted/official match state. Defense-only and last-place role notes prevent missing activity being misrepresented as a rule violation. No league writes or new schema.
+- Managed view: Admin → Jornadas e emparelhamento → Participação nos desafios. Legacy view: Papéis semanais → Duplas sem desafios enviados ou recebidos, respecting week/category filters and saved team snapshots. Uses existing live-state updates; no player UI exposes these lists.
+- Local validation: typecheck, all 271 tests, production build, three managed browser scenarios plus the legacy paired-team weekly browser scenario pass. Extended browser checks verify attacker/defender membership in the correct lists, full paired names, no player access and transition to official game status. Deployment pending.
+
 ## Response-deadline reminders — 23 October 2026
 
 - Latest user addition: defender receives configured acceptance/refusal window (currently 48 hours / 2 days), reminders at 12/6/3/1 hours remaining and expiry notification. Reuses each stored `respondBy`; does not add a competing deadline setting or hardcode 48 hours. Applies to managed and legacy challenges. Every saved defender-team member receives the initial notice/reminders; expiry notifies both teams and existing admin workflow without inventing a loss/result. Accepted/refused/cancelled challenges stop reminders; missed worker milestones coalesce to the nearest rather than bursting all old notices. Unique per deadline/recipient keys support explicit extensions and duplicate worker invocations.

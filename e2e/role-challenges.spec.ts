@@ -216,6 +216,25 @@ test("published roles gate player challenges and accepted challenges stay privat
       (await (await page.request.get("/api/league")).json()).challenges,
     ).toEqual(initial.challenges);
     await page.goto("/admin?tab=matchmaking");
+    const noSent = page.getByRole("region", {
+        name: "Duplas que não enviaram desafios",
+        exact: true,
+      }),
+      noReceived = page.getByRole("region", {
+        name: "Duplas que não receberam desafios",
+        exact: true,
+      });
+    await expect(noSent).not.toContainText(teams[6].members[0].name);
+    await expect(noSent).toContainText(teams[4].members[0].name);
+    await expect(noReceived).not.toContainText(teams[4].members[0].name);
+    await expect(noReceived).toContainText(teams[6].members[0].name);
+    await expect(noSent).toContainText("Em DEFESA, a dupla aguarda desafios");
+    await expect(
+      attacker.getByRole("region", {
+        name: "Participação nos desafios da jornada",
+        exact: true,
+      }),
+    ).toHaveCount(0);
     const court = final.courts.find((c: { active: boolean }) => c.active);
     await page
       .getByRole("combobox", { name: "Campo para a marcação", exact: true })
@@ -231,6 +250,8 @@ test("published roles gate player challenges and accepted challenges stay privat
         (c: { competitionRoundId: string }) =>
           c.competitionRoundId === round._id,
       );
+    await expect(noSent).toContainText("Já tem jogo oficial");
+    await expect(noReceived).toContainText("Já tem jogo oficial");
     expect(game.status).toBe("scheduled");
     expect(game.courtId).toBe(court._id);
     expect(game.officialPublication).toBeTruthy();
