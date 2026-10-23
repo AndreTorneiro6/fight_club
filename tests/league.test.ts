@@ -2796,3 +2796,40 @@ test("invalid set results never confirm a winner or change statistics", () => {
   assert.equal(s.results[0].score, "4-6, 3-6");
   assert.equal(s.results[0].setScores!.length, 2);
 });
+
+test("legacy defenders receive the configured response deadline, four deduplicated reminders and team expiry notices", () => {
+  const s = fixture();
+  s.settings[0].acceptHours = 48;
+  const defender = s.players.find((p) => p._id === "p6")!,
+    partner = s.players.find((p) => p._id === "p5")!;
+  defender.partnerId = partner._id;
+  partner.partnerId = defender._id;
+  const c = create(s, 8, 6),
+    end = Date.parse(c.respondBy);
+  for (const id of ["p6", "p5"])
+    assert.match(
+      s.notifications.find(
+        (n) => n.playerId === id && n.dedupe?.startsWith("challenge-received:"),
+      )!.body,
+      /48 horas \(2 dias\)/,
+    );
+  for (const h of [12, 6, 3, 1]) {
+    processDeadlines(s, end - h * 3600000, false);
+    processDeadlines(s, end - h * 3600000 + 1000, false);
+  }
+  assert.equal(
+    s.notifications.filter((n) => n.responseDeadline?.status === "pending")
+      .length,
+    8,
+  );
+  processDeadlines(s, end + 1, false);
+  assert.equal(c.status, "expired");
+  for (const id of ["p8", "p6", "p5"])
+    assert.equal(
+      s.notifications.filter(
+        (n) => n.playerId === id && n.responseDeadline?.status === "expired",
+      ).length,
+      1,
+    );
+  assert.equal(s.results.length, 0);
+});

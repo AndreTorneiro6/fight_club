@@ -207,6 +207,12 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  responseDeadline?: {
+    id: string;
+    managed: boolean;
+    respondBy: string;
+    status: "pending" | "expired";
+  };
   kind?: NotificationEvent;
   seasonId?: string;
   rankingNotice?: boolean;

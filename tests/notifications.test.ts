@@ -1,3 +1,4 @@
+import { notifyResponseReminder } from "../lib/challenge-response-notices";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
@@ -403,6 +404,80 @@ test("outbox commits with events, fans out admins, respects consent, leases work
     assert.equal(
       (await queue.findOne({ notificationId: "season-start" }))?.status,
       "sent",
+    );
+    // Saved team partners must receive their own match notice, too.
+    const reminderAt = Date.now(),
+      reminderEnd = new Date(reminderAt + 12 * 3600000).toISOString();
+    await transaction((s) => {
+      s.challenges.push({
+        _id: "team-notification-game",
+        number: 999,
+        seasonId: "season-1",
+        divisionId: "ouro",
+        challengerId: "player-8",
+        defenderId: "player-5",
+        challengerTeam: [{ playerId: "player-8", name: "Attacker" }],
+        defenderTeam: [
+          { playerId: "player-5", name: "Defender" },
+          { playerId: actor.playerId, name: own.name },
+        ],
+        challengerPosition: 8,
+        defenderPosition: 5,
+        status: "pending",
+        createdAt: new Date(reminderAt - 36 * 3600000).toISOString(),
+        respondBy: reminderEnd,
+        scheduleBy: new Date(reminderAt + 48 * 3600000).toISOString(),
+        playBy: new Date(reminderAt + 96 * 3600000).toISOString(),
+        durationMinutes: 90,
+        titleFight: false,
+      });
+      s.notifications.push({
+        _id: "partner-match-notice",
+        playerId: actor.playerId,
+        title: "Jogo marcado pelo clube",
+        body: "Campo 1",
+        challengeId: "team-notification-game",
+        read: false,
+        createdAt: new Date().toISOString(),
+        deliveryChannels: ["push"],
+      });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "partner-match-notice" }))?.status,
+      "sent",
+    );
+    await transaction((s) => {
+      notifyResponseReminder(
+        s,
+        {
+          id: "team-notification-game",
+          createdAt: new Date(reminderAt - 36 * 3600000).toISOString(),
+          respondBy: reminderEnd,
+          label: "Dupla A × Dupla B",
+          defenderIds: [actor.playerId],
+          participantIds: [actor.playerId],
+          challengeId: "team-notification-game",
+        },
+        reminderAt,
+      );
+    });
+    // Acceptance after queuing but before delivery makes the reminder obsolete.
+    await transaction((s) => {
+      s.challenges.find((c) => c._id === "team-notification-game")!.status =
+        "accepted";
+    });
+    const beforePush = pushSent.length;
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(pushSent.length, beforePush);
+    const queuedReminders = await queue
+      .find({ title: "Lembrete — desafio por responder" })
+      .toArray();
+    assert.equal(queuedReminders.length, 1);
+    assert.equal(queuedReminders[0].status, "skipped");
+    assert.equal(
+      new Date(queuedReminders[0].expiresAt!).toISOString(),
+      reminderEnd,
     );
   } finally {
     await clientToClose?.close();

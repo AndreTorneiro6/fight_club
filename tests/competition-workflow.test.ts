@@ -2090,3 +2090,78 @@ test("publication notifies every member of both teams and blocks changed live ro
     assert.deepEqual(notices[0].deliveryChannels, ["push"]);
   }
 });
+
+test("response deadline notices use the configured 48 hours and remind all defenders at 12, 6, 3 and 1 hours, then expire once", () => {
+  const s = fixture(),
+    r = round(s),
+    c = challenge(s, r, 3, 1);
+  const received = s.notifications.find(
+    (n) =>
+      n.playerId === "ouro-1" && n.dedupe?.startsWith("challenge-pending:"),
+  );
+  assert.match(received!.body, /48 horas \(2 dias\)/);
+  assert.match(received!.body, /aceitar ou recusar/);
+  const end = Date.parse(c.respondBy);
+  processDeadlines(s, end - 13 * 3600000, false);
+  assert.equal(
+    s.notifications.filter((n) => n.dedupe?.startsWith("response-deadline:"))
+      .length,
+    0,
+  );
+  for (const h of [12, 6, 3, 1]) {
+    processDeadlines(s, end - h * 3600000, false);
+    processDeadlines(s, end - h * 3600000 + 1000, false);
+    const notices = s.notifications.filter((n) =>
+      n.dedupe?.startsWith("response-deadline:"),
+    );
+    assert.equal(notices.length, [12, 6, 3, 1].indexOf(h) + 1);
+    assert.equal(notices.at(-1)!.playerId, "ouro-1");
+    assert.equal(notices.at(-1)!.kind, "reminder");
+    assert.deepEqual(notices.at(-1)!.deliveryChannels, ["push"]);
+  }
+  processDeadlines(s, end, false);
+  assert.equal(c.status, "EXPIRED");
+  assert.equal(
+    s.notifications.filter((n) => n.responseDeadline?.status === "expired")
+      .length,
+    2,
+  );
+  const count = s.notifications.length;
+  processDeadlines(s, end + 60000, false);
+  assert.equal(s.notifications.length, count);
+  assert.equal(s.results.length, 0);
+});
+
+test("a response stops reminders; a delayed worker sends only the nearest milestone, using each saved deadline", () => {
+  const s = fixture(),
+    r = round(s),
+    c = challenge(s, r, 3, 1);
+  processDeadlines(s, Date.parse(c.respondBy) - 30 * 60000, false);
+  const reminders = s.notifications.filter(
+    (n) => n.responseDeadline?.status === "pending",
+  );
+  assert.equal(reminders.length, 1);
+  assert.match(reminders[0].body, /30 min/);
+  assert.match(reminders[0].dedupe!, /:1:ouro-1$/);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(1),
+    Date.parse(c.respondBy) - 20 * 60000,
+  );
+  processDeadlines(s, Date.parse(c.respondBy) + 60000, false);
+  assert.equal(s.notifications.filter((n) => n.responseDeadline).length, 1);
+  const other = fixture();
+  command(other, configCommand(other, { responseHours: 24 }));
+  const rr = round(other),
+    cc = challenge(other, rr, 3, 1);
+  assert.equal(
+    Date.parse(cc.respondBy) - Date.parse(cc.createdAt),
+    24 * 3600000,
+  );
+  assert.match(
+    other.notifications.find((n) => n.dedupe?.startsWith("challenge-pending:"))!
+      .body,
+    /24 horas \(1 dia\)/,
+  );
+});
