@@ -3,11 +3,16 @@
 Last updated: 23 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## CI browser setup delay corrected — 23 October 2026
+
+- Slow release validation came from playwright install --with-deps downloading 25.9 MB of font/system packages from azure.archive.ubuntu.com at low throughput. Attempt 1 of run 39936870475 was cancelled around the install/test transition; attempt 2 eventually passed and deployed the reference-card image.
+- PR #6 replaces the redundant OS installation with playwright install chromium on ubuntu-24.04. All typecheck/tests/build and 8 release browser checks still run; PR CI 39939032274 passed in 2m10s without missing libraries. Merged as workflow-only commit 7a211b07ea069d2f47229c58ff471393c276584f with [skip ci] to avoid a duplicate app deployment while the same tested app code was already deploying. Live app revision is 773e0f6, while deploy branch additionally contains this workflow-only change. Next deployment uses the corrected setup.
+
 ## Reference-style cards, slogans and signatures — 23 October 2026
 
 - User supplied Untitled.jpeg as a visual reference (kept untracked, never copied to public). feature/card-reference replaces the preview with original scalable angular metallic artwork for Ouro, Prata and Bronze; front uses Perfil photo and self-assessed padel attributes, verified Fight Club results/recent form; back uses the private Python cartoon and social scores. No invented division history or new excluded game modes. No photos stored in public.
 - Added optional editable per-card slogan and pointer-drawn signature, clear control and bounds/shape validation. Fields are audited/versioned through the existing domain engine; legacy edits preserve existing new fields. Both-face PNG export renders the same SVG artwork, inlining private images in memory, including slogan/signature and correct metal theme (1520×1060). No security-policy relaxation.
-- Admin-only preview remains Em implementação. Validation passed: typecheck, 211 automated tests, production build and browser checks for slogan/signature persistence, all division themes, PNG export, player denial, search and iPhone layout. Visual preview inspected. Release pending CI/deploy.
+- Admin-only preview remains Em implementação. Validation passed: typecheck, 211 automated tests, production build and browser checks for slogan/signature persistence, all division themes, PNG export, player denial, search and iPhone layout. Visual preview inspected. Released via PR #5 and Actions 39936870475 attempt 2 at 773e0f6fcff09f9354804f0d1e2a250d225b1cba. Public health OK; app healthy and worker running with zero restarts on the same image. Deployed source confirms slogan/signature controls. Gamification remains admin-only and in progress. No production cards or player photos were edited for tests.
 
 ## Ollama removal — 23 October 2026
 
