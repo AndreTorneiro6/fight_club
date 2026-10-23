@@ -105,6 +105,15 @@ test("published roles gate player challenges and accepted challenges stay privat
       )
       .selectOption("attack");
     await page
+      .getByRole("button", { name: "Aprovar papéis", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Publicar ATAQUE / DEFESA",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await page
       .getByRole("button", { name: "Publicar ATAQUE / DEFESA", exact: true })
       .click();
     await expect(
@@ -317,4 +326,88 @@ test("administrator records two separate set scores on an officially published m
       p.position,
     ]),
   ).toEqual(ranking);
+});
+
+test("first round proposes Open Attack privately, requires approval and preserves published role history", async ({
+  page,
+}) => {
+  await login(page, "admin@fightclub.local");
+  await enterAdminWorkspace(page);
+  await skip(page);
+  const read = async () => (await page.request.get("/api/league")).json();
+  let s = await read();
+  const division = s.divisions[0]._id,
+    cfg = s.competitionConfigurations[0],
+    now = Date.now(),
+    iso = (h: number) => new Date(now + h * 3600000).toISOString();
+  await post(page, {
+    type: "competition.round.save",
+    expectedVersion: 0,
+    competitionId: cfg._id,
+    divisionId: division,
+    number: 1,
+    opensAt: iso(-1),
+    closesAt: iso(12),
+    schedulingDeadline: iso(18),
+    startsAt: iso(24),
+    endsAt: iso(48),
+    instructions: "Primeira jornada de ataque livre",
+  });
+  s = await read();
+  let r = s.competitionRounds.find(
+    (r: { divisionId: string; number: number }) =>
+      r.divisionId === division && r.number === 1,
+  );
+  await page.goto("/admin?tab=matchmaking");
+  await page
+    .getByRole("combobox", { name: "Jornada", exact: true })
+    .selectOption(r._id);
+  await page
+    .getByRole("button", { name: "Gerar proposta de papéis", exact: true })
+    .click();
+  await expect(
+    page.getByText(/Proposta gerada pelo administrador/),
+  ).toBeVisible();
+  s = await read();
+  r = s.competitionRounds.find((p: { _id: string }) => p._id === r._id);
+  const teams = rankingEntries(s.players, division);
+  expect(r.roles[teams[0].id]).toBe("defense");
+  for (const t of teams.slice(1)) expect(r.roles[t.id]).toBe("attack");
+  expect(r.rolesPublishedAt).toBeUndefined();
+  const publish = page.getByRole("button", {
+    name: "Publicar ATAQUE / DEFESA",
+    exact: true,
+  });
+  await expect(publish).toBeDisabled();
+  const denied = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "competition.roles.save",
+      roundId: r._id,
+      expectedVersion: r.version,
+      roles: r.roles,
+      publish: true,
+    },
+  });
+  expect(denied.status()).toBe(409);
+  await page
+    .getByRole("button", { name: "Aprovar papéis", exact: true })
+    .click();
+  await expect(publish).toBeEnabled();
+  await publish.click();
+  await expect(page.getByText("PUBLICADO", { exact: true })).toBeVisible();
+  s = await read();
+  const next = s.competitionRounds.find(
+    (p: { divisionId: string; number: number }) =>
+      p.divisionId === division && p.number === 2,
+  );
+  await page
+    .getByRole("combobox", { name: "Jornada", exact: true })
+    .selectOption(next._id);
+  await page
+    .getByText("Histórico de papéis das jornadas anteriores", { exact: true })
+    .click();
+  await expect(
+    page.getByText("Jornada 1 · Publicado", { exact: true }),
+  ).toBeVisible();
 });

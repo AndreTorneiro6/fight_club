@@ -35,6 +35,27 @@ const actor = (
 });
 const admin = actor(1, "ouro", "admin");
 function command(s: State, raw: unknown, who = admin, at = time) {
+  const cmd = raw as Record<string, any>;
+  // Publication fixtures explicitly use save, approval and separate publication.
+  if (
+    who.role === "admin" &&
+    cmd.type === "competition.roles.save" &&
+    cmd.publish
+  ) {
+    execute(s, who, { ...cmd, publish: false }, at);
+    const r = s.competitionRounds!.find((r) => r._id === cmd.roundId)!;
+    execute(
+      s,
+      who,
+      {
+        type: "competition.roles.approve",
+        roundId: r._id,
+        expectedVersion: r.version,
+      },
+      at,
+    );
+    return execute(s, who, { ...cmd, expectedVersion: r.version }, at);
+  }
   return execute(s, who, raw, at);
 }
 function configCommand(s: State, patch: Record<string, unknown> = {}) {

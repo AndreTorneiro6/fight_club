@@ -113,3 +113,81 @@ test("season dates can be edited by admins and season details stay public and mo
   expect(denied.status()).toBe(403);
   await context.close();
 });
+
+test("admin starting a season notifies players once and resuming preserves the announcement", async ({
+  page,
+  browser,
+}) => {
+  await login(page, "admin@fightclub.local");
+  const read = async () => (await page.request.get("/api/league")).json(),
+    s = await read(),
+    season = s.seasons[0],
+    origin = new URL(page.url()).origin;
+  const change = async (status: string) => {
+    const r = await page.request.post("/api/league", {
+      headers: { Origin: origin },
+      data: { type: "admin.season.status", seasonId: season._id, status },
+    });
+    expect(r.ok(), await r.text()).toBe(true);
+  };
+  await change("paused");
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Iniciar época e notificar jogadores",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText("Época iniciada.", { exact: true }),
+  ).toBeVisible();
+  let after = await read();
+  const notices = after.notifications.filter(
+    (n: { seasonId?: string }) => n.seasonId === season._id,
+  );
+  expect(notices).toHaveLength(1); // The administrator sees only their own personal notification.
+  const announced = after.audit.find(
+    (a: { action: string }) => a.action === "season.start.announced",
+  );
+  expect(JSON.parse(announced.details).recipients).toBe(
+    after.players.filter(
+      (p: {
+        status: string;
+        awaitingApproval?: boolean;
+        registrationRejectedAt?: string;
+      }) =>
+        p.status === "active" &&
+        !p.awaitingApproval &&
+        !p.registrationRejectedAt,
+    ).length,
+  );
+  expect(
+    after.seasons.find((p: { _id: string }) => p._id === season._id)
+      .startAnnouncedAt,
+  ).toBeTruthy();
+  await change("paused");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Retomar época", exact: true })
+    .click();
+  after = await read();
+  expect(
+    after.notifications.filter(
+      (n: { seasonId?: string }) => n.seasonId === season._id,
+    ),
+  ).toHaveLength(notices.length);
+  const context = await browser.newContext(),
+    player = await context.newPage();
+  await login(player, "jogador@fightclub.local");
+  const playerState = await (await player.request.get("/api/league")).json();
+  expect(
+    playerState.notifications.filter(
+      (n: { seasonId?: string }) => n.seasonId === season._id,
+    ),
+  ).toHaveLength(1);
+  await player.goto("/notificacoes");
+  await expect(
+    player.getByText("A época começou! 🎾", { exact: true }),
+  ).toBeVisible();
+  await context.close();
+});

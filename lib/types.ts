@@ -1,3 +1,4 @@
+import type { NotificationEvent } from "./notification-presentation";
 import type { SetScore } from "./set-scores";
 import type {
   AdminTestAccount,
@@ -82,6 +83,8 @@ export interface Division extends Entity {
 }
 export interface Settings extends Entity {
   weeklyCompetition: boolean;
+  autoWeeklyRoles?: boolean;
+  roleDraftLeadDays?: number;
   requireClubConfirmation: boolean;
   initialSuggestionCount: 3 | 4;
   rulesText: string;
@@ -201,6 +204,9 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  kind?: NotificationEvent;
+  seasonId?: string;
+  deliveryChannels?: ("email" | "whatsapp" | "push")[];
   competitionNotice?: boolean;
   adminTestId?: string;
   testChannels?: TestChannel[];
@@ -260,6 +266,8 @@ export interface Champion extends Entity {
   seasonId: string;
 }
 export interface Season extends Entity {
+  startAnnouncedAt?: string;
+  startAnnouncedBy?: string;
   version?: number;
   archivedDivisions?: Division[];
   name: string;
@@ -280,6 +288,23 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  teamSnapshot?: {
+    id: string;
+    name: string;
+    divisionId: string;
+    playerIds: string[];
+  }[];
+  version?: number;
+  seasonId?: string;
+  weekType?: "NORMAL" | "OPEN_ATTACK";
+  generatedAt?: string;
+  generatedBy?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  approvedVersion?: number;
+  approvalSnapshot?: string;
+  publishedBy?: string;
+  warnings?: string[];
   weekStart: string;
   publishedAt?: string;
   assignments: { playerId: string; role: "attack" | "defense" }[];
@@ -399,6 +424,8 @@ export interface View extends State {
 
 export const defaultSettings: Settings = {
   weeklyCompetition: false,
+  autoWeeklyRoles: true,
+  roleDraftLeadDays: 7,
   requireClubConfirmation: true,
   _id: "league",
   initialSuggestionCount: 4,

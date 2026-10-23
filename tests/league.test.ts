@@ -1683,24 +1683,56 @@ test("approving a refused registration cancels automatic removal", () => {
   assert(s.players.some((entry) => entry._id === p._id));
 });
 
-function publishWeek(s: State, timestamp = time) {
-  s.settings[0].weeklyCompetition = true;
+function publishAssignments(
+  s: State,
+  assignments: { playerId: string; role: "attack" | "defense" }[],
+  timestamp: number,
+) {
+  const who = actor(1, "admin"),
+    weekStart = clubWeek(timestamp).start;
   execute(
     s,
-    actor(1, "admin"),
+    who,
     {
       type: "admin.week.save",
-      weekStart: clubWeek(timestamp).start,
-      publish: true,
-      assignments: s.players
-        .filter((p) => p.status === "active")
-        .map((p) => ({
-          playerId: p._id,
-          role: ["p8", "p7", "p16", "p24"].includes(p._id)
-            ? "attack"
-            : "defense",
-        })),
+      weekStart,
+      expectedVersion:
+        s.weeklyRounds.find((r) => r.weekStart === weekStart)?.version ?? 0,
+      publish: false,
+      assignments,
     },
+    timestamp,
+  );
+  const r = s.weeklyRounds.find((r) => r.weekStart === weekStart)!;
+  execute(
+    s,
+    who,
+    { type: "admin.week.approve", weekStart, expectedVersion: r.version ?? 0 },
+    timestamp,
+  );
+  execute(
+    s,
+    who,
+    {
+      type: "admin.week.save",
+      weekStart,
+      expectedVersion: r.version ?? 0,
+      publish: true,
+      assignments,
+    },
+    timestamp,
+  );
+}
+function publishWeek(s: State, timestamp = time) {
+  s.settings[0].weeklyCompetition = true;
+  publishAssignments(
+    s,
+    s.players
+      .filter((p) => p.status === "active")
+      .map((p) => ({
+        playerId: p._id,
+        role: ["p8", "p7", "p16", "p24"].includes(p._id) ? "attack" : "defense",
+      })),
     timestamp,
   );
 }
@@ -1715,6 +1747,9 @@ test("weekly roles must be published and only attackers can challenge assigned d
         actor(8),
         {
           type: "admin.week.save",
+          expectedVersion:
+            s.weeklyRounds.find((r) => r.weekStart === clubWeek(time).start)
+              ?.version ?? 0,
           weekStart: clubWeek(time).start,
           publish: true,
           assignments: [],
@@ -1730,6 +1765,9 @@ test("weekly roles must be published and only attackers can challenge assigned d
         actor(1, "admin"),
         {
           type: "admin.week.save",
+          expectedVersion:
+            s.weeklyRounds.find((r) => r.weekStart === clubWeek(time).start)
+              ?.version ?? 0,
           weekStart: clubWeek(time).start,
           publish: true,
           assignments: [],
@@ -1763,6 +1801,9 @@ test("weekly roles must be published and only attackers can challenge assigned d
         actor(1, "admin"),
         {
           type: "admin.week.save",
+          expectedVersion:
+            s.weeklyRounds.find((r) => r.weekStart === clubWeek(time).start)
+              ?.version ?? 0,
           weekStart: clubWeek(time).start,
           publish: true,
           assignments: s.weeklyRounds[0].assignments.map((entry) => ({
@@ -1772,7 +1813,7 @@ test("weekly roles must be published and only attackers can challenge assigned d
         },
         time,
       ),
-    /Mantém os papéis/,
+    /Mantém os papéis|históricos/,
   );
   assert.throws(() => create(s, 7, 5), /desafio atribuído/);
 });
@@ -1978,20 +2019,14 @@ test("weekly publication rejects opposite roles within a partner team", () => {
   s.players[5].partner = s.players[6].name;
   s.settings[0].weeklyCompetition = true;
   assert.throws(() => publishWeek(s), /mesmo papel semanal/);
-  execute(
+  publishAssignments(
     s,
-    actor(1, "admin"),
-    {
-      type: "admin.week.save",
-      weekStart: clubWeek(time).start,
-      publish: true,
-      assignments: s.players.map((p) => ({
-        playerId: p._id,
-        role: ["p8", "p7", "p6", "p16", "p24"].includes(p._id)
-          ? "attack"
-          : "defense",
-      })),
-    },
+    s.players.map((p) => ({
+      playerId: p._id,
+      role: ["p8", "p7", "p6", "p16", "p24"].includes(p._id)
+        ? "attack"
+        : "defense",
+    })),
     time,
   );
   assert.equal(
@@ -2314,6 +2349,9 @@ test("weekly boundary roles follow teams in each division and reject drafts and 
             actor(1, "admin"),
             {
               type: "admin.week.save",
+              expectedVersion:
+                s.weeklyRounds.find((r) => r.weekStart === clubWeek(time).start)
+                  ?.version ?? 0,
               weekStart: clubWeek(time).start,
               publish,
               assignments: s.players.map((p) => ({

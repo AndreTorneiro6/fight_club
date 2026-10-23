@@ -57,23 +57,28 @@ export function weeklyReason(
     )
   )
     return "A aguardar a publicação dos papéis semanais pelo administrador.";
-  if (weeklyRole(s, attacker._id, now) !== "attack")
-    return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
-  if (weeklyRole(s, defender._id, now) !== "defense")
-    return "Este jogador não está em defesa esta semana.";
-  if (
-    attackingTeam.some(
-      (member) =>
-        member.status === "active" &&
-        weeklyRole(s, member._id, now) !== "attack",
-    ) ||
-    defendingTeam.some(
-      (member) =>
-        member.status === "active" &&
-        weeklyRole(s, member._id, now) !== "defense",
+  const open =
+    s.weeklyRounds.find((r) => r.weekStart === week)?.weekType ===
+    "OPEN_ATTACK";
+  if (!open) {
+    if (weeklyRole(s, attacker._id, now) !== "attack")
+      return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
+    if (weeklyRole(s, defender._id, now) !== "defense")
+      return "Este jogador não está em defesa esta semana.";
+    if (
+      attackingTeam.some(
+        (member) =>
+          member.status === "active" &&
+          weeklyRole(s, member._id, now) !== "attack",
+      ) ||
+      defendingTeam.some(
+        (member) =>
+          member.status === "active" &&
+          weeklyRole(s, member._id, now) !== "defense",
+      )
     )
-  )
-    return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";
+      return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";
+  }
   const positionReason =
     weeklyPositionReason(s.players, attacker._id, "attack") ??
     weeklyPositionReason(s.players, defender._id, "defense");

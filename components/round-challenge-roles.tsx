@@ -1,4 +1,5 @@
 "use client";
+import { sameRoles } from "@/lib/role-proposals";
 import { useState } from "react";
 import type { View } from "@/lib/types";
 import type { CompetitionRound } from "@/lib/competition-types";
@@ -41,6 +42,65 @@ export function RoundRoles({ s, round: r, run, busy }: Props) {
   return (
     <div className="card stack">
       <h3>Papéis e acesso aos desafios</h3>
+      <p role="status">
+        {r.rolesPublishedAt
+          ? "PUBLICADO"
+          : r.rolesApprovedAt && r.rolesApprovedVersion === r.version
+            ? "APROVADO — aguarda publicação"
+            : "RASCUNHO — aguarda aprovação"}
+      </p>
+      {r.rolesGeneratedAt && (
+        <small>
+          Proposta gerada{" "}
+          {r.rolesGeneratedBy === "system"
+            ? "automaticamente"
+            : "pelo administrador"}{" "}
+          · {new Date(r.rolesGeneratedAt).toLocaleString("pt-PT")}
+        </small>
+      )}
+      {r.rolesWarnings?.map((w) => (
+        <p key={w}>{w}</p>
+      ))}
+      <details>
+        <summary>Histórico de papéis das jornadas anteriores</summary>
+        {(s.competitionRounds ?? [])
+          .filter(
+            (p) =>
+              p.competitionId === r.competitionId &&
+              p.divisionId === r.divisionId &&
+              p.number < r.number,
+          )
+          .sort((a, b) => b.number - a.number)
+          .map((p) => (
+            <div className="inset stack" key={p._id}>
+              <strong>
+                Jornada {p.number} ·{" "}
+                {p.rolesPublishedAt
+                  ? "Publicado"
+                  : p.rolesApprovedAt
+                    ? "Aprovado"
+                    : "Rascunho"}
+                {p.settledAt ? " · Concluída" : ""}
+              </strong>
+              {(p.roleSnapshot ?? e.teams).map((t) => (
+                <small key={t.id}>
+                  {t.members.map((m) => m.name).join(" + ")}:{" "}
+                  {p.roles?.[t.id] === "attack"
+                    ? "ATAQUE"
+                    : p.roles?.[t.id] === "defense"
+                      ? "DEFESA"
+                      : "Por atribuir"}
+                </small>
+              ))}
+            </div>
+          ))}
+        {!(s.competitionRounds ?? []).some(
+          (p) =>
+            p.competitionId === r.competitionId &&
+            p.divisionId === r.divisionId &&
+            p.number < r.number,
+        ) && <p>Sem jornadas anteriores.</p>}
+      </details>
       <p>
         {r.rolesPublishedAt
           ? "Papéis publicados — os jogadores podem escolher adversários elegíveis."
@@ -114,6 +174,21 @@ export function RoundRoles({ s, round: r, run, busy }: Props) {
             onClick={() =>
               run(
                 {
+                  type: "competition.roles.generate",
+                  roundId: r._id,
+                  expectedVersion: r.version,
+                },
+                "Proposta automática de papéis gerada",
+              )
+            }
+          >
+            Gerar proposta de papéis
+          </button>
+          <button
+            disabled={busy || r.locked || official}
+            onClick={() =>
+              run(
+                {
                   type: "competition.roles.save",
                   roundId: r._id,
                   expectedVersion: r.version,
@@ -127,8 +202,41 @@ export function RoundRoles({ s, round: r, run, busy }: Props) {
             Guardar papéis
           </button>
           <button
-            className="primary"
             disabled={busy || r.locked || official}
+            onClick={async () => {
+              const saved = await run(
+                {
+                  type: "competition.roles.save",
+                  roundId: r._id,
+                  expectedVersion: r.version,
+                  roles,
+                  publish: false,
+                },
+                "Rascunho guardado",
+              );
+              if (saved)
+                await run(
+                  {
+                    type: "competition.roles.approve",
+                    roundId: r._id,
+                    expectedVersion: r.version + 1,
+                  },
+                  "Papéis aprovados; aguardam publicação",
+                );
+            }}
+          >
+            Aprovar papéis
+          </button>
+          <button
+            className="primary"
+            disabled={
+              busy ||
+              r.locked ||
+              official ||
+              !r.rolesApprovedAt ||
+              r.rolesApprovedVersion !== r.version ||
+              !sameRoles(roles, r.roles ?? {})
+            }
             onClick={() =>
               run(
                 {

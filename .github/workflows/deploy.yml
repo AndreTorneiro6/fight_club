@@ -42,10 +42,14 @@ jobs:
       # from a slow apt mirror on every run; the browser tests remain mandatory.
       - name: Install Chromium for browser checks
         run: npx playwright install chromium
-      - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts e2e/gamification.spec.ts e2e/global-search.spec.ts
+      - run: npx playwright test e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts e2e/gamification.spec.ts e2e/global-search.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
       # A fresh demo database keeps aggregate logins below the production rate limit.
+      - name: Check season administration and start announcements
+        run: npx playwright test e2e/seasons.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
       - name: Check placement imports and private simulations
         run: npx playwright test e2e/placement-simulation.spec.ts
         env:
@@ -59,6 +63,11 @@ jobs:
 
       - name: Check role-based challenges and per-set official results
         run: npx playwright test e2e/role-challenges.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+      - name: Check team weekly role approval and publication
+        run: npx playwright test e2e/weekly-teams.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 
