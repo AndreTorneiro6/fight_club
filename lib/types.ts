@@ -1,3 +1,8 @@
+import type {
+  AdminTestAccount,
+  AdminTestChallenge,
+  TestChannel,
+} from "./admin-test-types";
 import type { PlacementEvent } from "./placement-types";
 import type {
   GamificationSettings,
@@ -192,6 +197,8 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  adminTestId?: string;
+  testChannels?: TestChannel[];
   playerId: string;
   title: string;
   body: string;
@@ -272,6 +279,9 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  /** Server-derived verified admin roster; never persisted as a collection. */
+  adminTestAccounts?: AdminTestAccount[];
+  adminTestChallenges?: AdminTestChallenge[];
   placementEvents?: PlacementEvent[];
   gamificationSettings?: GamificationSettings[];
   gamificationProfiles?: GamificationProfile[];
@@ -311,6 +321,7 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "adminTestChallenges",
   "placementEvents",
   "gamificationSettings",
   "gamificationProfiles",

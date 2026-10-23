@@ -1,3 +1,4 @@
+import type { AdminTestChallenge } from "./admin-test-types";
 import { randomUUID } from "node:crypto";
 import type { ClientSession, Db } from "mongodb";
 import nodemailer from "nodemailer";
@@ -60,9 +61,11 @@ export function deliveryContent(n: Notification) {
   return {
     title: n.title,
     body: n.body,
-    path: n.challengeId
-      ? `/desafios/${encodeURIComponent(n.challengeId)}`
-      : "/notificacoes",
+    path: n.adminTestId
+      ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
+      : n.challengeId
+        ? `/desafios/${encodeURIComponent(n.challengeId)}`
+        : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */
@@ -87,9 +90,11 @@ export async function enqueueNotifications(
         : after.players.some((p) => p._id === n.playerId && p.userId === u._id),
     );
     for (const user of recipients) {
+      if (n.adminTestId && user.role !== "admin") continue;
       const player = after.players.find((p) => p.userId === user._id);
       if (!player) continue;
       for (const channel of ["email", "whatsapp"] as const) {
+        if (n.adminTestId && !n.testChannels?.includes(channel)) continue;
         if (!enabledChannel(player, channel)) continue;
         const key = `${n._id}:${user._id}:${channel}`;
         await queue.updateOne(
@@ -111,6 +116,7 @@ export async function enqueueNotifications(
           { upsert: true, session },
         );
       }
+      if (n.adminTestId && !n.testChannels?.includes("push")) continue;
       const subscriptions = await db
         .collection<PushSubscriptionRecord>("push_subscriptions")
         .find({ userId: user._id, playerId: player._id }, { session })
@@ -300,7 +306,21 @@ export async function dispatchNotifications(
             [challenge.challengerId, challenge.defenderId].includes(
               player?._id ?? "",
             )));
+      const testChallenge = notification?.adminTestId
+        ? await db
+            .collection<AdminTestChallenge>("adminTestChallenges")
+            .findOne({ _id: notification.adminTestId })
+        : null;
+      const testAccess =
+        !notification?.adminTestId ||
+        (user?.role === "admin" &&
+          testChallenge &&
+          [testChallenge.attackerId, testChallenge.defenderId].includes(
+            player?._id ?? "",
+          ) &&
+          notification.testChannels?.includes(job.channel));
       const allowed =
+        testAccess &&
         challengeAccess &&
         notification &&
         (notification.playerId === "__admins__"

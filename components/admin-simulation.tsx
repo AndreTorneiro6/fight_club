@@ -1,11 +1,20 @@
 "use client";
 import styles from "./admin-lab.module.css";
+import SharedAdminTests from "./shared-admin-tests";
 import { useState } from "react";
 import type { View } from "@/lib/types";
 import { rankingEntries } from "@/lib/ranking-groups";
 import type { simulateAdmin } from "@/lib/admin-simulation";
 type Report = ReturnType<typeof simulateAdmin>;
-export default function AdminSimulation({ state }: { state: View }) {
+export default function AdminSimulation({
+  state,
+  run,
+  busy,
+}: {
+  state: View;
+  run: (cmd: unknown, message?: string) => Promise<unknown>;
+  busy: boolean;
+}) {
   const [divisionId, setDivision] = useState(state.divisions[0]?._id ?? ""),
     [mode, setMode] = useState<"challenge" | "matchmaking">("matchmaking"),
     [roundId, setRound] = useState(""),
@@ -75,8 +84,10 @@ export default function AdminSimulation({ state }: { state: View }) {
       className={`stack ${styles.root}`}
       aria-label="Simulador privado de desafios"
     >
+      <h2>Simulador de desafios</h2>
+      <SharedAdminTests state={state} run={run} busy={busy} />
       <div className="panel stack">
-        <h2>Simulador de desafios</h2>
+        <h3>Simulação automática sem notificações</h3>
         <strong className="badge">SIMULAÇÃO PRIVADA · NÃO ALTERA A LIGA</strong>
         <p>
           Experimenta regras numa cópia. Não cria desafios, reservas,

@@ -23,6 +23,17 @@ const port =
   "3000";
 process.env.APP_URL ??= `http://localhost:${port}`;
 await seed(true);
+if (testing && process.env.DEMO_TEST_ADMIN_PAIR === "1") {
+  const { database } = await import("../lib/db");
+  await (
+    await database()
+  ).db
+    .collection("users")
+    .updateOne(
+      { email: "adversario@fightclub.local" },
+      { $set: { role: "admin" } },
+    );
+}
 console.log(
   "\nFight Club · Demonstração local com MongoDB replica set\nAdmin: admin@fightclub.local\nJogador: jogador@fightclub.local\nAdversário: adversario@fightclub.local\nPalavra-passe: FightClub2026!\nOs dados são fictícios e ficam em .demo-data/.\n",
 );

@@ -31,6 +31,8 @@ A aplicação do ranking não é automática depois de importar. É possível ex
 
 ## Simulador privado
 
+Para desafios partilhados entre os dois administradores com notificações reais, usa o painel superior **Desafiar o outro administrador**. Ver docs/SHARED-ADMIN-TESTS.md. As opções automáticas abaixo continuam sem envios.
+
 Admin → Competição → **Simulador de desafios**. As duas opções trabalham apenas em cópias em memória, sem gravar propostas, resultados, reservas ou notificações.
 
 - **Submissão e aceitação de um desafio:** escolhe atacante/defensor; executa o motor real de desafios com a configuração e o estado atuais, e apresenta o passo válido ou a regra que o bloqueia. Testa estes dois passos; não testa reservas de campo, publicação ou confirmação de resultados.

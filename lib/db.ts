@@ -52,6 +52,9 @@ export async function database() {
 }
 async function indexes(db: Db) {
   await db
+    .collection("adminTestChallenges")
+    .createIndex({ attackerId: 1, requestId: 1 }, { unique: true });
+  await db
     .collection("placementEvents")
     .createIndex({ seasonId: 1, divisionId: 1, status: 1 });
   await db
@@ -164,6 +167,21 @@ export async function readState(
       .collection<Entity>(key)
       .find({}, { session })
       .toArray()) as Entity[];
+  const admins = await db
+    .collection<User>("users")
+    .find({ role: "admin", verified: true }, { session })
+    .toArray();
+  const ids = new Set(admins.map((a) => a._id));
+  state.adminTestAccounts = state.players
+    .filter(
+      (p) =>
+        p.userId &&
+        ids.has(p.userId) &&
+        p.status !== "removed" &&
+        !p.awaitingApproval &&
+        !p.registrationRejectedAt,
+    )
+    .map((p) => ({ playerId: p._id, name: p.name }));
   if (state.settings[0])
     state.settings = [{ ...defaultSettings, ...state.settings[0] }];
   return state;
