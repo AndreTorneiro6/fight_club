@@ -100,6 +100,10 @@ export function weeklyReason(
       s.challenges.some(
         (c) =>
           c._id !== ignoreId &&
+          !(c.status === "pending" && Date.parse(c.respondBy) <= now) &&
+          (c.status !== "pending" ||
+            (attackingTeam.some((m) => m._id === p._id) &&
+              attackingTeam.some((m) => m._id === c.challengerId))) &&
           (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
           [c.challengerId, c.defenderId].includes(p._id) &&
           !["cancelled", "refused", "expired"].includes(c.status),
@@ -177,4 +181,47 @@ export function weeklyBookingReason(
   )
     return "Um dos jogadores já tem um jogo nessa semana. O limite é um jogo por semana.";
   return null;
+}
+
+/** Regulatory order, including rotation of a contested benefit in the previous week. */
+export function weeklyPriority(s: State, defenderId: string, now = Date.now()) {
+  const members = teamMembers(s.players, defenderId).map((m) => m._id),
+    week = clubWeek(now).start;
+  const group = s.challenges
+    .filter(
+      (c) =>
+        (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
+        members.includes(c.defenderId) &&
+        c.status === "pending" &&
+        Date.parse(c.respondBy) > now,
+    )
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.number - b.number ||
+        a._id.localeCompare(b._id),
+    );
+  if (!group.length) return undefined;
+  const previous = addClubDays(week, -7);
+  const benefited = s.challenges
+    .filter(
+      (c) =>
+        (c.weekStart ?? clubWeek(c.createdAt).start) === previous &&
+        c.weeklyPriorityWinner &&
+        c.weeklyPriorityReason?.includes("disputada"),
+    )
+    .flatMap((c) => teamMembers(s.players, c.challengerId).map((m) => m._id));
+  const rotated = group.length > 1 && benefited.includes(group[0].challengerId);
+  const winner = rotated
+    ? (group.find((c) => !benefited.includes(c.challengerId)) ?? group[0])
+    : group[0];
+  return {
+    id: winner._id,
+    reason:
+      group.length > 1
+        ? rotated
+          ? "Rotação de prioridade disputada"
+          : "Primeira submissão válida disputada"
+        : "Único desafio válido",
+  };
 }

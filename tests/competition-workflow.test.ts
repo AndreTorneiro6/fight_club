@@ -161,6 +161,22 @@ function challenge(
   attacker: number,
   defender: number,
 ) {
+  if (!r.rolesPublishedAt) {
+    // These historical workflow fixtures exercise challenge/approval semantics in open weeks.
+    r.weekType = "OPEN_ATTACK";
+    command(s, {
+      type: "competition.roles.save",
+      roundId: r._id,
+      expectedVersion: r.version,
+      roles: Object.fromEntries(
+        competitionTeams(s, r.divisionId).map((t) => [
+          t.id,
+          t.rank === 1 ? "defense" : "attack",
+        ]),
+      ),
+      publish: true,
+    });
+  }
   command(
     s,
     {
@@ -223,6 +239,7 @@ test("first valid challenge gets title priority, previous-round contested priori
     previous = round(s),
     r = round(s, 2);
   publish(s, generate(s, previous));
+  previous.settledAt = iso(); // Priority fixture starts after the previous round is settled.
   const third = challenge(s, r, 3, 1),
     second = challenge(s, r, 2, 1);
   assert.equal(competitionPriorities(s, r)[0]._id, third._id);
@@ -756,6 +773,18 @@ test("per-league championship configuration does not alter other league rules", 
   const gold = round(s),
     silver = round(s, 1, "prata");
   assert.throws(() => challenge(s, gold, 3, 1), /título/);
+  command(s, {
+    type: "competition.roles.save",
+    roundId: silver._id,
+    expectedVersion: silver.version,
+    roles: Object.fromEntries(
+      competitionTeams(s, "prata").map((t) => [
+        t.id,
+        t.rank === 1 ? "defense" : "attack",
+      ]),
+    ),
+    publish: true,
+  });
   command(
     s,
     {
@@ -920,7 +949,7 @@ test("permanent deletion preserves private competition commitments and predictio
         playerId: "ouro-12",
         confirmation: "ELIMINAR",
       }),
-    /histórico de competição/,
+    /histórico de competição|jornada oficial está por liquidar/,
   );
   const q = timed(s, generate(s, r));
   publish(s, q);
@@ -941,7 +970,7 @@ test("permanent deletion preserves private competition commitments and predictio
         playerId: "prata-5",
         confirmation: "ELIMINAR",
       }),
-    /histórico de competição/,
+    /histórico de competição|jornada oficial está por liquidar/,
   );
   assert.ok(s.players.some((p) => p._id === "prata-5"));
   assert.equal(s.predictions?.length, 1);
@@ -1109,4 +1138,530 @@ test("an actual postponed match can recover without absence unless administrator
   command(s, recovery);
   assert.equal(s.competitionRecoveries?.length, 1);
   assert.equal(s.competitionAbsences?.length, 0);
+});
+
+// Explicit role publication is independent of official match approval/publication.
+function roles(
+  s: State,
+  r: CompetitionRound,
+  attack: number[] = [2, 4, 6, 8, 10, 12],
+  publishRoles = true,
+) {
+  command(s, {
+    type: "competition.roles.save",
+    roundId: r._id,
+    expectedVersion: r.version,
+    roles: Object.fromEntries(
+      competitionTeams(s, r.divisionId).map((t) => [
+        t.id,
+        attack.includes(t.rank) ? "attack" : "defense",
+      ]),
+    ),
+    publish: publishRoles,
+  });
+}
+test("unpublished roles and direct player commands cannot bypass role permissions", () => {
+  const s = fixture(),
+    r = round(s, 2);
+  const submit = (a: number, d: number) =>
+    command(
+      s,
+      {
+        type: "competition.challenge.submit",
+        roundId: r._id,
+        defenderId: `ouro-${d}`,
+      },
+      actor(a),
+    );
+  assert.throws(() => submit(6, 5), /publicação/);
+  roles(s, r, undefined, false);
+  assert.throws(() => submit(6, 5), /publicação/);
+  roles(s, r);
+  assert.throws(() => submit(5, 3), /DEFESA/);
+  assert.throws(() => submit(6, 4), /não está em DEFESA/);
+  submit(6, 5);
+  const c = s.competitionChallenges!.at(-1)!;
+  assert.equal(c.status, "PENDING");
+  assert.equal(Date.parse(c.respondBy) - time, 48 * 3600000);
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.respond",
+          challengeId: c._id,
+          accept: true,
+        },
+        actor(6),
+      ),
+    /defensora/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.roles.save",
+          roundId: r._id,
+          expectedVersion: r.version,
+          roles: r.roles,
+          publish: true,
+        },
+        actor(6),
+      ),
+    /administradores/,
+  );
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(5),
+  );
+  assert.equal(c.status, "ACCEPTED");
+  assert.equal(s.challenges.length, 0);
+  assert.equal(s.competitionSchedules!.length, 0);
+  assert.throws(() => submit(8, 6), /DEFESA|aceite/);
+});
+test("rank six distance three sees only published defense ranks three four five", async () => {
+  const { eligibleChallengeTargets } = await import("../lib/challenge-access");
+  const s = fixture();
+  command(s, configCommand(s, { defaultDistance: 3 }));
+  const r = round(s, 2);
+  roles(s, r, [2, 6, 8, 10, 12]);
+  assert.deepEqual(
+    eligibleChallengeTargets(s, r, "ouro-6").map((t) => t.rank),
+    [3, 4, 5],
+  );
+  assert.deepEqual(eligibleChallengeTargets(s, r, "ouro-1"), []);
+  assert.ok(
+    eligibleChallengeTargets(s, r, "ouro-12").every((t) => t.rank < 12),
+  );
+  assert.equal(eligibleChallengeTargets(s, r, "ouro-4").length, 0);
+  const q = generate(s, r);
+  assert.ok(
+    q.pairs.every(
+      (p) =>
+        r.roles?.[p.attackerId] === "attack" &&
+        r.roles?.[p.defenderId] === "defense",
+    ),
+  );
+});
+test("normal title eligibility and absence filtering survive API calls", async () => {
+  const { eligibleChallengeTargets } = await import("../lib/challenge-access");
+  const s = fixture();
+  command(s, configCommand(s, { defaultDistance: 3 }));
+  const r = round(s, 2);
+  roles(s, r);
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.submit",
+          roundId: r._id,
+          defenderId: "ouro-1",
+        },
+        actor(4),
+      ),
+    /título/,
+  );
+  command(s, {
+    type: "competition.absence.add",
+    competitionId: r.competitionId,
+    divisionId: r.divisionId,
+    teamId: "ouro-5",
+    from: iso(1),
+    to: iso(8),
+    reason: "Ausência aprovada",
+    roundIds: [r._id],
+    recoveryAllowed: false,
+  });
+  assert.ok(
+    !eligibleChallengeTargets(s, r, "ouro-6").some((t) => t.id === "ouro-5"),
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.submit",
+          roundId: r._id,
+          defenderId: "ouro-5",
+        },
+        actor(6),
+      ),
+    /Ausência/,
+  );
+});
+test("open attack can initiate despite published defense assignment and may receive challenges", () => {
+  const s = fixture(),
+    r = round(s);
+  roles(s, r);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-3",
+    },
+    actor(5),
+  );
+  const c = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(3),
+  );
+  assert.equal(c.status, "ACCEPTED");
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.submit",
+          roundId: r._id,
+          defenderId: "ouro-1",
+        },
+        actor(3),
+      ),
+    /aceite/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.submit",
+          roundId: r._id,
+          defenderId: "ouro-2",
+        },
+        actor(1),
+      ),
+    /abaixo/,
+  );
+});
+test("defenders must respond in priority order and rejection requires a reason without a loss", () => {
+  const s = fixture(),
+    r = round(s);
+  roles(s, r);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(3),
+  );
+  const first = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(2),
+  );
+  const second = s.competitionChallenges!.at(-1)!;
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.respond",
+          challengeId: second._id,
+          accept: false,
+          reason: "Não posso jogar",
+        },
+        actor(1),
+      ),
+    /prioridade/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.respond",
+          challengeId: first._id,
+          accept: false,
+        },
+        actor(1),
+      ),
+    /motivo/,
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: first._id,
+      accept: false,
+      reason: "Indisponibilidade confirmada",
+    },
+    actor(1),
+  );
+  assert.equal(first.status, "REJECTED");
+  assert.equal(s.results.length, 0);
+  assert.equal(s.players.find((p) => p._id === "ouro-1")!.losses, 0);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: second._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  assert.equal(second.status, "ACCEPTED");
+  assert.ok(
+    first.decisions.some((d) =>
+      d.action.includes("Indisponibilidade confirmada"),
+    ),
+  );
+});
+test("admin blocks and reopens challenges with version checks and audit history", () => {
+  const s = fixture(),
+    r = round(s);
+  roles(s, r);
+  command(s, {
+    type: "competition.challenges.control",
+    roundId: r._id,
+    expectedVersion: r.version,
+    blocked: true,
+    reason: "Revisão administrativa",
+  });
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.submit",
+          roundId: r._id,
+          defenderId: "ouro-1",
+        },
+        actor(2),
+      ),
+    /bloqueados/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.challenges.control",
+        roundId: r._id,
+        expectedVersion: r.version - 1,
+        blocked: false,
+        reason: "Reabertura validada",
+      }),
+    /Outro administrador/,
+  );
+  command(s, {
+    type: "competition.challenges.control",
+    roundId: r._id,
+    expectedVersion: r.version,
+    blocked: false,
+    reason: "Reabertura validada",
+  });
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(2),
+  );
+  const c = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.note",
+      challengeId: c._id,
+      note: "Podemos jogar quinta às 19h30?",
+    },
+    actor(1),
+  );
+  assert.match(c.responseNote!, /19h30/);
+  assert.equal(c.status, "PENDING");
+  assert.equal(s.matches.length, 0);
+  assert.ok(s.audit.some((a) => a.action === "competition.challenges.control"));
+});
+test("no eligible opponent sends one deduplicated administrator notice and no fake match", () => {
+  const s = fixture(),
+    r = round(s, 2);
+  roles(s, r, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const count = () =>
+    s.notifications.filter((n) => n.dedupe === `no-targets:${r._id}:ouro-6`)
+      .length;
+  assert.equal(count(), 1);
+  processDeadlines(s, time);
+  processDeadlines(s, time);
+  assert.equal(count(), 1);
+  assert.equal(s.matches.length, 0);
+  assert.equal(s.challenges.length, 0);
+});
+test("player projection hides draft roles and private audit, derives priority before filtering", async () => {
+  const { filterFeatureView } = await import("../lib/feature-view");
+  const s = fixture(),
+    r = round(s);
+  roles(s, r);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(3),
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(2),
+  );
+  const future = round(s, 3);
+  roles(s, future, undefined, false);
+  const projected = structuredClone(s);
+  filterFeatureView(projected, actor(1));
+  assert.equal(
+    projected.competitionChallenges!.filter((c) => c.priorityEligible).length,
+    1,
+  );
+  assert.equal(
+    projected.competitionRounds!.find((r) => r._id === future._id)!.roles,
+    undefined,
+  );
+  assert.ok(!projected.audit.some((a) => a.action.startsWith("competition.")));
+});
+
+test("publishing normal roles invalidates earlier schedule approval and revalidates locked pairs", () => {
+  const s = fixture(),
+    r = round(s, 2),
+    q = generate(s, r);
+  scheduleCommand(s, q, "competition.approve");
+  assert.equal(q.status, "APPROVED");
+  roles(s, r, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.equal(q.status, "DRAFT");
+  assert.equal(q.approvedVersion, undefined);
+  assert.ok(q.errors.some((e) => e.includes("DEFESA")));
+  assert.throws(
+    () => scheduleCommand(s, q, "competition.publish"),
+    /aprovação/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "admin.ranking.move",
+        playerId: "ouro-6",
+        targetPlayerId: "ouro-4",
+      }),
+    /jornada oficial|liquidar/i,
+  );
+});
+
+test("accepted contested priority is preserved when rival challenges expire before publication", () => {
+  const s = fixture(),
+    r = round(s);
+  roles(s, r);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(3),
+  );
+  const first = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(2),
+  );
+  const rival = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: first._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  assert.equal(first.priorityReason, "Primeiro desafio válido disputado");
+  rival.status = "EXPIRED";
+  assert.equal(
+    competitionPriorities(s, r)[0].priorityReason,
+    "Primeiro desafio válido disputado",
+  );
+  const q = generate(s, r);
+  publish(s, q);
+  assert.equal(first.priorityReason, "Primeiro desafio válido disputado");
+  assert.equal(first.priorityWinner, true);
+});
+
+test("open attack priority advances past a challenger whose accepted defense occupies its slot", () => {
+  const s = fixture();
+  command(s, configCommand(s, { defaultDistance: 3 }));
+  const r = round(s);
+  roles(s, r);
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(3),
+  );
+  const unavailable = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-3",
+    },
+    actor(4),
+  );
+  const defense = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: defense._id,
+      accept: true,
+    },
+    actor(3),
+  );
+  assert.equal(defense.status, "ACCEPTED");
+  assert.match(unavailable.invalidReason!, /aceite/);
+  assert.equal(unavailable.status, "PENDING");
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(2),
+  );
+  const available = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: available._id,
+      accept: true,
+    },
+    actor(1),
+  );
+  assert.equal(available.status, "ACCEPTED");
 });

@@ -57,6 +57,11 @@ jobs:
           TMPDIR: ${{ runner.temp }}
           DEMO_TEST_ADMIN_PAIR: "1"
 
+      - name: Check role-based challenges and per-set official results
+        run: npx playwright test e2e/role-challenges.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
   deploy:
     if: github.ref == 'refs/heads/deploy' && github.event_name != 'pull_request'
     needs: checks

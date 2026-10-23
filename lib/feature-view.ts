@@ -1,3 +1,8 @@
+import {
+  competitionPriorities,
+  challengeContext,
+  eligibleChallengeTargets,
+} from "./challenge-access";
 import { rankingEntries } from "./ranking-groups";
 import type { Actor, State } from "./types";
 
@@ -49,7 +54,8 @@ export function filterFeatureView(state: State, actor: Actor) {
       !entry.action.startsWith("admin.coins.") &&
       !entry.action.startsWith("admin.sponsors.") &&
       !entry.action.startsWith("admin.gamification.") &&
-      !entry.action.startsWith("admin.placement."),
+      !entry.action.startsWith("admin.placement.") &&
+      !entry.action.startsWith("competition."),
   );
   const ownTeams = new Set(
     state.divisions.flatMap((division) =>
@@ -65,10 +71,50 @@ export function filterFeatureView(state: State, actor: Actor) {
   state.competitionSchedules = (state.competitionSchedules ?? []).filter(
     (schedule) => schedule.status === "PUBLISHED" && !!schedule.publishedAt,
   );
+  // Compute on the complete trusted state before filtering other teams' private challenges.
+  for (const r of state.competitionRounds ?? []) {
+    const priority = competitionPriorities(state, r);
+    for (const c of state.competitionChallenges ?? [])
+      if (c.roundId === r._id) {
+        c.priorityEligible = priority.some((p) => p._id === c._id);
+        c.priorityReason =
+          priority.find((p) => p._id === c._id)?.priorityReason ??
+          (c.status === "PENDING"
+            ? "Outro desafio tem prioridade regulamentar"
+            : c.priorityReason);
+      }
+    r.challengeTargets = Object.fromEntries(
+      challengeContext(state, r)
+        .teams.filter((t) => ownTeams.has(t.id))
+        .map((t) => [
+          t.id,
+          eligibleChallengeTargets(state, r, t.id).map((t) => t.id),
+        ]),
+    );
+    r.challengePendingCounts = Object.fromEntries(
+      [...new Set(Object.values(r.challengeTargets).flat())].map((id) => [
+        id,
+        (state.competitionChallenges ?? []).filter(
+          (c) =>
+            c.roundId === r._id &&
+            c.defenderId === id &&
+            c.status === "PENDING",
+        ).length,
+      ]),
+    );
+    if (!r.rolesPublishedAt) {
+      delete r.roles;
+      delete r.roleSnapshot;
+    }
+  }
   state.competitionChallenges = (state.competitionChallenges ?? []).filter(
     (challenge) =>
       ownTeams.has(challenge.attackerId) || ownTeams.has(challenge.defenderId),
   );
+  state.competitionChallenges = state.competitionChallenges.map((c) => ({
+    ...c,
+    decisions: (c.decisions ?? []).map((d) => ({ ...d, actorId: "" })),
+  }));
   state.competitionAbsences = (state.competitionAbsences ?? []).map(
     (absence) =>
       ownTeams.has(absence.teamId)

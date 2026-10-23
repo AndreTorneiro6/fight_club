@@ -1,3 +1,4 @@
+import type { SetScore } from "./set-scores";
 import type {
   AdminTestAccount,
   AdminTestChallenge,
@@ -117,6 +118,8 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  weeklyPriorityWinner?: boolean;
+  weeklyPriorityReason?: string;
   competitionRoundId?: string;
   predictionCutoffAt?: string;
   officialPublication?: {
@@ -150,6 +153,7 @@ export interface Challenge extends Entity {
   durationMinutes: number;
   winnerId?: string;
   score?: string;
+  setScores?: SetScore[];
   reportedBy?: string;
   disputeNote?: string;
   completedAt?: string;
@@ -197,6 +201,7 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  competitionNotice?: boolean;
   adminTestId?: string;
   testChannels?: TestChannel[];
   playerId: string;
@@ -242,6 +247,7 @@ export interface Result extends Entity {
   winnerId: string;
   loserId: string;
   score: string;
+  setScores?: SetScore[];
   confirmedAt: string;
   seasonId: string;
 }

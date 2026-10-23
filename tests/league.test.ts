@@ -1745,7 +1745,17 @@ test("weekly roles must be published and only attackers can challenge assigned d
   assert.equal(c.weekStart, "2026-10-12");
   assert.equal(c.playBy, clubWeek(time).endsAt);
   assert.throws(() => create(s, 8, 5), /desafio atribuído/);
-  assert.throws(() => create(s, 7, 6), /defensor já tem/);
+  const contender = create(s, 7, 6);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(6),
+        { type: "challenge.respond", challengeId: contender._id, accept: true },
+        time,
+      ),
+    /prioridade/,
+  );
   assert.throws(
     () =>
       execute(
@@ -1764,7 +1774,7 @@ test("weekly roles must be published and only attackers can challenge assigned d
       ),
     /Mantém os papéis/,
   );
-  assert.ok(create(s, 7, 5));
+  assert.throws(() => create(s, 7, 5), /desafio atribuído/);
 });
 
 test("vacation players can be challenged and their weekly game is deferred until return", () => {
@@ -2004,10 +2014,10 @@ test("weekly teams cannot challenge themselves or create separate challenges thr
   assert.throws(() => create(s, 8, 7), /própria equipa/);
   assert.ok(create(s, 8, 6));
   assert.throws(() => create(s, 7, 5), /desafio atribuído/);
-  // A different attacker also cannot use the other defender's account for a second challenge.
+  // A higher-ranked team cannot bypass the upward-only rule through a partner account.
   s.weeklyRounds[0].assignments.find((entry) => entry.playerId === "p4")!.role =
     "attack";
-  assert.throws(() => create(s, 4, 5), /defensor já tem/);
+  assert.throws(() => create(s, 4, 5), /limite de posições/);
 });
 
 test("a partner's vacation defers the team's weekly challenge until return", () => {
@@ -2648,4 +2658,103 @@ test("clearing champions requires administrator access and explicit confirmation
     execute(s, actor(1, "admin"), { ...command, confirmation: "" }, time),
   );
   assert.deepEqual(s, before);
+});
+
+test("structured set scores persist through official confirmation and audited correction", () => {
+  const s = fixture(),
+    c = schedule(s),
+    at = time + 2 * 86400000;
+  const sets = [
+    { attacker: 6, defender: 4 },
+    { attacker: 3, defender: 6 },
+    { attacker: 10, defender: 8 },
+  ];
+  execute(
+    s,
+    actor(8, "admin"),
+    {
+      type: "result.report",
+      challengeId: c._id,
+      winnerId: "p8",
+      setScores: sets,
+    },
+    at,
+  );
+  assert.equal(s.results.length, 0);
+  assert.equal(s.players[7].wins, 0);
+  assert.deepEqual(c.setScores, sets);
+  assert.equal(c.score, "6-4, 3-6, 10-8");
+  execute(
+    s,
+    actor(6, "admin"),
+    { type: "result.confirm", challengeId: c._id },
+    at,
+  );
+  assert.deepEqual(s.results[0].setScores, sets);
+  assert.equal(s.players[7].wins, 1);
+  const corrected = [
+    { attacker: 4, defender: 6 },
+    { attacker: 3, defender: 6 },
+  ];
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.correct",
+      challengeId: c._id,
+      winnerId: "p6",
+      setScores: corrected,
+      note: "Pontuação confirmada pelas duplas",
+    },
+    at,
+  );
+  assert.deepEqual(s.results[0].setScores, corrected);
+  assert.deepEqual(c.setScores, corrected);
+  assert.equal(c.score, "4-6, 3-6");
+  assert.deepEqual(
+    JSON.parse(s.audit.find((a) => a.action === "result.corrected")!.details)
+      .before.setScores,
+    sets,
+  );
+});
+test("invalid set results never confirm a winner or change statistics", () => {
+  const s = fixture(),
+    c = schedule(s),
+    at = time + 2 * 86400000;
+  const before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.result.record",
+          challengeId: c._id,
+          winnerId: "p8",
+          setScores: [
+            { attacker: 4, defender: 6 },
+            { attacker: 3, defender: 6 },
+          ],
+        },
+        at,
+      ),
+    /vencedor escolhido/,
+  );
+  assert.deepEqual(s, before);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.result.record",
+      challengeId: c._id,
+      winnerId: "p6",
+      setScores: [
+        { attacker: 4, defender: 6 },
+        { attacker: 3, defender: 6 },
+      ],
+    },
+    at,
+  );
+  assert.equal(s.results[0].score, "4-6, 3-6");
+  assert.equal(s.results[0].setScores!.length, 2);
 });

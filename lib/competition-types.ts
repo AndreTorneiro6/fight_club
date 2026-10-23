@@ -55,6 +55,14 @@ export interface CompetitionRound {
   endsAt: string;
   instructions: string;
   locked: boolean;
+  /** Server-derived, filtered eligibility; never trusted in commands. */
+  challengeTargets?: Record<string, string[]>;
+  challengePendingCounts?: Record<string, number>;
+  roles?: Record<string, "attack" | "defense">;
+  rolesPublishedAt?: string;
+  rolesPublishedBy?: string;
+  roleSnapshot?: CompetitionTeam[];
+  challengesBlocked?: boolean;
   settledAt?: string;
   rankingBefore?: CompetitionTeam[];
   rankingAfter?: CompetitionTeam[];
@@ -137,6 +145,8 @@ export interface CompetitionChallenge {
     | "SCHEDULED"
     | "COMPLETED"
     | "CANCELLED";
+  priorityEligible?: boolean;
+  responseNote?: string;
   invalidReason?: string;
   priorityWinner?: boolean;
   priorityReason?: string;
