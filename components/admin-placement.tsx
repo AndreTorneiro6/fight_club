@@ -89,6 +89,16 @@ function EventEditor({
           <option value="CLASSIFICATION_POINTS">Pontos de classificação</option>
         </select>
       </label>
+      <label className="row">
+        <input
+          type="checkbox"
+          checked={rules.protectVacationPositions ?? false}
+          onChange={(e) =>
+            setRules({ ...rules, protectVacationPositions: e.target.checked })
+          }
+        />
+        Aplicar proteção de férias também na colocação inicial
+      </label>
       {rules.pointsMode === "CLASSIFICATION_POINTS" && (
         <>
           <label>
@@ -697,6 +707,35 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                   Confirmo a ordem apresentada para os empates completos
                 </label>
               )}
+              <p>
+                O ranking provisório pode ser atualizado com os resultados
+                disponíveis e mantém os jogos editáveis. A competição oficial
+                ainda não pode ter desafios, propostas ou papéis publicados.
+              </p>
+              <button
+                disabled={
+                  busy ||
+                  group.some((e) => e.status !== "DRAFT") ||
+                  !group.some((e) => e.games.length > 0) ||
+                  (ranking.some((r) => r.tied) && !confirmTies)
+                }
+                onClick={() =>
+                  run(
+                    {
+                      type: "admin.placement.previewRanking",
+                      events: group.map((e) => ({
+                        id: e._id,
+                        version: e.version,
+                      })),
+                      tieOrder: ranking.map((r) => r.id),
+                      confirmTies,
+                    },
+                    "Ranking provisório atualizado; os jogos continuam editáveis.",
+                  )
+                }
+              >
+                Atualizar ranking provisório
+              </button>
               <button
                 className="primary"
                 disabled={

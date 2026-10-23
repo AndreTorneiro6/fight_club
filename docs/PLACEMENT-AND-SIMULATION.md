@@ -40,3 +40,9 @@ A seleção de jornada carrega regras de título/pesos; o campo de distância po
 Coleção aditiva `placementEvents`, indexada por época/divisão/estado. As escritas usam o motor de domínio existente e as transações MongoDB, com versões otimistas e auditoria. Eventos mantêm snapshots que impedem a eliminação física de jogadores referenciados; a remoção lógica existente permanece disponível. Não há migração destrutiva.
 
 Testes cobrem critérios e empates, parceiros, importação Excel/CSV e duplicados, permissões, concorrência MongoDB, não alteração do ranking durante importação/simulação, trocas diretas hipotéticas e validação do motor de desafios. A bateria de browser testa o fluxo admin, privacidade do jogador e largura móvel.
+
+## Ranking provisório antes da competição
+
+Seleciona os eventos e confirma a ordem dos empates. **Atualizar ranking provisório** atualiza as posições visíveis mantendo os jogos editáveis e os eventos em rascunho, incluindo quando ainda existem equipas/jogos sem resultado. Pode ser repetido quando chegarem novos resultados. **Aplicar ranking inicial** continua a ser a ação final que fecha os eventos. Nenhuma destas ações pode reescrever uma competição que já tenha desafios, propostas ou papéis oficiais publicados.
+
+As férias da competição mantêm os seus registos. A opção **Aplicar proteção de férias também na colocação inicial**, por evento, está desligada por defeito porque a colocação antecede a competição oficial; quando ativada bloqueia deslocações protegidas. Isto não altera as regras de férias da liga.
