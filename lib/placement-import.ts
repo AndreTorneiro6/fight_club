@@ -1,3 +1,9 @@
+import {
+  findPlacementTable,
+  workbookTeamLookup,
+  readWorkbookGame,
+  type PlacementImportOptions,
+} from "./placement-workbook";
 import ExcelJS from "exceljs";
 import { Readable } from "node:stream";
 import { ensure } from "./rules";
@@ -12,23 +18,6 @@ export const placementHeaders = [
   "Pontos A",
   "Pontos B",
 ];
-const normalize = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("pt-PT");
-const value = (cell: ExcelJS.Cell) => {
-  const v = cell.value;
-  ensure(
-    !v || typeof v !== "object" || !("formula" in v),
-    "O ficheiro não pode conter fórmulas. Exporta os valores.",
-  );
-  if (v && typeof v === "object" && "richText" in v)
-    return v.richText.map((t) => t.text).join("");
-  return String(v ?? "").trim();
-};
 function checkZip(bytes: Buffer) {
   // Inspect declared expanded sizes before asking ExcelJS to decompress the workbook.
   const start = bytes.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
@@ -65,7 +54,8 @@ function checkZip(bytes: Buffer) {
 export async function placementTemplate(event: PlacementEvent) {
   const book = new ExcelJS.Workbook(),
     games = book.addWorksheet("Jogos");
-  games.addRow(placementHeaders);
+  games.addRow(["Jogo", "Equipa A", "Equipa B", "Set 1", "Set 2", "Set 3"]);
+  for (const index of [4, 5, 6]) games.getColumn(index).numFmt = "@";
   games.columns.forEach((c) => (c.width = 28));
   const teams = book.addWorksheet("Equipas");
   teams.addRow(["ID da equipa", "Nome"]);
@@ -79,7 +69,7 @@ export async function placementTemplate(event: PlacementEvent) {
     "Jogo: identificador único do teu ficheiro; deixa vazio para identificar pelo resultado.",
   ]);
   instructions.addRow([
-    "Sets: 2–0, 2–1, 0–2 ou 1–2. Pontos: total efetivamente marcado por cada equipa.",
+    "Uma pontuação por set: 6-4, 3-6, 10-8. Mantém a ordem Equipa A / Equipa B. Os totais são calculados a partir dos sets.",
   ]);
   instructions.addRow([
     "Não incluas fórmulas. A importação mostra uma pré-visualização antes de guardar.",
@@ -90,6 +80,7 @@ export async function parsePlacementImport(
   bytes: Buffer,
   name: string,
   event: PlacementEvent,
+  options: PlacementImportOptions = {},
 ) {
   ensure(bytes.length <= 5 * 1024 * 1024, "Limite de 5 MB.");
   const book = new ExcelJS.Workbook();
@@ -105,64 +96,67 @@ export async function parsePlacementImport(
       },
     });
   }
-  const sheet = book.getWorksheet("Jogos") ?? book.worksheets[0];
-  ensure(sheet && sheet.rowCount >= 2, "O ficheiro não tem jogos.");
-  ensure(sheet.rowCount <= 501, "Importa até 500 jogos de cada vez.");
-  const columns = new Map<string, number>();
-  sheet.getRow(1).eachCell((cell, index) => {
-    const key = normalize(value(cell));
-    ensure(!columns.has(key), "Existem colunas repetidas.");
-    columns.set(key, index);
-  });
+  const tables = book.worksheets
+    .map(findPlacementTable)
+    .filter((t) => t !== undefined);
   ensure(
-    placementHeaders.every((h) => columns.has(normalize(h))),
-    "Colunas esperadas: " + placementHeaders.join(", "),
+    tables.length,
+    "Não foi encontrada uma folha de resultados. Usa o modelo Jogos ou uma folha com Dupla A/B e Set 1/Set 2.",
   );
-  const lookup = (raw: string) => {
-    const key = normalize(raw);
-    const matches = event.teams.filter(
-      (t) =>
-        t.id === raw ||
-        normalize(t.name) === key ||
-        t.members.some((m) => normalize(m.name) === key),
-    );
-    ensure(
-      matches.length === 1,
-      `Equipa desconhecida ou ambígua: ${raw}. Usa o ID da folha Equipas.`,
-    );
-    return matches[0].id;
+  const sheetNames = tables.map((t) => t.sheet.name);
+  ensure(
+    !options.sheetName || sheetNames.includes(options.sheetName),
+    "A folha selecionada não contém uma tabela de resultados reconhecida.",
+  );
+  const table = options.sheetName
+    ? tables.find((t) => t.sheet.name === options.sheetName)!
+    : tables.length === 1
+      ? tables[0]
+      : undefined;
+  const metadata = {
+    sheets: sheetNames,
+    allSheets: book.worksheets.map((s) => s.name),
+    sheetName: table?.sheet.name ?? "",
+    needsSheetSelection: !table,
   };
+  if (!table)
+    return {
+      ...metadata,
+      games: [] as PlacementGame[],
+      duplicates: 0,
+      errors: [] as { row: number; message: string }[],
+      skippedDivision: 0,
+      skippedUnplayed: 0,
+      convertedDates: 0,
+    };
+  ensure(
+    table.sheet.rowCount - table.row <= 500,
+    "Importa até 500 jogos de cada vez.",
+  );
+  const lookup = workbookTeamLookup(book, event);
   const games: PlacementGame[] = [],
     errors: { row: number; message: string }[] = [];
   let duplicates = 0;
   const seen = new Map(
     event.games.map((g) => [g.id, placementGameFingerprint(g)]),
   );
-  for (let row = 2; row <= sheet.rowCount; row++) {
+  let skippedDivision = 0,
+    skippedUnplayed = 0,
+    convertedDates = 0;
+  for (let row = table.row + 1; row <= table.sheet.rowCount; row++) {
     try {
-      const cells = placementHeaders.map((h) =>
-        value(sheet.getRow(row).getCell(columns.get(normalize(h))!)),
-      );
-      if (cells.every((c) => !c)) continue;
-      const numeric = cells.slice(3).map((c) => {
-        ensure(
-          /^\d+$/.test(c),
-          "Os sets e pontos devem ser inteiros, sem campos vazios.",
-        );
-        return Number(c);
-      });
-      const draft = {
-        teamA: lookup(cells[1]),
-        teamB: lookup(cells[2]),
-        setsA: numeric[0],
-        setsB: numeric[1],
-        pointsA: numeric[2],
-        pointsB: numeric[3],
-      };
+      const result = readWorkbookGame(table, row, lookup, options);
+      if (result.skipped) {
+        if (result.skipped === "division") skippedDivision++;
+        if (result.skipped === "unplayed") skippedUnplayed++;
+        continue;
+      }
+      const draft = result.draft;
       const game = placementGameSchema.parse({
         ...draft,
-        id: cells[0] || `auto-${placementGameFingerprint(draft)}`,
+        id: draft.id || `auto-${placementGameFingerprint(draft)}`,
       });
+      convertedDates += result.dateCount;
       const fingerprint = placementGameFingerprint(game),
         old = seen.get(game.id);
       ensure(
@@ -182,5 +176,13 @@ export async function parsePlacementImport(
       });
     }
   }
-  return { games, duplicates, errors };
+  return {
+    ...metadata,
+    games,
+    duplicates,
+    errors,
+    skippedDivision,
+    skippedUnplayed,
+    convertedDates,
+  };
 }

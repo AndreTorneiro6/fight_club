@@ -11,6 +11,7 @@ export interface PlacementGame {
   setsB: number;
   pointsA: number;
   pointsB: number;
+  setScores?: { a: number; b: number }[];
 }
 export interface PlacementRules {
   pointsMode: "TOTAL_POINTS" | "CLASSIFICATION_POINTS";
