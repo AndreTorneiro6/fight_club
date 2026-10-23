@@ -1,7 +1,13 @@
 # Fight Club — project handoff
 
-Last updated: 22 October 2026 (Europe/Lisbon).
+Last updated: 23 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
+
+## Profile-photo cartoon — 23 October 2026
+
+- On feature/profile-cartoon, private admin card back now uses a deterministic Python/Pillow cartoon filter of the uploaded Perfil photo, including two-face export. Front keeps the original; no-photo fallback keeps the existing manual avatar. No external image service or fetching arbitrary URLs. MongoDB photoCartoons stores versioned derived PNGs; originals and derivatives never go in public/. Authenticated same-origin POST enforces effective admin workspace even for cached images. Bounded/coalesced subprocesses, decode limits and timeouts protect the host. Docker and CI include Pillow. Guide: docs/PROFILE-CARTOON.md. Not deployed; production photos/data untouched.
+- Validation: typecheck, all 218 tests, production build and the gamification browser scenario pass. Browser verifies a 512px cartoon from the uploaded photo, export and player-workspace 403.
+- WhatsApp test bot was preserved separately on feature/whatsapp-test-bot, commit caaab0a. It remains unlinked: user does not want to connect their personal account and has no separate number.
 
 ## Global search, profile-photo cards and iPhone safe areas — 22 October 2026
 

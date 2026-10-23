@@ -30,6 +30,8 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Install local photo processor
+        run: sudo apt-get update && sudo apt-get install -y python3-pil
       - run: npm run typecheck
       - run: npm test
         env:

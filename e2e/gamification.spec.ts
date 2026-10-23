@@ -98,6 +98,20 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
       .getByRole("article", { name: "Verso da carta", exact: true })
       .getByText("Parceiro do clube", { exact: true }),
   ).toBeVisible();
+  const cartoonImage = area.getByRole("img", {
+    name: `Cartoon de ${profile.name}`,
+    exact: true,
+  });
+  await expect(cartoonImage).toBeVisible();
+  await expect(cartoonImage).toHaveAttribute("src", /^blob:/);
+  expect(
+    await cartoonImage.evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBe(512);
+  const cachedCartoon = await page.request.post(`${photo}/cartoon`, {
+    headers: { Origin: origin },
+  });
+  expect(cachedCartoon.ok()).toBe(true);
+  expect(cachedCartoon.headers()["cache-control"]).toBe("private, no-store");
   await area
     .getByRole("button", { name: "Guardar avatar e carta", exact: true })
     .click();
@@ -145,6 +159,10 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
     ),
   ).toBe(true);
   await switchWorkspace(page, "player");
+  const deniedCartoon = await page.request.post(`${photo}/cartoon`, {
+    headers: { Origin: origin },
+  });
+  expect(deniedCartoon.status()).toBe(403);
   const hidden = await (await page.request.get("/api/league")).json();
   expect(hidden.gamificationProfiles).toEqual([]);
   expect(hidden.gamificationSettings).toEqual([]);
