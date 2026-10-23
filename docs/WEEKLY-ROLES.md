@@ -63,3 +63,7 @@ A fila volta a verificar o estado e o prazo antes de enviar, descartando avisos 
 **Admin → Jornadas e emparelhamento → Participação nos desafios** mostra, por liga e jornada, as duplas que ainda não enviaram desafios e as que ainda não receberam desafios, além do total sem qualquer desafio. Cada entrada mostra a posição, nomes da dupla, papel e estado (aguarda resposta, aceite, jogo oficial, ausência ou inscrição inativa/pendente). As listas contam submissões reais, incluindo as posteriormente recusadas, expiradas ou canceladas; o estado distingue atividade passada de um compromisso atual. As duplas em DEFESA não são tratadas como obrigadas a iniciar desafios.
 
 No modo semanal anterior, o mesmo acompanhamento está em **Papéis semanais → Duplas sem desafios enviados ou recebidos**, usando a semana e a categoria selecionadas. As listas são exclusivas do administrador e atualizam-se com o estado em direto existente. Não criam desafios, notificações ou alterações ao ranking.
+
+## Estado da época e da competição por jornadas
+
+O seletor de competição identifica o estado real da **época** (ativa, pausada, em preparação ou concluída). O estado da **competição por jornadas** aparece separadamente: por configurar, por ativar ou ativada. Uma época pode estar ativa enquanto as jornadas ainda não foram ativadas/configuradas. Ativar a época não publica papéis nem abre desafios automaticamente; as opções da competição e as datas das jornadas continuam sob controlo administrativo.

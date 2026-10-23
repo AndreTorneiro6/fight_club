@@ -1,13 +1,14 @@
 # Fight Club — project handoff
 
-Last updated: 23 October 2026 (Europe/Lisbon).
+Last updated: 24 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
-## Administrator challenge participation lists — 23 October 2026
+## Administrator challenge participation lists and season status labels — 24 October 2026
 
 - Added admin-only lists of teams that have not sent and teams that have not received a challenge, scoped to the selected league/round; also shows teams with neither. Reuses the published ranking/team snapshot and all real challenge submissions, including refused/expired/cancelled history, with separate current commitment status. Shows team members, rank, role, approved absence/current registration status and accepted/official match state. Defense-only and last-place role notes prevent missing activity being misrepresented as a rule violation. No league writes or new schema.
 - Managed view: Admin → Jornadas e emparelhamento → Participação nos desafios. Legacy view: Papéis semanais → Duplas sem desafios enviados ou recebidos, respecting week/category filters and saved team snapshots. Uses existing live-state updates; no player UI exposes these lists.
-- Local validation: typecheck, all 271 tests, production build, three managed browser scenarios plus the legacy paired-team weekly browser scenario pass. Extended browser checks verify attacker/defender membership in the correct lists, full paired names, no player access and transition to official game status. Deployment pending.
+- User additionally reported active season appearing deactivated in Jornadas. Read-only live check now shows season-1 active (start 24 October, end 18 April), managed configuration 5c8c5078-378d-4310-af24-89af80a6649e disabled/version 3/12 rounds, no configured round dates. These are independent states. UI now labels the actual season status in the selector and shows a separate round-competition status (not configured/not activated/activated) with explanatory guidance. Did not enable a competition, create dates, change the season or publish roles to fix a label. Previous release observations of a paused season are historical; the administrator has since activated it.
+- Local validation: typecheck, all 271 tests, production build, three managed browser scenarios plus the legacy paired-team weekly browser scenario pass. Extended browser checks verify attacker/defender membership in the correct lists, full paired names, no player access and transition to official game status. Additional fresh browser scenario confirms active season + disabled round competition is labelled correctly without changing backend state. CI includes this regression scenario. Deployment pending.
 
 ## Response-deadline reminders — 23 October 2026
 
