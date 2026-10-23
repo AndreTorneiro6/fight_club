@@ -333,7 +333,7 @@ export async function mutate(actor: Actor, command: unknown) {
   return transaction(async (s, db, session) => {
     await validateActorSession(actor, db, session);
     ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
-    processDeadlines(s);
+    processDeadlines(s, Date.now(), false);
     const previousEmails = new Map(
       s.players.map((player) => [player._id, normalizeEmail(player.email)]),
     );

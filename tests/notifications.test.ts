@@ -369,6 +369,41 @@ test("outbox commits with events, fans out admins, respects consent, leases work
     );
     await dispatchNotifications(db, 10, fake);
     assert.equal((await queue.findOne({ _id: retry!._id }))!.status, "sent");
+    // A season announcement is in-app + push only, independent of WhatsApp/email opt-ins.
+    await db
+      .collection<PushSubscriptionRecord>("push_subscriptions")
+      .insertOne({
+        _id: "season-push",
+        userId: u._id,
+        playerId: actor.playerId,
+        endpoint: "https://push.example.test/season",
+        keys: { p256dh: "p".repeat(30), auth: "a".repeat(20) },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    await transaction((s) => {
+      s.notifications.push({
+        _id: "season-start",
+        playerId: actor.playerId,
+        title: "A época começou!",
+        body: "Nova época",
+        read: false,
+        createdAt: new Date().toISOString(),
+        seasonId: "season-1",
+        deliveryChannels: ["push"],
+      });
+    });
+    const announcement = await queue
+      .find({ notificationId: "season-start" })
+      .toArray();
+    assert.equal(announcement.length, 1);
+    assert.equal(announcement[0].channel, "push");
+    assert.equal(announcement[0].path, "/epocas");
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "season-start" }))?.status,
+      "sent",
+    );
   } finally {
     await clientToClose?.close();
     process.env = previous;

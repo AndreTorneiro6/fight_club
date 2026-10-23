@@ -1,4 +1,5 @@
 "use client";
+import NotificationEventIcon from "./notification-event-icon";
 import {
   SetScoreFields,
   SetScoreDisplay,
@@ -2875,13 +2876,28 @@ function Notifications({ s, run, busy }: Actions) {
                 className={`notification ${!n.read ? "unread" : ""}`}
                 key={n._id}
               >
-                <Bell size={18} className={n.read ? "muted" : "gold"} />
+                <NotificationEventIcon notice={n} />
                 <div className="flex-1">
                   <strong>{n.title}</strong>
                   <p>{n.body}</p>
                   <small>
                     {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
                   </small>
+                  {n.seasonId && (
+                    <Link
+                      className="link"
+                      href="/epocas"
+                      style={{ marginLeft: 12 }}
+                      onClick={() =>
+                        void run(
+                          { type: "notifications.read", notificationId: n._id },
+                          "",
+                        )
+                      }
+                    >
+                      Ver época →
+                    </Link>
+                  )}
                   {n.adminTestId && (
                     <Link
                       className="link"
@@ -5111,6 +5127,8 @@ const settingLabels: Record<
   string
 > = {
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
+  autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
+  roleDraftLeadDays: "Antecedência dos rascunhos de papéis · dias",
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
   maxPositionsAbove: "Posições que pode desafiar acima",
@@ -5137,8 +5155,16 @@ const settingLabels: Record<
   extendResponseHours: "Prolongamento de resposta · horas",
 };
 function Rules({ s, run, busy }: Actions) {
-  const [settings, setSettings] = useState(s.settings[0]);
-  const incomingSettings = JSON.stringify(s.settings[0]);
+  const [settings, setSettings] = useState({
+    autoWeeklyRoles: true,
+    roleDraftLeadDays: 7,
+    ...s.settings[0],
+  });
+  const incomingSettings = JSON.stringify({
+    autoWeeklyRoles: true,
+    roleDraftLeadDays: 7,
+    ...s.settings[0],
+  });
   const settingsBaseline = useRef(incomingSettings);
   useEffect(() => {
     const previous = settingsBaseline.current;
@@ -5639,7 +5665,9 @@ function Seasons({ s, run, busy }: Actions) {
                             )
                           }
                         >
-                          Iniciar / retomar
+                          {season.startAnnouncedAt
+                            ? "Retomar época"
+                            : "Iniciar época e notificar jogadores"}
                         </button>
                       )}
                       {season.status === "active" && (

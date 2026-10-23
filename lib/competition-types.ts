@@ -59,6 +59,13 @@ export interface CompetitionRound {
   challengeTargets?: Record<string, string[]>;
   challengePendingCounts?: Record<string, number>;
   roles?: Record<string, "attack" | "defense">;
+  rolesGeneratedAt?: string;
+  rolesGeneratedBy?: string;
+  rolesWarnings?: string[];
+  rolesApprovedAt?: string;
+  rolesApprovedBy?: string;
+  rolesApprovedVersion?: number;
+  rolesApprovalSnapshot?: string;
   rolesPublishedAt?: string;
   rolesPublishedBy?: string;
   roleSnapshot?: CompetitionTeam[];

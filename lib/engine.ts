@@ -1,3 +1,11 @@
+import { notificationPresentation } from "./notification-presentation";
+import type { Notification } from "./types";
+import {
+  generateWeeklyRoles,
+  autoWeeklyRoles,
+  weeklyApprovalSnapshot,
+  weeklyTeamSnapshot,
+} from "./weekly-role-workflow";
 import {
   setScoresSchema,
   validateSetScores,
@@ -89,6 +97,8 @@ const playerFields = {
 };
 export const settingsSchema = z.object({
   weeklyCompetition: z.boolean().default(false),
+  autoWeeklyRoles: z.boolean().optional(),
+  roleDraftLeadDays: z.number().int().min(0).max(28).optional(),
   requireClubConfirmation: z.boolean().default(true),
   initialSuggestionCount: z.union([z.literal(3), z.literal(4)]).default(4),
   rulesText: z.string().trim().max(12000).default(""),
@@ -118,6 +128,16 @@ export const settingsSchema = z.object({
 });
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
+    type: z.literal("admin.week.generate"),
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("admin.week.approve"),
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
     type: z.literal("admin.ranking.move"),
     playerId: id,
     targetPlayerId: id,
@@ -129,6 +149,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("admin.week.save"),
+    expectedVersion: z.number().int().min(0),
+    weekType: z.enum(["NORMAL", "OPEN_ATTACK"]).optional(),
     weekStart: day,
     publish: z.boolean(),
     assignments: z
@@ -658,18 +680,35 @@ export function execute(
     body: string,
     cid?: string,
     dedupe?: string,
+    metadata?: Pick<Notification, "seasonId" | "deliveryChannels" | "kind">,
   ) => {
     if (
       dedupe &&
       s.notifications.some((n) => n.dedupe === dedupe && n.playerId === pid)
     )
       return;
+    const kind = notificationPresentation({ title, body, ...metadata }).kind;
+    const match = cid ? s.challenges.find((c) => c._id === cid) : undefined;
+    if (
+      match &&
+      ["challenge", "accepted", "schedule", "result", "update"].includes(kind)
+    ) {
+      const a =
+        match.challengerTeam?.map((m) => m.name).join(" + ") ??
+        s.players.find((p) => p._id === match.challengerId)?.name;
+      const d =
+        match.defenderTeam?.map((m) => m.name).join(" + ") ??
+        s.players.find((p) => p._id === match.defenderId)?.name;
+      if (a && d) body = `${a} × ${d}. ${body}`;
+    }
     s.notifications.push({
       _id: uid(),
+      kind,
       playerId: pid,
       title,
       body,
       challengeId: cid,
+      ...metadata,
       read: false,
       createdAt: now,
       dedupe,
@@ -1260,7 +1299,74 @@ export function execute(
       );
       return { id: cmd.playerId };
     }
+    case "admin.week.generate": {
+      const old = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      ensure(
+        (old?.version ?? 0) === cmd.expectedVersion,
+        "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+        409,
+      );
+      const r = generateWeeklyRoles(s, cmd.weekStart, actor.userId, timestamp);
+      return { id: r._id };
+    }
+    case "admin.week.approve": {
+      const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      ensure(r && !r.publishedAt, "Escolhe um rascunho por publicar.");
+      ensure(
+        (r.version ?? 0) === cmd.expectedVersion,
+        "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+        409,
+      );
+      const probe = structuredClone(s);
+      execute(
+        probe,
+        actor,
+        {
+          type: "admin.week.save",
+          weekStart: cmd.weekStart,
+          expectedVersion: cmd.expectedVersion,
+          assignments: r.assignments,
+          weekType: r.weekType,
+          publish: false,
+        },
+        timestamp,
+      );
+      const eligible = s.players.filter(
+        (p) =>
+          p.status === "active" &&
+          !p.awaitingApproval &&
+          !p.registrationRejectedAt,
+      );
+      ensure(
+        eligible.every((p) => r.assignments.some((a) => a.playerId === p._id)),
+        "Atribui papéis a todas as equipas antes de aprovar.",
+      );
+      r.version = (r.version ?? 0) + 1;
+      r.approvedAt = now;
+      r.approvedBy = actor.userId;
+      r.approvedVersion = r.version;
+      r.approvalSnapshot = weeklyApprovalSnapshot(s, r);
+      log("week.roles.approved", {
+        weekStart: r.weekStart,
+        version: r.version,
+      });
+      return { id: r._id };
+    }
     case "admin.week.save": {
+      const existing = s.weeklyRounds.find(
+        (r) => r.weekStart === cmd.weekStart,
+      );
+      ensure(
+        !existing?.publishedAt,
+        "Os papéis publicados são históricos e não podem ser alterados.",
+        409,
+      );
+      ensure(
+        cmd.expectedVersion === undefined ||
+          cmd.expectedVersion === (existing?.version ?? 0),
+        "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+        409,
+      );
       ensure(
         clubWeek(cmd.weekStart).start === cmd.weekStart,
         "A semana deve começar numa segunda-feira.",
@@ -1324,11 +1430,33 @@ export function execute(
         );
         ensure(!reason, reason ?? "Papel inválido para esta posição.");
       }
-      const round = {
+      const candidate = {
+        ...(existing ?? {}),
         _id: cmd.weekStart,
         weekStart: cmd.weekStart,
         assignments: cmd.assignments,
-        ...(cmd.publish ? { publishedAt: now } : {}),
+        teamSnapshot: weeklyTeamSnapshot(s),
+        weekType: cmd.weekType ?? existing?.weekType ?? "NORMAL",
+      };
+      if (cmd.publish)
+        ensure(
+          existing?.approvedAt &&
+            existing.approvedVersion === (existing.version ?? 0) &&
+            existing.approvalSnapshot === weeklyApprovalSnapshot(s, candidate),
+          "Aprova esta versão dos papéis antes de publicar.",
+          409,
+        );
+      const round = {
+        ...candidate,
+        version: (existing?.version ?? 0) + 1,
+        ...(cmd.publish
+          ? { publishedAt: now, publishedBy: actor.userId }
+          : {
+              approvedAt: undefined,
+              approvedBy: undefined,
+              approvedVersion: undefined,
+              approvalSnapshot: undefined,
+            }),
       };
       s.weeklyRounds = [
         ...s.weeklyRounds.filter((entry) => entry.weekStart !== cmd.weekStart),
@@ -3238,6 +3366,7 @@ export function execute(
     case "admin.season.status": {
       const target = s.seasons.find((x) => x._id === cmd.seasonId);
       ensure(target, "Época inexistente.");
+      const previousStatus = target.status;
       ensure(target.status !== "completed", "Época já arquivada.");
       if (cmd.status === "active")
         ensure(
@@ -3353,6 +3482,36 @@ export function execute(
         }
       }
       target.status = cmd.status;
+      if (
+        cmd.status === "active" &&
+        previousStatus !== "active" &&
+        !target.startAnnouncedAt
+      ) {
+        target.startAnnouncedAt = now;
+        target.startAnnouncedBy = actor.userId;
+        let recipients = 0;
+        for (const p of s.players.filter(
+          (p) =>
+            p.status === "active" &&
+            !p.awaitingApproval &&
+            !p.registrationRejectedAt,
+        )) {
+          notify(
+            p._id,
+            "A época começou! 🎾",
+            `A época ${target.name} começou. Consulta o ranking, as jornadas e os avisos da organização.`,
+            undefined,
+            `season-start:${target._id}:${p._id}`,
+            { seasonId: target._id, deliveryChannels: ["push"] },
+          );
+          recipients++;
+        }
+        log("season.start.announced", {
+          seasonId: target._id,
+          recipients,
+          channels: ["in-app", "push"],
+        });
+      }
       target.version = (target.version ?? 0) + 1;
       log("season.status", cmd);
       break;
@@ -3371,8 +3530,13 @@ export function lisbonDay(timestamp: number) {
   return `${p.find((x) => x.type === "year")!.value}-${p.find((x) => x.type === "month")!.value}-${p.find((x) => x.type === "day")!.value}`;
 }
 
-export function processDeadlines(s: State, timestamp = Date.now()) {
-  processCompetitionDeadlines(s, timestamp);
+export function processDeadlines(
+  s: State,
+  timestamp = Date.now(),
+  generateRoles = true,
+) {
+  if (generateRoles) autoWeeklyRoles(s, timestamp);
+  processCompetitionDeadlines(s, timestamp, generateRoles);
   const now = new Date(timestamp).toISOString(),
     rules = s.settings[0] ?? defaultSettings;
   const add = (

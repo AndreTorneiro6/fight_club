@@ -82,6 +82,15 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     else await row.getByRole("button", { name: /^Ataque:/ }).click();
   }
   await admin
+    .getByRole("button", { name: "Aprovar papéis da semana", exact: true })
+    .click();
+  await expect(
+    admin.getByRole("button", {
+      name: "Publicar papéis da semana",
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await admin
     .getByRole("button", { name: "Publicar papéis da semana", exact: true })
     .click();
   await expect(
@@ -137,6 +146,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     headers: { Origin: "http://localhost:3100" },
     data: {
       type: "admin.week.save",
+      expectedVersion: saved.weeklyRounds[0].version ?? 0,
       weekStart: saved.weeklyRounds[0].weekStart,
       publish: true,
       assignments: saved.weeklyRounds[0].assignments,

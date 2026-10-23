@@ -1,3 +1,8 @@
+import {
+  notificationPresentation,
+  pushNotificationPayload,
+} from "./notification-presentation";
+import type { NotificationEvent } from "./notification-presentation";
 import type { AdminTestChallenge } from "./admin-test-types";
 import { randomUUID } from "node:crypto";
 import type { ClientSession, Db } from "mongodb";
@@ -18,6 +23,9 @@ export interface PushSubscriptionRecord {
   updatedAt: Date;
 }
 export interface Delivery {
+  kind?: NotificationEvent;
+  icon?: string;
+  badge?: string;
   _id: string;
   notificationId: string;
   userId: string;
@@ -58,18 +66,24 @@ export function whatsappNumber(phone: string) {
   return /^\+[1-9]\d{7,14}$/.test(number) ? number : null;
 }
 export function deliveryContent(n: Notification) {
+  const presentation = notificationPresentation(n);
   return {
+    kind: presentation.kind,
+    icon: presentation.icon,
+    badge: presentation.badge,
     title: n.title,
     body: n.body,
-    path: n.adminTestId
-      ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
-      : n.challengeId
-        ? `/desafios/${encodeURIComponent(n.challengeId)}`
-        : n.competitionNotice
-          ? n.playerId === "__admins__"
-            ? "/admin?tab=matchmaking"
-            : "/jornadas"
-          : "/notificacoes",
+    path: n.seasonId
+      ? "/epocas"
+      : n.adminTestId
+        ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
+        : n.challengeId
+          ? `/desafios/${encodeURIComponent(n.challengeId)}`
+          : n.competitionNotice
+            ? n.playerId === "__admins__"
+              ? "/admin?tab=matchmaking"
+              : "/jornadas"
+            : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */
@@ -98,6 +112,8 @@ export async function enqueueNotifications(
       const player = after.players.find((p) => p.userId === user._id);
       if (!player) continue;
       for (const channel of ["email", "whatsapp"] as const) {
+        if (n.deliveryChannels && !n.deliveryChannels.includes(channel))
+          continue;
         if (n.adminTestId && !n.testChannels?.includes(channel)) continue;
         if (!enabledChannel(player, channel)) continue;
         const key = `${n._id}:${user._id}:${channel}`;
@@ -121,6 +137,7 @@ export async function enqueueNotifications(
         );
       }
       if (n.adminTestId && !n.testChannels?.includes("push")) continue;
+      if (n.deliveryChannels && !n.deliveryChannels.includes("push")) continue;
       const subscriptions = await db
         .collection<PushSubscriptionRecord>("push_subscriptions")
         .find({ userId: user._id, playerId: player._id }, { session })
@@ -237,15 +254,9 @@ export async function sendPushDelivery(
   if (!publicKey || !privateKey || !subject) throw new ProviderError(false);
   webpush.setVapidDetails(subject, publicKey, privateKey);
   try {
-    const url = new URL(job.path, process.env.APP_URL).toString();
     await webpush.sendNotification(
       { endpoint: subscription.endpoint, keys: subscription.keys },
-      JSON.stringify({
-        title: job.title,
-        body: job.body,
-        url,
-        tag: job.notificationId,
-      }),
+      JSON.stringify(pushNotificationPayload(job, process.env.APP_URL)),
       { TTL: 86400 },
     );
     return `push:${subscription._id}`;

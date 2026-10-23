@@ -133,6 +133,7 @@ export function WeeklyRoles({
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
   const [week, setWeek] = useState(clubWeek().start);
   const [exportOpen, setExportOpen] = useState(false);
+  const [weekType, setWeekType] = useState<"NORMAL" | "OPEN_ATTACK">("NORMAL");
   const [division, setDivision] = useState(admin ? "all" : me.divisionId);
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(round?.assignments ?? []);
@@ -148,7 +149,8 @@ export function WeeklyRoles({
         ).map((entry) => [entry.playerId, entry.role]),
       ),
     );
-  }, [saved, week]);
+    setWeekType(round?.weekType ?? "NORMAL");
+  }, [saved, week, round?.weekType]);
   if (!s.settings[0].weeklyCompetition) return null;
   const players = s.players.filter(
     (p) =>
@@ -175,6 +177,8 @@ export function WeeklyRoles({
       {
         type: "admin.week.save",
         weekStart: week,
+        expectedVersion: round?.version ?? 0,
+        weekType,
         publish,
         assignments: players
           .filter((p) => roles[p._id])
@@ -218,6 +222,92 @@ export function WeeklyRoles({
             t.members.some((m) => m._id === me._id),
           ) + 1}{" "}
           · Distância máxima: {s.settings[0].maxPositionsAbove} posições.
+        </p>
+      )}
+      {admin && (
+        <>
+          <p>
+            <strong>
+              {published
+                ? "PUBLICADO"
+                : round?.approvedAt && round.approvedVersion === round.version
+                  ? "APROVADO — aguarda publicação"
+                  : "RASCUNHO — aguarda aprovação"}
+            </strong>
+          </p>
+          {round?.generatedAt && (
+            <small>
+              Gerado{" "}
+              {round.generatedBy === "system"
+                ? "automaticamente"
+                : "pelo administrador"}{" "}
+              · {new Date(round.generatedAt).toLocaleString("pt-PT")}
+            </small>
+          )}
+          <label>
+            Tipo de semana
+            <select
+              value={weekType}
+              disabled={busy || published || week < clubWeek().start}
+              onChange={(e) => setWeekType(e.target.value as typeof weekType)}
+            >
+              <option value="NORMAL">Normal</option>
+              <option value="OPEN_ATTACK">SEMANA DE ATAQUE LIVRE</option>
+            </select>
+          </label>
+          {round?.warnings?.map((w) => (
+            <small key={w}>{w}</small>
+          ))}
+          <details>
+            <summary>Histórico dos papéis semanais</summary>
+            {[...s.weeklyRounds]
+              .filter((r) => r.weekStart < week)
+              .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+              .map((r) => (
+                <div className="inset stack" key={r._id}>
+                  <button onClick={() => setWeek(r.weekStart)}>
+                    Semana de {r.weekStart} ·{" "}
+                    {r.publishedAt
+                      ? "Publicado"
+                      : r.approvedAt
+                        ? "Aprovado"
+                        : "Rascunho"}
+                  </button>
+                  {(
+                    r.teamSnapshot ??
+                    teams.map((t) => ({
+                      id: t.id,
+                      name: t.members.map((m) => m.name).join(" + "),
+                      divisionId: t.members[0].divisionId,
+                      playerIds: t.members.map((m) => m._id),
+                    }))
+                  )
+                    .filter(
+                      (t) => division === "all" || t.divisionId === division,
+                    )
+                    .map((t) => (
+                      <small key={t.id}>
+                        {t.name}:{" "}
+                        {r.assignments.find((a) =>
+                          t.playerIds.includes(a.playerId),
+                        )?.role === "attack"
+                          ? "ATAQUE"
+                          : r.assignments.find((a) =>
+                                t.playerIds.includes(a.playerId),
+                              )?.role === "defense"
+                            ? "DEFESA"
+                            : "Por atribuir"}
+                      </small>
+                    ))}
+                </div>
+              ))}
+          </details>
+        </>
+      )}
+      {(weekType === "OPEN_ATTACK" || round?.weekType === "OPEN_ATTACK") && (
+        <p>
+          <strong>SEMANA DE ATAQUE LIVRE</strong> — todas as duplas elegíveis
+          podem desafiar, exceto o campeão.
         </p>
       )}
       <p role="status">
@@ -437,6 +527,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!attackReason ||
                       (lockedByChallenge && requiredRole !== "attack") ||
+                      published ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("attack")}
@@ -453,6 +544,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!defenseReason ||
                       (lockedByChallenge && requiredRole !== "defense") ||
+                      published ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("defense")}
@@ -465,7 +557,10 @@ export function WeeklyRoles({
                       className="small"
                       aria-label={`Remover seleção: ${label}`}
                       disabled={
-                        busy || lockedByChallenge || week < clubWeek().start
+                        busy ||
+                        lockedByChallenge ||
+                        published ||
+                        week < clubWeek().start
                       }
                       onClick={remove}
                     >
@@ -523,14 +618,70 @@ export function WeeklyRoles({
           </small>
           <div className="row wrap">
             <button
-              disabled={busy || week < clubWeek().start}
+              disabled={busy || published || week < clubWeek().start}
+              onClick={() =>
+                run(
+                  {
+                    type: "admin.week.generate",
+                    weekStart: week,
+                    expectedVersion: round?.version ?? 0,
+                  },
+                  "Proposta semanal gerada",
+                )
+              }
+            >
+              Gerar papéis automaticamente
+            </button>
+            <button
+              disabled={busy || published || week < clubWeek().start}
+              onClick={async () => {
+                const assignments = players
+                  .filter((p) => roles[p._id])
+                  .map((p) => ({ playerId: p._id, role: roles[p._id] }));
+                const saved = await run(
+                  {
+                    type: "admin.week.save",
+                    weekStart: week,
+                    expectedVersion: round?.version ?? 0,
+                    weekType,
+                    assignments,
+                    publish: false,
+                  },
+                  "Rascunho guardado",
+                );
+                if (saved)
+                  await run(
+                    {
+                      type: "admin.week.approve",
+                      weekStart: week,
+                      expectedVersion: (round?.version ?? 0) + 1,
+                    },
+                    "Papéis aprovados; aguardam publicação",
+                  );
+              }}
+            >
+              Aprovar papéis da semana
+            </button>
+            <button
+              disabled={busy || published || week < clubWeek().start}
               onClick={() => void save(false)}
             >
               Guardar rascunho
             </button>
             <button
               className="primary"
-              disabled={busy || week < clubWeek().start}
+              disabled={
+                busy ||
+                published ||
+                week < clubWeek().start ||
+                !round?.approvedAt ||
+                round.approvedVersion !== round.version ||
+                weekType !== (round.weekType ?? "NORMAL") ||
+                JSON.stringify(Object.entries(roles).sort()) !==
+                  JSON.stringify(
+                    round.assignments.map((a) => [a.playerId, a.role]).sort(),
+                  )
+              }
               onClick={() => void save(true)}
             >
               Publicar papéis da semana

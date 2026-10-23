@@ -102,9 +102,17 @@ export function filterFeatureView(state: State, actor: Actor) {
         ).length,
       ]),
     );
+    delete r.rolesApprovalSnapshot;
     if (!r.rolesPublishedAt) {
       delete r.roles;
       delete r.roleSnapshot;
+      delete r.rolesWarnings;
+      delete r.rolesGeneratedAt;
+      delete r.rolesGeneratedBy;
+      delete r.rolesApprovedAt;
+      delete r.rolesApprovedBy;
+      delete r.rolesApprovedVersion;
+      delete r.rolesApprovalSnapshot;
     }
   }
   state.competitionChallenges = (state.competitionChallenges ?? []).filter(

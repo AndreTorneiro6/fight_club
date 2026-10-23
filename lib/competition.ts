@@ -1,3 +1,5 @@
+import { notificationPresentation } from "./notification-presentation";
+import { proposeTeamRoles, sameRoles } from "./role-proposals";
 import {
   competitionPriorities,
   challengeContext,
@@ -48,6 +50,16 @@ const weightsSchema = z.object({
   priority: z.number().int().min(0).max(1000000),
 });
 export const competitionCommandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("competition.roles.generate"),
+    roundId: id,
+    expectedVersion: z.number().int().min(1),
+  }),
+  z.object({
+    type: z.literal("competition.roles.approve"),
+    roundId: id,
+    expectedVersion: z.number().int().min(1),
+  }),
   z.object({
     type: z.literal("competition.roles.save"),
     roundId: id,
@@ -584,6 +596,47 @@ export function validateCompetitionSchedule(
   }
   return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
 }
+function validateRoleAssignments(
+  s: State,
+  r: CompetitionRound,
+  roles: Record<string, "attack" | "defense">,
+  complete: boolean,
+) {
+  const teams = competitionTeams(s, r.divisionId);
+  ensure(
+    Object.keys(roles).every((id) => teams.some((t) => t.id === id)),
+    "Dupla de outra liga ou inexistente.",
+  );
+  for (const t of teams) {
+    if (complete)
+      ensure(
+        !!roles[t.id],
+        "Atribui um papel a todas as duplas antes de aprovar.",
+      );
+    ensure(
+      !(t.rank === 1 && roles[t.id] === "attack"),
+      "O campeão só pode defender.",
+    );
+    ensure(
+      !(t.rank === teams.length && roles[t.id] === "defense"),
+      "A última dupla só pode atacar.",
+    );
+  }
+}
+function roleApprovalSnapshot(
+  s: State,
+  r: CompetitionRound,
+  roles: Record<string, "attack" | "defense">,
+) {
+  const e = effectiveCompetitionConfig(s, r);
+  return JSON.stringify({
+    roles: Object.entries(roles).sort(),
+    teams: competitionTeams(s, r.divisionId),
+    distance: e.distance,
+    champions: e.config.championPositions,
+    type: e.weekType,
+  });
+}
 function requireEarlierSettled(s: State, r: CompetitionRound) {
   ensure(
     !(s.competitionRounds ?? []).some(
@@ -680,6 +733,7 @@ function notify(
   if (!s.notifications.some((n) => n.dedupe === dedupe))
     s.notifications.push({
       _id: randomUUID(),
+      kind: notificationPresentation({ title, body, dedupe }).kind,
       playerId,
       title,
       body,
@@ -753,7 +807,70 @@ export function executeCompetition(
     ensure(q, "Proposta não encontrada.", 404);
     return q;
   };
-  if (cmd.type === "competition.roles.save") {
+  if (cmd.type === "competition.roles.generate") {
+    const r = getRound(cmd.roundId);
+    version(r.version, cmd.expectedVersion);
+    ensure(
+      !r.rolesPublishedAt &&
+        !r.locked &&
+        !r.settledAt &&
+        !s.competitionSchedules.some(
+          (q) => q.roundId === r._id && q.status === "PUBLISHED",
+        ),
+      "Os papéis oficiais não podem ser regenerados.",
+    );
+    const e = effectiveCompetitionConfig(s, r),
+      teams = competitionTeams(s, r.divisionId);
+    const previous = s
+      .competitionRounds!.filter(
+        (p) =>
+          p.competitionId === r.competitionId &&
+          p.divisionId === r.divisionId &&
+          p.number < r.number &&
+          p.rolesPublishedAt,
+      )
+      .sort((a, b) => b.number - a.number)[0];
+    const proposal = proposeTeamRoles({
+      teams,
+      distance: e.distance,
+      champions: e.config.championPositions,
+      weekType: e.weekType,
+      round: r.number,
+      history: competitionHistory(s, r.divisionId, r.competitionId),
+      previous: previous?.roles,
+      unavailable: teams
+        .filter((t) => absent(s, r, t.id) || conflicts(s, r, t))
+        .map((t) => t.id),
+    });
+    r.roles = proposal.roles;
+    r.rolesWarnings = proposal.warnings;
+    r.rolesGeneratedAt = now;
+    r.rolesGeneratedBy = actor.userId;
+    r.version++;
+    delete r.rolesApprovedAt;
+    delete r.rolesApprovedBy;
+    delete r.rolesApprovedVersion;
+    delete r.rolesApprovalSnapshot;
+  } else if (cmd.type === "competition.roles.approve") {
+    const r = getRound(cmd.roundId);
+    version(r.version, cmd.expectedVersion);
+    ensure(
+      !r.rolesPublishedAt &&
+        !r.locked &&
+        !r.settledAt &&
+        !s.competitionSchedules.some(
+          (q) => q.roundId === r._id && q.status === "PUBLISHED",
+        ),
+      "Escolhe papéis por publicar.",
+    );
+    requireEarlierSettled(s, r);
+    validateRoleAssignments(s, r, r.roles ?? {}, true);
+    r.version++;
+    r.rolesApprovedAt = now;
+    r.rolesApprovedBy = actor.userId;
+    r.rolesApprovedVersion = r.version;
+    r.rolesApprovalSnapshot = roleApprovalSnapshot(s, r, r.roles ?? {});
+  } else if (cmd.type === "competition.roles.save") {
     const r = getRound(cmd.roundId),
       teams = competitionTeams(s, r.divisionId);
     version(r.version, cmd.expectedVersion);
@@ -765,24 +882,21 @@ export function executeCompetition(
         ),
       "Os papéis publicados não podem ser alterados; contacta a organização para uma exceção regulamentar.",
     );
-    ensure(
-      Object.keys(cmd.roles).every((id) => teams.some((t) => t.id === id)),
-      "Dupla de outra liga ou inexistente.",
-    );
-    for (const t of teams) {
-      if (cmd.publish)
-        ensure(
-          !!cmd.roles[t.id],
-          "Atribui um papel a todas as duplas antes de publicar.",
-        );
+    validateRoleAssignments(s, r, cmd.roles, cmd.publish);
+    if (cmd.publish)
       ensure(
-        !(t.rank === 1 && cmd.roles[t.id] === "attack"),
-        "O campeão só pode defender.",
+        r.rolesApprovedAt &&
+          r.rolesApprovedVersion === r.version &&
+          sameRoles(r.roles ?? {}, cmd.roles) &&
+          r.rolesApprovalSnapshot === roleApprovalSnapshot(s, r, cmd.roles),
+        "Aprova esta versão dos papéis antes de publicar.",
+        409,
       );
-      ensure(
-        !(t.rank === teams.length && cmd.roles[t.id] === "defense"),
-        "A última dupla só pode atacar.",
-      );
+    else {
+      delete r.rolesApprovedAt;
+      delete r.rolesApprovedBy;
+      delete r.rolesApprovedVersion;
+      delete r.rolesApprovalSnapshot;
     }
     if (cmd.publish) {
       requireEarlierSettled(s, r);
@@ -951,6 +1065,13 @@ export function executeCompetition(
         )
       )
         continue;
+      if (!r.rolesPublishedAt && r.rolesApprovedAt) {
+        delete r.rolesApprovedAt;
+        delete r.rolesApprovedBy;
+        delete r.rolesApprovedVersion;
+        delete r.rolesApprovalSnapshot;
+        r.version++;
+      }
       revalidateChallenges(s, r);
       for (const q of s.competitionSchedules.filter(
         (q) => q.roundId === r._id,
@@ -1031,6 +1152,12 @@ export function executeCompetition(
       locked: false,
       version: (existing?.version ?? 0) + 1,
     };
+    if (existing && !existing.rolesPublishedAt) {
+      delete existing.rolesApprovedAt;
+      delete existing.rolesApprovedBy;
+      delete existing.rolesApprovedVersion;
+      delete existing.rolesApprovalSnapshot;
+    }
     if (existing) Object.assign(existing, r);
     else s.competitionRounds.push(r);
     revalidateChallenges(s, r);
@@ -1213,7 +1340,12 @@ export function executeCompetition(
             s,
             m.playerId,
             cmd.accept ? "Desafio aceite" : "Desafio recusado",
-            `Jornada ${r.number}: ${cmd.accept ? "o desafio foi aceite. Aguarda aprovação e publicação administrativa." : cmd.reason}`,
+            `Jornada ${r.number}: ${challengeContext(s, r)
+              .teams.filter((t) => [c.attackerId, c.defenderId].includes(t.id))
+              .map((t) => t.members.map((m) => m.name).join(" + "))
+              .join(
+                " × ",
+              )}. ${cmd.accept ? "O desafio foi aceite. Aguarda aprovação e publicação administrativa." : cmd.reason}`,
             now,
             `challenge-${c.status}:${c._id}:${m.playerId}`,
           );
@@ -1953,9 +2085,68 @@ export function executeCompetition(
     ...(savedCompetitionId ? { competitionId: savedCompetitionId } : {}),
   };
 }
-export function processCompetitionDeadlines(s: State, timestamp = Date.now()) {
+export function processCompetitionDeadlines(
+  s: State,
+  timestamp = Date.now(),
+  generateRoles = true,
+) {
   const now = new Date(timestamp).toISOString();
-  for (const r of s.competitionRounds ?? []) notifyChallengeBlocks(s, r, now);
+  for (const r of s.competitionRounds ?? []) {
+    const c = s.competitionConfigurations?.find(
+      (c) => c._id === r.competitionId,
+    );
+    if (
+      generateRoles &&
+      s.settings[0]?.autoWeeklyRoles !== false &&
+      c?.enabled &&
+      s.seasons.some(
+        (season) => season._id === c.seasonId && season.status === "active",
+      ) &&
+      !r.roles &&
+      !r.rolesPublishedAt &&
+      !r.locked &&
+      !r.settledAt &&
+      !(s.competitionSchedules ?? []).some(
+        (q) => q.roundId === r._id && q.status === "PUBLISHED",
+      ) &&
+      Date.parse(r.opensAt) - timestamp <=
+        (s.settings[0]?.roleDraftLeadDays ?? 7) * 86400000 &&
+      r.endsAt > now
+    ) {
+      try {
+        executeCompetition(
+          s,
+          { userId: "system", playerId: "system", role: "admin" },
+          {
+            type: "competition.roles.generate",
+            roundId: r._id,
+            expectedVersion: r.version,
+          },
+          timestamp,
+        );
+      } catch (error) {
+        if (
+          !s.audit.some(
+            (a) =>
+              a.action === "competition.roles.auto.failed" &&
+              a.details.includes(r._id),
+          )
+        )
+          s.audit.push({
+            _id: randomUUID(),
+            userId: "system",
+            action: "competition.roles.auto.failed",
+            details: JSON.stringify({
+              roundId: r._id,
+              message:
+                error instanceof Error ? error.message : "Falha na geração",
+            }),
+            createdAt: now,
+          });
+      }
+    }
+    notifyChallengeBlocks(s, r, now);
+  }
   for (const c of s.competitionChallenges ?? []) {
     if (c.status === "PENDING" && c.respondBy <= now) {
       c.status = "EXPIRED";

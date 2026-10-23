@@ -18,6 +18,7 @@ export interface OptimizerInput {
   basic?: boolean;
   forbiddenPairs?: string[];
   diagnose?: boolean;
+  rolePreferences?: Record<string, "attack" | "defense">;
 }
 export function pairingError(
   a: CompetitionTeam | undefined,
@@ -126,7 +127,9 @@ export function optimize(input: OptimizerInput) {
         (ar.attacks - ar.defenses + dr.defenses - dr.attacks) * weights.role +
         (ar.lastRole === "attack" ? ar.streak : 0) * weights.role +
         (dr.lastRole === "defense" ? dr.streak : 0) * weights.role +
-        last;
+        last +
+        (input.rolePreferences?.[a.id] === "defense" ? weights.role : 0) +
+        (input.rolePreferences?.[d.id] === "attack" ? weights.role : 0);
     return { score: priority - cost, past, last, consecutive };
   };
   type Solution = { count: number; score: number; pairs: CompetitionPair[] };
