@@ -725,3 +725,111 @@ test("initial placement vacation protection is configurable and official publish
   assert.throws(() => execute(s, admin, command()), /papéis oficiais/);
   assert.equal(e.status, "DRAFT");
 });
+
+test("placement pending fixtures do not affect standings and become scored games atomically", () => {
+  const s = fixture(),
+    e = event(s),
+    before = structuredClone(s.players);
+  const pending = { id: "pending-1", teamA: "p3", teamB: "p0" };
+  execute(s, admin, {
+    type: "admin.placement.fixtures",
+    eventId: e._id,
+    expectedVersion: e.version,
+    fixtures: [pending],
+  });
+  assert.equal(e.fixtures?.length, 1);
+  assert.ok(placementStandings([e]).every((r) => r.played === 0));
+  assert.throws(
+    () =>
+      execute(s, player, {
+        type: "admin.placement.fixtures",
+        eventId: e._id,
+        expectedVersion: e.version,
+        fixtures: [pending],
+      }),
+    /administradores/,
+  );
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        type: "admin.placement.games",
+        eventId: e._id,
+        expectedVersion: e.version,
+        games: [{ ...games[0], id: pending.id, teamA: "p2" }],
+      }),
+    /correspondem/,
+  );
+  assert.equal(e.fixtures?.length, 1);
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        type: "admin.placement.fixtures",
+        eventId: e._id,
+        expectedVersion: e.version - 1,
+        fixtures: [pending],
+      }),
+    /administrador/,
+  );
+  execute(s, admin, {
+    type: "admin.placement.games",
+    eventId: e._id,
+    expectedVersion: e.version,
+    games: [{ ...games[0], id: pending.id }],
+  });
+  assert.equal(e.games.length, 1);
+  assert.equal(e.fixtures?.length, 0);
+  assert.deepEqual(s.players, before);
+  assert.equal(s.results.length, 0);
+  assert.ok(s.audit.some((a) => a.action === "admin.placement.fixtures"));
+});
+
+test("placement pending fixtures enforce roster, identity, limits and final closure", () => {
+  const s = fixture(),
+    e = event(s),
+    cmd = (fixtures: unknown[]) => ({
+      type: "admin.placement.fixtures",
+      eventId: e._id,
+      expectedVersion: e.version,
+      fixtures,
+    });
+  assert.throws(
+    () => execute(s, admin, cmd([{ id: "x", teamA: "p0", teamB: "foreign" }])),
+    /fora/,
+  );
+  execute(s, admin, cmd([{ id: "x", teamA: "p0", teamB: "p1" }]));
+  assert.throws(
+    () => execute(s, admin, cmd([{ id: "x", teamA: "p0", teamB: "p2" }])),
+    /outro jogo/,
+  );
+  execute(s, admin, {
+    type: "admin.placement.games",
+    eventId: e._id,
+    expectedVersion: e.version,
+    games,
+  });
+  const rows = placementStandings([e]);
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        type: "admin.placement.apply",
+        events: [{ id: e._id, version: e.version }],
+        tieOrder: rows.map((r) => r.id),
+        confirmTies: true,
+      }),
+    /por jogar/,
+  );
+  execute(s, admin, {
+    type: "admin.placement.previewRanking",
+    events: [{ id: e._id, version: e.version }],
+    tieOrder: rows.map((r) => r.id),
+    confirmTies: true,
+  });
+  assert.equal(e.status, "DRAFT");
+  execute(s, admin, {
+    type: "admin.placement.removeFixture",
+    eventId: e._id,
+    expectedVersion: e.version,
+    gameId: "x",
+  });
+  assert.equal(e.fixtures?.length, 0);
+});

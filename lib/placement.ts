@@ -66,6 +66,10 @@ export const placementGameSchema = z
       });
     }
   });
+const fixtureSchema = z
+  .object({ id, teamA: id, teamB: id })
+  .strict()
+  .refine((g) => g.teamA !== g.teamB, "Escolhe equipas diferentes.");
 const rules = z
   .object({
     protectVacationPositions: z.boolean().optional(),
@@ -80,6 +84,22 @@ const eventFields = {
   rules,
 };
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.placement.fixtures"),
+      eventId: id,
+      expectedVersion: integer,
+      fixtures: z.array(fixtureSchema).min(1).max(500),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("admin.placement.removeFixture"),
+      eventId: id,
+      expectedVersion: integer,
+      gameId: id,
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.placement.previewRanking"),
@@ -380,6 +400,10 @@ export function executePlacement(
       "Já existem papéis oficiais publicados. A colocação inicial não pode reescrever esse ranking.",
       409,
     );
+    ensure(
+      provisional || events.every((e) => !e.fixtures?.length),
+      "Existem jogos por jogar. Regista os resultados antes de fechar a colocação.",
+    );
     const rows = placementStandings(events, cmd.tieOrder);
     ensure(
       events.some((e) => e.games.length > 0),
@@ -468,7 +492,40 @@ export function executePlacement(
   }
   const e = writable(cmd.eventId, cmd.expectedVersion),
     before = structuredClone(e);
-  if (cmd.type === "admin.placement.update") {
+  if (cmd.type === "admin.placement.fixtures") {
+    const staged = new Map((e.fixtures ?? []).map((g) => [g.id, g]));
+    for (const g of cmd.fixtures) {
+      ensure(
+        e.teams.some((t) => t.id === g.teamA) &&
+          e.teams.some((t) => t.id === g.teamB),
+        "Equipa fora deste evento/divisão.",
+      );
+      ensure(
+        !e.games.some((old) => old.id === g.id),
+        "Este jogo já tem resultado.",
+        409,
+      );
+      const old = staged.get(g.id);
+      ensure(
+        !old || (old.teamA === g.teamA && old.teamB === g.teamB),
+        "O identificador já pertence a outro jogo.",
+        409,
+      );
+      staged.set(g.id, g);
+    }
+    ensure(
+      staged.size + e.games.length <= 1000,
+      "Limite de 1000 jogos por evento.",
+    );
+    e.fixtures = [...staged.values()];
+  } else if (cmd.type === "admin.placement.removeFixture") {
+    ensure(
+      e.fixtures?.some((g) => g.id === cmd.gameId),
+      "Jogo não encontrado.",
+      404,
+    );
+    e.fixtures = e.fixtures!.filter((g) => g.id !== cmd.gameId);
+  } else if (cmd.type === "admin.placement.update") {
     e.name = cmd.name;
     e.date = cmd.date;
     e.rules = cmd.rules;
@@ -500,6 +557,12 @@ export function executePlacement(
           e.teams.some((t) => t.id === g.teamB),
         "Equipa fora deste evento/divisão.",
       );
+      const fixture = e.fixtures?.find((f) => f.id === g.id);
+      ensure(
+        !fixture || (fixture.teamA === g.teamA && fixture.teamB === g.teamB),
+        "As equipas não correspondem ao jogo por jogar.",
+        409,
+      );
       const old = staged.get(g.id);
       if (old) {
         ensure(
@@ -513,7 +576,12 @@ export function executePlacement(
         added++;
       }
     }
-    ensure(staged.size <= 1000, "Limite de 1000 jogos por evento.");
+    const remaining = (e.fixtures ?? []).filter((f) => !staged.has(f.id));
+    ensure(
+      staged.size + remaining.length <= 1000,
+      "Limite de 1000 jogos por evento.",
+    );
+    if (e.fixtures) e.fixtures = remaining;
     e.games = [...staged.values()];
     e.version++;
     e.updatedAt = now;
