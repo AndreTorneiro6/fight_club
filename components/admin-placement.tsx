@@ -3,7 +3,11 @@ import PlacementGameEditor from "./placement-game-editor";
 import styles from "./admin-lab.module.css";
 import { useState } from "react";
 import type { View } from "@/lib/types";
-import type { PlacementEvent, PlacementGame } from "@/lib/placement-types";
+import type {
+  PlacementEvent,
+  PlacementGame,
+  PlacementFixture,
+} from "@/lib/placement-types";
 import { defaultPlacementRules } from "@/lib/placement-types";
 import { placementStandings } from "@/lib/placement-standings";
 import DataRows from "./data-rows";
@@ -11,20 +15,6 @@ type Props = {
   state: View;
   run: (cmd: unknown, message?: string) => Promise<unknown>;
   busy: boolean;
-};
-type Preview = {
-  eventId: string;
-  version: number;
-  games: PlacementGame[];
-  duplicates: number;
-  errors: { row: number; message: string }[];
-  sheets: string[];
-  allSheets: string[];
-  sheetName: string;
-  needsSheetSelection: boolean;
-  skippedDivision: number;
-  skippedUnplayed: number;
-  convertedDates: number;
 };
 function EventEditor({
   event,
@@ -143,59 +133,35 @@ export default function AdminPlacement({ state, run, busy }: Props) {
     [name, setName] = useState("Evento de colocação"),
     [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [eventId, setEvent] = useState(""),
-    [preview, setPreview] = useState<Preview | null>(null),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [tieOrder, setTieOrder] = useState<string[]>([]),
     [confirmTies, setConfirmTies] = useState(false);
   const events = (state.placementEvents ?? []).filter(
       (e) => e.seasonId === seasonId && e.divisionId === divisionId,
     ),
-    event = events.find((e) => e._id === eventId) ?? events[0];
-  const [importedFile, setImportedFile] = useState<File | null>(null),
-    [dateOrder, setDateOrder] = useState(""),
-    [editing, setEditing] = useState<PlacementGame | null>(null),
-    [editingVersion, setEditingVersion] = useState(0);
+    event =
+      events.find((e) => e._id === eventId) ??
+      [...events].sort(
+        (a, b) =>
+          b.games.length +
+          (b.fixtures?.length ?? 0) -
+          (a.games.length + (a.fixtures?.length ?? 0)),
+      )[0];
+  const [editing, setEditing] = useState<PlacementGame | null>(null),
+    [editingVersion, setEditingVersion] = useState(0),
+    [scoringFixture, setScoringFixture] = useState<PlacementFixture | null>(
+      null,
+    );
   const group = events.filter((e) => selected.includes(e._id));
   const ranking = placementStandings(group, tieOrder);
-  const stale =
-    !!preview &&
-    (preview.eventId !== event?._id || preview.version !== event?.version);
   const editable = event?.status === "DRAFT";
   const label = (id: string) =>
     event?.teams.find((t) => t.id === id)?.name ?? id;
-  async function importFile(file: File, sheetName = "", dates = dateOrder) {
-    if (!event) return;
-    setLoading(true);
-    setError("");
-    setPreview(null);
-    try {
-      const body = new FormData();
-      body.set("file", file);
-      body.set("eventId", event._id);
-      body.set("sheetName", sheetName);
-      body.set("dateOrder", dates);
-      const response = await fetch("/api/placement-import", {
-        method: "POST",
-        body,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setPreview(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro na importação.");
-    } finally {
-      setLoading(false);
-    }
-  }
   function reset() {
     setEvent("");
-    setImportedFile(null);
-    setDateOrder("");
     setEditing(null);
+    setScoringFixture(null);
     setSelected([]);
-    setPreview(null);
     setTieOrder([]);
     setConfirmTies(false);
   }
@@ -264,9 +230,7 @@ export default function AdminPlacement({ state, run, busy }: Props) {
             if (result && typeof result === "object" && "id" in result) {
               setEvent(String(result.id));
               setEditing(null);
-              setImportedFile(null);
-              setDateOrder("");
-              setPreview(null);
+              setScoringFixture(null);
             }
           }}
         >
@@ -301,22 +265,21 @@ export default function AdminPlacement({ state, run, busy }: Props) {
               onChange={(e) => {
                 setEvent(e.target.value);
                 setEditing(null);
-                setImportedFile(null);
-                setDateOrder("");
-                setPreview(null);
+                setScoringFixture(null);
               }}
             >
               {events.map((e) => (
                 <option key={e._id} value={e._id}>
-                  {e.name} · {e.date} ·{" "}
+                  {e.name} · {e.date} · {e.games.length} resultados ·{" "}
+                  {e.fixtures?.length ?? 0} por jogar ·{" "}
                   {e.status === "APPLIED" ? "aplicado" : "rascunho"}
                 </option>
               ))}
             </select>
           </label>
           <p>
-            {event.teams.length} equipas · {event.games.length} jogos · versão{" "}
-            {event.version}
+            {event.teams.length} equipas · {event.games.length} resultados ·{" "}
+            {event.fixtures?.length ?? 0} por jogar · versão {event.version}
           </p>
           <EventEditor
             key={`${event._id}:${event.version}`}
@@ -343,188 +306,24 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                   onClose={() => setEditing(null)}
                 />
               )}
-              <h3>Importar jogos do Excel</h3>
-              <a
-                className="button"
-                href={`/api/placement-import?eventId=${event._id}`}
-              >
-                Descarregar modelo Excel com equipas
-              </a>
-              <label>
-                Excel ou CSV de jogos
-                <input
-                  type="file"
-                  accept=".xlsx,.csv"
-                  disabled={busy || loading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setImportedFile(file);
-                      setDateOrder("");
-                      void importFile(file, "", "");
-                    }
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              {importedFile && (
-                <label>
-                  Interpretar datas nos sets
-                  <select
-                    value={dateOrder}
-                    disabled={loading}
-                    onChange={(e) => {
-                      setDateOrder(e.target.value);
-                      void importFile(
-                        importedFile,
-                        preview?.sheetName ?? "",
-                        e.target.value,
-                      );
-                    }}
-                  >
-                    <option value="">
-                      Não converter datas automaticamente
-                    </option>
-                    <option value="DAY_MONTH">
-                      Dia–mês · 6 de abril → 6–4
-                    </option>
-                    <option value="MONTH_DAY">
-                      Mês–dia · 6 de abril → 4–6
-                    </option>
-                  </select>
-                </label>
-              )}
-              {loading && <p role="status">A validar ficheiro…</p>}
-              {error && <p role="alert">{error}</p>}
-              {preview && (
-                <div className="inset stack">
-                  <h4>Pré-visualização da importação</h4>
-                  <p>
-                    {preview.allSheets.length} folhas encontradas. Só a folha de
-                    resultados selecionada será importada para esta divisão.
-                  </p>
-                  <label>
-                    Folha de resultados
-                    <select
-                      value={preview.sheetName}
-                      disabled={loading || !importedFile}
-                      onChange={(e) => {
-                        if (importedFile)
-                          void importFile(importedFile, e.target.value);
-                      }}
-                    >
-                      <option value="" disabled>
-                        Seleciona uma folha
-                      </option>
-                      {preview.sheets.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {preview.needsSheetSelection && (
-                    <p role="status">
-                      O documento tem várias folhas de resultados. Escolhe a que
-                      queres importar.
-                    </p>
-                  )}
-                  <p>
-                    {preview.skippedDivision} jogos de outras divisões ignorados
-                    · {preview.skippedUnplayed} jogos sem resultado ignorados.
-                  </p>
-                  {!!preview.convertedDates && (
-                    <p role="status">
-                      {preview.convertedDates} pontuações recuperadas de datas
-                      com a interpretação escolhida. Confirma cada set antes de
-                      guardar.
-                    </p>
-                  )}
-                  <p>
-                    {preview.games.length} jogos novos · {preview.duplicates}{" "}
-                    duplicados ignorados · {preview.errors.length} erros
-                  </p>
-                  {preview.errors.map((e) => (
-                    <p role="alert" key={e.row}>
-                      Linha {e.row}: {e.message}
-                    </p>
-                  ))}
-                  {stale && (
-                    <p role="alert">
-                      O evento foi alterado. Volta a importar o ficheiro.
-                    </p>
-                  )}
-                  <DataRows
-                    data={preview.games}
-                    searchText={(g) =>
-                      `${label(g.teamA)} ${label(g.teamB)} ${g.id}`
-                    }
-                    label="jogos a importar"
-                  >
-                    {(rows) => (
-                      <div className="table-scroll">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Jogo</th>
-                              <th>Equipa A</th>
-                              <th>Equipa B</th>
-                              <th>Resultado por set</th>
-                              <th>Sets</th>
-                              <th>Pontos</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rows.map((g) => (
-                              <tr key={g.id}>
-                                <td>{g.id}</td>
-                                <td>{label(g.teamA)}</td>
-                                <td>{label(g.teamB)}</td>
-                                <td>
-                                  {g.setScores
-                                    ?.map((s, i) => `${i + 1}.º: ${s.a}–${s.b}`)
-                                    .join(" · ") ?? "Apenas totais"}
-                                </td>
-                                <td>
-                                  {g.setsA}–{g.setsB}
-                                </td>
-                                <td>
-                                  {g.pointsA}–{g.pointsB}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </DataRows>
-                  <button
-                    disabled={
-                      busy ||
-                      stale ||
-                      preview.needsSheetSelection ||
-                      !!preview.errors.length ||
-                      !preview.games.length
-                    }
-                    onClick={async () => {
-                      const result = await run(
-                        {
-                          type: "admin.placement.games",
-                          eventId: preview.eventId,
-                          expectedVersion: preview.version,
-                          games: preview.games,
-                        },
-                        "Jogos importados sem alterar o ranking.",
-                      );
-                      if (result) setPreview(null);
-                    }}
-                  >
-                    Confirmar importação dos jogos
-                  </button>
-                </div>
-              )}
             </>
           )}
+          {scoringFixture && editable && (
+            <PlacementGameEditor
+              key={`fixture:${event._id}:${scoringFixture.id}:${editingVersion}`}
+              event={event}
+              fixture={scoringFixture}
+              expectedVersion={editingVersion}
+              run={run}
+              busy={busy}
+              onClose={() => setScoringFixture(null)}
+            />
+          )}
+          <h3>Jogos de colocação</h3>
+          <p>
+            Resultados registados por set. Os jogos por jogar aparecem abaixo e
+            não contam para a classificação até terem resultado.
+          </p>
           <DataRows
             data={event.games}
             searchText={(g) => `${label(g.teamA)} ${label(g.teamB)} ${g.id}`}
@@ -602,6 +401,75 @@ export default function AdminPlacement({ state, run, busy }: Props) {
               </div>
             )}
           </DataRows>
+          {!!event.fixtures?.length && (
+            <DataRows
+              data={event.fixtures}
+              label="jogos por jogar"
+              searchText={(g) => `${g.id} ${label(g.teamA)} ${label(g.teamB)}`}
+            >
+              {(rows) => (
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Jogo</th>
+                        <th>Equipa A</th>
+                        <th>Equipa B</th>
+                        <th>Estado</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((g) => (
+                        <tr key={g.id}>
+                          <td>{g.id}</td>
+                          <td>{label(g.teamA)}</td>
+                          <td>{label(g.teamB)}</td>
+                          <td>Por jogar</td>
+                          <td>
+                            {editable && (
+                              <>
+                                <button
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setScoringFixture(g);
+                                    setEditingVersion(event.version);
+                                  }}
+                                >
+                                  Adicionar resultado
+                                </button>
+                                <button
+                                  disabled={busy}
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        "Remover este jogo por jogar?",
+                                      )
+                                    )
+                                      void run(
+                                        {
+                                          type: "admin.placement.removeFixture",
+                                          eventId: event._id,
+                                          expectedVersion: event.version,
+                                          gameId: g.id,
+                                        },
+                                        "Jogo removido.",
+                                      );
+                                  }}
+                                >
+                                  Remover jogo
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DataRows>
+          )}
         </div>
       )}
       {!!events.length && (

@@ -2,7 +2,7 @@
 
 ## Colocação inicial
 
-Admin → Competição → **Eventos de colocação**. Escolhe época e divisão, cria um ou mais eventos com data e nome, e regista os jogos manualmente ou importa os resultados existentes no Excel. Os participantes são snapshots das equipas aprovadas nessa divisão, incluindo os parceiros. Não são criados novos jogadores nem desafios oficiais pela importação.
+Admin → Competição → **Eventos de colocação**. Escolhe época e divisão, cria um ou mais eventos com data e nome, e regista os resultados por set. Os participantes são snapshots das equipas aprovadas nessa divisão, incluindo os parceiros. Os eventos existentes abrem por defeito no que contém mais jogos; a lista indica resultados e jogos por jogar. Não são criados jogadores nem desafios oficiais por estes registos.
 
 Cada jogo é em melhor de três sets. Introduz as pontuações nas colunas Equipa A / Equipa B, por exemplo 6–4, 3–6, 10–8. Os sets ganhos e o total marcado são calculados a partir desses valores; o terceiro set só é necessário com 1–1. Os registos antigos que só têm totais continuam legíveis. Para corrigir, usa **Editar resultado** na linha do jogo e indica o motivo. As correções guardam antes/depois na auditoria e não alteram automaticamente o ranking. Uma edição concorrente preserva os campos locais e exige reabrir a versão atual. Eventos já aplicados permanecem fechados. A ordenação é:
 
@@ -14,15 +14,11 @@ O significado de pontos é configurável por evento: total marcado (por exemplo,
 
 A aplicação do ranking é uma ação separada, com confirmação. Todas as equipas precisam de pelo menos um jogo. Empates completos precisam de confirmação; as setas só mudam a ordem dentro de um empate. O servidor verifica versões, composição das equipas, posições protegidas, época atual e ausência de desafios/jornadas já criados. Não reescreve um campeonato em curso ou uma colocação já aplicada. Os eventos aplicados ficam fechados, com ordem final, administrador e timestamp. O ranking é alterado por equipa, com posições internas únicas e história para cada jogador; não altera vitórias/derrotas oficiais nem resultados, moedas ou previsões.
 
-## Excel e CSV
+## Jogos por jogar
 
-O novo modelo contém a folha Jogos com Jogo, Equipa A, Equipa B, Set 1, Set 2 e Set 3, mais a folha Equipas com IDs/nomes. Os modelos antigos com totais ainda são aceites. Até 5 MB e 500 linhas por folha de resultados, com pré-visualização e confirmação explícita antes de guardar.
+A tabela **Jogos por jogar** contém os encontros ainda sem resultado. Usa **Adicionar resultado** nessa linha para preencher os sets com as equipas e identificador preservados. Guardar move o encontro para a tabela de resultados na mesma transação. Os encontros pendentes não contam para a classificação. **Atualizar ranking provisório** continua disponível, mas **Aplicar ranking inicial** exige terminar ou remover explicitamente os encontros pendentes.
 
-Documentos completos exportados do Numbers são suportados: os cabeçalhos podem estar nas primeiras 25 linhas depois do título; folhas de resumo/ranking não são importadas. Quando há várias tabelas de resultados, escolhe **Folha de resultados**. A folha Duplas pode fornecer IDs externos e nomes; a associação usa as equipas já existentes no evento, sem criar jogadores. IDs/nomes contraditórios ou ambíguos geram erros. Jogos de outras divisões e jogos sem resultado são contados separadamente e ignorados.
-
-Pontuações convertidas em datas exigem uma escolha explícita em **Interpretar datas nos sets**: dia–mês (6 de abril → 6–4) ou mês–dia (6 de abril → 4–6). Não se infere automaticamente a ordem. A pré-visualização mostra cada set recuperado e quantas células foram convertidas. Totais numéricos literais, quando presentes, têm de coincidir com os sets. Fórmulas de resumo são ignoradas e nunca executadas; fórmulas nos dados efetivamente importados são rejeitadas. Confirma as pontuações antes de guardar.
-
-Duplicados iguais são ignorados. O mesmo ID com resultados diferentes bloqueia a importação: usa a edição auditada para corrigir. Sem ID, a chave deriva das equipas e resultado; para jogos distintos com resultados iguais, usa IDs diferentes. O detalhe de cada set é preservado. Qualquer erro ou versão desatualizada bloqueia a confirmação. Importar/editar altera apenas o evento de colocação; aplicar o ranking continua a ser uma ação separada.
+A opção de importar Excel foi retirada da página dos eventos a pedido da organização. Os jogos já carregados mantêm-se guardados e editáveis. O parser e a API protegida de importação permanecem para compatibilidade e manutenção administrativa, sem controlos de importação na página.
 
 ## Simulador privado
 

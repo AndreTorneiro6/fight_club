@@ -3,7 +3,12 @@ export interface PlacementTeam {
   name: string;
   members: { playerId: string; name: string; position: number }[];
 }
-export interface PlacementGame {
+export interface PlacementFixture {
+  id: string;
+  teamA: string;
+  teamB: string;
+}
+export interface PlacementGame extends PlacementFixture {
   id: string;
   teamA: string;
   teamB: string;
@@ -30,6 +35,7 @@ export interface PlacementEvent {
   rules: PlacementRules;
   teams: PlacementTeam[];
   games: PlacementGame[];
+  fixtures?: PlacementFixture[];
   createdAt: string;
   updatedAt: string;
   previewedAt?: string;

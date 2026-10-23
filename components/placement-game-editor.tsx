@@ -1,10 +1,15 @@
 "use client";
 import { useState } from "react";
-import type { PlacementEvent, PlacementGame } from "@/lib/placement-types";
+import type {
+  PlacementEvent,
+  PlacementGame,
+  PlacementFixture,
+} from "@/lib/placement-types";
 import { validateSetScores } from "@/lib/set-scores";
 export default function PlacementGameEditor({
   event,
   game,
+  fixture,
   run,
   busy,
   onClose,
@@ -12,6 +17,7 @@ export default function PlacementGameEditor({
 }: {
   event: PlacementEvent;
   game?: PlacementGame;
+  fixture?: PlacementFixture;
   run: (cmd: unknown, message?: string) => Promise<unknown>;
   busy: boolean;
   onClose?: () => void;
@@ -35,8 +41,8 @@ export default function PlacementGameEditor({
         const form = e.currentTarget,
           data = new FormData(form);
         try {
-          const teamA = String(data.get("teamA")),
-            teamB = String(data.get("teamB"));
+          const teamA = fixture?.teamA ?? String(data.get("teamA")),
+            teamB = fixture?.teamB ?? String(data.get("teamB"));
           const setScores = [0, 1, 2]
             .filter(
               (i) =>
@@ -62,7 +68,10 @@ export default function PlacementGameEditor({
           );
           const result: PlacementGame = {
             id:
-              game?.id || String(data.get("id")).trim() || crypto.randomUUID(),
+              game?.id ||
+              fixture?.id ||
+              String(data.get("id")).trim() ||
+              crypto.randomUUID(),
             teamA,
             teamB,
             setScores,
@@ -116,16 +125,21 @@ export default function PlacementGameEditor({
         <input
           name="id"
           maxLength={150}
-          defaultValue={game?.id ?? ""}
-          readOnly={!!game}
-          placeholder="Opcional · ID do Excel"
+          defaultValue={game?.id ?? fixture?.id ?? ""}
+          readOnly={!!game || !!fixture}
+          placeholder="Opcional"
         />
       </label>
       <div className="form-grid">
         {(["teamA", "teamB"] as const).map((key, i) => (
           <label key={key}>
             Equipa {i ? "B" : "A"}
-            <select name={key} required defaultValue={game?.[key] ?? ""}>
+            <select
+              name={key}
+              required
+              defaultValue={game?.[key] ?? fixture?.[key] ?? ""}
+              disabled={!!fixture}
+            >
               <option value="">Seleciona</option>
               {event.teams.map((t) => (
                 <option key={t.id} value={t.id}>

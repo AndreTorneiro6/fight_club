@@ -5,7 +5,7 @@ const ExcelJS = createRequire(import.meta.url)(
 ) as typeof import("exceljs");
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 
-test("admin previews placement Excel without ranking writes and runs a private challenge simulation", async ({
+test("admin sees placement games without Excel controls and runs a private challenge simulation", async ({
   page,
 }) => {
   await page.goto("/auth");
@@ -80,33 +80,35 @@ test("admin previews placement Excel without ranking writes and runs a private c
     `/api/placement-import?eventId=${event._id}`,
   );
   expect(template.ok()).toBe(true);
-  await area
-    .getByLabel("Excel ou CSV de jogos", { exact: true })
-    .setInputFiles({
-      name: "jogos.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer,
-    });
   await expect(
-    area.getByRole("heading", { name: "Pré-visualização da importação" }),
-  ).toBeVisible();
-  await expect(
-    area.getByText(/1 duplicados ignorados · 0 erros/),
-  ).toBeVisible();
-  expect(
-    (await (await page.request.get("/api/league")).json()).placementEvents[0]
-      .games,
-  ).toHaveLength(0);
-  await area
-    .getByRole("button", {
-      name: "Confirmar importação dos jogos",
-      exact: true,
-    })
-    .click();
-  await expect(
-    area.getByRole("heading", { name: "Pré-visualização da importação" }),
+    area.getByText("Importar jogos do Excel", { exact: true }),
   ).toHaveCount(0);
+  const previewResponse = await page.request.post("/api/placement-import", {
+    headers: { Origin: new URL(page.url()).origin },
+    multipart: {
+      eventId: event._id,
+      file: {
+        name: "jogos.xlsx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        buffer,
+      },
+    },
+  });
+  expect(previewResponse.ok(), await previewResponse.text()).toBe(true);
+  const preview = await previewResponse.json();
+  expect(preview.duplicates).toBe(1);
+  const savedResponse = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.placement.games",
+      eventId: event._id,
+      expectedVersion: event.version,
+      games: preview.games,
+    },
+  });
+  expect(savedResponse.ok(), await savedResponse.text()).toBe(true);
+  await expect(area.getByText("e2e-0", { exact: true })).toBeVisible();
   const imported = await (await page.request.get("/api/league")).json();
   expect(imported.placementEvents[0].games.length).toBeGreaterThan(0);
   expect(
@@ -163,7 +165,7 @@ test("admin previews placement Excel without ranking writes and runs a private c
   ).toBe(403);
 });
 
-test("admin adds and edits individual sets, then imports a multi-sheet Numbers workbook with explicit date recovery", async ({
+test("admin edits individual sets, scores pending games and updates provisional ranking", async ({
   page,
 }) => {
   await page.goto("/auth");
@@ -334,38 +336,85 @@ test("admin adds and edits individual sets, then imports a multi-sheet Numbers w
   teams.addRow(["ID", "Divisão", "Dupla"]);
   teams.addRow(["O01", "Ouro", a.name]);
   teams.addRow(["O02", "Ouro", b.name]);
-  await area
-    .getByLabel("Excel ou CSV de jogos", { exact: true })
-    .setInputFiles({
-      name: "completo.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: Buffer.from(await book.xlsx.writeBuffer()),
-    });
-  await expect(area.getByText(/Set 1 foi convertido numa data/)).toBeVisible();
-  await area
-    .getByRole("combobox", { name: "Interpretar datas nos sets", exact: true })
-    .selectOption("DAY_MONTH");
+  const workbook = Buffer.from(await book.xlsx.writeBuffer());
+  const imported = await page.request.post("/api/placement-import", {
+    headers: { Origin: new URL(page.url()).origin },
+    multipart: {
+      eventId: event._id,
+      dateOrder: "DAY_MONTH",
+      file: {
+        name: "completo.xlsx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        buffer: workbook,
+      },
+    },
+  });
+  expect(imported.ok(), await imported.text()).toBe(true);
+  const preview = await imported.json();
+  expect(preview.convertedDates).toBe(1);
+  let latest = (await read()).placementEvents.find(
+    (e: { _id: string }) => e._id === event._id,
+  );
+  const savedImport = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.placement.games",
+      eventId: event._id,
+      expectedVersion: latest.version,
+      games: preview.games,
+    },
+  });
+  expect(savedImport.ok(), await savedImport.text()).toBe(true);
+  latest = (await read()).placementEvents.find(
+    (e: { _id: string }) => e._id === event._id,
+  );
+  const pending = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.placement.fixtures",
+      eventId: event._id,
+      expectedVersion: latest.version,
+      fixtures: [{ id: "pending-browser", teamA: a.id, teamB: b.id }],
+    },
+  });
+  expect(pending.ok(), await pending.text()).toBe(true);
+  const pendingRow = area
+    .getByRole("row")
+    .filter({ hasText: "pending-browser" });
   await expect(
-    area.getByText(/1 pontuações recuperadas de datas/),
+    pendingRow.getByText("Por jogar", { exact: true }),
   ).toBeVisible();
-  await expect(
-    area.getByRole("combobox", { name: "Folha de resultados", exact: true }),
-  ).toHaveValue("Evento Colocação");
-  await area
-    .getByRole("button", {
-      name: "Confirmar importação dos jogos",
+  await pendingRow
+    .getByRole("button", { name: "Adicionar resultado", exact: true })
+    .click();
+  const score = area
+    .getByRole("form", {
+      name: "Adicionar resultado de colocação",
       exact: true,
     })
+    .filter({ has: page.locator('input[value="pending-browser"]') });
+  for (const [name, value] of [
+    ["1.º set Equipa A", "6"],
+    ["1.º set Equipa B", "2"],
+    ["2.º set Equipa A", "6"],
+    ["2.º set Equipa B", "3"],
+  ])
+    await score.getByRole("spinbutton", { name, exact: true }).fill(value);
+  await score
+    .getByRole("button", { name: "Adicionar jogo", exact: true })
     .click();
   await expect(
-    area.getByRole("heading", { name: "Pré-visualização da importação" }),
-  ).toHaveCount(0);
+    area.getByText("1.º: 6–2 · 2.º: 6–3", { exact: true }),
+  ).toBeVisible();
+  await expect(pendingRow.getByText("Por jogar", { exact: true })).toHaveCount(
+    0,
+  );
   s = await read();
   const saved = s.placementEvents.find(
     (e: { _id: string }) => e._id === event._id,
   );
-  expect(saved.games).toHaveLength(2);
+  expect(saved.games).toHaveLength(3);
   expect(
     saved.games.find((g: { id: string }) => g.id === "excel-per-set").setScores,
   ).toEqual([
@@ -398,5 +447,5 @@ test("admin adds and edits individual sets, then imports a multi-sheet Numbers w
     );
   expect(draft.status).toBe("DRAFT");
   expect(draft.previewedAt).toBeTruthy();
-  expect(draft.games).toHaveLength(2);
+  expect(draft.games).toHaveLength(3);
 });
