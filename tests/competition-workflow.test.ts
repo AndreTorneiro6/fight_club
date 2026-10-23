@@ -475,7 +475,7 @@ test("approved absence yields a feasible partial round without forfeits or ranki
   assert.equal(s.results.length, 0);
 });
 
-test("official results hold snapshots until deterministic direct-swap settlement", () => {
+test("official results immediately update ranking while published snapshots stay unchanged", () => {
   const s = fixture(),
     r = round(s),
     accepted = challenge(s, r, 3, 1);
@@ -509,8 +509,13 @@ test("official results hold snapshots until deterministic direct-swap settlement
     );
     assert.deepEqual(
       competitionTeams(s, "ouro").map((t) => t.id),
+      expected,
+    );
+    assert.deepEqual(
+      q.snapshot.map((t) => t.id),
       before,
     );
+    assert.equal(r.settledAt, undefined);
   }
   command(
     s,
@@ -1685,4 +1690,403 @@ test("open attack priority advances past a challenger whose accepted defense occ
     actor(1),
   );
   assert.equal(available.status, "ACCEPTED");
+});
+
+function acceptedTimedChallenge(
+  s: State,
+  r: CompetitionRound,
+  attacker: number,
+  defender: number,
+  start = iso(2, 1),
+) {
+  if (!s.courts.length)
+    s.courts.push({ _id: "court-a", name: "Campo A", active: true });
+  const c = challenge(s, r, attacker, defender);
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(defender),
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.time.propose",
+      challengeId: c._id,
+      expectedVersion: 0,
+      start,
+    },
+    actor(attacker),
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.time.respond",
+      challengeId: c._id,
+      expectedVersion: c.timeVersion,
+      accept: true,
+    },
+    actor(defender),
+  );
+  return c;
+}
+function approveTime(
+  s: State,
+  c: NonNullable<State["competitionChallenges"]>[number],
+  at = time,
+) {
+  return command(
+    s,
+    {
+      type: "competition.challenge.time.decide",
+      challengeId: c._id,
+      expectedVersion: c.timeVersion,
+      accept: true,
+      courtId: "court-a",
+    },
+    admin,
+    at,
+  );
+}
+
+test("admins see pending acceptance and confirmed time; approval publishes only the chosen game and notifies both teams once", () => {
+  const s = fixture(),
+    r = round(s),
+    c = acceptedTimedChallenge(s, r, 3, 1);
+  const other = challenge(s, r, 6, 5);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: other._id,
+      accept: true,
+    },
+    actor(5),
+  );
+  assert.equal(s.challenges.length, 0);
+  assert.ok(
+    s.notifications.some(
+      (n) =>
+        n.playerId === "__admins__" &&
+        n.title.includes("aguarda aceitação") &&
+        n.body.includes("Ouro 3") &&
+        n.body.includes("Ouro 1"),
+    ),
+  );
+  assert.ok(
+    s.notifications.some(
+      (n) =>
+        n.playerId === "__admins__" &&
+        n.title.includes("decisão administrativa pendente"),
+    ),
+  );
+  const draft = generate(s, r);
+  approveTime(s, c);
+  assert.equal(c.status, "SCHEDULED");
+  assert.equal(other.status, "ACCEPTED");
+  assert.equal(s.challenges.length, 1);
+  assert.equal(s.matches.length, 1);
+  const game = s.challenges[0],
+    q = s.competitionSchedules!.find((q) => q.status === "PUBLISHED")!;
+  assert.equal(q.pairs.length, 1);
+  assert.equal(q.approvedBy, admin.userId);
+  assert.ok(q.approvedAt && q.publishedAt);
+  assert.equal(game.scheduledAt, iso(2, 1));
+  assert.equal(game.courtId, "court-a");
+  assert.ok(game.officialPublication);
+  for (const id of ["ouro-3", "ouro-1"]) {
+    const notices = s.notifications.filter(
+      (n) => n.playerId === id && n.dedupe?.startsWith("publication:"),
+    );
+    assert.equal(notices.length, 1);
+    assert.match(notices[0].title, /Jogo marcado/);
+    assert.match(notices[0].body, /Ouro 3 × Ouro 1/);
+    assert.match(notices[0].body, /Campo A/);
+    assert.equal(notices[0].challengeId, game._id);
+  }
+  assert.equal(
+    s.notifications.filter(
+      (n) => n.playerId === "ouro-6" && n.dedupe?.startsWith("publication:"),
+    ).length,
+    0,
+  );
+  assert.throws(() => approveTime(s, c), /aceite|publicado/);
+  assert.equal(s.challenges.length, 1);
+  assert.throws(
+    () => scheduleCommand(s, draft, "competition.approve"),
+    /recente|Horário/,
+  );
+});
+
+test("time confirmations require participant permissions, both teams, valid versions and an explicit admin court decision", () => {
+  const s = fixture(),
+    r = round(s),
+    c = challenge(s, r, 3, 1);
+  s.courts = [{ _id: "court-a", name: "Campo A", active: true }];
+  command(
+    s,
+    { type: "competition.challenge.respond", challengeId: c._id, accept: true },
+    actor(1),
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.time.propose",
+          challengeId: c._id,
+          expectedVersion: 0,
+          start: iso(2, 1),
+        },
+        actor(5),
+      ),
+    /duplas/,
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.time.propose",
+      challengeId: c._id,
+      expectedVersion: 0,
+      start: iso(2, 1),
+    },
+    actor(3),
+  );
+  assert.throws(() => approveTime(s, c), /duas duplas/);
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.time.respond",
+          challengeId: c._id,
+          expectedVersion: c.timeVersion,
+          accept: true,
+        },
+        actor(3),
+      ),
+    /já confirmou/,
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.time.respond",
+          challengeId: c._id,
+          expectedVersion: 42,
+          accept: true,
+        },
+        actor(1),
+      ),
+    /alterou/,
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.time.respond",
+      challengeId: c._id,
+      expectedVersion: c.timeVersion,
+      accept: true,
+    },
+    actor(1),
+  );
+  assert.throws(
+    () =>
+      command(
+        s,
+        {
+          type: "competition.challenge.time.decide",
+          challengeId: c._id,
+          expectedVersion: c.timeVersion,
+          accept: true,
+          courtId: "court-a",
+        },
+        actor(3),
+      ),
+    /administrador|permiss/,
+  );
+  assert.throws(
+    () =>
+      command(s, {
+        type: "competition.challenge.time.decide",
+        challengeId: c._id,
+        expectedVersion: c.timeVersion,
+        accept: true,
+      }),
+    /campo/,
+  );
+  assert.equal(s.challenges.length, 0);
+});
+
+test("rejecting a time proposal preserves the accepted challenge without a forfeit; replacing a time resets confirmations", () => {
+  const s = fixture(),
+    r = round(s),
+    c = acceptedTimedChallenge(s, r, 3, 1);
+  command(s, {
+    type: "competition.challenge.time.decide",
+    challengeId: c._id,
+    expectedVersion: c.timeVersion,
+    accept: false,
+    reason: "Campo indisponível",
+  });
+  assert.equal(c.status, "ACCEPTED");
+  assert.equal(c.timeProposal?.status, "REJECTED");
+  assert.equal(s.results.length, 0);
+  command(
+    s,
+    {
+      type: "competition.challenge.time.propose",
+      challengeId: c._id,
+      expectedVersion: c.timeVersion,
+      start: iso(2, 3),
+    },
+    actor(1),
+  );
+  assert.equal(c.timeProposal?.attackerConfirmed, false);
+  assert.equal(c.timeProposal?.defenderConfirmed, true);
+  assert.throws(() => approveTime(s, c), /duas duplas/);
+  command(
+    s,
+    {
+      type: "competition.challenge.time.respond",
+      challengeId: c._id,
+      expectedVersion: c.timeVersion,
+      accept: false,
+      reason: "Não conseguimos a essa hora",
+    },
+    actor(3),
+  );
+  assert.equal(c.timeProposal?.status, "REJECTED");
+  assert.equal(s.results.length, 0);
+});
+
+test("individual publications preserve previous games and ranking snapshots after immediate result updates", () => {
+  const s = fixture(),
+    r = round(s),
+    first = acceptedTimedChallenge(s, r, 3, 1),
+    second = acceptedTimedChallenge(s, r, 6, 5, iso(4));
+  approveTime(s, first);
+  const original = s.challenges[0],
+    before = structuredClone(
+      s.competitionSchedules!.find((q) => q.status === "PUBLISHED")!,
+    );
+  command(
+    s,
+    {
+      type: "admin.result.record",
+      challengeId: original._id,
+      winnerId: original.challengerId,
+      score: "6-2 6-3",
+    },
+    admin,
+    time + 3 * 86400000,
+  );
+  assert.equal(competitionTeams(s, "ouro")[0].id, "ouro-3");
+  assert.equal(r.settledAt, undefined);
+  approveTime(s, second, time + 3 * 86400000);
+  const published = s
+    .competitionSchedules!.filter((q) => q.status === "PUBLISHED")
+    .sort((a, b) => a.revision - b.revision);
+  assert.equal(published.length, 2);
+  assert.deepEqual(published[0], before);
+  assert.equal(published[1].snapshot[0].id, "ouro-1");
+  assert.equal(published[1].pairs.length, 2);
+  assert.equal(s.challenges.length, 2);
+  assert.equal(original.status, "completed");
+  assert.equal(
+    s.notifications.filter(
+      (n) => n.playerId === "ouro-3" && n.dedupe?.startsWith("publication:"),
+    ).length,
+    1,
+  );
+  assert.equal(
+    s.notifications.filter(
+      (n) => n.playerId === "ouro-6" && n.dedupe?.startsWith("publication:"),
+    ).length,
+    1,
+  );
+});
+
+test("second accepted team can still propose a time after another game has been published; overlapping court is blocked", () => {
+  const s = fixture(),
+    r = round(s),
+    first = acceptedTimedChallenge(s, r, 3, 1);
+  const second = challenge(s, r, 6, 5);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: second._id,
+      accept: true,
+    },
+    actor(5),
+  );
+  approveTime(s, first);
+  command(
+    s,
+    {
+      type: "competition.challenge.time.propose",
+      challengeId: second._id,
+      expectedVersion: 0,
+      start: iso(2, 1),
+    },
+    actor(6),
+  );
+  command(
+    s,
+    {
+      type: "competition.challenge.time.respond",
+      challengeId: second._id,
+      expectedVersion: second.timeVersion,
+      accept: true,
+    },
+    actor(5),
+  );
+  assert.throws(() => approveTime(s, second), /ocupado|sobrepost/);
+  assert.equal(second.timeProposal?.status, "AWAITING_ADMIN");
+  assert.equal(s.challenges.length, 1);
+});
+
+test("publishing one approved game leaves unrelated teams able to initiate and accept challenges", () => {
+  const s = fixture(),
+    r = round(s),
+    first = acceptedTimedChallenge(s, r, 3, 1);
+  approveTime(s, first);
+  const second = challenge(s, r, 6, 5);
+  command(
+    s,
+    {
+      type: "competition.challenge.respond",
+      challengeId: second._id,
+      accept: true,
+    },
+    actor(5),
+  );
+  assert.equal(second.status, "ACCEPTED");
+  assert.equal(first.status, "SCHEDULED");
+  assert.equal(s.challenges.length, 1);
+});
+
+test("publication notifies every member of both teams and blocks changed live roster status despite a frozen round snapshot", () => {
+  const s = fixture();
+  const a = s.players.find((p) => p._id === "ouro-3")!,
+    b = s.players.find((p) => p._id === "ouro-4")!;
+  a.partnerId = b._id;
+  b.partnerId = a._id;
+  a.partner = b.name;
+  b.partner = a.name;
+  const r = round(s),
+    c = acceptedTimedChallenge(s, r, 3, 1);
+  b.status = "inactive";
+  assert.throws(() => approveTime(s, c), /estado|composição/);
+  b.status = "active";
+  approveTime(s, c);
+  for (const id of ["ouro-3", "ouro-4", "ouro-1"]) {
+    const notices = s.notifications.filter(
+      (n) => n.playerId === id && n.dedupe?.startsWith("publication:"),
+    );
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].kind, "schedule");
+    assert.deepEqual(notices[0].deliveryChannels, ["push"]);
+  }
 });

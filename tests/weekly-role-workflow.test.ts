@@ -401,3 +401,82 @@ test("starting a season announces once to active approved players and resumes ne
     2,
   );
 });
+
+test("Sunday ranking publication announces the current ranking once with a saved snapshot and push only", async () => {
+  const { autoWeeklyRanking } = await import("../lib/weekly-ranking");
+  const { deliveryContent } = await import("../lib/notification-delivery");
+  const s = fixture(),
+    before = structuredClone(s.players);
+  autoWeeklyRanking(s, Date.parse("2026-10-24T20:00:00Z"));
+  autoWeeklyRanking(s, Date.parse("2026-10-25T19:59:59Z"));
+  assert.equal(s.notifications.length, 0);
+  autoWeeklyRanking(s, Date.parse("2026-10-25T20:00:00Z"));
+  assert.equal(s.notifications.length, 4);
+  assert.deepEqual(s.players, before);
+  assert.equal(
+    s.audit.filter((a) => a.action === "ranking.weekly.published").length,
+    1,
+  );
+  assert.equal(JSON.parse(s.audit.at(-1)!.details).snapshot[0].teams.length, 4);
+  for (const n of s.notifications) {
+    assert.equal(n.kind, "result");
+    assert.deepEqual(n.deliveryChannels, ["push"]);
+    assert.equal(deliveryContent(n).path, "/ranking");
+  }
+  autoWeeklyRanking(s, Date.parse("2026-10-25T20:30:00Z"));
+  assert.equal(s.notifications.length, 4);
+  execute(
+    s,
+    admin,
+    { type: "admin.ranking.publishWeekly", seasonId: "season" },
+    Date.parse("2026-10-25T21:00:00Z"),
+  );
+  assert.equal(s.notifications.length, 4);
+  autoWeeklyRanking(s, Date.parse("2026-11-01T20:00:00Z"));
+  assert.equal(s.notifications.length, 8);
+});
+
+test("weekly ranking notices respect Lisbon summer time, configuration, season state and administrator permissions", async () => {
+  const { autoWeeklyRanking } = await import("../lib/weekly-ranking");
+  const s = fixture();
+  s.seasons[0].start = "2026-07-01";
+  s.seasons[0].end = "2026-12-31";
+  s.players[3].awaitingApproval = true;
+  autoWeeklyRanking(s, Date.parse("2026-07-05T18:59:00Z"));
+  assert.equal(s.notifications.length, 0);
+  autoWeeklyRanking(s, Date.parse("2026-07-05T19:00:00Z"));
+  assert.equal(s.notifications.length, 3);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...admin, role: "player" },
+        { type: "admin.ranking.publishWeekly", seasonId: "season" },
+        now,
+      ),
+    /administrador|permiss/i,
+  );
+  const paused = fixture();
+  paused.seasons[0].status = "paused";
+  autoWeeklyRanking(paused, Date.parse("2026-10-25T20:00:00Z"));
+  assert.equal(paused.notifications.length, 0);
+  assert.throws(
+    () =>
+      execute(
+        paused,
+        admin,
+        { type: "admin.ranking.publishWeekly", seasonId: "season" },
+        now,
+      ),
+    /ativa/,
+  );
+  const disabled = fixture();
+  disabled.settings[0].autoWeeklyRanking = false;
+  autoWeeklyRanking(disabled, Date.parse("2026-10-25T20:00:00Z"));
+  assert.equal(disabled.notifications.length, 0);
+  disabled.settings[0].autoWeeklyRanking = true;
+  disabled.settings[0].weeklyRankingDay = 6;
+  disabled.settings[0].weeklyRankingHour = 18;
+  autoWeeklyRanking(disabled, Date.parse("2026-10-24T18:00:00Z"));
+  assert.equal(disabled.notifications.length, 4);
+});

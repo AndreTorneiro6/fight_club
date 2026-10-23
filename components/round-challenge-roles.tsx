@@ -1,4 +1,5 @@
 "use client";
+import ChallengeTimeProposal from "./challenge-time-proposal";
 import { sameRoles } from "@/lib/role-proposals";
 import { useState } from "react";
 import type { View } from "@/lib/types";
@@ -291,7 +292,7 @@ export function PlayerRoundChallenges({ s, round: r, run, busy }: Props) {
       ?.members.map((m) => m.name)
       .join(" + ") ?? id;
   const published = (s.competitionSchedules ?? []).some(
-    (q) => q.roundId === r._id && q.status === "PUBLISHED",
+    (q) => q.roundId === r._id && q.status === "PUBLISHED" && !q.incremental,
   );
   const attack =
     !!r.rolesPublishedAt &&
@@ -473,6 +474,14 @@ export function PlayerRoundChallenges({ s, round: r, run, busy }: Props) {
             {c.responseNote && (
               <p>Resposta / proposta de horário: {c.responseNote}</p>
             )}
+            <ChallengeTimeProposal
+              key={`${c._id}:${c.timeVersion ?? 0}`}
+              s={s}
+              round={r}
+              challenge={c}
+              run={run}
+              busy={busy}
+            />
             {c.defenderId === own?.id &&
               c.status === "PENDING" &&
               !published &&

@@ -32,3 +32,20 @@ O aviso abre **Épocas** e não afirma que os desafios já estão abertos: os pa
 As notificações distinguem início da época, novos desafios, aceitação, marcações, resultados, papéis, lembretes e outras atualizações. A app mostra um ícone e descrição próprios para o evento; o push inclui título, mensagem, ícone e badge correspondentes, com ligação para a página relevante. As mensagens de desafios incluem o confronto quando existe. O sistema operativo pode determinar a apresentação final das notificações do telemóvel.
 
 Os ícones são desenhos gerados por código, sem fotografias de jogadores ou recursos externos. Para regenerar os PNGs: `python3 scripts/notification-icons.py` (usa Pillow, já usado no processamento local de fotografias). O service worker mantém apenas recursos públicos na cache; notificações, dados de jogadores e respostas da API não são colocados na cache offline.
+
+## Desafios, horários e decisão final do clube
+
+O painel **Competição e jornadas** mostra o desafio desde a submissão: duplas, estado de aceitação/recusa, prazo de resposta, prioridade, histórico e estado da marcação. Ambos os administradores recebem avisos de novo desafio, aceitação/recusa e horário acordado; um desafio aceite pelos jogadores continua privado até à decisão do clube.
+
+1. Uma dupla propõe data/hora no desafio aceite, com campo preferido opcional. A proposta já confirma a disponibilidade dessa dupla.
+2. A outra dupla confirma ou recusa com motivo. Não há derrota automática por recusar um horário. Uma nova proposta reinicia as confirmações.
+3. Com ambas as confirmações, o administrador escolhe o campo e usa **APROVAR E PUBLICAR JOGO**. Esta decisão valida, aprova e publica exatamente esse jogo na mesma transação. Os jogos anteriormente publicados ficam preservados; os restantes desafios continuam pendentes e as duplas ainda livres podem continuar a desafiar dentro do prazo.
+4. As duas duplas recebem uma notificação **Jogo marcado pelo clube**, com adversários, dia, hora e campo e ligação ao jogo. Não há jogo nem aviso duplicado ao repetir o pedido.
+
+O servidor bloqueia horários fora da jornada, campos ocupados, ausências, compromissos incompatíveis, ações de terceiros, versões desatualizadas e aprovação sem confirmação de ambas as duplas. A publicação guarda versão, administrador e datas de aprovação/publicação. Propostas coletivas do algoritmo continuam privadas e exigem aprovação e publicação explícitas. Alterações posteriores a jogos oficiais seguem a revisão auditada existente; resultados concluídos não podem ser alterados por uma revisão do calendário.
+
+## Resultados e ranking semanal
+
+Cada resultado **confirmado oficialmente** atualiza logo o ranking por troca direta se o atacante vencer; uma vitória do defensor mantém as posições. Resultados ainda pendentes/contestados não alteram o ranking. Os jogos já publicados mantêm as posições e regras do snapshot da jornada. Nos jogos de recuperação com duplas repetidas, os resultados confirmados são recalculados por ordem de horário e ID, independentemente da ordem de introdução. Fechar/liquidar a jornada conserva o mesmo resultado, sem repetir trocas.
+
+O resumo do ranking semanal é publicado automaticamente **ao domingo às 20h, hora de Portugal**, apenas em épocas ativas. Guarda um snapshot no registo de atividade e notifica os jogadores ativos/aprovados na app e por push. Este resumo apresenta o ranking dos resultados já confirmados, sem inventar resultados nem alterar posições por calendário. **Regras** permite alterar o dia (0 = domingo), hora e ativar/desativar o automatismo. **Admin → Ranking → PUBLICAR RANKING SEMANAL E NOTIFICAR** permite antecipar o resumo. O envio é deduplicado por época/semana/jogador, incluindo quando a publicação manual antecede o automatismo. A publicação dos papéis semanais também notifica as respetivas duplas.

@@ -3,6 +3,7 @@ import RankingExport from "./ranking-export";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Snowflake } from "lucide-react";
 import { rankingEntries, teamRecord } from "@/lib/ranking-groups";
+import { clubWeek } from "@/lib/calendar";
 import { frozenRanking } from "@/lib/weekly";
 import type { View } from "@/lib/types";
 
@@ -24,6 +25,8 @@ export default function AdminTeamRanking({
     [over, setOver] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const entries = rankingEntries(s.players, division);
+  const season = s.seasons.find((season) => season.status === "active"),
+    published = season?.weeklyRankingPublication;
   async function move(playerId: string, targetPlayerId: string) {
     setDragging(null);
     setOver(null);
@@ -40,6 +43,39 @@ export default function AdminTeamRanking({
           Arrasta uma equipa para a posição pretendida. Os botões de subir e
           descer também funcionam no telemóvel.
         </p>
+      </div>
+      <div className="inset stack">
+        <h3>Publicação do ranking semanal</h3>
+        <p>
+          O ranking atualiza-se após cada resultado confirmado. O resumo semanal
+          é publicado ao domingo, às {s.settings[0].weeklyRankingHour ?? 20}h,
+          por defeito. Podes ajustar o dia, hora e envio automático em Regras.
+        </p>
+        {published && (
+          <small>
+            Última publicação:{" "}
+            {new Date(published.publishedAt).toLocaleString("pt-PT", {
+              timeZone: "Europe/Lisbon",
+            })}
+          </small>
+        )}
+        <button
+          disabled={
+            busy ||
+            !season ||
+            published?.weekStart === clubWeek(Date.now()).start
+          }
+          onClick={() =>
+            season &&
+            void run(
+              { type: "admin.ranking.publishWeekly", seasonId: season._id },
+              "Ranking semanal publicado e jogadores notificados.",
+            )
+          }
+        >
+          PUBLICAR RANKING SEMANAL E NOTIFICAR
+        </button>
+        {!season && <small>Disponível quando a época estiver ativa.</small>}
       </div>
       <label>
         Categoria do ranking

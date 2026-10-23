@@ -183,6 +183,82 @@ test("published roles gate player challenges and accepted challenges stay privat
           n.title === "Novo desafio" && n.playerId === "player-5",
       ),
     ).toBe(true);
+    expect(
+      final.notifications.some(
+        (n: { playerId: string; title: string }) =>
+          n.playerId === "__admins__" && n.title.includes("aguarda aceitação"),
+      ),
+    ).toBe(true);
+    await attacker.reload();
+    const timeForm = attacker.getByRole("form", {
+      name: "Propor horário do jogo",
+    });
+    await timeForm
+      .getByRole("button", { name: "ENVIAR PROPOSTA DE HORÁRIO", exact: true })
+      .click();
+    await expect(
+      attacker.getByText(
+        "Horário proposto — aguarda confirmação da outra dupla",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await defender.reload();
+    await defender
+      .getByRole("button", { name: "CONFIRMAR HORÁRIO", exact: true })
+      .click();
+    await expect(
+      defender.getByText(
+        "As duas duplas confirmaram o horário — aguarda decisão administrativa",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(
+      (await (await page.request.get("/api/league")).json()).challenges,
+    ).toEqual(initial.challenges);
+    await page.goto("/admin?tab=matchmaking");
+    const court = final.courts.find((c: { active: boolean }) => c.active);
+    await page
+      .getByRole("combobox", { name: "Campo para a marcação", exact: true })
+      .selectOption(court._id);
+    await page
+      .getByRole("button", { name: "APROVAR E PUBLICAR JOGO", exact: true })
+      .click();
+    await expect(
+      page.getByText("Jogo aprovado e publicado pelo clube", { exact: true }),
+    ).toBeVisible();
+    const published = await (await page.request.get("/api/league")).json(),
+      game = published.challenges.find(
+        (c: { competitionRoundId: string }) =>
+          c.competitionRoundId === round._id,
+      );
+    expect(game.status).toBe("scheduled");
+    expect(game.courtId).toBe(court._id);
+    expect(game.officialPublication).toBeTruthy();
+    expect(
+      published.matches.some(
+        (m: { challengeId: string }) => m.challengeId === game._id,
+      ),
+    ).toBe(true);
+    for (const recipient of [attacker, defender]) {
+      await recipient.reload();
+      await expect(
+        recipient.getByText("Jogo aprovado e publicado pelo clube", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      const view = await (await recipient.request.get("/api/league")).json();
+      const notices = view.notifications.filter(
+        (n: { title: string }) => n.title === "Jogo marcado pelo clube",
+      );
+      expect(notices).toHaveLength(1);
+      expect(notices[0].body).toContain(court.name);
+      expect(notices[0].challengeId).toBe(game._id);
+      expect(
+        view.competitionSchedules.every(
+          (q: { status: string }) => q.status === "PUBLISHED",
+        ),
+      ).toBe(true);
+    }
   } finally {
     await attackerContext.close();
     await defenderContext.close();
@@ -320,12 +396,22 @@ test("administrator records two separate set scores on an officially published m
     { attacker: 6, defender: 3 },
   ]);
   expect(result.score).toBe("6-4, 6-3");
+  const attackerPosition = ranking.find(
+      ([id]: [string, number]) => id === c.challengerId,
+    )![1],
+    defenderPosition = ranking.find(
+      ([id]: [string, number]) => id === c.defenderId,
+    )![1];
   expect(
-    s.players.map((p: { _id: string; position: number }) => [
-      p._id,
-      p.position,
-    ]),
-  ).toEqual(ranking);
+    s.players.find((p: { _id: string }) => p._id === c.challengerId).position,
+  ).toBe(defenderPosition);
+  expect(
+    s.players.find((p: { _id: string }) => p._id === c.defenderId).position,
+  ).toBe(attackerPosition);
+  expect(
+    s.competitionSchedules.find((p: { _id: string }) => p._id === q._id)
+      .snapshot,
+  ).toEqual(q.snapshot);
 });
 
 test("first round proposes Open Attack privately, requires approval and preserves published role history", async ({

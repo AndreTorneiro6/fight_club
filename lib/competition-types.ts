@@ -87,6 +87,9 @@ export interface CompetitionPair {
   challengeId?: string;
 }
 export interface CompetitionSchedule {
+  /** Incremental, explicitly approved individual match publication. */
+  incremental?: boolean;
+  supersededBy?: string;
   _id: string;
   roundId: string;
   version: number;
@@ -133,7 +136,23 @@ export interface CompetitionRecovery {
   approvedBy: string;
   approvedAt: string;
 }
+export interface ChallengeTimeProposal {
+  id: string;
+  version: number;
+  start: string;
+  minutes: number;
+  courtId?: string;
+  proposedByTeamId: string;
+  attackerConfirmed: boolean;
+  defenderConfirmed: boolean;
+  status: "PENDING_TEAMS" | "AWAITING_ADMIN" | "APPROVED" | "REJECTED";
+  decidedAt?: string;
+  decidedBy?: string;
+  reason?: string;
+}
 export interface CompetitionChallenge {
+  timeVersion?: number;
+  timeProposal?: ChallengeTimeProposal;
   _id: string;
   roundId: string;
   attackerId: string;
