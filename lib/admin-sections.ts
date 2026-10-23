@@ -27,7 +27,6 @@ export const adminGroups = [
       ["coins", "Moedas e bar"],
       ["gamification", "Gamificação"],
       ["sponsors", "Patrocínios"],
-      ["assistant", "Assistente"],
       ["engagement", "Cartões e palpites"],
       ["album", "Caderneta"],
       ["rules", "Regras"],

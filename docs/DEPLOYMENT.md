@@ -31,7 +31,7 @@ The runner is named `fight-club-rpi` with label `fight-club-production`, scoped 
 
 - Only push/manual runs of `refs/heads/deploy` can reach the Pi job; PR checks use hosted machines. Workflow actions are pinned by commit hash and checkout does not persist Git credentials.
 - The runner uses Docker already installed on the Pi. Builds use the isolated checked-out revision, not the live directory containing production environment/data. The script verifies the branch, SHA and clean tracked source before building.
-- Deployments are serialized in GitHub and with a host lock. MongoDB is backed up before replacing app/worker. MongoDB, backup, Ollama and Traefik containers are left running.
+- Deployments are serialized in GitHub and with a host lock. MongoDB is backed up before replacing app/worker. MongoDB, backup and Traefik containers are left running. The retired Ollama service has been removed.
 - New app health and worker state/restart count must pass. Failures or interrupted updates restore the previous image, environment and deployment markers. Database recovery is deliberately operator-controlled; deployment never rewrites league data.
 - Success updates only `FIGHT_CLUB_APP_IMAGE` in the existing `.env.production`, preserving every other setting. `.deployed-revision` and `.deployed-image` record the live release. The local image tag is `fightclub:git-<validated SHA>`.
 

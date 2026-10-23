@@ -1,8 +1,0 @@
-# ARM64 CPU-only runner. The official Ollama distribution is mounted read-only;
-# GPU libraries are deliberately omitted by scripts/install-local-ai.sh.
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 && rm -rf /var/lib/apt/lists/*
-USER 1000:1000
-ENV OLLAMA_HOST=0.0.0.0:11434 OLLAMA_MODELS=/models OLLAMA_NO_CLOUD=1
-ENTRYPOINT ["/opt/ollama/bin/ollama"]
-CMD ["serve"]

@@ -2381,51 +2381,6 @@ html[data-theme="fight-club"] .landing-hero:before {
   margin-bottom: 16px;
 }
 
-.assistant-panel {
-  min-width: 0;
-}
-.assistant-messages {
-  display: grid;
-  gap: 1rem;
-  max-height: 60vh;
-  overflow-y: auto;
-  margin: 1.25rem 0;
-  padding: 0.25rem;
-}
-.assistant-message {
-  padding: 1rem;
-  border: 1px solid var(--border, #333);
-  border-radius: 0.75rem;
-  overflow-wrap: anywhere;
-}
-.assistant-message.user {
-  margin-left: min(10%, 4rem);
-  background: rgba(255, 255, 255, 0.04);
-}
-.assistant-message.assistant {
-  margin-right: min(5%, 2rem);
-}
-.assistant-message p {
-  white-space: pre-wrap;
-}
-.assistant-proposal {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid #cfa83e;
-  border-radius: 0.5rem;
-}
-.assistant-form {
-  display: grid;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-.assistant-form textarea {
-  width: 100%;
-  resize: vertical;
-}
-.assistant-welcome {
-  padding: 1rem 0;
-}
 @media (max-width: 760px) {
   .topbar .hide-mobile {
     display: none;
