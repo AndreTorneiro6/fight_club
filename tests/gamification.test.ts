@@ -170,3 +170,34 @@ test("blank or oversized settings and unsupported game-mode commands are rejecte
   ])
     assert.throws(() => execute(state(), admin, { type }));
 });
+
+test("card slogans and drawn signatures are validated, audited and preserved by legacy edits", () => {
+  const s = state();
+  const signature = [
+    [
+      { x: 0.1, y: 0.2 },
+      { x: 0.8, y: 0.9 },
+    ],
+  ];
+  execute(s, admin, { ...profile, slogan: "Jogar e evoluir", signature });
+  assert.equal(s.gamificationProfiles![0].slogan, "Jogar e evoluir");
+  assert.deepEqual(s.gamificationProfiles![0].signature, signature);
+  execute(s, admin, { ...profile, expectedVersion: 1 });
+  assert.deepEqual(s.gamificationProfiles![0].signature, signature);
+  assert.equal(s.gamificationProfiles![0].slogan, "Jogar e evoluir");
+  execute(s, admin, {
+    ...profile,
+    expectedVersion: 2,
+    slogan: "",
+    signature: [],
+  });
+  assert.deepEqual(s.gamificationProfiles![0].signature, []);
+  for (const patch of [
+    { slogan: "a".repeat(101) },
+    { signature: [[{ x: -1, y: 0 }]] },
+    { signature: [[{ x: 0, y: Infinity }]] },
+    { signature: [[{ x: 0, y: 0, extra: true }]] },
+  ]) {
+    assert.throws(() => execute(state(), admin, { ...profile, ...patch }));
+  }
+});

@@ -8,4 +8,10 @@ Original photos remain in MongoDB `photos`; derived PNGs are cached in `photoCar
 
 Runtime requires Python 3 and Pillow: Debian/Ubuntu `sudo apt-get install python3-pil`; production Docker installs `python3 py3-pillow`. CI installs the Debian dependency before tests. No separate service or paid model needed. Unit tests cover real Python output, invalid input and coalescing; the browser scenario checks uploaded-photo reuse, image dimensions, cache response, PNG export and player-workspace denial.
 
-Not deployed automatically from this feature branch. No production photographs or competition data were changed during implementation.
+Initial cartoon integration released via PR #3 on 23 October 2026. No production photographs or competition data were changed during implementation.
+
+## Reference-style cards
+
+The administrator preview follows the angular dark/metallic layout of the supplied Untitled.jpeg with original SVG artwork, automatically using Ouro, Prata or Bronze from the current division. Verified Fight Club counts and recent confirmed results appear on the front; unavailable self-assessments remain dashes. No invented division history, awards or excluded game modes are introduced.
+
+In Admin → Gamificação → Cartas e avatares, choose a player, edit **Slogan da carta**, draw **Assinatura na carta** with a finger or mouse, and save. Clear removes the drawn signature. These optional fields are versioned and audited with the card and remain admin-only during the private preview. Export produces a 1520×1060 PNG of both faces with their actual theme, slogan and signature, embedding profile/cartoon photos only in memory. Signature is decorative rather than legal authentication.

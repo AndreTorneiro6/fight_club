@@ -19,11 +19,14 @@ export interface GamificationSettings {
   updatedAt?: string;
   updatedBy?: string;
 }
+export type SignatureStroke = { x: number; y: number }[];
 export interface GamificationProfile {
   _id: string;
   playerId: string;
   version: number;
   nickname: string;
+  slogan?: string;
+  signature?: SignatureStroke[];
   avatar: AvatarStyle;
   social: Record<SocialKey, number>;
   createdAt: string;

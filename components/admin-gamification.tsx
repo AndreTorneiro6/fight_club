@@ -11,9 +11,9 @@ import {
   type GamificationProfile,
   type GamificationSettings,
 } from "@/lib/gamification-types";
-import { attributeKeys } from "@/lib/padel-attributes";
 import { useEngagement } from "./engagement-client";
-import AvatarIllustration from "./avatar-illustration";
+import LeagueCardArtwork from "./league-card-artwork";
+import CardSignature from "./card-signature";
 import AdminCoins from "./admin-coins";
 import { exportTwoSidedCard } from "./gamification-export";
 import styles from "./gamification.module.css";
@@ -22,36 +22,10 @@ type Props = {
   run: (command: unknown, message?: string) => Promise<unknown>;
   busy: boolean;
 };
-const padelLabels = {
-  speed: "Velocidade",
-  smash: "Smash",
-  lob: "Lob",
-  volley: "Voleio",
-  defense: "Defesa",
-  physic: "Físico",
-};
-function Photo({ player }: { player: Player }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [player._id, player.photo]);
-  return player.photo && !failed ? (
-    <img
-      className={styles.photo}
-      src={player.photo}
-      alt={player.name}
-      onError={() => setFailed(true)}
-    />
-  ) : (
-    <div className={styles.initials}>
-      {player.name
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join("")}
-    </div>
-  );
-}
 type CardDraft = {
   nickname: string;
+  slogan: string;
+  signature: NonNullable<GamificationProfile["signature"]>;
   avatar: AvatarStyle;
   social: GamificationProfile["social"];
   version: number;
@@ -74,7 +48,8 @@ function Cards({ state, run, busy }: Props) {
     [back, setBack] = useState(false),
     [exporting, setExporting] = useState(false),
     [message, setMessage] = useState("");
-  const avatarRef = useRef<HTMLDivElement>(null);
+  const frontRef = useRef<HTMLElement>(null);
+  const backRef = useRef<HTMLElement>(null);
   const [cartoon, setCartoon] = useState<{
     source: string;
     url: string;
@@ -85,6 +60,8 @@ function Cards({ state, run, busy }: Props) {
     saved = state.gamificationProfiles?.find((p) => p.playerId === playerId);
   const live: CardDraft = {
     nickname: saved?.nickname ?? "",
+    slogan: saved?.slogan ?? "",
+    signature: saved?.signature ?? [],
     avatar: saved?.avatar ?? defaultAvatar,
     social: saved?.social ?? defaultSocial,
     version: saved?.version ?? 0,
@@ -132,8 +109,6 @@ function Cards({ state, run, busy }: Props) {
   const division = state.divisions.find((d) => d._id === player?.divisionId);
   const change = (patch: Partial<CardDraft>) =>
     setDraft({ ...value, ...patch });
-  const avatar = (patch: Partial<AvatarStyle>) =>
-    change({ avatar: { ...value.avatar, ...patch } });
   useEffect(() => {
     if (!draft) return;
     const prevent = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -148,6 +123,8 @@ function Cards({ state, run, busy }: Props) {
         expectedVersion: value.version,
         expectedSettingsVersion: value.settingsVersion,
         nickname: value.nickname,
+        slogan: value.slogan,
+        signature: value.signature,
         avatar: value.avatar,
         social: value.social,
       },
@@ -163,17 +140,10 @@ function Cards({ state, run, busy }: Props) {
     setExporting(true);
     setMessage("");
     try {
-      const svg = avatarRef.current?.querySelector("svg")?.outerHTML;
-      if (!svg && !cartoonUrl) throw new Error("Cartoon indisponível.");
-      await exportTwoSidedCard(
-        player,
-        saved,
-        settings,
-        personal,
-        svg ?? "",
-        division?.name ?? "Liga",
-        cartoonUrl,
-      );
+      const front = frontRef.current?.querySelector("svg");
+      const backSvg = backRef.current?.querySelector("svg");
+      if (!front || !backSvg) throw new Error("Carta indisponível.");
+      await exportTwoSidedCard(front, backSvg);
       setMessage("Imagem com frente e verso descarregada.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Não foi possível exportar.");
@@ -227,84 +197,56 @@ function Cards({ state, run, busy }: Props) {
               <div className={styles.card} data-face={back ? "back" : "front"}>
                 <article
                   className={styles.face}
-                  data-theme={division?.code ?? "ouro"}
+                  ref={frontRef}
                   aria-label="Frente da carta"
                   aria-hidden={back}
                 >
-                  <span className="eyebrow">FIGHT CLUB · NEIVA PADEL</span>
-                  <h3>{settings.frontTitle}</h3>
-                  <span>{division?.name ?? "Liga"}</span>
-                  <span className="eyebrow">FOTOGRAFIA DO PERFIL</span>
-                  <Photo player={player} />
-                  <h3>{player.name}</h3>
-                  <strong className={styles.rating}>
-                    {personal?.overall ?? "—"} <small>GERAL</small>
-                  </strong>
-                  <div className={styles.metrics}>
-                    {attributeKeys.map((key) => (
-                      <div key={key}>
-                        <strong>{personal?.attributes[key] ?? "—"}</strong>
-                        <span>{padelLabels[key]}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <small>
-                    AUTOAVALIAÇÃO DE PADEL{!personal ? " · POR DEFINIR" : ""}
-                  </small>
+                  <LeagueCardArtwork
+                    player={player}
+                    profile={value}
+                    settings={settings}
+                    attributes={personal}
+                    stats={data?.cards.find((c) => c.playerId === playerId)}
+                    theme={division?.code ?? "ouro"}
+                    back={false}
+                    photo={player.photo || ""}
+                  />
                 </article>
                 <article
                   className={`${styles.face} ${styles.back}`}
-                  data-theme={division?.code ?? "ouro"}
+                  ref={backRef}
                   aria-label="Verso da carta"
                   aria-hidden={!back}
                 >
-                  <span className="eyebrow">FIGHT CLUB · NEIVA PADEL</span>
-                  <h3>{settings.backTitle}</h3>
-                  <span className="eyebrow">CARTOON · ATRIBUTOS SOCIAIS</span>
-                  <div className={styles.avatar} ref={avatarRef}>
-                    {sourcePhoto ? (
-                      cartoonUrl ? (
-                        <img
-                          className={styles.photo}
-                          src={cartoonUrl}
-                          alt={`Cartoon de ${player.name}`}
-                        />
-                      ) : (
-                        <p role="status">
-                          {cartoonError ||
-                            "A criar cartoon da fotografia de perfil…"}
-                        </p>
-                      )
-                    ) : (
-                      <AvatarIllustration style={value.avatar} />
-                    )}
-                    {sourcePhoto && cartoonError && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCartoon(null);
-                          setCartoonAttempt((n) => n + 1);
-                        }}
-                      >
-                        Tentar novamente
-                      </button>
-                    )}
-                  </div>
-                  <h3>{value.nickname || player.name}</h3>
-                  <div className={styles.metrics}>
-                    {socialKeys.map((key) => (
-                      <div key={key}>
-                        <strong>{value.social[key]}</strong>
-                        <span>{settings.labels[key]}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <small>
-                    ATRIBUTOS LÚDICOS ·{" "}
-                    {saved && !draft
-                      ? "AUTOAVALIAÇÃO"
-                      : "PRÉ-VISUALIZAÇÃO POR GUARDAR"}
-                  </small>
+                  <LeagueCardArtwork
+                    player={player}
+                    profile={value}
+                    settings={settings}
+                    attributes={personal}
+                    stats={data?.cards.find((c) => c.playerId === playerId)}
+                    theme={division?.code ?? "ouro"}
+                    back
+                    photo={cartoonUrl}
+                  />
+                  {sourcePhoto && !cartoonUrl && (
+                    <div className={styles.cartoonStatus} role="status">
+                      <p>
+                        {cartoonError ||
+                          "A criar cartoon da fotografia de perfil…"}
+                      </p>
+                      {cartoonError && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCartoon(null);
+                            setCartoonAttempt((n) => n + 1);
+                          }}
+                        >
+                          Tentar novamente
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </article>
               </div>
             </div>
@@ -325,8 +267,8 @@ function Cards({ state, run, busy }: Props) {
               Exportar as duas faces (PNG)
             </button>
             <small>
-              Guarda primeiro. A imagem contém as duas faces; fotos externas sem
-              acesso seguro usam iniciais na exportação.
+              Guarda primeiro. A imagem contém as duas faces, o slogan e a
+              assinatura. Usa uma fotografia carregada no Perfil para exportar.
             </small>
             {message && <p role="status">{message}</p>}
           </div>
@@ -337,12 +279,12 @@ function Cards({ state, run, busy }: Props) {
               void save().catch(() => {});
             }}
           >
-            <h3>Personalizar avatar e carta</h3>
+            <h3>Personalizar a carta</h3>
             <p>
               O verso usa um cartoon gerado localmente da fotografia do Perfil.
-              Sem foto, usa o avatar personalizável abaixo. Os atributos sociais
-              são brincadeira e não são estatísticas verificadas nem avaliações
-              de outros jogadores.
+              Sem foto, mostra as iniciais do jogador. Os atributos sociais são
+              brincadeira e não são estatísticas verificadas nem avaliações de
+              outros jogadores.
             </p>
             {conflict && (
               <div className="inset stack" role="alert">
@@ -374,79 +316,22 @@ function Cards({ state, run, busy }: Props) {
                 onChange={(e) => change({ nickname: e.target.value })}
               />
             </label>
-            <div className={styles.fields}>
-              {(
-                [
-                  ["skin", "Tom de pele"],
-                  ["hairColor", "Cor do cabelo"],
-                  ["shirt", "Cor da camisola"],
-                  ["background", "Fundo do avatar"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <input
-                    disabled={busy}
-                    type="color"
-                    value={value.avatar[key]}
-                    onChange={(e) => avatar({ [key]: e.target.value })}
-                  />
-                </label>
-              ))}
-              <label>
-                Cabelo
-                <select
-                  disabled={busy}
-                  aria-label="Cabelo"
-                  value={value.avatar.hair}
-                  onChange={(e) =>
-                    avatar({ hair: e.target.value as AvatarStyle["hair"] })
-                  }
-                >
-                  <option value="short">Curto</option>
-                  <option value="wave">Ondulado</option>
-                  <option value="long">Comprido</option>
-                  <option value="bald">Sem cabelo</option>
-                </select>
-              </label>
-              <label>
-                Expressão
-                <select
-                  disabled={busy}
-                  aria-label="Expressão"
-                  value={value.avatar.expression}
-                  onChange={(e) =>
-                    avatar({
-                      expression: e.target.value as AvatarStyle["expression"],
-                    })
-                  }
-                >
-                  <option value="smile">Sorridente</option>
-                  <option value="focused">Concentrado</option>
-                </select>
-              </label>
-            </div>
-            <div className="row wrap">
-              <label>
-                <input
-                  disabled={busy}
-                  type="checkbox"
-                  checked={value.avatar.glasses}
-                  onChange={(e) => avatar({ glasses: e.target.checked })}
-                />{" "}
-                Óculos
-              </label>
-              <label>
-                <input
-                  disabled={busy}
-                  type="checkbox"
-                  checked={value.avatar.beard}
-                  onChange={(e) => avatar({ beard: e.target.checked })}
-                />{" "}
-                Barba
-              </label>
-            </div>
-            <h3>Atributos sociais</h3>
+            <label>
+              Slogan da carta
+              <textarea
+                disabled={busy}
+                maxLength={100}
+                rows={3}
+                value={value.slogan}
+                placeholder="Escolhe a frase que te representa"
+                onChange={(e) => change({ slogan: e.target.value })}
+              />
+            </label>
+            <CardSignature
+              value={value.signature}
+              disabled={busy}
+              onChange={(signature) => change({ signature })}
+            />
             <div className={styles.social}>
               {socialKeys.map((key) => (
                 <label key={key}>
