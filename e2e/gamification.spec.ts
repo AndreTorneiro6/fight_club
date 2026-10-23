@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 
-test("admin preview customizes avatars, flips/exports both card faces and keeps gamification out of player mode", async ({
+test("admin preview saves slogan/signature, renders division cards and exports both private faces", async ({
   page,
 }) => {
   await page.goto("/auth");
@@ -81,13 +81,25 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
   await expect(
     area
       .getByRole("article", { name: "Frente da carta", exact: true })
-      .getByRole("img", { name: profile.name, exact: true }),
-  ).toHaveAttribute("src", photo);
+      .locator("image"),
+  ).toHaveAttribute("href", photo);
   await area
     .getByLabel("Alcunha no verso", { exact: true })
     .fill("Parceiro do clube");
-  await area.getByLabel("Cabelo", { exact: true }).selectOption("wave");
-  await area.getByLabel("Óculos", { exact: true }).check();
+  await area
+    .getByLabel("Slogan da carta", { exact: true })
+    .fill("Joga com alma. Cresce com a equipa.");
+  const signature = area.getByRole("img", {
+    name: "Assinatura na carta",
+    exact: true,
+  });
+  await signature.scrollIntoViewIfNeeded();
+  const bounds = await signature.boundingBox();
+  expect(bounds).toBeTruthy();
+  await page.mouse.move(bounds!.x + 40, bounds!.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + 120, bounds!.y + 80, { steps: 6 });
+  await page.mouse.up();
   await area.getByLabel("Valor social: Convívio", { exact: true }).fill("80");
   await area
     .getByLabel("Valor social: Bom parceiro", { exact: true })
@@ -98,15 +110,17 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
       .getByRole("article", { name: "Verso da carta", exact: true })
       .getByText("Parceiro do clube", { exact: true }),
   ).toBeVisible();
-  const cartoonImage = area.getByRole("img", {
-    name: `Cartoon de ${profile.name}`,
-    exact: true,
-  });
+  const cartoonImage = area
+    .getByRole("article", { name: "Verso da carta", exact: true })
+    .locator("image");
   await expect(cartoonImage).toBeVisible();
-  await expect(cartoonImage).toHaveAttribute("src", /^blob:/);
-  expect(
-    await cartoonImage.evaluate((img: HTMLImageElement) => img.naturalWidth),
-  ).toBe(512);
+  await expect(cartoonImage).toHaveAttribute("href", /^blob:/);
+  await area
+    .getByRole("article", { name: "Verso da carta", exact: true })
+    .screenshot({
+      path: "test-results/card-reference-back.png",
+      animations: "disabled",
+    });
   const cachedCartoon = await page.request.post(`${photo}/cartoon`, {
     headers: { Origin: origin },
   });
@@ -123,7 +137,10 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
   ).toBeVisible();
   const state = await (await page.request.get("/api/league")).json();
   expect(state.gamificationProfiles).toHaveLength(1);
-  expect(state.gamificationProfiles[0].avatar.glasses).toBe(true);
+  expect(state.gamificationProfiles[0].slogan).toBe(
+    "Joga com alma. Cresce com a equipa.",
+  );
+  expect(state.gamificationProfiles[0].signature[0].length).toBeGreaterThan(1);
   expect(state.gamificationProfiles[0].social.bar).toBe(80);
   expect(state.gamificationSettings[0].backTitle).toBe("No clube Neiva");
   const download = page.waitForEvent("download", { timeout: 15000 });
@@ -135,7 +152,7 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
   expect(file).toBeTruthy();
   const bytes = await readFile(file!);
   expect(bytes.subarray(1, 4).toString()).toBe("PNG");
-  expect(bytes.readUInt32BE(16)).toBe(1440);
+  expect(bytes.readUInt32BE(16)).toBe(1520);
   expect(bytes.readUInt32BE(20)).toBe(1060);
   await area
     .getByRole("button", { name: "Bar e prémios", exact: true })
@@ -158,6 +175,37 @@ test("admin preview customizes avatars, flips/exports both card faces and keeps 
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.screenshot({
+    path: "test-results/card-reference-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  for (const division of state.divisions) {
+    const member = state.players.find(
+      (p: {
+        divisionId: string;
+        status: string;
+        awaitingApproval?: boolean;
+        registrationRejectedAt?: string;
+      }) =>
+        p.divisionId === division._id &&
+        p.status !== "removed" &&
+        !p.awaitingApproval &&
+        !p.registrationRejectedAt,
+    );
+    if (!member) continue;
+    await area
+      .getByLabel("Jogador para testar a carta", { exact: true })
+      .selectOption(member._id);
+    const front = area.getByRole("article", {
+      name: "Frente da carta",
+      exact: true,
+    });
+    await expect(front.locator("svg")).toHaveAttribute(
+      "aria-label",
+      `Frente · ${member.name} · ${division.code.toUpperCase()}`,
+    );
+  }
   await switchWorkspace(page, "player");
   const deniedCartoon = await page.request.post(`${photo}/cartoon`, {
     headers: { Origin: origin },

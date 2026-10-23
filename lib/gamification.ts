@@ -25,6 +25,23 @@ const schema = z.discriminatedUnion("type", [
       expectedVersion: z.number().int().min(0),
       expectedSettingsVersion: z.number().int().min(0),
       nickname: z.string().trim().max(40),
+      slogan: z.string().trim().max(100).optional(),
+      signature: z
+        .array(
+          z
+            .array(
+              z
+                .object({
+                  x: z.number().min(0).max(1),
+                  y: z.number().min(0).max(1),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(160),
+        )
+        .max(40)
+        .optional(),
       avatar: z
         .object({
           skin: color,
@@ -110,6 +127,8 @@ export function executeGamification(
       playerId: cmd.playerId,
       version,
       nickname: cmd.nickname,
+      slogan: cmd.slogan ?? existing?.slogan ?? "",
+      signature: cmd.signature ?? existing?.signature ?? [],
       avatar: cmd.avatar,
       social: cmd.social,
       createdAt: existing?.createdAt ?? now,
