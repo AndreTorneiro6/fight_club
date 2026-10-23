@@ -6,7 +6,14 @@ export function filterFeatureView(state: State, actor: Actor) {
   state.stickerPacks = (state.stickerPacks ?? []).filter(
     (pack) => actor.role === "admin" && pack.userId === actor.userId,
   );
+  state.adminTestChallenges = (state.adminTestChallenges ?? []).filter(
+    (c) =>
+      actor.role === "admin" &&
+      [c.attackerId, c.defenderId].includes(actor.playerId),
+  );
   if (actor.role !== "admin") {
+    state.adminTestAccounts = [];
+    state.notifications = state.notifications.filter((n) => !n.adminTestId);
     state.placementEvents = [];
     state.gamificationSettings = [];
     state.gamificationProfiles = [];

@@ -2862,6 +2862,15 @@ function Notifications({ s, run, busy }: Actions) {
                   <small>
                     {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
                   </small>
+                  {n.adminTestId && (
+                    <Link
+                      className="link"
+                      href={`/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`}
+                      style={{ marginLeft: 12 }}
+                    >
+                      Abrir teste
+                    </Link>
+                  )}
                   {n.challengeId && (
                     <Link
                       className="link"
@@ -3498,7 +3507,7 @@ function Admin(a: Actions) {
       ) : tab === "placement" ? (
         <AdminPlacement state={s} run={a.run} busy={a.busy} />
       ) : tab === "simulation" ? (
-        <AdminSimulation state={s} />
+        <AdminSimulation state={s} run={a.run} busy={a.busy} />
       ) : tab === "matchmaking" ? (
         <CompetitionMatchmaking s={s} run={a.run} busy={a.busy} />
       ) : tab === "payments" ? (

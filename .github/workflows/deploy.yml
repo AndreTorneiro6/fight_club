@@ -51,6 +51,12 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check notifications between two test administrators
+        run: npx playwright test e2e/shared-admin-tests.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEMO_TEST_ADMIN_PAIR: "1"
+
   deploy:
     if: github.ref == 'refs/heads/deploy' && github.event_name != 'pull_request'
     needs: checks

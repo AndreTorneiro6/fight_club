@@ -1,3 +1,4 @@
+import { executeAdminTest } from "./admin-test-challenges";
 import { executePlacement } from "./placement";
 import { executeGamification } from "./gamification";
 import { executeSponsors } from "./sponsors";
@@ -399,6 +400,8 @@ export function execute(
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (featureType.startsWith("admin.test."))
+    return executeAdminTest(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.placement."))
     return executePlacement(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.gamification."))
@@ -2420,6 +2423,9 @@ export function execute(
       const referencesTeam = (teamId: string) =>
         teamId.split(":").includes(p._id);
       const hasCompetitionHistory =
+        (s.adminTestChallenges ?? []).some((c) =>
+          [c.attackerId, c.defenderId].includes(p._id),
+        ) ||
         (s.placementEvents ?? []).some((e) =>
           e.teams.some((t) =>
             t.members.some((m) => m.playerId === cmd.playerId),
