@@ -1,3 +1,4 @@
+import type { PlacementEvent } from "./placement-types";
 import type {
   GamificationSettings,
   GamificationProfile,
@@ -271,6 +272,7 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  placementEvents?: PlacementEvent[];
   gamificationSettings?: GamificationSettings[];
   gamificationProfiles?: GamificationProfile[];
   sponsors?: Sponsor[];
@@ -309,6 +311,7 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "placementEvents",
   "gamificationSettings",
   "gamificationProfiles",
   "sponsors",

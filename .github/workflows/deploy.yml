@@ -45,6 +45,11 @@ jobs:
       - run: npx playwright test e2e/seasons.spec.ts e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts e2e/gamification.spec.ts e2e/global-search.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
+      # A fresh demo database keeps aggregate logins below the production rate limit.
+      - name: Check placement imports and private simulations
+        run: npx playwright test e2e/placement-simulation.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
 
   deploy:
     if: github.ref == 'refs/heads/deploy' && github.event_name != 'pull_request'

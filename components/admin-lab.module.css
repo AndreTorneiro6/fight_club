@@ -1,0 +1,11 @@
+.root,
+.root :where(div, fieldset, label) {
+  min-width: 0;
+  max-width: 100%;
+}
+.root :where(p, td) {
+  overflow-wrap: anywhere;
+}
+.root select {
+  max-width: 100%;
+}

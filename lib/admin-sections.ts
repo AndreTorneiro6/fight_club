@@ -11,6 +11,8 @@ export const adminGroups = [
   {
     label: "Competição",
     items: [
+      ["placement", "Eventos de colocação"],
+      ["simulation", "Simulador de desafios"],
       ["matchmaking", "Jornadas e emparelhamento"],
       ["weekly", "Papéis semanais"],
       ["rankings", "Rankings"],
