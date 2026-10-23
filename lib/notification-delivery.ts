@@ -1,3 +1,5 @@
+import { responseNoticeIsCurrent } from "./challenge-response-notices";
+import type { CompetitionChallenge } from "./competition-types";
 import {
   notificationPresentation,
   pushNotificationPayload,
@@ -47,6 +49,7 @@ export interface Delivery {
   availableAt: Date;
   createdAt: Date;
   sentAt?: Date;
+  expiresAt?: Date;
   leaseId?: string;
   providerId?: string;
   error?: string;
@@ -73,6 +76,10 @@ export function deliveryContent(n: Notification) {
     badge: presentation.badge,
     title: n.title,
     body: n.body,
+    expiresAt:
+      n.responseDeadline?.status === "pending"
+        ? new Date(n.responseDeadline.respondBy)
+        : undefined,
     path: n.rankingNotice
       ? "/ranking"
       : n.seasonId
@@ -259,7 +266,19 @@ export async function sendPushDelivery(
     await webpush.sendNotification(
       { endpoint: subscription.endpoint, keys: subscription.keys },
       JSON.stringify(pushNotificationPayload(job, process.env.APP_URL)),
-      { TTL: 86400 },
+      {
+        TTL: job.expiresAt
+          ? Math.max(
+              1,
+              Math.min(
+                86400,
+                Math.ceil(
+                  (new Date(job.expiresAt).getTime() - Date.now()) / 1000,
+                ),
+              ),
+            )
+          : 86400,
+      },
     );
     return `push:${subscription._id}`;
   } catch (error) {
@@ -320,9 +339,22 @@ export async function dispatchNotifications(
         !notification?.challengeId ||
         (challenge &&
           (user?.role === "admin" ||
-            [challenge.challengerId, challenge.defenderId].includes(
-              player?._id ?? "",
-            )));
+            [
+              challenge.challengerId,
+              challenge.defenderId,
+              ...(challenge.challengerTeam ?? []).map((m) => m.playerId),
+              ...(challenge.defenderTeam ?? []).map((m) => m.playerId),
+            ].includes(player?._id ?? "")));
+      const responseSource = notification?.responseDeadline
+        ? notification.responseDeadline.managed
+          ? await db
+              .collection<CompetitionChallenge>("competitionChallenges")
+              .findOne({ _id: notification.responseDeadline.id })
+          : challenge
+        : null;
+      const responseCurrent =
+        !notification ||
+        responseNoticeIsCurrent(notification, responseSource, Date.now());
       const testChallenge = notification?.adminTestId
         ? await db
             .collection<AdminTestChallenge>("adminTestChallenges")
@@ -337,6 +369,7 @@ export async function dispatchNotifications(
           ) &&
           notification.testChannels?.includes(job.channel));
       const allowed =
+        responseCurrent &&
         testAccess &&
         challengeAccess &&
         notification &&
@@ -352,7 +385,9 @@ export async function dispatchNotifications(
         await queue.updateOne(filter, {
           $set: {
             status: "skipped",
-            error: "Destinatário sem acesso ou canal desativado.",
+            error: responseCurrent
+              ? "Destinatário sem acesso ou canal desativado."
+              : "Aviso de prazo desatualizado: o desafio foi respondido, expirou ou o prazo mudou.",
           },
         });
         continue;

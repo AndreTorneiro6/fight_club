@@ -1,3 +1,9 @@
+import {
+  notifyResponseReminder,
+  notifyResponseExpired,
+  responseDeadlineText,
+  responseWindowText,
+} from "./challenge-response-notices";
 import { autoWeeklyRanking, publishWeeklyRanking } from "./weekly-ranking";
 import { notificationPresentation } from "./notification-presentation";
 import type { Notification } from "./types";
@@ -1732,12 +1738,15 @@ export function execute(
             ...slot,
           })),
         );
-      notify(
-        d._id,
-        `🥊 ${p.name} desafiou-te`,
-        "Aceita o desafio e propõe um horário.",
-        c._id,
-      );
+      for (const member of c.defenderTeam ?? [{ playerId: d._id }])
+        notify(
+          member.playerId,
+          `🥊 ${p.name} desafiou-te`,
+          `Tens ${responseWindowText(c.createdAt, c.respondBy)} para aceitar ou recusar o desafio. Prazo: ${responseDeadlineText(c.respondBy)} (Portugal).`,
+          c._id,
+          `challenge-received:${c._id}:${member.playerId}`,
+          { deliveryChannels: ["push"] },
+        );
       notifyAdmins(
         "Novo desafio",
         `${p.name} desafiou ${d.name}. Desafio #${c.number}.`,
@@ -3585,6 +3594,27 @@ export function processDeadlines(
       });
   };
   for (const c of s.challenges) {
+    const responseMeta = {
+      id: c._id,
+      createdAt: c.createdAt,
+      respondBy: c.respondBy,
+      label: [
+        c.challengerTeam?.map((m) => m.name).join(" + ") ??
+          s.players.find((p) => p._id === c.challengerId)?.name,
+        c.defenderTeam?.map((m) => m.name).join(" + ") ??
+          s.players.find((p) => p._id === c.defenderId)?.name,
+      ].join(" × "),
+      defenderIds: (c.defenderTeam ?? [{ playerId: c.defenderId }]).map(
+        (m) => m.playerId,
+      ),
+      participantIds: [
+        ...(c.challengerTeam ?? [{ playerId: c.challengerId }]),
+        ...(c.defenderTeam ?? [{ playerId: c.defenderId }]),
+      ].map((m) => m.playerId),
+      challengeId: c._id,
+    };
+    if (!c.competitionRoundId && c.status === "pending" && c.respondBy > now)
+      notifyResponseReminder(s, responseMeta, timestamp);
     if (
       c.status === "schedule_pending" &&
       c.scheduleProposal?.previousStatus === "scheduled" &&
@@ -3627,7 +3657,11 @@ export function processDeadlines(
         details: JSON.stringify({ challengeId: c._id }),
         createdAt: now,
       });
-      for (const pid of [c.challengerId, c.defenderId, "__admins__"])
+      if (c.expiredFrom === "pending")
+        notifyResponseExpired(s, responseMeta, timestamp);
+      for (const pid of c.expiredFrom === "pending"
+        ? ["__admins__"]
+        : [c.challengerId, c.defenderId, "__admins__"])
         add(
           pid,
           "Prazo expirado",
@@ -3637,12 +3671,9 @@ export function processDeadlines(
         );
     }
     if (terminal.has(c.status)) continue;
-    const deadline =
-      c.status === "pending"
-        ? c.respondBy
-        : ["accepted", "schedule_pending"].includes(c.status)
-          ? c.scheduleBy
-          : null;
+    const deadline = ["accepted", "schedule_pending"].includes(c.status)
+      ? c.scheduleBy
+      : null;
     if (
       deadline &&
       Date.parse(deadline) - timestamp <= rules.reminderHours * 3600000

@@ -1,3 +1,9 @@
+import {
+  notifyResponseReminder,
+  notifyResponseExpired,
+  responseDeadlineText,
+  responseWindowText,
+} from "./challenge-response-notices";
 import { notificationPresentation } from "./notification-presentation";
 import { proposeTeamRoles, sameRoles } from "./role-proposals";
 import {
@@ -1660,7 +1666,7 @@ export function executeCompetition(
         s,
         m.playerId,
         "Novo desafio",
-        `Jornada ${r.number}: ${a.members.map((m) => m.name).join(" + ")} desafiou a tua dupla. Responde até ${new Date(timestamp + e.config.responseHours * 3600000).toLocaleString("pt-PT")}. Consulta Jornadas.`,
+        `Jornada ${r.number}: ${a.members.map((m) => m.name).join(" + ")} desafiou a tua dupla. Tens ${responseWindowText(now, new Date(timestamp + e.config.responseHours * 3600000).toISOString())} para aceitar ou recusar. Prazo: ${responseDeadlineText(new Date(timestamp + e.config.responseHours * 3600000).toISOString())} (Portugal). Consulta Jornadas.`,
         now,
         `challenge-pending:${challengeId}:${m.playerId}`,
       );
@@ -2785,7 +2791,41 @@ export function processCompetitionDeadlines(
     notifyChallengeBlocks(s, r, now);
   }
   for (const c of s.competitionChallenges ?? []) {
-    if (c.status === "PENDING" && c.respondBy <= now) {
+    if (c.status !== "PENDING") continue;
+    const round = s.competitionRounds?.find((r) => r._id === c.roundId);
+    if (!round) continue;
+    const teams = challengeContext(s, round).teams;
+    const meta = {
+      id: c._id,
+      createdAt: c.createdAt,
+      respondBy: c.respondBy,
+      label: challengeLabel(s, c),
+      defenderIds:
+        teams
+          .find((t) => t.id === c.defenderId)
+          ?.members.map((m) => m.playerId) ?? [],
+      participantIds: teams
+        .filter((t) => [c.attackerId, c.defenderId].includes(t.id))
+        .flatMap((t) => t.members.map((m) => m.playerId)),
+      competitionNotice: true,
+    };
+    if (c.respondBy > now) {
+      const config = s.competitionConfigurations?.find(
+        (config) => config._id === round.competitionId,
+      );
+      if (
+        !round.locked &&
+        !round.settledAt &&
+        config?.enabled &&
+        s.seasons.some(
+          (season) =>
+            season._id === config.seasonId && season.status === "active",
+        )
+      )
+        notifyResponseReminder(s, meta, timestamp);
+    }
+    if (c.respondBy <= now) {
+      notifyResponseExpired(s, meta, timestamp);
       c.status = "EXPIRED";
       c.decisions.push({ at: now, actorId: "system", action: "EXPIRED" });
       challengeAdminNotice(
