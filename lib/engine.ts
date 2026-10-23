@@ -1,3 +1,9 @@
+import {
+  setScoresSchema,
+  validateSetScores,
+  formatSetScores,
+  type SetScore,
+} from "./set-scores";
 import { executeAdminTest } from "./admin-test-challenges";
 import { executePlacement } from "./placement";
 import { executeGamification } from "./gamification";
@@ -19,6 +25,7 @@ import {
   weeklyPositionReason,
   frozenRanking,
   weeklyReason,
+  weeklyPriority,
   weeklyWindow,
   weeklyBookingReason,
 } from "./weekly";
@@ -140,6 +147,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("admin.result.record"),
     challengeId: id,
     winnerId: id,
+    setScores: setScoresSchema.optional(),
     score: short.default(""),
   }),
   z.object({
@@ -244,6 +252,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("result.report"),
     challengeId: id,
     winnerId: id,
+    setScores: setScoresSchema.optional(),
     score: short.default(""),
   }),
   z.object({ type: z.literal("result.confirm"), challengeId: id }),
@@ -348,7 +357,8 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("admin.result.correct"),
     challengeId: id,
     winnerId: id,
-    score: short,
+    setScores: setScoresSchema.optional(),
+    score: short.default(""),
     note: text.min(3),
   }),
   z.object({
@@ -810,7 +820,16 @@ export function execute(
       seasonId,
     });
   };
-  const applyResult = (c: Challenge, winnerId: string, score: string) => {
+  const applyResult = (
+    c: Challenge,
+    winnerId: string,
+    score: string,
+    sets?: SetScore[],
+  ) => {
+    if (sets) {
+      sets = validateSetScores(sets, c.challengerId, c.defenderId, winnerId);
+      score = formatSetScores(sets);
+    }
     ensure(
       c.competitionRoundId || !managedRoundOpen(s, c.divisionId),
       "Existe uma jornada oficial por liquidar. Resolve o resultado legado antes de publicar uma jornada.",
@@ -865,6 +884,7 @@ export function execute(
       crown(c.divisionId, winnerId, c.seasonId);
     c.winnerId = winnerId;
     c.score = score;
+    c.setScores = sets;
     c.status = "completed";
     c.completedAt = now;
     if (c.competitionRoundId) {
@@ -900,6 +920,7 @@ export function execute(
       winnerId,
       loserId: l._id,
       score,
+      setScores: sets,
       confirmedAt: now,
       approvedBy: actor.userId,
       seasonId: c.seasonId,
@@ -1320,6 +1341,30 @@ export function execute(
             "Papel semanal publicado",
             `Semana de ${cmd.weekStart}: ${entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
           );
+      if (cmd.publish && cmd.weekStart === clubWeek(timestamp).start)
+        for (const division of s.divisions)
+          for (const team of rankingEntries(s.players, division._id)) {
+            const p = team.members[0];
+            if (
+              cmd.assignments.find((a) => a.playerId === p._id)?.role ===
+                "attack" &&
+              !s.challenges.some(
+                (c) =>
+                  c.weekStart === cmd.weekStart &&
+                  !["cancelled", "refused", "expired"].includes(c.status) &&
+                  team.members.some((m) =>
+                    [c.challengerId, c.defenderId].includes(m._id),
+                  ),
+              ) &&
+              !s.players.some((d) => !challengeReason(s, p, d, timestamp))
+            )
+              notifyAdmins(
+                "Bloqueio potencial de desafios",
+                `Semana ${cmd.weekStart}: ${team.members.map((m) => m.name).join(" + ")} não tem duplas disponíveis para desafiar.`,
+                undefined,
+                `weekly-no-targets:${cmd.weekStart}:${team.id}`,
+              );
+          }
       log("week.roles.saved", {
         weekStart: cmd.weekStart,
         published: cmd.publish,
@@ -1694,7 +1739,9 @@ export function execute(
     case "challenge.respond": {
       const c = challenge(cmd.challengeId);
       ensure(
-        actor.playerId === c.defenderId || admin,
+        teamMembers(s.players, c.defenderId).some(
+          (m) => m._id === actor.playerId,
+        ) || admin,
         "Só o defensor pode responder.",
         403,
       );
@@ -1703,6 +1750,25 @@ export function execute(
         "O desafio já não está pendente.",
       );
       season();
+      if (rules.weeklyCompetition) {
+        const roleError = weeklyReason(
+          s,
+          player(c.challengerId),
+          player(c.defenderId),
+          timestamp,
+          c._id,
+        );
+        ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
+        const priority = weeklyPriority(s, c.defenderId, timestamp);
+        ensure(
+          priority?.id === c._id,
+          "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
+        );
+        if (cmd.accept) {
+          c.weeklyPriorityWinner = true;
+          c.weeklyPriorityReason = priority.reason;
+        }
+      }
       if (cmd.accept) {
         c.status = "accepted";
         c.scheduleBy = new Date(
@@ -2069,10 +2135,19 @@ export function execute(
         [c.challengerId, c.defenderId].includes(cmd.winnerId),
         "Vencedor inválido.",
       );
+      const sets = cmd.setScores
+        ? validateSetScores(
+            cmd.setScores,
+            c.challengerId,
+            c.defenderId,
+            cmd.winnerId,
+          )
+        : undefined;
+      c.setScores = sets;
       c.status = "result_pending";
       c.winnerId = cmd.winnerId;
       c.reportedBy = actor.playerId;
-      c.score = cmd.score;
+      c.score = sets ? formatSetScores(sets) : cmd.score;
       notify(
         actor.playerId === c.challengerId ? c.defenderId : c.challengerId,
         "Confirma o resultado do jogo",
@@ -2095,7 +2170,7 @@ export function execute(
         "Só o adversário pode confirmar.",
         403,
       );
-      applyResult(c, c.winnerId!, c.score ?? "");
+      applyResult(c, c.winnerId!, c.score ?? "", c.setScores);
       break;
     }
     case "result.dispute": {
@@ -2922,11 +2997,12 @@ export function execute(
           Date.parse(c.scheduledAt) + c.durationMinutes * 60000 <= timestamp,
         "Regista o resultado depois do jogo terminar.",
       );
-      applyResult(c, cmd.winnerId, cmd.score);
+      applyResult(c, cmd.winnerId, cmd.score, cmd.setScores);
       log("admin.result.recorded", {
         challengeId: c._id,
         winnerId: cmd.winnerId,
-        score: cmd.score,
+        score: c.score,
+        setScores: c.setScores,
       });
       break;
     }
@@ -2941,7 +3017,16 @@ export function execute(
         [c.challengerId, c.defenderId].includes(cmd.winnerId),
         "Vencedor inválido.",
       );
-      const before = { ...result };
+      const sets = cmd.setScores
+        ? validateSetScores(
+            cmd.setScores,
+            c.challengerId,
+            c.defenderId,
+            cmd.winnerId,
+          )
+        : undefined;
+      const score = sets ? formatSetScores(sets) : cmd.score;
+      const before = structuredClone(result);
       if (result.winnerId !== cmd.winnerId) {
         const oldWinner = player(result.winnerId),
           oldLoser = player(result.loserId);
@@ -2956,9 +3041,11 @@ export function execute(
         result.loserId = result.winnerId;
         result.winnerId = cmd.winnerId;
       }
-      result.score = cmd.score;
+      result.score = score;
+      result.setScores = sets;
+      c.setScores = sets;
       c.winnerId = cmd.winnerId;
-      c.score = cmd.score;
+      c.score = score;
       // Later games/manual moves may depend on this result. Admin explicitly corrects ranking/champion separately.
       log("result.corrected", {
         before,

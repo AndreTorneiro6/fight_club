@@ -1,4 +1,9 @@
 "use client";
+import {
+  SetScoreFields,
+  SetScoreDisplay,
+  setScoresFromForm,
+} from "./set-score-fields";
 import AdminPlacement from "./admin-placement";
 import AdminSimulation from "./admin-simulation";
 import {
@@ -121,7 +126,12 @@ import {
   type View,
 } from "@/lib/types";
 import { WeeklyRoles, WeeklyBadge, WeekNavigation } from "./weekly-controls";
-import { weeklyWindow, weeklyRole, frozenRanking } from "@/lib/weekly";
+import {
+  weeklyWindow,
+  weeklyRole,
+  weeklyPriority,
+  frozenRanking,
+} from "@/lib/weekly";
 import {
   clubDateTime,
   clubDay,
@@ -1775,7 +1785,8 @@ function Challenges(a: Actions) {
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
-          ) : (
+          ) : s.settings[0].weeklyCompetition &&
+            weeklyRole(s, p._id) !== "attack" ? null : (
             <a
               className="button primary"
               href={
@@ -2068,6 +2079,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
     status = effectiveStatus(c),
     opponentId =
       c.challengerId === s.actor.playerId ? c.defenderId : c.challengerId;
+  const weeklyResponsePriority = s.settings[0].weeklyCompetition
+    ? weeklyPriority(s, c.defenderId)
+    : undefined;
+  const canRespondByRole =
+    !s.settings[0].weeklyCompetition ||
+    (weeklyRole(s, c.defenderId) === "defense" &&
+      weeklyResponsePriority?.id === c._id);
   const mySlots = s.slots.filter(
       (x) => x.challengeId === id && x.playerId === s.actor.playerId,
     ),
@@ -2142,12 +2160,16 @@ function ChallengeDetail(a: Actions & { id: string }) {
             {status === "pending" && c.defenderId === s.actor.playerId && (
               <div className="stack space-top">
                 <p>
-                  Foste desafiado. Aceita para encontrar um horário em comum.
+                  Foste desafiado. Responde até{" "}
+                  {new Date(c.respondBy).toLocaleString("pt-PT")}.{" "}
+                  {canRespondByRole
+                    ? "Aceita para encontrar um horário em comum."
+                    : "Outro desafio tem prioridade regulamentar. Aguarda decisão administrativa."}
                 </p>
                 <div className="row">
                   <button
                     className="primary flex-1"
-                    disabled={busy}
+                    disabled={busy || !canRespondByRole}
                     onClick={() =>
                       run(
                         {
@@ -2163,7 +2185,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
                     Aceitar
                   </button>
                   <button
-                    disabled={!canRefuse(s, c) || busy}
+                    disabled={!canRefuse(s, c) || busy || !canRespondByRole}
                     onClick={() => setRefuse(true)}
                   >
                     Recusar
@@ -2205,7 +2227,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
                   <strong className="gold">
                     Vitória de {name(c.winnerId!)}
                   </strong>
-                  <p>{c.score || "Sets não indicados"}</p>
+                  <SetScoreDisplay challenge={c} />
                   <small>
                     Resultado registado. Estatísticas e ranking atualizados.
                   </small>
@@ -2608,6 +2630,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                     type: "admin.result.correct",
                     challengeId: c._id,
                     ...Object.fromEntries(new FormData(e.currentTarget)),
+                    setScores: setScoresFromForm(e.currentTarget),
                   },
                   "Resultado corrigido. Revê o ranking e o cinturão, se necessário.",
                 );
@@ -2623,10 +2646,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                   ))}
                 </select>
               </label>
-              <label>
-                Sets
-                <input name="score" defaultValue={c.score} />
-              </label>
+              <SetScoreFields challenge={c} />
               <label>
                 Motivo da correção
                 <textarea name="note" required minLength={3} />
@@ -2869,6 +2889,25 @@ function Notifications({ s, run, busy }: Actions) {
                       style={{ marginLeft: 12 }}
                     >
                       Abrir teste
+                    </Link>
+                  )}
+                  {n.competitionNotice && !n.challengeId && (
+                    <Link
+                      className="link"
+                      href={
+                        s.actor.role === "admin" && n.playerId === "__admins__"
+                          ? "/admin?tab=matchmaking"
+                          : "/jornadas"
+                      }
+                      style={{ marginLeft: 12 }}
+                      onClick={() => {
+                        void run(
+                          { type: "notifications.read", notificationId: n._id },
+                          "",
+                        );
+                      }}
+                    >
+                      Abrir jornada →
                     </Link>
                   )}
                   {n.challengeId && (
@@ -3808,6 +3847,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                       : "admin.result.record",
                     challengeId: c._id,
                     ...fields,
+                    setScores: setScoresFromForm(e.currentTarget),
                   },
                   completed
                     ? "Resultado corrigido. Revê o ranking e o cinturão, se necessário."
@@ -3838,15 +3878,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                 ))}
               </select>
             </label>
-            <label>
-              Resultado dos sets · opcional
-              <input
-                name="score"
-                defaultValue={c.score ?? ""}
-                placeholder="6-4 / 4-6 / 10-8"
-                maxLength={150}
-              />
-            </label>
+            <SetScoreFields challenge={c} />
             {completed ? (
               <>
                 <label>

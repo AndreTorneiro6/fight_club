@@ -1,4 +1,5 @@
 "use client";
+import { RoundRoles, PlayerRoundChallenges } from "./round-challenge-roles";
 import { useState } from "react";
 import { statusLabels, type View } from "@/lib/types";
 import type {
@@ -708,12 +709,19 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
               busy={busy}
             />
           )}
+          <RoundRoles
+            key={`${round._id}:${round.version}`}
+            s={s}
+            round={round}
+            run={run}
+            busy={busy}
+          />
           <div className="card">
             <h3>Desafios e prioridades</h3>
             {(s.competitionChallenges ?? [])
               .filter((c) => c.roundId === round._id)
               .map((c) => (
-                <p key={c._id}>
+                <div className="inset stack" key={c._id}>
                   {name(c.attackerId)} → {name(c.defenderId)} ·{" "}
                   {competitionLabels[c.status]} ·{" "}
                   {new Date(c.createdAt).toLocaleString("pt-PT")}{" "}
@@ -740,7 +748,15 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
                       Resolver / cancelar
                     </button>
                   )}
-                </p>
+                  <details>
+                    <summary>Histórico de respostas e intervenções</summary>
+                    {c.decisions.map((d, i) => (
+                      <p key={i}>
+                        {new Date(d.at).toLocaleString("pt-PT")} · {d.action}
+                      </p>
+                    ))}
+                  </details>
+                </div>
               ))}
             <p>
               A primeira submissão válida tem prioridade, com rotação se a mesma
@@ -1305,26 +1321,6 @@ export function PlayerCompetition({ s, run, busy }: Props) {
   const publication = (s.competitionSchedules ?? [])
     .filter((q) => q.roundId === round._id && q.status === "PUBLISHED")
     .sort((a, b) => b.revision - a.revision)[0];
-  const eligible = teams.filter(
-    (t, i) =>
-      own &&
-      t.members.every((member) => member.status === "active") &&
-      !(s.competitionAbsences ?? []).some(
-        (a) =>
-          a.teamId === t.id &&
-          (a.roundIds.includes(round._id) ||
-            (a.from < round.endsAt && a.to > round.startsAt)),
-      ) &&
-      i + 1 < teams.indexOf(own) + 1 &&
-      teams.indexOf(own) - i <= e.distance &&
-      (i !== 0 ||
-        (e.config?.championPositions ?? [2, 3]).includes(
-          teams.indexOf(own) + 1,
-        )),
-  );
-  const ownChallenges = (s.competitionChallenges ?? []).filter(
-    (c) => c.roundId === round._id,
-  );
   const ownMatch = s.challenges.filter(
     (c) =>
       c.competitionRoundId === round._id &&
@@ -1386,83 +1382,7 @@ export function PlayerCompetition({ s, run, busy }: Props) {
           </p>
         )}
       </div>
-      <div className="card">
-        <h3>Adversários elegíveis</h3>
-        {eligible.map((t) => (
-          <p key={t.id}>
-            {t.members.map((m) => m.name).join(" + ")}{" "}
-            <button
-              disabled={
-                busy ||
-                !!publication ||
-                Date.now() < Date.parse(round.opensAt) ||
-                Date.now() >= Date.parse(round.closesAt)
-              }
-              onClick={() =>
-                run(
-                  {
-                    type: "competition.challenge.submit",
-                    roundId: round._id,
-                    defenderId: t.id,
-                  },
-                  "Desafio submetido",
-                )
-              }
-            >
-              Desafiar
-            </button>
-          </p>
-        ))}
-        {!eligible.length && (
-          <p>
-            Sem adversários elegíveis acima da tua posição. O campeão apenas
-            defende.
-          </p>
-        )}
-      </div>
-      <div className="card">
-        <h3>Os teus desafios</h3>
-        {ownChallenges.map((c) => (
-          <p key={c._id}>
-            {name(c.attackerId)} → {name(c.defenderId)} ·{" "}
-            {competitionLabels[c.status]} {c.invalidReason}{" "}
-            {c.defenderId === own?.id && c.status === "PENDING" && (
-              <>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    run(
-                      {
-                        type: "competition.challenge.respond",
-                        challengeId: c._id,
-                        accept: true,
-                      },
-                      "Desafio aceite; aguarda publicação administrativa",
-                    )
-                  }
-                >
-                  Aceitar
-                </button>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    run(
-                      {
-                        type: "competition.challenge.respond",
-                        challengeId: c._id,
-                        accept: false,
-                      },
-                      "Resposta registada",
-                    )
-                  }
-                >
-                  Recusar
-                </button>
-              </>
-            )}
-          </p>
-        ))}
-      </div>
+      <PlayerRoundChallenges s={s} round={round} run={run} busy={busy} />
       {ownMatch.map((c) => (
         <div className="card" key={c._id}>
           <h3>

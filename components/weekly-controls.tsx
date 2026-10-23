@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usesManagedCompetition } from "@/lib/competition-mode";
 import RankingExport from "./ranking-export";
 import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
@@ -160,7 +162,12 @@ export function WeeklyRoles({
       ),
     );
   const visible = teams.filter(
-    (entry) => division === "all" || entry.members[0].divisionId === division,
+    (entry) =>
+      (division === "all" || entry.members[0].divisionId === division) &&
+      (admin ||
+        entry.members.some((m) => m._id === me._id) ||
+        (weeklyRole(s, me._id) === "attack" &&
+          entry.members.some((m) => !challengeReason(s, me, m)))),
   );
   const published = !!round?.publishedAt;
   const save = async (publish: boolean) => {
@@ -187,14 +194,30 @@ export function WeeklyRoles({
       <h2>
         {admin
           ? "Atribuição semanal de ataque e defesa"
-          : "O teu papel e os teus adversários"}
+          : weeklyRole(s, me._id) === "attack"
+            ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
+            : weeklyRole(s, me._id) === "defense"
+              ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
+              : "OS MEUS DESAFIOS"}
       </h2>
+      {admin && s.divisions.some((d) => usesManagedCompetition(s, d._id)) && (
+        <p>
+          As jornadas oficiais têm papéis próprios por liga.{" "}
+          <Link href="/admin?tab=matchmaking">
+            Define e publica os papéis em Competição e jornadas
+          </Link>{" "}
+          antes de abrir os desafios.
+        </p>
+      )}
       {admin ? (
         <WeekNavigation week={week} onChange={setWeek} />
       ) : (
         <p>
-          Semana de {week} · máximo de um jogo por equipa ou jogador sem
-          parceiro.
+          Semana de {week} · Ranking:{" "}
+          {rankingEntries(s.players, me.divisionId).findIndex((t) =>
+            t.members.some((m) => m._id === me._id),
+          ) + 1}{" "}
+          · Distância máxima: {s.settings[0].maxPositionsAbove} posições.
         </p>
       )}
       <p role="status">
@@ -207,6 +230,20 @@ export function WeeklyRoles({
           O teu papel: <WeeklyBadge s={s} player={me} />
         </p>
       )}
+      {!admin && weeklyRole(s, me._id) === "defense" && (
+        <p>
+          Esta jornada estás em modo DEFESA. Aguarda pelos desafios das duplas
+          elegíveis.
+        </p>
+      )}
+      {!admin &&
+        weeklyRole(s, me._id) === "attack" &&
+        visible.every((t) => t.members.some((m) => m._id === me._id)) && (
+          <p>
+            Não existem duplas disponíveis para desafiar nesta jornada. A
+            organização será notificada.
+          </p>
+        )}
       {admin && (
         <label>
           Categoria dos papéis

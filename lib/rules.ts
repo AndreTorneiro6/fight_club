@@ -1,3 +1,4 @@
+import { rankingEntries } from "./ranking-groups";
 import { weeklyReason } from "./weekly";
 import type { Challenge, Player, Settings, Slot, State } from "./types";
 
@@ -60,17 +61,21 @@ export function challengeReason(
     return "Jogador indisponível.";
   if (me.divisionId !== defender.divisionId)
     return "Só podes desafiar na tua divisão.";
-  if (
-    !title &&
-    (defender.position >= me.position ||
-      me.position - defender.position > rules.maxPositionsAbove)
-  )
+  const teams = rankingEntries(s.players, me.divisionId),
+    aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
+    dRank =
+      teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
+  if (!title && (dRank >= aRank || aRank - dRank > rules.maxPositionsAbove))
     return "Adversário fora do limite de posições.";
+  if (dRank === 1 && aRank > rules.titleMaxPosition)
+    return "Posição fora das regras do jogo do título.";
   if (title && me.position > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
     activeChallenges(s, me._id, now).length >= rules.maxActiveChallenges ||
-    activeChallenges(s, defender._id, now).length >= rules.maxActiveChallenges
+    activeChallenges(s, defender._id, now).filter(
+      (c) => !rules.weeklyCompetition || c.status !== "pending",
+    ).length >= rules.maxActiveChallenges
   )
     return "Limite de desafios simultâneos atingido.";
   const previous = s.challenges

@@ -65,7 +65,11 @@ export function deliveryContent(n: Notification) {
       ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
       : n.challengeId
         ? `/desafios/${encodeURIComponent(n.challengeId)}`
-        : "/notificacoes",
+        : n.competitionNotice
+          ? n.playerId === "__admins__"
+            ? "/admin?tab=matchmaking"
+            : "/jornadas"
+          : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */
