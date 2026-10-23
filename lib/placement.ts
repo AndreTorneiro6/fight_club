@@ -68,6 +68,7 @@ export const placementGameSchema = z
   });
 const rules = z
   .object({
+    protectVacationPositions: z.boolean().optional(),
     pointsMode: z.enum(["TOTAL_POINTS", "CLASSIFICATION_POINTS"]),
     winPoints: integer,
     lossPoints: integer,
@@ -79,6 +80,17 @@ const eventFields = {
   rules,
 };
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.placement.previewRanking"),
+      events: z
+        .array(z.object({ id, version: integer }).strict())
+        .min(1)
+        .max(30),
+      tieOrder: z.array(id).max(100),
+      confirmTies: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.placement.game.update"),
@@ -198,7 +210,16 @@ export function validatePlacementGroup(events: PlacementEvent[]) {
   );
   ensure(
     events.every(
-      (e) => JSON.stringify(e.rules) === JSON.stringify(first.rules),
+      (e) =>
+        JSON.stringify({
+          ...e.rules,
+          protectVacationPositions: e.rules.protectVacationPositions ?? false,
+        }) ===
+        JSON.stringify({
+          ...first.rules,
+          protectVacationPositions:
+            first.rules.protectVacationPositions ?? false,
+        }),
     ),
     "Os eventos selecionados têm regras de pontos diferentes.",
   );
@@ -288,7 +309,11 @@ export function executePlacement(
     audit({ eventId: e._id, after: e });
     return { id: e._id };
   }
-  if (cmd.type === "admin.placement.apply") {
+  if (
+    cmd.type === "admin.placement.apply" ||
+    cmd.type === "admin.placement.previewRanking"
+  ) {
+    const provisional = cmd.type === "admin.placement.previewRanking";
     ensure(
       new Set(cmd.events.map((e) => e.id)).size === cmd.events.length,
       "Evento repetido.",
@@ -348,9 +373,20 @@ export function executePlacement(
       "Já existem propostas ou jornadas nesta divisão. Resolve-as antes da colocação.",
       409,
     );
+    ensure(
+      !(state.competitionRounds ?? []).some(
+        (r) => roundIds.has(r._id) && r.rolesPublishedAt,
+      ),
+      "Já existem papéis oficiais publicados. A colocação inicial não pode reescrever esse ranking.",
+      409,
+    );
     const rows = placementStandings(events, cmd.tieOrder);
     ensure(
-      rows.every((r) => r.played > 0),
+      events.some((e) => e.games.length > 0),
+      "Regista pelo menos um jogo de colocação.",
+    );
+    ensure(
+      provisional || rows.every((r) => r.played > 0),
       "Todas as equipas precisam de pelo menos um jogo de colocação.",
     );
     ensure(
@@ -368,9 +404,10 @@ export function executePlacement(
       "A ordem deve respeitar a diferença de sets e os pontos.",
     );
     ensure(
-      rows.every((r) =>
-        r.members.every((m) => !frozenRanking(state, m.playerId, timestamp)),
-      ),
+      !first.rules.protectVacationPositions ||
+        rows.every((r) =>
+          r.members.every((m) => !frozenRanking(state, m.playerId, timestamp)),
+        ),
       "Existe uma posição protegida por férias. Resolve a proteção antes de aplicar.",
     );
     const before = state.players
@@ -381,7 +418,8 @@ export function executePlacement(
       for (const member of row.members) {
         const p = state.players.find((p) => p._id === member.playerId)!;
         ensure(
-          !frozenRanking(state, p._id, timestamp),
+          !first.rules.protectVacationPositions ||
+            !frozenRanking(state, p._id, timestamp),
           "Existe uma posição protegida por férias. Resolve a proteção antes de aplicar.",
         );
         const old = p.position;
@@ -393,18 +431,24 @@ export function executePlacement(
           divisionId: p.divisionId,
           oldPosition: old,
           newPosition: p.position,
-          reason: `Colocação inicial: ${events.map((e) => e.name).join(" + ")}`,
+          reason: `${provisional ? "Colocação provisória" : "Colocação inicial"}: ${events.map((e) => e.name).join(" + ")}`,
           createdAt: now,
         });
       }
     for (const e of events) {
-      e.status = "APPLIED";
+      if (!provisional) e.status = "APPLIED";
       e.version++;
       e.updatedAt = now;
-      e.appliedAt = now;
-      e.appliedBy = actor.userId;
-      e.appliedOrder = cmd.tieOrder;
-      e.appliedEventIds = events.map((e) => e._id);
+      if (provisional) {
+        e.previewedAt = now;
+        e.previewedBy = actor.userId;
+        e.previewOrder = cmd.tieOrder;
+      } else {
+        e.appliedAt = now;
+        e.appliedBy = actor.userId;
+        e.appliedOrder = cmd.tieOrder;
+        e.appliedEventIds = events.map((e) => e._id);
+      }
     }
     audit({
       eventIds: events.map((e) => e._id),
@@ -416,8 +460,11 @@ export function executePlacement(
         points: r.rankingPoints,
       })),
       confirmedTies: cmd.confirmTies,
+      provisional,
+      vacationProtectionDuringPlacement:
+        first.rules.protectVacationPositions ?? false,
     });
-    return { applied: rows.length };
+    return { applied: rows.length, provisional };
   }
   const e = writable(cmd.eventId, cmd.expectedVersion),
     before = structuredClone(e);

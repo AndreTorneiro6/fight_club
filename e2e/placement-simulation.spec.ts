@@ -376,4 +376,27 @@ test("admin adds and edits individual sets, then imports a multi-sheet Numbers w
     saved.games.find((g: { id: string }) => g.id === "manual-per-set").setsB,
   ).toBe(2);
   expect(saved.status).toBe("DRAFT");
+  await area.getByRole("checkbox", { name: /Folhas e resultados/ }).check();
+  await area
+    .getByRole("checkbox", {
+      name: "Confirmo a ordem apresentada para os empates completos",
+      exact: true,
+    })
+    .check();
+  await area
+    .getByRole("button", { name: "Atualizar ranking provisório", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Ranking provisório atualizado; os jogos continuam editáveis.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const ranked = await read(),
+    draft = ranked.placementEvents.find(
+      (e: { _id: string }) => e._id === event._id,
+    );
+  expect(draft.status).toBe("DRAFT");
+  expect(draft.previewedAt).toBeTruthy();
+  expect(draft.games).toHaveLength(2);
 });

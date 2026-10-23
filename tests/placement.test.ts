@@ -652,3 +652,76 @@ test("per-set placement totals and contradictory same-ID set corrections cannot 
   );
   assert.deepEqual(e.games[0].setScores, g.setScores);
 });
+
+test("provisional placement updates live positions while games stay editable and vacation records remain unchanged", () => {
+  const s = fixture(),
+    e = event(s);
+  execute(s, admin, {
+    type: "admin.placement.games",
+    eventId: e._id,
+    expectedVersion: e.version,
+    games: [games[0]],
+  });
+  s.exceptions.push({
+    _id: "vacation",
+    playerId: "p3",
+    from: "2026-01-01",
+    to: "2027-01-01",
+    vacation: true,
+    note: "Férias para a liga",
+  });
+  const vacation = structuredClone(s.exceptions),
+    order = placementStandings([e]).map((r) => r.id);
+  execute(s, admin, {
+    type: "admin.placement.previewRanking",
+    events: [{ id: e._id, version: e.version }],
+    tieOrder: order,
+    confirmTies: true,
+  });
+  assert.equal(s.players.find((p) => p._id === "p3")!.position, 1);
+  assert.equal(e.status, "DRAFT");
+  assert.deepEqual(s.exceptions, vacation);
+  assert.ok(e.previewedAt);
+  assert.equal(s.results.length, 0);
+  execute(s, admin, {
+    type: "admin.placement.game.update",
+    eventId: e._id,
+    expectedVersion: e.version,
+    game: { ...games[0], pointsA: 13 },
+    reason: "Correção na colocação",
+  });
+  assert.equal(e.games[0].pointsA, 13);
+});
+test("initial placement vacation protection is configurable and official published roles block provisional reordering", () => {
+  const s = fixture(),
+    e = event(s);
+  e.games = [games[0]];
+  e.rules = { ...e.rules, protectVacationPositions: true };
+  s.exceptions.push({
+    _id: "v",
+    playerId: "p3",
+    from: "2026-01-01",
+    to: "2027-01-01",
+    vacation: true,
+    note: "Férias",
+  });
+  const command = () => ({
+    type: "admin.placement.previewRanking",
+    events: [{ id: e._id, version: e.version }],
+    tieOrder: placementStandings([e]).map((r) => r.id),
+    confirmTies: true,
+  });
+  assert.throws(() => execute(s, admin, command()), /férias/);
+  e.rules.protectVacationPositions = false;
+  s.competitionConfigurations = [{ _id: "c", seasonId: e.seasonId } as any];
+  s.competitionRounds = [
+    {
+      _id: "r",
+      competitionId: "c",
+      divisionId: e.divisionId,
+      rolesPublishedAt: new Date().toISOString(),
+    } as any,
+  ];
+  assert.throws(() => execute(s, admin, command()), /papéis oficiais/);
+  assert.equal(e.status, "DRAFT");
+});

@@ -14,6 +14,7 @@ export interface PlacementGame {
   setScores?: { a: number; b: number }[];
 }
 export interface PlacementRules {
+  protectVacationPositions?: boolean;
   pointsMode: "TOTAL_POINTS" | "CLASSIFICATION_POINTS";
   winPoints: number;
   lossPoints: number;
@@ -31,6 +32,9 @@ export interface PlacementEvent {
   games: PlacementGame[];
   createdAt: string;
   updatedAt: string;
+  previewedAt?: string;
+  previewedBy?: string;
+  previewOrder?: string[];
   appliedAt?: string;
   appliedBy?: string;
   appliedOrder?: string[];
