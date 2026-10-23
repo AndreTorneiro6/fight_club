@@ -1,4 +1,5 @@
 "use client";
+import RoundChallengeCoverage from "./round-challenge-coverage";
 import ChallengeTimeProposal from "./challenge-time-proposal";
 import { RoundRoles, PlayerRoundChallenges } from "./round-challenge-roles";
 import { useState } from "react";
@@ -12,6 +13,12 @@ import { defaultCompetitionWeights } from "@/lib/competition-types";
 import { roleStatistics } from "@/lib/competition-optimizer";
 import type { CompetitionMeeting } from "@/lib/competition-types";
 import { rankingEntries } from "@/lib/ranking-groups";
+const seasonStatusLabels = {
+  active: "ativa",
+  paused: "pausada",
+  draft: "em preparação",
+  completed: "concluída",
+} as const;
 const competitionLabels: Record<string, string> = {
   DRAFT: "Rascunho",
   APPROVED: "Aprovado",
@@ -82,6 +89,9 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
       : (configurations.find((c) => c._id === configurationId) ??
         configurations.find((c) => c.enabled) ??
         configurations[0]);
+  const selectedSeason = s.seasons.find(
+    (season) => season._id === config?.seasonId,
+  );
   const [divisionId, setDivision] = useState(s.divisions[0]?._id ?? "");
   const rounds = (s.competitionRounds ?? [])
     .filter(
@@ -134,19 +144,42 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
               <option key={entry._id} value={entry._id}>
                 {s.seasons.find((season) => season._id === entry.seasonId)
                   ?.name ?? entry.seasonId}
-                {entry.enabled ? " — ativa" : " — desativada"}
+                {" — época "}
+                {
+                  seasonStatusLabels[
+                    s.seasons.find((season) => season._id === entry.seasonId)
+                      ?.status ?? "draft"
+                  ]
+                }
               </option>
             ))}
             <option value="new">Criar competição para outra época</option>
           </select>
         </label>
+        {selectedSeason && (
+          <p role="status">
+            <strong>Época {seasonStatusLabels[selectedSeason.status]}</strong> ·{" "}
+            {selectedSeason.name}
+          </p>
+        )}
         <p>
           <strong>
-            {config?.enabled
-              ? "Competição gerida ativa"
-              : "Modo seguro — competição gerida desativada"}
+            {!config
+              ? "Competição por jornadas ainda não configurada"
+              : config.enabled
+                ? "Competição por jornadas ativada"
+                : "Competição por jornadas por ativar"}
           </strong>
         </p>
+        {config && !config.enabled && (
+          <p>
+            A época e a competição por jornadas têm estados independentes.
+            Ativar a época não publica papéis nem abre desafios. Para usar
+            jornadas, ativa a opção nas Definições da competição e configura as
+            respetivas datas.
+          </p>
+        )}
+
         <details>
           <summary>Definições da competição</summary>
           <form
@@ -718,6 +751,7 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
             run={run}
             busy={busy}
           />
+          <RoundChallengeCoverage s={s} round={round} />
           <div className="card">
             <h3>Desafios e prioridades</h3>
             <p role="status">

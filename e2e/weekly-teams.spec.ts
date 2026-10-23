@@ -167,6 +167,26 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await expect(
     admin.locator("[data-weekly-team]").filter({ hasText: "Luís Costa" }),
   ).toContainText("Papel bloqueado");
+  await admin
+    .getByRole("combobox", { name: "Categoria dos papéis", exact: true })
+    .selectOption(saved.players.find((p) => p._id === "player-7")!.divisionId);
+  await admin
+    .getByText("Duplas sem desafios enviados ou recebidos", { exact: true })
+    .click();
+  const noSent = admin.getByRole("region", {
+      name: "Duplas que não enviaram desafios",
+      exact: true,
+    }),
+    noReceived = admin.getByRole("region", {
+      name: "Duplas que não receberam desafios",
+      exact: true,
+    });
+  await expect(noSent).not.toContainText("Carlos Pereira");
+  await expect(noSent).not.toContainText("Miguel Silva");
+  await expect(noSent).toContainText("Luís Costa + Bruno Martins");
+  await expect(noReceived).not.toContainText("Luís Costa");
+  await expect(noReceived).not.toContainText("Bruno Martins");
+  await expect(noReceived).toContainText("Carlos Pereira + Miguel Silva");
   const withHistory: View = await (
     await admin.request.get("/api/league")
   ).json();

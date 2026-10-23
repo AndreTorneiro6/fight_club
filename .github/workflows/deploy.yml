@@ -66,6 +66,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check independent season and competition status labels
+        run: npx playwright test e2e/competition-season-status.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check weekly ranking publication and player notifications
         run: npx playwright test e2e/weekly-ranking.spec.ts
         env:
