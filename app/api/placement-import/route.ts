@@ -44,16 +44,38 @@ export async function POST(request: Request) {
       file instanceof File && file.size <= 5 * 1024 * 1024,
       "Escolhe Excel/CSV até 5 MB.",
     );
-    const event = (await view(actor)).placementEvents?.find(
+    const state = await view(actor);
+    const event = state.placementEvents?.find(
       (e) => e._id === form.get("eventId"),
     );
     ensure(event && event.status === "DRAFT", "Escolhe um evento por aplicar.");
+    const sheetName = form.get("sheetName"),
+      dateOrder = form.get("dateOrder");
+    ensure(
+      !sheetName || (typeof sheetName === "string" && sheetName.length <= 31),
+      "Folha inválida.",
+    );
+    ensure(
+      !dateOrder || dateOrder === "DAY_MONTH" || dateOrder === "MONTH_DAY",
+      "Interpretação de datas inválida.",
+    );
+    const division = state.divisions.find((d) => d._id === event.divisionId);
     return NextResponse.json(
       {
         ...(await parsePlacementImport(
           Buffer.from(await file.arrayBuffer()),
           file.name,
           event,
+          {
+            sheetName: typeof sheetName === "string" ? sheetName : undefined,
+            dateOrder:
+              dateOrder === "DAY_MONTH" || dateOrder === "MONTH_DAY"
+                ? dateOrder
+                : undefined,
+            divisionNames: division
+              ? [division._id, division.name, division.code]
+              : [event.divisionId],
+          },
         )),
         eventId: event._id,
         version: event.version,

@@ -1,4 +1,5 @@
 "use client";
+import PlacementGameEditor from "./placement-game-editor";
 import styles from "./admin-lab.module.css";
 import { useState } from "react";
 import type { View } from "@/lib/types";
@@ -17,6 +18,13 @@ type Preview = {
   games: PlacementGame[];
   duplicates: number;
   errors: { row: number; message: string }[];
+  sheets: string[];
+  allSheets: string[];
+  sheetName: string;
+  needsSheetSelection: boolean;
+  skippedDivision: number;
+  skippedUnplayed: number;
+  convertedDates: number;
 };
 function EventEditor({
   event,
@@ -135,15 +143,10 @@ export default function AdminPlacement({ state, run, busy }: Props) {
       (e) => e.seasonId === seasonId && e.divisionId === divisionId,
     ),
     event = events.find((e) => e._id === eventId) ?? events[0];
-  const [draft, setDraft] = useState({
-    id: "",
-    teamA: "",
-    teamB: "",
-    setsA: 2,
-    setsB: 0,
-    pointsA: 0,
-    pointsB: 0,
-  });
+  const [importedFile, setImportedFile] = useState<File | null>(null),
+    [dateOrder, setDateOrder] = useState(""),
+    [editing, setEditing] = useState<PlacementGame | null>(null),
+    [editingVersion, setEditingVersion] = useState(0);
   const group = events.filter((e) => selected.includes(e._id));
   const ranking = placementStandings(group, tieOrder);
   const stale =
@@ -152,7 +155,7 @@ export default function AdminPlacement({ state, run, busy }: Props) {
   const editable = event?.status === "DRAFT";
   const label = (id: string) =>
     event?.teams.find((t) => t.id === id)?.name ?? id;
-  async function importFile(file: File) {
+  async function importFile(file: File, sheetName = "", dates = dateOrder) {
     if (!event) return;
     setLoading(true);
     setError("");
@@ -161,6 +164,8 @@ export default function AdminPlacement({ state, run, busy }: Props) {
       const body = new FormData();
       body.set("file", file);
       body.set("eventId", event._id);
+      body.set("sheetName", sheetName);
+      body.set("dateOrder", dates);
       const response = await fetch("/api/placement-import", {
         method: "POST",
         body,
@@ -176,6 +181,9 @@ export default function AdminPlacement({ state, run, busy }: Props) {
   }
   function reset() {
     setEvent("");
+    setImportedFile(null);
+    setDateOrder("");
+    setEditing(null);
     setSelected([]);
     setPreview(null);
     setTieOrder([]);
@@ -245,6 +253,9 @@ export default function AdminPlacement({ state, run, busy }: Props) {
             );
             if (result && typeof result === "object" && "id" in result) {
               setEvent(String(result.id));
+              setEditing(null);
+              setImportedFile(null);
+              setDateOrder("");
               setPreview(null);
             }
           }}
@@ -279,6 +290,9 @@ export default function AdminPlacement({ state, run, busy }: Props) {
               value={event._id}
               onChange={(e) => {
                 setEvent(e.target.value);
+                setEditing(null);
+                setImportedFile(null);
+                setDateOrder("");
                 setPreview(null);
               }}
             >
@@ -302,76 +316,23 @@ export default function AdminPlacement({ state, run, busy }: Props) {
           />
           {editable && (
             <>
-              <h3>Registar um jogo</h3>
-              <p>
-                Sets em melhor de três. Introduz o total efetivamente marcado
-                por cada equipa; não são calculados pontos em falta.
-              </p>
-              <form
-                className="row wrap"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const result = await run(
-                    {
-                      type: "admin.placement.games",
-                      eventId: event._id,
-                      expectedVersion: event.version,
-                      games: [
-                        { ...draft, id: draft.id || crypto.randomUUID() },
-                      ],
-                    },
-                    "Jogo registado.",
-                  );
-                  if (result) setDraft({ ...draft, id: "" });
-                }}
-              >
-                <label>
-                  Identificador do jogo
-                  <input
-                    maxLength={150}
-                    value={draft.id}
-                    placeholder="Opcional · ID do Excel"
-                    onChange={(e) => setDraft({ ...draft, id: e.target.value })}
-                  />
-                </label>
-                {(["teamA", "teamB"] as const).map((key, i) => (
-                  <label key={key}>
-                    Equipa {i ? "B" : "A"}
-                    <select
-                      required
-                      value={draft[key]}
-                      onChange={(e) =>
-                        setDraft({ ...draft, [key]: e.target.value })
-                      }
-                    >
-                      <option value="">Seleciona</option>
-                      {event.teams.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-                {(["setsA", "setsB", "pointsA", "pointsB"] as const).map(
-                  (key, i) => (
-                    <label key={key}>
-                      {["Sets A", "Sets B", "Pontos A", "Pontos B"][i]}
-                      <input
-                        type="number"
-                        min={0}
-                        max={i < 2 ? 2 : 100000}
-                        required
-                        value={draft[key]}
-                        onChange={(e) =>
-                          setDraft({ ...draft, [key]: Number(e.target.value) })
-                        }
-                      />
-                    </label>
-                  ),
-                )}
-                <button disabled={busy}>Adicionar jogo</button>
-              </form>
+              <PlacementGameEditor
+                key={`add:${event._id}:${event.version}`}
+                event={event}
+                run={run}
+                busy={busy}
+              />
+              {editing && (
+                <PlacementGameEditor
+                  key={`edit:${event._id}:${editing.id}:${editingVersion}`}
+                  event={event}
+                  game={editing}
+                  expectedVersion={editingVersion}
+                  run={run}
+                  busy={busy}
+                  onClose={() => setEditing(null)}
+                />
+              )}
               <h3>Importar jogos do Excel</h3>
               <a
                 className="button"
@@ -387,16 +348,88 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                   disabled={busy || loading}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) void importFile(file);
+                    if (file) {
+                      setImportedFile(file);
+                      setDateOrder("");
+                      void importFile(file, "", "");
+                    }
                     e.target.value = "";
                   }}
                 />
               </label>
+              {importedFile && (
+                <label>
+                  Interpretar datas nos sets
+                  <select
+                    value={dateOrder}
+                    disabled={loading}
+                    onChange={(e) => {
+                      setDateOrder(e.target.value);
+                      void importFile(
+                        importedFile,
+                        preview?.sheetName ?? "",
+                        e.target.value,
+                      );
+                    }}
+                  >
+                    <option value="">
+                      Não converter datas automaticamente
+                    </option>
+                    <option value="DAY_MONTH">
+                      Dia–mês · 6 de abril → 6–4
+                    </option>
+                    <option value="MONTH_DAY">
+                      Mês–dia · 6 de abril → 4–6
+                    </option>
+                  </select>
+                </label>
+              )}
               {loading && <p role="status">A validar ficheiro…</p>}
               {error && <p role="alert">{error}</p>}
               {preview && (
                 <div className="inset stack">
                   <h4>Pré-visualização da importação</h4>
+                  <p>
+                    {preview.allSheets.length} folhas encontradas. Só a folha de
+                    resultados selecionada será importada para esta divisão.
+                  </p>
+                  <label>
+                    Folha de resultados
+                    <select
+                      value={preview.sheetName}
+                      disabled={loading || !importedFile}
+                      onChange={(e) => {
+                        if (importedFile)
+                          void importFile(importedFile, e.target.value);
+                      }}
+                    >
+                      <option value="" disabled>
+                        Seleciona uma folha
+                      </option>
+                      {preview.sheets.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {preview.needsSheetSelection && (
+                    <p role="status">
+                      O documento tem várias folhas de resultados. Escolhe a que
+                      queres importar.
+                    </p>
+                  )}
+                  <p>
+                    {preview.skippedDivision} jogos de outras divisões ignorados
+                    · {preview.skippedUnplayed} jogos sem resultado ignorados.
+                  </p>
+                  {!!preview.convertedDates && (
+                    <p role="status">
+                      {preview.convertedDates} pontuações recuperadas de datas
+                      com a interpretação escolhida. Confirma cada set antes de
+                      guardar.
+                    </p>
+                  )}
                   <p>
                     {preview.games.length} jogos novos · {preview.duplicates}{" "}
                     duplicados ignorados · {preview.errors.length} erros
@@ -426,6 +459,7 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                               <th>Jogo</th>
                               <th>Equipa A</th>
                               <th>Equipa B</th>
+                              <th>Resultado por set</th>
                               <th>Sets</th>
                               <th>Pontos</th>
                             </tr>
@@ -436,6 +470,11 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                                 <td>{g.id}</td>
                                 <td>{label(g.teamA)}</td>
                                 <td>{label(g.teamB)}</td>
+                                <td>
+                                  {g.setScores
+                                    ?.map((s, i) => `${i + 1}.º: ${s.a}–${s.b}`)
+                                    .join(" · ") ?? "Apenas totais"}
+                                </td>
                                 <td>
                                   {g.setsA}–{g.setsB}
                                 </td>
@@ -453,6 +492,7 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                     disabled={
                       busy ||
                       stale ||
+                      preview.needsSheetSelection ||
                       !!preview.errors.length ||
                       !preview.games.length
                     }
@@ -488,6 +528,7 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                       <th>Jogo</th>
                       <th>Equipa A</th>
                       <th>Equipa B</th>
+                      <th>Resultado por set</th>
                       <th>Sets</th>
                       <th>Pontos</th>
                       <th>Ações</th>
@@ -500,12 +541,28 @@ export default function AdminPlacement({ state, run, busy }: Props) {
                         <td>{label(g.teamA)}</td>
                         <td>{label(g.teamB)}</td>
                         <td>
+                          {g.setScores
+                            ?.map((s, i) => `${i + 1}.º: ${s.a}–${s.b}`)
+                            .join(" · ") ?? "Apenas totais"}
+                        </td>
+                        <td>
                           {g.setsA}–{g.setsB}
                         </td>
                         <td>
                           {g.pointsA}–{g.pointsB}
                         </td>
                         <td>
+                          {editable && (
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                setEditing(g);
+                                setEditingVersion(event.version);
+                              }}
+                            >
+                              Editar resultado
+                            </button>
+                          )}
                           {editable && (
                             <button
                               disabled={busy}

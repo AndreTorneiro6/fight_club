@@ -242,7 +242,9 @@ test("Excel template includes team IDs; CSV preview resolves teams, reports erro
   assert.ok(template.byteLength > 0);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(template as never);
-  workbook.getWorksheet("Jogos")!.addRow(["xlsx-1", "p3", "p0", 2, 0, 12, 5]);
+  workbook
+    .getWorksheet("Jogos")!
+    .addRow(["xlsx-1", "p3", "p0", "6-4", "6-1", ""]);
   const xlsx = Buffer.from(await workbook.xlsx.writeBuffer());
   assert.equal(
     (await parsePlacementImport(xlsx, "jogos.xlsx", e)).games[0].id,
@@ -401,4 +403,252 @@ test("specific valid challenge submission and acceptance run only in a copied st
   }
   assert.deepEqual(s, snapshot);
   assert.equal(s.challenges.length, before.challenges.length);
+});
+
+async function fullWorkbook() {
+  const book = new ExcelJS.Workbook();
+  book.addWorksheet("Export Summary").addRow(["Exportado do Numbers"]);
+  const games = book.addWorksheet("Evento Colocação");
+  games.addRow(["Evento de colocação"]);
+  games.addRow([]);
+  games.addRow([]);
+  games.addRow([
+    "ID Jogo",
+    "Divisão",
+    "Ronda",
+    "ID Dupla A",
+    "Dupla A",
+    "ID Dupla B",
+    "Dupla B",
+    "Data",
+    "Hora",
+    "Set 1",
+    "Set 2",
+    "Set 3",
+    "Sets A",
+    "Sets B",
+    "Jogos A",
+    "Jogos B",
+  ]);
+  games.addRow([
+    "O-1",
+    "Ouro",
+    1,
+    "O04",
+    "Equipa 3",
+    "O01",
+    "Equipa 0",
+    "",
+    "",
+    "6-4",
+    "3-6",
+    "10-8",
+    { formula: "IGNORED()" },
+    null,
+    null,
+    null,
+  ]);
+  games.addRow([
+    "P-1",
+    "Prata",
+    1,
+    "P01",
+    "Outra dupla",
+    "P02",
+    "Mais uma",
+    "",
+    "",
+    "6-2",
+    "6-1",
+  ]);
+  games.addRow(["O-2", "Ouro", 2, "O01", "Equipa 0", "O04", "Equipa 3"]);
+  const teams = book.addWorksheet("Duplas");
+  teams.addRow(["DUPLAS"]);
+  teams.addRow([]);
+  teams.addRow(["ID", "Divisão", "Dupla"]);
+  teams.addRow(["O04", "Ouro", "Equipa 3"]);
+  teams.addRow(["O01", "Ouro", "Equipa 0"]);
+  book.addWorksheet("Ranking").addRow([{ formula: "IGNORED_TOO()" }]);
+  return { book, games };
+}
+test("full Numbers workbook finds placement header below title, resolves external IDs and keeps each set", async () => {
+  const s = fixture(),
+    e = event(s),
+    { book } = await fullWorkbook(),
+    before = structuredClone(s);
+  const parsed = await parsePlacementImport(
+    Buffer.from(await book.xlsx.writeBuffer()),
+    "full.xlsx",
+    e,
+    { divisionNames: ["Ouro"] },
+  );
+  assert.equal(parsed.allSheets.length, 4);
+  assert.equal(parsed.sheetName, "Evento Colocação");
+  assert.equal(parsed.games.length, 1);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.skippedDivision, 1);
+  assert.equal(parsed.skippedUnplayed, 1);
+  assert.deepEqual(parsed.games[0].setScores, [
+    { a: 6, b: 4 },
+    { a: 3, b: 6 },
+    { a: 10, b: 8 },
+  ]);
+  assert.equal(parsed.games[0].pointsA, 19);
+  assert.equal(parsed.games[0].pointsB, 18);
+  assert.deepEqual(s, before);
+});
+test("Excel dates require explicit interpretation and literal totals must match recovered set scores", async () => {
+  const s = fixture(),
+    e = event(s),
+    { book, games } = await fullWorkbook();
+  games.getRow(5).getCell(10).value = new Date("2026-04-06T00:00:00Z");
+  let bytes = Buffer.from(await book.xlsx.writeBuffer());
+  let parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    divisionNames: ["ouro"],
+  });
+  assert.equal(parsed.games.length, 0);
+  assert.match(parsed.errors[0].message, /convertido numa data/);
+  parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    divisionNames: ["ouro"],
+    dateOrder: "DAY_MONTH",
+  });
+  assert.equal(parsed.games.length, 1);
+  assert.equal(parsed.convertedDates, 1);
+  assert.deepEqual(parsed.games[0].setScores?.[0], { a: 6, b: 4 });
+  games.getRow(5).getCell(15).value = 100;
+  bytes = Buffer.from(await book.xlsx.writeBuffer());
+  parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    divisionNames: ["ouro"],
+    dateOrder: "DAY_MONTH",
+  });
+  assert.equal(parsed.games.length, 0);
+  assert.match(parsed.errors[0].message, /não correspondem/);
+});
+test("multiple result sheets require selection and raw score formulas cannot be evaluated or imported", async () => {
+  const s = fixture(),
+    e = event(s),
+    { book, games } = await fullWorkbook();
+  const another = book.addWorksheet("Outra ronda");
+  another.addRow(["Jogo", "Equipa A", "Equipa B", "Set 1", "Set 2", "Set 3"]);
+  another.addRow(["g2", "p3", "p0", "6-1", "6-2"]);
+  let bytes = Buffer.from(await book.xlsx.writeBuffer());
+  let parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    divisionNames: ["Ouro"],
+  });
+  assert.equal(parsed.needsSheetSelection, true);
+  assert.equal(parsed.games.length, 0);
+  parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    sheetName: "Outra ronda",
+    divisionNames: ["Ouro"],
+  });
+  assert.equal(parsed.games[0].id, "g2");
+  games.getRow(5).getCell(10).value = { formula: "6+4", result: "6-4" };
+  bytes = Buffer.from(await book.xlsx.writeBuffer());
+  parsed = await parsePlacementImport(bytes, "full.xlsx", e, {
+    sheetName: "Evento Colocação",
+    divisionNames: ["Ouro"],
+  });
+  assert.equal(parsed.games.length, 0);
+  assert.match(parsed.errors[0].message, /fórmulas/);
+});
+test("editing a placement result is versioned, audited and cannot alter applied events or another division", () => {
+  const s = fixture(),
+    e = event(s);
+  execute(s, admin, {
+    type: "admin.placement.games",
+    eventId: e._id,
+    expectedVersion: e.version,
+    games: [games[0]],
+  });
+  const old = structuredClone(e.games[0]),
+    corrected = {
+      ...old,
+      setsA: 0,
+      setsB: 2,
+      pointsA: 7,
+      pointsB: 12,
+      setScores: [
+        { a: 4, b: 6 },
+        { a: 3, b: 6 },
+      ],
+    };
+  const cmd = {
+    type: "admin.placement.game.update",
+    eventId: e._id,
+    expectedVersion: e.version,
+    game: corrected,
+    reason: "Resultado confirmado pelas duplas",
+  };
+  assert.throws(() => execute(s, player, cmd), /administradores/);
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        ...cmd,
+        game: { ...corrected, teamA: "another-league" },
+      }),
+    /evento\/divisão/,
+  );
+  execute(s, admin, cmd);
+  assert.deepEqual(e.games[0], corrected);
+  const audit = JSON.parse(s.audit.at(-1)!.details);
+  assert.deepEqual(audit.before.games[0], old);
+  assert.equal(audit.reason, cmd.reason);
+  assert.throws(() => execute(s, admin, cmd), /Outro administrador/);
+  e.status = "APPLIED";
+  assert.throws(
+    () => execute(s, admin, { ...cmd, expectedVersion: e.version }),
+    /fechado/,
+  );
+  assert.equal(s.results.length, 0);
+});
+test("per-set placement totals and contradictory same-ID set corrections cannot bypass backend validation", () => {
+  const s = fixture(),
+    e = event(s),
+    g = {
+      ...games[0],
+      setScores: [
+        { a: 6, b: 4 },
+        { a: 6, b: 2 },
+      ],
+    };
+  g.setsA = 2;
+  g.setsB = 0;
+  g.pointsA = 12;
+  g.pointsB = 6;
+  execute(s, admin, {
+    type: "admin.placement.games",
+    eventId: e._id,
+    expectedVersion: e.version,
+    games: [g],
+  });
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        type: "admin.placement.game.update",
+        eventId: e._id,
+        expectedVersion: e.version,
+        game: { ...g, pointsA: 20 },
+        reason: "Teste de totais",
+      }),
+    /totais/,
+  );
+  assert.throws(
+    () =>
+      execute(s, admin, {
+        type: "admin.placement.games",
+        eventId: e._id,
+        expectedVersion: e.version,
+        games: [
+          {
+            ...g,
+            setScores: [
+              { a: 6, b: 3 },
+              { a: 6, b: 3 },
+            ],
+          },
+        ],
+      }),
+    /outro resultado/,
+  );
+  assert.deepEqual(e.games[0].setScores, g.setScores);
 });

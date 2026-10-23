@@ -1,3 +1,4 @@
+import { validateSetScores } from "./set-scores";
 import { placementStandings } from "./placement-standings";
 export { placementStandings } from "./placement-standings";
 import { createHash, randomUUID } from "node:crypto";
@@ -22,6 +23,18 @@ export const placementGameSchema = z
     setsB: z.number().int().min(0).max(2),
     pointsA: integer,
     pointsB: integer,
+    setScores: z
+      .array(
+        z
+          .object({
+            a: z.number().int().min(0).max(99),
+            b: z.number().int().min(0).max(99),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(3)
+      .optional(),
   })
   .strict()
   .refine(
@@ -29,7 +42,30 @@ export const placementGameSchema = z
       g.teamA !== g.teamB &&
       ((g.setsA === 2 && g.setsB < 2) || (g.setsB === 2 && g.setsA < 2)),
     "Usa equipas diferentes e um resultado 2–0, 2–1, 0–2 ou 1–2.",
-  );
+  )
+  .superRefine((g, ctx) => {
+    if (!g.setScores) return;
+    try {
+      validateSetScores(
+        g.setScores.map((s) => ({ attacker: s.a, defender: s.b })),
+        g.teamA,
+        g.teamB,
+        g.setsA > g.setsB ? g.teamA : g.teamB,
+      );
+      if (
+        g.setScores.filter((s) => s.a > s.b).length !== g.setsA ||
+        g.setScores.filter((s) => s.b > s.a).length !== g.setsB ||
+        g.setScores.reduce((n, s) => n + s.a, 0) !== g.pointsA ||
+        g.setScores.reduce((n, s) => n + s.b, 0) !== g.pointsB
+      )
+        throw new Error("Os totais não correspondem aos resultados por set.");
+    } catch (error) {
+      ctx.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "Sets inválidos.",
+      });
+    }
+  });
 const rules = z
   .object({
     pointsMode: z.enum(["TOTAL_POINTS", "CLASSIFICATION_POINTS"]),
@@ -43,6 +79,15 @@ const eventFields = {
   rules,
 };
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.placement.game.update"),
+      eventId: id,
+      expectedVersion: integer,
+      game: placementGameSchema,
+      reason: z.string().trim().min(3).max(2000),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.placement.create"),
@@ -122,7 +167,19 @@ export function placementGameFingerprint(g: Omit<PlacementGame, "id">) {
           [g.teamA, g.setsA, g.pointsA],
         ];
   return createHash("sha256")
-    .update(JSON.stringify([a, b]))
+    .update(
+      JSON.stringify(
+        g.setScores
+          ? [
+              a,
+              b,
+              g.setScores.map((s) =>
+                g.teamA < g.teamB ? [s.a, s.b] : [s.b, s.a],
+              ),
+            ]
+          : [a, b],
+      ),
+    )
     .digest("hex")
     .slice(0, 24);
 }
@@ -368,6 +425,18 @@ export function executePlacement(
     e.name = cmd.name;
     e.date = cmd.date;
     e.rules = cmd.rules;
+  } else if (cmd.type === "admin.placement.game.update") {
+    ensure(
+      e.games.some((g) => g.id === cmd.game.id),
+      "Jogo não encontrado.",
+      404,
+    );
+    ensure(
+      e.teams.some((t) => t.id === cmd.game.teamA) &&
+        e.teams.some((t) => t.id === cmd.game.teamB),
+      "Equipa fora deste evento/divisão.",
+    );
+    e.games = e.games.map((g) => (g.id === cmd.game.id ? cmd.game : g));
   } else if (cmd.type === "admin.placement.removeGame") {
     ensure(
       e.games.some((g) => g.id === cmd.gameId),
@@ -388,7 +457,7 @@ export function executePlacement(
       if (old) {
         ensure(
           placementGameFingerprint(old) === placementGameFingerprint(g),
-          `O identificador ${g.id} já existe com outro resultado. Remove o registo antigo antes de corrigir.`,
+          `O identificador ${g.id} já existe com outro resultado. Usa Editar resultado para corrigir o jogo existente.`,
           409,
         );
         skipped++;
@@ -406,6 +475,13 @@ export function executePlacement(
   }
   e.version++;
   e.updatedAt = now;
-  audit({ eventId: e._id, before, after: e });
+  audit({
+    eventId: e._id,
+    before,
+    after: e,
+    ...(cmd.type === "admin.placement.game.update"
+      ? { reason: cmd.reason }
+      : {}),
+  });
   return { id: e._id };
 }
