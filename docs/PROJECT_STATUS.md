@@ -3,6 +3,11 @@
 Last updated: 23 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Ollama removal — 23 October 2026
+
+- User requested complete removal because it was not useful and occupied disk space. Work on feature/remove-ollama removes the assistant UI/navigation/search entry, API routes, local model client, scripts, Docker service/definition and obsolete dedicated tests. Historical league/audit data remains unchanged. docs/LOCAL-AI.md now records retirement.
+- Raspberry Pi: stopped and removed only fight-club-ollama-1, removed fightclub-ollama:cpu and the verified dedicated .local-ai directory (549 MB runtime/models). Free filesystem space increased from 8.6 GB to 9.1 GB. No host ollama executable/system unit was found. Other services remain running. Local validation passed: typecheck, 210 remaining tests, production build and three browser checks (gamification, global search including removed endpoints, and iPhone layout). Web release pending deploy.
+
 ## Profile-photo cartoon — 23 October 2026
 
 - On feature/profile-cartoon, private admin card back now uses a deterministic Python/Pillow cartoon filter of the uploaded Perfil photo, including two-face export. Front keeps the original; no-photo fallback keeps the existing manual avatar. No external image service or fetching arbitrary URLs. MongoDB photoCartoons stores versioned derived PNGs; originals and derivatives never go in public/. Authenticated same-origin POST enforces effective admin workspace even for cached images. Bounded/coalesced subprocesses, decode limits and timeouts protect the host. Docker and CI include Pillow. Guide: docs/PROFILE-CARTOON.md. Not deployed; production photos/data untouched.

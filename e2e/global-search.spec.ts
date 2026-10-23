@@ -29,6 +29,14 @@ test("global search supports Ctrl/Cmd K, direct admin tabs and role-safe results
     name: "O que procuras?",
     exact: true,
   });
+  await input.fill("assistente");
+  await expect(dialog.getByRole("option")).toHaveCount(0);
+  expect((await page.request.get("/api/admin/assistant")).status()).toBe(404);
+  expect(
+    (
+      await page.request.post("/api/admin/assistant/confirm", { data: {} })
+    ).status(),
+  ).toBe(404);
   await input.fill("gamificar");
   await input.press("Enter");
   await expect(page).toHaveURL(/\/admin\?tab=gamification/);

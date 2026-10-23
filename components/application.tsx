@@ -32,7 +32,6 @@ import CourtAvailability from "./court-availability";
 import { StickerAlbum } from "./sticker-album";
 import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
-import AdminAssistant from "./admin-assistant";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
 import AdminGamification from "./admin-gamification";
@@ -3489,8 +3488,7 @@ function Admin(a: Actions) {
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (
         <AdminNotes state={s} run={a.run} busy={a.busy} />
-      ) : tab === "assistant" ? (
-        <AdminAssistant s={s} refresh={a.refresh} />
+
       ) : tab === "engagement" ? (
         <div className="stack">
           <AdminPlayerCards revision={s} />
