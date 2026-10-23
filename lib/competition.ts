@@ -19,6 +19,8 @@ import type {
   CompetitionPair,
   CompetitionTeam,
   CompetitionMeeting,
+  CompetitionChallenge,
+  ChallengeTimeProposal,
 } from "./competition-types";
 import { defaultCompetitionWeights } from "./competition-types";
 import {
@@ -50,6 +52,28 @@ const weightsSchema = z.object({
   priority: z.number().int().min(0).max(1000000),
 });
 export const competitionCommandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("competition.challenge.time.propose"),
+    challengeId: id,
+    expectedVersion: z.number().int().min(0),
+    start: date,
+    courtId: id.optional(),
+  }),
+  z.object({
+    type: z.literal("competition.challenge.time.respond"),
+    challengeId: id,
+    expectedVersion: z.number().int().min(1),
+    accept: z.boolean(),
+    reason: reason.optional(),
+  }),
+  z.object({
+    type: z.literal("competition.challenge.time.decide"),
+    challengeId: id,
+    expectedVersion: z.number().int().min(1),
+    accept: z.boolean(),
+    courtId: id.optional(),
+    reason: reason.optional(),
+  }),
   z.object({
     type: z.literal("competition.roles.generate"),
     roundId: id,
@@ -333,6 +357,7 @@ function conflicts(s: State, round: CompetitionRound, team: CompetitionTeam) {
 export function validateCompetitionSchedule(
   s: State,
   schedule: CompetitionSchedule,
+  checkTimeProposals = true,
 ) {
   const round = s.competitionRounds?.find((r) => r._id === schedule.roundId);
   ensure(round, "Jornada inexistente.");
@@ -340,7 +365,18 @@ export function validateCompetitionSchedule(
     errors: string[] = [],
     warnings: string[] = [];
   const counts = new Map<string, number>();
-  const liveTeams = competitionTeams(s, round.divisionId);
+  const liveTeams = challengeContext(s, round).teams;
+  const rosterKey = (teams: CompetitionTeam[]) =>
+    JSON.stringify(
+      teams
+        .map((t) => [t.id, t.active])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    );
+  if (
+    rosterKey(competitionTeams(s, round.divisionId)) !==
+    rosterKey(schedule.snapshot)
+  )
+    errors.push("A composição ou o estado das equipas mudou; revê a proposta.");
   if (
     JSON.stringify(liveTeams.map((t) => [t.id, t.rank, t.active])) !==
     JSON.stringify(schedule.snapshot.map((t) => [t.id, t.rank, t.active]))
@@ -434,6 +470,30 @@ export function validateCompetitionSchedule(
         )
           errors.push("Campo ocupado por outro jogo no calendário.");
       }
+    }
+    if (checkTimeProposals && !p.recoveryId) {
+      const challenge = s.competitionChallenges?.find(
+        (c) =>
+          c.roundId === round._id &&
+          c.attackerId === p.attackerId &&
+          c.defenderId === p.defenderId &&
+          c.status === "ACCEPTED",
+      );
+      const time = challenge?.timeProposal;
+      if (time && ["PENDING_TEAMS", "AWAITING_ADMIN"].includes(time.status))
+        errors.push(
+          "Horário proposto aguarda confirmação das duplas e decisão administrativa.",
+        );
+      if (
+        time?.status === "APPROVED" &&
+        (p.start !== time.start ||
+          p.courtId !== time.courtId ||
+          (schedule.matchMinutes ?? s.settings[0].matchMinutes) !==
+            time.minutes)
+      )
+        errors.push(
+          "O confronto deve preservar o horário e campo aprovados pela organização.",
+        );
     }
     if (p.recoveryId) {
       if (
@@ -580,6 +640,13 @@ export function validateCompetitionSchedule(
   }
   for (const c of s.competitionChallenges ?? []) {
     if (c.roundId !== round._id || c.status !== "ACCEPTED") continue;
+    if (
+      schedule.incremental &&
+      !schedule.pairs.some(
+        (p) => p.attackerId === c.attackerId && p.defenderId === c.defenderId,
+      )
+    )
+      continue;
     const err = pairingError(
       schedule.snapshot.find((t) => t.id === c.attackerId),
       schedule.snapshot.find((t) => t.id === c.defenderId),
@@ -691,7 +758,7 @@ function notifyChallengeBlocks(s: State, r: CompetitionRound, now: string) {
     r.settledAt ||
     now >= r.closesAt ||
     s.competitionSchedules?.some(
-      (q) => q.roundId === r._id && q.status === "PUBLISHED",
+      (q) => q.roundId === r._id && q.status === "PUBLISHED" && !q.incremental,
     )
   )
     return;
@@ -742,7 +809,167 @@ function notify(
       dedupe,
       challengeId,
       competitionNotice: true,
+      deliveryChannels: ["push"],
     });
+}
+function challengeLabel(s: State, c: CompetitionChallenge) {
+  const r = s.competitionRounds?.find((r) => r._id === c.roundId);
+  if (!r) return "Desafio";
+  const teams = challengeContext(s, r).teams;
+  return `${s.divisions.find((d) => d._id === r.divisionId)?.name ?? r.divisionId} · Jornada ${r.number} · ${[
+    c.attackerId,
+    c.defenderId,
+  ]
+    .map(
+      (id) =>
+        teams
+          .find((t) => t.id === id)
+          ?.members.map((m) => m.name)
+          .join(" + ") ?? id,
+    )
+    .join(" × ")}`;
+}
+function challengeAdminNotice(
+  s: State,
+  c: CompetitionChallenge,
+  title: string,
+  body: string,
+  now: string,
+  event: string,
+) {
+  const key = `challenge-admin:${c._id}:${event}`;
+  notify(s, "__admins__", title, `${challengeLabel(s, c)}. ${body}`, now, key);
+  const notice = s.notifications.find((n) => n.dedupe === key);
+  if (notice) notice.deliveryChannels = ["push"];
+}
+function notifyTimeTeams(
+  s: State,
+  c: CompetitionChallenge,
+  title: string,
+  body: string,
+  now: string,
+  event: string,
+) {
+  const r = s.competitionRounds!.find((r) => r._id === c.roundId)!;
+  for (const t of challengeContext(s, r).teams.filter((t) =>
+    [c.attackerId, c.defenderId].includes(t.id),
+  ))
+    for (const m of t.members) {
+      const key = `challenge-time:${c._id}:${event}:${m.playerId}`;
+      notify(
+        s,
+        m.playerId,
+        title,
+        `${challengeLabel(s, c)}. ${body}`,
+        now,
+        key,
+      );
+      const notice = s.notifications.find((n) => n.dedupe === key);
+      if (notice) notice.deliveryChannels = ["push"];
+    }
+}
+function timeDescription(
+  s: State,
+  p: Pick<ChallengeTimeProposal, "start" | "minutes" | "courtId">,
+) {
+  return `${new Date(p.start).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} · ${p.minutes} min${p.courtId ? ` · ${s.courts.find((c) => c._id === p.courtId)?.name ?? p.courtId}` : " · campo por atribuir"}`;
+}
+function invalidateTimeDrafts(s: State, c: CompetitionChallenge) {
+  for (const q of s.competitionSchedules ?? [])
+    if (q.roundId === c.roundId && q.status !== "PUBLISHED") {
+      q.status = "DRAFT";
+      q.version++;
+      delete q.approvedAt;
+      delete q.approvedBy;
+      delete q.approvedVersion;
+      for (const p of q.pairs)
+        if (p.attackerId === c.attackerId && p.defenderId === c.defenderId) {
+          if (
+            c.timeProposal?.status === "APPROVED" &&
+            c.status === "ACCEPTED"
+          ) {
+            p.start = c.timeProposal.start;
+            p.courtId = c.timeProposal.courtId;
+            p.locked = true;
+          } else {
+            delete p.start;
+            delete p.courtId;
+            p.locked = false;
+          }
+        }
+      const v = validateCompetitionSchedule(s, q);
+      q.errors = v.errors;
+      q.warnings = v.warnings;
+    }
+}
+function validateChallengeTime(
+  s: State,
+  c: CompetitionChallenge,
+  p: ChallengeTimeProposal,
+  timestamp: number,
+) {
+  const r = s.competitionRounds!.find((r) => r._id === c.roundId)!,
+    e = effectiveCompetitionConfig(s, r);
+  ensure(Date.parse(p.start) > timestamp, "Escolhe uma data e hora futuras.");
+  ensure(
+    p.minutes === s.settings[0].matchMinutes,
+    "A duração do jogo mudou. Propõe um novo horário.",
+  );
+  const pairs = (s.competitionChallenges ?? [])
+    .filter((a) => a.roundId === c.roundId && a.status === "ACCEPTED")
+    .map((a) => ({
+      attackerId: a.attackerId,
+      defenderId: a.defenderId,
+      ...(a._id === c._id
+        ? { start: p.start, courtId: p.courtId }
+        : a.timeProposal?.status === "APPROVED"
+          ? { start: a.timeProposal.start, courtId: a.timeProposal.courtId }
+          : {}),
+    }));
+  const q: CompetitionSchedule = {
+    _id: "time-validation",
+    roundId: r._id,
+    version: 1,
+    revision: 1,
+    status: "DRAFT",
+    snapshot: structuredClone(challengeContext(s, r).teams),
+    effectiveDistance: e.distance,
+    championPositions: e.config.championPositions,
+    weekType: e.weekType,
+    matchMinutes: p.minutes,
+    pairs,
+    unmatched: [],
+    warnings: [],
+    errors: [],
+    createdAt: new Date(timestamp).toISOString(),
+    createdBy: "validation",
+  };
+  const v = validateCompetitionSchedule(s, q, false);
+  ensure(!v.errors.length, v.errors.join(" "));
+  const end = Date.parse(p.start) + p.minutes * 60000;
+  for (const other of s.competitionChallenges ?? []) {
+    const t = other.timeProposal;
+    if (
+      other._id === c._id ||
+      other.status !== "ACCEPTED" ||
+      t?.status !== "APPROVED"
+    )
+      continue;
+    const overlap =
+      Date.parse(p.start) < Date.parse(t.start) + t.minutes * 60000 &&
+      end > Date.parse(t.start);
+    ensure(
+      !overlap || !p.courtId || p.courtId !== t.courtId,
+      "Campo já reservado noutro horário aprovado pela organização.",
+    );
+    ensure(
+      !overlap ||
+        ![c.attackerId, c.defenderId].some((id) =>
+          [other.attackerId, other.defenderId].includes(id),
+        ),
+      "Uma dupla já tem outro horário aprovado neste período.",
+    );
+  }
 }
 export function executeCompetition(
   s: State,
@@ -755,7 +982,9 @@ export function executeCompetition(
   const playerCommand =
     cmd.type === "competition.challenge.submit" ||
     cmd.type === "competition.challenge.respond" ||
-    cmd.type === "competition.challenge.note";
+    cmd.type === "competition.challenge.note" ||
+    cmd.type === "competition.challenge.time.propose" ||
+    cmd.type === "competition.challenge.time.respond";
   ensure(
     playerCommand || actor.role === "admin",
     "Apenas administradores podem gerir a competição.",
@@ -807,7 +1036,187 @@ export function executeCompetition(
     ensure(q, "Proposta não encontrada.", 404);
     return q;
   };
-  if (cmd.type === "competition.roles.generate") {
+  if (
+    cmd.type === "competition.challenge.time.propose" ||
+    cmd.type === "competition.challenge.time.respond" ||
+    cmd.type === "competition.challenge.time.decide"
+  ) {
+    const c = s.competitionChallenges.find((c) => c._id === cmd.challengeId);
+    ensure(c, "Desafio inexistente.", 404);
+    const r = getRound(c.roundId),
+      e = challengeContext(s, r),
+      own = e.teams.find((t) =>
+        t.members.some((m) => m.playerId === actor.playerId),
+      );
+    ensure(
+      c.status === "ACCEPTED" &&
+        !r.locked &&
+        !r.settledAt &&
+        !r.challengesBlocked,
+      "O horário só pode ser proposto num desafio aceite e ainda não publicado.",
+    );
+    version(c.timeVersion ?? 0, cmd.expectedVersion);
+    if (cmd.type !== "competition.challenge.time.decide") {
+      ensure(
+        own && [c.attackerId, c.defenderId].includes(own.id),
+        "Apenas as duplas deste desafio podem propor ou confirmar horários.",
+        403,
+      );
+      ensure(
+        now < r.schedulingDeadline,
+        "O prazo de marcação terminou. Contacta a organização.",
+      );
+    }
+    if (cmd.type === "competition.challenge.time.propose") {
+      const proposal: ChallengeTimeProposal = {
+        id: randomUUID(),
+        version: (c.timeVersion ?? 0) + 1,
+        start: cmd.start,
+        minutes: s.settings[0].matchMinutes,
+        courtId: cmd.courtId,
+        proposedByTeamId: own!.id,
+        attackerConfirmed: own!.id === c.attackerId,
+        defenderConfirmed: own!.id === c.defenderId,
+        status: "PENDING_TEAMS",
+      };
+      validateChallengeTime(s, c, proposal, timestamp);
+      c.timeProposal = proposal;
+      c.timeVersion = proposal.version;
+      c.decisions.push({
+        at: now,
+        actorId: actor.userId,
+        action: `TIME_PROPOSED: ${JSON.stringify(proposal)}`,
+      });
+      invalidateTimeDrafts(s, c);
+      notifyTimeTeams(
+        s,
+        c,
+        "Horário proposto — confirma a disponibilidade",
+        `Proposta: ${timeDescription(s, proposal)}. A outra dupla precisa de confirmar; a organização decide a marcação final.`,
+        now,
+        `proposed:${proposal.version}`,
+      );
+      challengeAdminNotice(
+        s,
+        c,
+        "Horário proposto — aguarda a outra dupla",
+        `${timeDescription(s, proposal)}. Ainda falta a confirmação da outra dupla.`,
+        now,
+        `time-proposed:${proposal.version}`,
+      );
+    } else {
+      const p = c.timeProposal;
+      ensure(p, "Não existe proposta de horário.", 404);
+      if (cmd.type === "competition.challenge.time.respond") {
+        ensure(
+          p.status === "PENDING_TEAMS",
+          "Este horário já foi respondido ou decidido.",
+        );
+        ensure(
+          (own!.id === c.attackerId && !p.attackerConfirmed) ||
+            (own!.id === c.defenderId && !p.defenderConfirmed),
+          "A tua dupla já confirmou esta proposta.",
+        );
+        if (cmd.accept) {
+          validateChallengeTime(s, c, p, timestamp);
+          if (own!.id === c.attackerId) p.attackerConfirmed = true;
+          else p.defenderConfirmed = true;
+          p.status = "AWAITING_ADMIN";
+        } else {
+          ensure(!!cmd.reason, "Indica o motivo da recusa do horário.");
+          p.status = "REJECTED";
+          p.reason = cmd.reason;
+        }
+        c.timeVersion = (c.timeVersion ?? 0) + 1;
+        p.version = c.timeVersion;
+        c.decisions.push({
+          at: now,
+          actorId: actor.userId,
+          action: `TIME_${cmd.accept ? "TEAMS_CONFIRMED" : "TEAM_REJECTED"}: ${JSON.stringify(p)}`,
+        });
+        invalidateTimeDrafts(s, c);
+        notifyTimeTeams(
+          s,
+          c,
+          cmd.accept
+            ? "Horário acordado — aguarda decisão do clube"
+            : "Horário recusado",
+          `${timeDescription(s, p)}. ${cmd.accept ? "As duas duplas confirmaram. O clube ainda precisa de aprovar e publicar a marcação." : cmd.reason}`,
+          now,
+          `response:${p.version}`,
+        );
+        challengeAdminNotice(
+          s,
+          c,
+          cmd.accept
+            ? "Horário acordado — decisão administrativa pendente"
+            : "Horário recusado por uma dupla",
+          `${timeDescription(s, p)}. ${cmd.accept ? "As duas duplas confirmaram. Aprova ou recusa esta marcação no painel." : cmd.reason}`,
+          now,
+          `time-response:${p.version}`,
+        );
+      } else {
+        ensure(
+          actor.role === "admin",
+          "Apenas administradores podem decidir a marcação.",
+          403,
+        );
+        if (cmd.accept) {
+          ensure(
+            p.status === "AWAITING_ADMIN" &&
+              p.attackerConfirmed &&
+              p.defenderConfirmed,
+            "As duas duplas precisam de confirmar o horário antes da aprovação.",
+          );
+          const candidate = { ...p, courtId: cmd.courtId ?? p.courtId };
+          ensure(
+            candidate.courtId,
+            "Seleciona o campo antes de aprovar a marcação.",
+          );
+          validateChallengeTime(s, c, candidate, timestamp);
+          p.courtId = candidate.courtId;
+          p.status = "APPROVED";
+        } else {
+          ensure(!!cmd.reason, "Indica o motivo da recusa administrativa.");
+          ensure(p.status !== "REJECTED", "A proposta já foi recusada.");
+          p.status = "REJECTED";
+          p.reason = cmd.reason;
+        }
+        p.decidedAt = now;
+        p.decidedBy = actor.userId;
+        c.timeVersion = (c.timeVersion ?? 0) + 1;
+        p.version = c.timeVersion;
+        c.decisions.push({
+          at: now,
+          actorId: actor.userId,
+          action: `TIME_ADMIN_${cmd.accept ? "APPROVED" : "REJECTED"}: ${JSON.stringify(p)}`,
+        });
+        invalidateTimeDrafts(s, c);
+        if (cmd.accept) publishApprovedChallenge(s, actor, c, timestamp);
+        if (!cmd.accept)
+          notifyTimeTeams(
+            s,
+            c,
+            cmd.accept
+              ? "Jogo aprovado e publicado"
+              : "Horário recusado pela organização",
+            `${timeDescription(s, p)}. ${cmd.accept ? "O jogo foi aprovado e publicado no calendário oficial." : cmd.reason}`,
+            now,
+            `decision:${p.version}`,
+          );
+        challengeAdminNotice(
+          s,
+          c,
+          cmd.accept
+            ? "Jogo aprovado e publicado"
+            : "Horário recusado pela organização",
+          `${timeDescription(s, p)}. ${cmd.accept ? "Marcação publicada no calendário oficial." : cmd.reason}`,
+          now,
+          `time-decision:${p.version}`,
+        );
+      }
+    }
+  } else if (cmd.type === "competition.roles.generate") {
     const r = getRound(cmd.roundId);
     version(r.version, cmd.expectedVersion);
     ensure(
@@ -908,7 +1317,8 @@ export function executeCompetition(
     r.version++;
     if (cmd.publish)
       for (const q of s.competitionSchedules.filter(
-        (q) => q.roundId === r._id && q.status !== "PUBLISHED",
+        (q) =>
+          q.roundId === r._id && q.status !== "PUBLISHED" && !q.supersededBy,
       )) {
         q.status = "DRAFT";
         q.version++;
@@ -976,6 +1386,7 @@ export function executeCompetition(
       !challengeTargetError(s, r, c.attackerId, c.defenderId, c._id),
       "Desafio incompatível com as regras atuais.",
     );
+    if (c.responseNote === cmd.note) return { ok: true };
     c.responseNote = cmd.note;
     c.decisions.push({
       at: now,
@@ -991,6 +1402,14 @@ export function executeCompetition(
         now,
         `challenge-note:${c._id}:${c.decisions.length}:${m.playerId}`,
       );
+    challengeAdminNotice(
+      s,
+      c,
+      "Resposta / horário proposto",
+      `${cmd.note}. Esta nota não confirma nem marca o jogo.`,
+      now,
+      `note:${c.decisions.length}`,
+    );
   } else if (cmd.type === "competition.config.save") {
     const existing = s.competitionConfigurations.find(
       (c) => c._id === cmd.competitionId,
@@ -1195,7 +1614,8 @@ export function executeCompetition(
     );
     ensure(
       !s.competitionSchedules.some(
-        (q) => q.roundId === r._id && q.status === "PUBLISHED",
+        (q) =>
+          q.roundId === r._id && q.status === "PUBLISHED" && !q.incremental,
       ),
       "Jornada já publicada.",
     );
@@ -1244,6 +1664,14 @@ export function executeCompetition(
         now,
         `challenge-pending:${challengeId}:${m.playerId}`,
       );
+    challengeAdminNotice(
+      s,
+      s.competitionChallenges.find((c) => c._id === challengeId)!,
+      "Novo desafio — aguarda aceitação",
+      `Estado: pendente de aceitação ou recusa pela dupla defensora. Resposta até ${new Date(timestamp + e.config.responseHours * 3600000).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}.`,
+      now,
+      "pending",
+    );
   } else if (
     cmd.type === "competition.challenge.respond" ||
     cmd.type === "competition.challenge.cancel"
@@ -1254,7 +1682,8 @@ export function executeCompetition(
     ensure(
       !r.locked &&
         !s.competitionSchedules.some(
-          (q) => q.roundId === r._id && q.status === "PUBLISHED",
+          (q) =>
+            q.roundId === r._id && q.status === "PUBLISHED" && !q.incremental,
         ),
       "Jornada bloqueada ou publicada.",
     );
@@ -1269,6 +1698,15 @@ export function executeCompetition(
         actorId: actor.userId,
         action: `ADMIN_CANCELLED: ${cmd.reason}`,
       });
+      invalidateTimeDrafts(s, c);
+      challengeAdminNotice(
+        s,
+        c,
+        "Desafio cancelado",
+        `Motivo: ${cmd.reason}`,
+        now,
+        "cancelled",
+      );
     } else {
       ensure(
         challengeContext(s, r)
@@ -1332,6 +1770,16 @@ export function executeCompetition(
         actorId: actor.userId,
         action: `${c.status}${!cmd.accept ? ": " + cmd.reason : ""}`,
       });
+      challengeAdminNotice(
+        s,
+        c,
+        cmd.accept ? "Desafio aceite — aguarda marcação" : "Desafio recusado",
+        cmd.accept
+          ? "As duas duplas aceitaram o desafio. Aguardam proposta de horário e decisão administrativa."
+          : `Motivo: ${cmd.reason}`,
+        now,
+        c.status,
+      );
       for (const t of challengeContext(s, r).teams.filter((t) =>
         [c.attackerId, c.defenderId].includes(t.id),
       ))
@@ -1407,7 +1855,8 @@ export function executeCompetition(
     for (const r of affected) {
       revalidateChallenges(s, r);
       for (const q of s.competitionSchedules.filter(
-        (q) => q.roundId === r._id && q.status !== "PUBLISHED",
+        (q) =>
+          q.roundId === r._id && q.status !== "PUBLISHED" && !q.supersededBy,
       )) {
         q.status = "DRAFT";
         q.version++;
@@ -1510,7 +1959,8 @@ export function executeCompetition(
     const existing = cmd.scheduleId
       ? getSchedule(cmd.scheduleId)
       : s.competitionSchedules.find(
-          (q) => q.roundId === r._id && q.status !== "PUBLISHED",
+          (q) =>
+            q.roundId === r._id && q.status !== "PUBLISHED" && !q.supersededBy,
         );
     version(existing?.version ?? 0, cmd.expectedVersion);
     ensure(
@@ -1529,14 +1979,24 @@ export function executeCompetition(
       "Cria uma revisão da publicação existente.",
     );
     revalidateChallenges(s, r);
-    const snapshot = competitionTeams(s, r.divisionId);
+    const snapshot = structuredClone(challengeContext(s, r).teams);
     ensure(
       snapshot.length <= 20,
       "Máximo de 20 equipas por liga no otimizador.",
     );
     const accepted = s.competitionChallenges
       .filter((c) => c.roundId === r._id && c.status === "ACCEPTED")
-      .map((c) => ({ attackerId: c.attackerId, defenderId: c.defenderId }));
+      .map((c) => ({
+        attackerId: c.attackerId,
+        defenderId: c.defenderId,
+        ...(c.timeProposal?.status === "APPROVED"
+          ? {
+              start: c.timeProposal.start,
+              courtId: c.timeProposal.courtId,
+              locked: true,
+            }
+          : {}),
+      }));
     const preserved =
       existing?.pairs.filter(
         (p) =>
@@ -1663,64 +2123,7 @@ export function executeCompetition(
       ),
       "Todos os jogos oficiais devem ter resultado validado.",
     );
-    let ranking = structuredClone(latest.snapshot);
-    r.rankingBefore = structuredClone(ranking);
-    for (const c of games.sort(
-      (a, b) =>
-        (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "") ||
-        a._id.localeCompare(b._id),
-    )) {
-      if (c.winnerId !== c.challengerId) continue;
-      const a = ranking.find((t) =>
-          t.members.some((m) => m.playerId === c.challengerId),
-        ),
-        d = ranking.find((t) =>
-          t.members.some((m) => m.playerId === c.defenderId),
-        );
-      ensure(a && d, "Equipa do resultado não encontrada no snapshot.");
-      const rank = a.rank;
-      a.rank = d.rank;
-      d.rank = rank;
-    }
-    ranking.sort((a, b) => a.rank - b.rank);
-    let slot = 1;
-    for (const team of ranking)
-      for (const member of team.members) {
-        const p = s.players.find((p) => p._id === member.playerId);
-        ensure(p, "Jogador histórico em falta.");
-        const previous = p.position;
-        p.previousPosition = previous;
-        p.position = slot++;
-        s.history.push({
-          _id: randomUUID(),
-          playerId: p._id,
-          divisionId: r.divisionId,
-          oldPosition: previous,
-          newPosition: p.position,
-          reason: `Liquidação determinística da jornada ${r.number}`,
-          createdAt: now,
-        });
-      }
-    const champion = ranking[0];
-    if (champion) {
-      const current = s.champions.find(
-        (c) => c.divisionId === r.divisionId && !c.until,
-      );
-      if (current?.playerId !== champion.members[0].playerId) {
-        if (current) current.until = now;
-        s.champions.push({
-          _id: randomUUID(),
-          divisionId: r.divisionId,
-          playerId: champion.members[0].playerId,
-          since: now,
-          defenses: 0,
-          seasonId: effectiveCompetitionConfig(s, r).config.seasonId,
-        });
-      } else
-        current.defenses += games.filter(
-          (c) => c.titleFight && c.winnerId === c.defenderId,
-        ).length;
-    }
+    const ranking = updateCompetitionRanking(s, r._id, actor.userId, timestamp);
     for (const t of ranking)
       for (const member of t.members)
         notify(
@@ -1757,6 +2160,11 @@ export function executeCompetition(
     const q = getSchedule(cmd.scheduleId),
       r = getRound(q.roundId);
     version(q.version, cmd.expectedVersion);
+    ensure(
+      !q.supersededBy,
+      "Esta proposta foi substituída por uma publicação mais recente.",
+      409,
+    );
     ensure(!r.locked && !r.settledAt, "Jornada bloqueada.");
     if (cmd.type === "competition.amend") {
       ensure(q.status === "PUBLISHED", "Apenas publicações podem ter revisão.");
@@ -1771,7 +2179,10 @@ export function executeCompetition(
       );
       ensure(
         !s.competitionSchedules.some(
-          (other) => other.roundId === r._id && other.status !== "PUBLISHED",
+          (other) =>
+            other.roundId === r._id &&
+            other.status !== "PUBLISHED" &&
+            !other.supersededBy,
         ),
         "Já existe uma revisão pendente.",
       );
@@ -1828,6 +2239,7 @@ export function executeCompetition(
           "Identificador de jogo fora desta proposta.",
         );
         q.pairs = cmd.pairs;
+        q.incremental = false;
         q.status = "DRAFT";
         q.version++;
         delete q.approvedVersion;
@@ -1843,6 +2255,18 @@ export function executeCompetition(
             !q.pairs.some((p) => [p.attackerId, p.defenderId].includes(t.id)),
         )
         .map((t) => t.id);
+      if (["competition.approve", "competition.publish"].includes(cmd.type)) {
+        const published = s.competitionSchedules
+          .filter(
+            (other) => other.roundId === r._id && other.status === "PUBLISHED",
+          )
+          .sort((a, b) => b.revision - a.revision)[0];
+        ensure(
+          !published || q.amendmentOf === published._id,
+          "Já existe uma publicação mais recente. Cria uma revisão da última versão publicada.",
+          409,
+        );
+      }
       if (cmd.type === "competition.approve") {
         requireEarlierSettled(s, r);
         ensure(!q.errors.length, q.errors.join(" "));
@@ -2038,10 +2462,33 @@ export function executeCompetition(
             notify(
               s,
               member.playerId,
-              old ? "Jornada alterada" : "Jornada oficial publicada",
-              `Jornada ${r.number}. ${q.weekType === "OPEN_ATTACK" ? "SEMANA DE ATAQUE LIVRE — todas as equipas elegíveis podem desafiar. " : ""}Distância máxima: ${q.effectiveDistance}.`,
+              q.incremental
+                ? "Jogo marcado pelo clube"
+                : old
+                  ? "Jornada alterada"
+                  : "Jornada oficial publicada",
+              `Jornada ${r.number}. ${q.pairs
+                .filter((p) => [p.attackerId, p.defenderId].includes(teamId))
+                .map((p) => {
+                  const game = s.challenges.find(
+                    (c) => c._id === p.challengeId,
+                  );
+                  const names = [p.attackerId, p.defenderId]
+                    .map((id) =>
+                      q.snapshot
+                        .find((t) => t.id === id)
+                        ?.members.map((m) => m.name)
+                        .join(" + "),
+                    )
+                    .join(" × ");
+                  return `${names}${p.start ? ` — ${timeDescription(s, { start: p.start, courtId: p.courtId, minutes: game?.durationMinutes ?? s.settings[0].matchMinutes })}` : " — horário por definir"}`;
+                })
+                .join("; ")}`,
+
               now,
               `publication:${q._id}:${member.playerId}`,
+              q.pairs.find((p) => [p.attackerId, p.defenderId].includes(teamId))
+                ?.challengeId,
             );
         }
         for (const priority of competitionPriorities(s, r, now)) {
@@ -2085,6 +2532,196 @@ export function executeCompetition(
     ...(savedCompetitionId ? { competitionId: savedCompetitionId } : {}),
   };
 }
+/** Replays confirmed results in scheduled order against the immutable round snapshot.
+ * Posting order cannot affect recovery swaps or invalidate the remaining fixtures. */
+export function updateCompetitionRanking(
+  s: State,
+  roundId: string,
+  userId: string,
+  timestamp: number,
+) {
+  const r = s.competitionRounds?.find((r) => r._id === roundId);
+  ensure(r && !r.settledAt, "Jornada indisponível para atualizar o ranking.");
+  const latest = (s.competitionSchedules ?? [])
+    .filter((q) => q.roundId === r._id && q.status === "PUBLISHED")
+    .sort((a, b) => b.revision - a.revision)[0];
+  ensure(latest, "O jogo precisa de estar publicado.");
+  const now = new Date(timestamp).toISOString();
+  const games = s.challenges.filter(
+    (c) =>
+      c.competitionRoundId === r._id &&
+      c.status === "completed" &&
+      s.results.some((result) => result.challengeId === c._id),
+  );
+  let ranking = structuredClone(latest.snapshot);
+  r.rankingBefore = structuredClone(ranking);
+  for (const c of games.sort(
+    (a, b) =>
+      (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "") ||
+      a._id.localeCompare(b._id),
+  )) {
+    if (c.winnerId !== c.challengerId) continue;
+    const a = ranking.find((t) =>
+        t.members.some((m) => m.playerId === c.challengerId),
+      ),
+      d = ranking.find((t) =>
+        t.members.some((m) => m.playerId === c.defenderId),
+      );
+    ensure(a && d, "Equipa do resultado não encontrada no snapshot.");
+    const rank = a.rank;
+    a.rank = d.rank;
+    d.rank = rank;
+  }
+  ranking.sort((a, b) => a.rank - b.rank);
+  let slot = 1;
+  for (const team of ranking)
+    for (const member of team.members) {
+      const p = s.players.find((p) => p._id === member.playerId);
+      ensure(p, "Jogador histórico em falta.");
+      const previous = p.position;
+      const next = slot++;
+      if (previous === next) continue;
+      p.previousPosition = previous;
+      p.position = next;
+      s.history.push({
+        _id: randomUUID(),
+        playerId: p._id,
+        divisionId: r.divisionId,
+        oldPosition: previous,
+        newPosition: p.position,
+        reason: `Resultado confirmado — jornada ${r.number} (troca direta)`,
+        createdAt: now,
+      });
+    }
+  const champion = ranking[0];
+  if (champion) {
+    const current = s.champions.find(
+      (c) => c.divisionId === r.divisionId && !c.until,
+    );
+    if (current?.playerId !== champion.members[0].playerId) {
+      if (current) current.until = now;
+      s.champions.push({
+        _id: randomUUID(),
+        divisionId: r.divisionId,
+        playerId: champion.members[0].playerId,
+        since: now,
+        defenses: 0,
+        seasonId: effectiveCompetitionConfig(s, r).config.seasonId,
+      });
+    }
+    const reigning = s.champions.find(
+      (c) => c.divisionId === r.divisionId && !c.until,
+    );
+    if (reigning)
+      reigning.defenses = s.challenges.filter(
+        (c) =>
+          c.divisionId === r.divisionId &&
+          c.seasonId === effectiveCompetitionConfig(s, r).config.seasonId &&
+          c.status === "completed" &&
+          c.titleFight &&
+          c.winnerId === reigning.playerId &&
+          c.winnerId === c.defenderId &&
+          (c.completedAt ?? "") >= reigning.since,
+      ).length;
+  }
+  r.rankingAfter = ranking;
+  s.audit.push({
+    _id: randomUUID(),
+    userId,
+    action: "competition.ranking.updated",
+    details: JSON.stringify({
+      roundId,
+      resultIds: games.map((c) => c._id),
+      ranking,
+    }),
+    createdAt: now,
+  });
+  return ranking;
+}
+
+function publishApprovedChallenge(
+  s: State,
+  actor: Actor,
+  c: CompetitionChallenge,
+  timestamp: number,
+) {
+  const r = s.competitionRounds!.find((r) => r._id === c.roundId)!,
+    p = c.timeProposal!;
+  const previous = s
+    .competitionSchedules!.filter(
+      (q) => q.roundId === r._id && q.status === "PUBLISHED",
+    )
+    .sort((a, b) => b.revision - a.revision)[0];
+  const e = effectiveCompetitionConfig(s, r);
+  const q: CompetitionSchedule = {
+    _id: randomUUID(),
+    roundId: r._id,
+    version: 1,
+    revision:
+      Math.max(
+        0,
+        ...s
+          .competitionSchedules!.filter((q) => q.roundId === r._id)
+          .map((q) => q.revision),
+      ) + 1,
+    status: "DRAFT",
+    incremental: true,
+    snapshot: structuredClone(
+      previous?.snapshot ?? challengeContext(s, r).teams,
+    ),
+    effectiveDistance: e.distance,
+    championPositions: [...e.config.championPositions],
+    weekType: e.weekType,
+    matchMinutes: previous?.matchMinutes ?? p.minutes,
+    pairs: [
+      ...structuredClone(previous?.pairs ?? []),
+      {
+        attackerId: c.attackerId,
+        defenderId: c.defenderId,
+        start: p.start,
+        courtId: p.courtId,
+        locked: true,
+      },
+    ],
+    unmatched: [],
+    warnings: [],
+    errors: [],
+    createdAt: new Date(timestamp).toISOString(),
+    createdBy: actor.userId,
+    amendmentOf: previous?._id,
+    reason: `Publicação individual do desafio aceite ${c._id}, com horário confirmado pelas duas duplas e aprovado pelo clube.`,
+  };
+  s.competitionSchedules!.push(q);
+  // Both audited transitions run inside the enclosing MongoDB transaction.
+  executeCompetition(
+    s,
+    actor,
+    {
+      type: "competition.approve",
+      scheduleId: q._id,
+      expectedVersion: q.version,
+    },
+    timestamp,
+  );
+  executeCompetition(
+    s,
+    actor,
+    {
+      type: "competition.publish",
+      scheduleId: q._id,
+      expectedVersion: q.version,
+    },
+    timestamp,
+  );
+  for (const draft of s.competitionSchedules!.filter(
+    (other) =>
+      other.roundId === r._id &&
+      other.status !== "PUBLISHED" &&
+      !other.supersededBy,
+  ))
+    draft.supersededBy = q._id;
+}
+
 export function processCompetitionDeadlines(
   s: State,
   timestamp = Date.now(),
@@ -2151,6 +2788,14 @@ export function processCompetitionDeadlines(
     if (c.status === "PENDING" && c.respondBy <= now) {
       c.status = "EXPIRED";
       c.decisions.push({ at: now, actorId: "system", action: "EXPIRED" });
+      challengeAdminNotice(
+        s,
+        c,
+        "Desafio expirado",
+        "Terminou o prazo sem aceitação. É necessária revisão; não foi criada uma derrota automática.",
+        now,
+        "expired",
+      );
     }
   }
   for (const r of s.competitionRounds ?? []) {

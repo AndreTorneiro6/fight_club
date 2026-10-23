@@ -8,18 +8,19 @@ export function challengeContext(s: State, r: CompetitionRound) {
   const config = s.competitionConfigurations?.find(
     (c) => c._id === r.competitionId,
   );
+  const publication = (s.competitionSchedules ?? [])
+    .filter((q) => q.roundId === r._id && q.status === "PUBLISHED")
+    .sort((a, b) => b.revision - a.revision)[0];
   const teams: CompetitionTeam[] =
-    r.rolesPublishedAt && r.roleSnapshot
+    publication?.snapshot ??
+    (r.rolesPublishedAt && r.roleSnapshot
       ? r.roleSnapshot
       : rankingEntries(s.players, r.divisionId).map((t, i) => ({
           id: t.id,
           rank: i + 1,
           active: t.members.every((m) => m.status === "active"),
           members: t.members.map((m) => ({ playerId: m._id, name: m.name })),
-        }));
-  const publication = (s.competitionSchedules ?? [])
-    .filter((q) => q.roundId === r._id && q.status === "PUBLISHED")
-    .sort((a, b) => b.revision - a.revision)[0];
+        })));
   const type =
     publication?.weekType ??
     r.weekType ??

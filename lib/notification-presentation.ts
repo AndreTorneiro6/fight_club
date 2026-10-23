@@ -35,7 +35,7 @@ export function notificationPresentation(n: Notice) {
         ? "roles"
         : /prazo.*proximo|jogo.*proximo|lembrete/.test(text)
           ? "reminder"
-          : /resultado|vitoria|vencedor/.test(text)
+          : /resultado|vitoria|vencedor|ranking/.test(text)
             ? "result"
             : /desafio aceite/.test(text)
               ? "accepted"
@@ -43,7 +43,9 @@ export function notificationPresentation(n: Notice) {
                 ? "challenge"
                 : /recus|cancelad|expir|bloqueio/.test(text)
                   ? "update"
-                  : /horario|marcad|marcacao|reserva|campo.*confirm/.test(text)
+                  : /horario|marcad|marcacao|reserva|campo.*confirm|jornada|confrontos/.test(
+                        text,
+                      )
                     ? "schedule"
                     : "general");
   const d = details[kind];

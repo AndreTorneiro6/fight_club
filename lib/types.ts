@@ -85,6 +85,9 @@ export interface Settings extends Entity {
   weeklyCompetition: boolean;
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
+  autoWeeklyRanking?: boolean;
+  weeklyRankingDay?: number;
+  weeklyRankingHour?: number;
   requireClubConfirmation: boolean;
   initialSuggestionCount: 3 | 4;
   rulesText: string;
@@ -206,6 +209,7 @@ export interface Message extends Entity {
 export interface Notification extends Entity {
   kind?: NotificationEvent;
   seasonId?: string;
+  rankingNotice?: boolean;
   deliveryChannels?: ("email" | "whatsapp" | "push")[];
   competitionNotice?: boolean;
   adminTestId?: string;
@@ -266,6 +270,11 @@ export interface Champion extends Entity {
   seasonId: string;
 }
 export interface Season extends Entity {
+  weeklyRankingPublication?: {
+    weekStart: string;
+    publishedAt: string;
+    publishedBy: string;
+  };
   startAnnouncedAt?: string;
   startAnnouncedBy?: string;
   version?: number;
@@ -426,6 +435,9 @@ export const defaultSettings: Settings = {
   weeklyCompetition: false,
   autoWeeklyRoles: true,
   roleDraftLeadDays: 7,
+  autoWeeklyRanking: true,
+  weeklyRankingDay: 0,
+  weeklyRankingHour: 20,
   requireClubConfirmation: true,
   _id: "league",
   initialSuggestionCount: 4,

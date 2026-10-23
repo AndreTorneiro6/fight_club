@@ -1,3 +1,4 @@
+import { autoWeeklyRanking, publishWeeklyRanking } from "./weekly-ranking";
 import { notificationPresentation } from "./notification-presentation";
 import type { Notification } from "./types";
 import {
@@ -22,6 +23,7 @@ import { executeAdminNotes } from "./admin-notes";
 import { executePlayerAttributes } from "./player-attributes";
 import {
   executeCompetition,
+  updateCompetitionRanking,
   processCompetitionDeadlines,
   managedRoundOpen,
 } from "./competition";
@@ -99,6 +101,9 @@ export const settingsSchema = z.object({
   weeklyCompetition: z.boolean().default(false),
   autoWeeklyRoles: z.boolean().optional(),
   roleDraftLeadDays: z.number().int().min(0).max(28).optional(),
+  autoWeeklyRanking: z.boolean().optional(),
+  weeklyRankingDay: z.number().int().min(0).max(6).optional(),
+  weeklyRankingHour: z.number().int().min(0).max(23).optional(),
   requireClubConfirmation: z.boolean().default(true),
   initialSuggestionCount: z.union([z.literal(3), z.literal(4)]).default(4),
   rulesText: z.string().trim().max(12000).default(""),
@@ -127,6 +132,7 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("admin.ranking.publishWeekly"), seasonId: id }),
   z.object({
     type: z.literal("admin.week.generate"),
     weekStart: day,
@@ -972,11 +978,18 @@ export function execute(
           }
         : {}),
     });
+    if (c.competitionRoundId)
+      updateCompetitionRanking(
+        s,
+        c.competitionRoundId,
+        actor.userId,
+        timestamp,
+      );
     notify(
       w._id,
       "Vitória confirmada 🏆",
       c.competitionRoundId
-        ? "Resultado validado. O ranking será atualizado na liquidação da jornada."
+        ? "Resultado validado e ranking atualizado. Os jogos publicados mantêm o snapshot da jornada."
         : "O resultado e o ranking foram atualizados.",
       c._id,
     );
@@ -984,7 +997,7 @@ export function execute(
       l._id,
       "Resultado confirmado",
       c.competitionRoundId
-        ? "Resultado validado. O ranking será atualizado na liquidação da jornada."
+        ? "Resultado validado e ranking atualizado. Os jogos publicados mantêm o snapshot da jornada."
         : "O resultado e o ranking foram atualizados.",
       c._id,
     );
@@ -1298,6 +1311,9 @@ export function execute(
         cmd.partnerId ? player(cmd.partnerId) : undefined,
       );
       return { id: cmd.playerId };
+    }
+    case "admin.ranking.publishWeekly": {
+      return publishWeeklyRanking(s, cmd.seasonId, actor.userId, timestamp);
     }
     case "admin.week.generate": {
       const old = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
@@ -3174,7 +3190,14 @@ export function execute(
       c.setScores = sets;
       c.winnerId = cmd.winnerId;
       c.score = score;
-      // Later games/manual moves may depend on this result. Admin explicitly corrects ranking/champion separately.
+      if (c.competitionRoundId)
+        updateCompetitionRanking(
+          s,
+          c.competitionRoundId,
+          actor.userId,
+          timestamp,
+        );
+      // Legacy corrections still require explicit review of subsequent ranking changes.
       log("result.corrected", {
         before,
         after: result,
@@ -3535,7 +3558,10 @@ export function processDeadlines(
   timestamp = Date.now(),
   generateRoles = true,
 ) {
-  if (generateRoles) autoWeeklyRoles(s, timestamp);
+  if (generateRoles) {
+    autoWeeklyRoles(s, timestamp);
+    autoWeeklyRanking(s, timestamp);
+  }
   processCompetitionDeadlines(s, timestamp, generateRoles);
   const now = new Date(timestamp).toISOString(),
     rules = s.settings[0] ?? defaultSettings;

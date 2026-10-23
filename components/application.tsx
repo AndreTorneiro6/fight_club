@@ -2883,6 +2883,11 @@ function Notifications({ s, run, busy }: Actions) {
                   <small>
                     {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
                   </small>
+                  {n.rankingNotice && (
+                    <Link className="link" href="/ranking">
+                      Ver ranking →
+                    </Link>
+                  )}
                   {n.seasonId && (
                     <Link
                       className="link"
@@ -5129,6 +5134,9 @@ const settingLabels: Record<
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
   autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
   roleDraftLeadDays: "Antecedência dos rascunhos de papéis · dias",
+  autoWeeklyRanking: "Publicar e notificar o resumo do ranking automaticamente",
+  weeklyRankingDay: "Dia do resumo semanal do ranking",
+  weeklyRankingHour: "Hora do resumo semanal · Portugal · 0–23",
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
   maxPositionsAbove: "Posições que pode desafiar acima",
@@ -5158,11 +5166,17 @@ function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState({
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
+    autoWeeklyRanking: true,
+    weeklyRankingDay: 0,
+    weeklyRankingHour: 20,
     ...s.settings[0],
   });
   const incomingSettings = JSON.stringify({
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
+    autoWeeklyRanking: true,
+    weeklyRankingDay: 0,
+    weeklyRankingHour: 20,
     ...s.settings[0],
   });
   const settingsBaseline = useRef(incomingSettings);
@@ -5174,6 +5188,15 @@ function Rules({ s, run, busy }: Actions) {
     );
   }, [incomingSettings]);
   const options: Record<string, [string, string][]> = {
+    weeklyRankingDay: [
+      ["0", "Domingo"],
+      ["1", "Segunda-feira"],
+      ["2", "Terça-feira"],
+      ["3", "Quarta-feira"],
+      ["4", "Quinta-feira"],
+      ["5", "Sexta-feira"],
+      ["6", "Sábado"],
+    ],
     promotionPlacement: [
       ["top", "Topo da nova divisão"],
       ["bottom", "Fundo da nova divisão"],
@@ -5229,7 +5252,13 @@ function Rules({ s, run, busy }: Actions) {
                 <select
                   value={String(settings[key as keyof Settings])}
                   onChange={(e) =>
-                    setSettings({ ...settings, [key]: e.target.value })
+                    setSettings({
+                      ...settings,
+                      [key]:
+                        key === "weeklyRankingDay"
+                          ? Number(e.target.value)
+                          : e.target.value,
+                    })
                   }
                 >
                   {options[key].map(([v, l]) => (

@@ -73,17 +73,19 @@ export function deliveryContent(n: Notification) {
     badge: presentation.badge,
     title: n.title,
     body: n.body,
-    path: n.seasonId
-      ? "/epocas"
-      : n.adminTestId
-        ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
-        : n.challengeId
-          ? `/desafios/${encodeURIComponent(n.challengeId)}`
-          : n.competitionNotice
-            ? n.playerId === "__admins__"
-              ? "/admin?tab=matchmaking"
-              : "/jornadas"
-            : "/notificacoes",
+    path: n.rankingNotice
+      ? "/ranking"
+      : n.seasonId
+        ? "/epocas"
+        : n.adminTestId
+          ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
+          : n.challengeId
+            ? `/desafios/${encodeURIComponent(n.challengeId)}`
+            : n.competitionNotice
+              ? n.playerId === "__admins__"
+                ? "/admin?tab=matchmaking"
+                : "/jornadas"
+              : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */

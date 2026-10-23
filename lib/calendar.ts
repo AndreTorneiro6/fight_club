@@ -5,7 +5,7 @@ export interface Proposal {
   end: string;
   selected: boolean;
 }
-function wallTime(timestamp: number) {
+export function wallTime(timestamp: number) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Lisbon",
     year: "numeric",

@@ -1,4 +1,5 @@
 "use client";
+import ChallengeTimeProposal from "./challenge-time-proposal";
 import { RoundRoles, PlayerRoundChallenges } from "./round-challenge-roles";
 import { useState } from "react";
 import { statusLabels, type View } from "@/lib/types";
@@ -93,7 +94,8 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
     .filter((q) => q.roundId === round?._id)
     .sort((a, b) => b.revision - a.revision);
   const proposal =
-    schedules.find((q) => q.status !== "PUBLISHED") ?? schedules[0];
+    schedules.find((q) => q.status !== "PUBLISHED" && !q.supersededBy) ??
+    schedules[0];
   const teams = rankingEntries(s.players, divisionId);
   const name = (id: string) =>
     teams
@@ -718,6 +720,28 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
           />
           <div className="card">
             <h3>Desafios e prioridades</h3>
+            <p role="status">
+              {
+                (s.competitionChallenges ?? []).filter(
+                  (c) => c.roundId === round._id && c.status === "PENDING",
+                ).length
+              }{" "}
+              aguardam aceitação/recusa ·{" "}
+              {
+                (s.competitionChallenges ?? []).filter(
+                  (c) => c.roundId === round._id && c.status === "ACCEPTED",
+                ).length
+              }{" "}
+              aceites ·{" "}
+              {
+                (s.competitionChallenges ?? []).filter(
+                  (c) =>
+                    c.roundId === round._id &&
+                    c.timeProposal?.status === "AWAITING_ADMIN",
+                ).length
+              }{" "}
+              horários aguardam decisão do clube
+            </p>
             {(s.competitionChallenges ?? [])
               .filter((c) => c.roundId === round._id)
               .map((c) => (
@@ -726,6 +750,26 @@ export function CompetitionMatchmaking({ s, run, busy }: Props) {
                   {competitionLabels[c.status]} ·{" "}
                   {new Date(c.createdAt).toLocaleString("pt-PT")}{" "}
                   {c.priorityReason}{" "}
+                  {c.status === "PENDING" && (
+                    <p>
+                      A aguardar aceitação ou recusa da dupla defensora até{" "}
+                      {new Date(c.respondBy).toLocaleString("pt-PT", {
+                        timeZone: "Europe/Lisbon",
+                      })}
+                      .
+                    </p>
+                  )}
+                  {c.responseNote && (
+                    <p>Resposta / proposta de horário: {c.responseNote}</p>
+                  )}
+                  <ChallengeTimeProposal
+                    key={`${c._id}:${c.timeVersion ?? 0}`}
+                    s={s}
+                    round={round}
+                    challenge={c}
+                    run={run}
+                    busy={busy}
+                  />
                   {c.invalidReason && <strong> — {c.invalidReason}</strong>}{" "}
                   {["ACCEPTED", "PENDING"].includes(c.status) && (
                     <button
