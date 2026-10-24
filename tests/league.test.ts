@@ -3214,3 +3214,148 @@ test("division openings notify only Ouro and Prata, hold Bronze until admin rele
     /Seleciona uma divisão/,
   );
 });
+
+test("queued weekly challenges cannot bypass priority through accepting a time slot or administrative time proposals", () => {
+  const s = fixture();
+  publishWeek(s);
+  const first = create(s),
+    queued = create(s, 7, 6);
+  for (const c of [first, queued])
+    execute(
+      s,
+      actor(c === first ? 8 : 7),
+      {
+        type: "slot.add",
+        challengeId: c._id,
+        start: iso(1),
+        end: iso(1, 2),
+      },
+      time,
+    );
+  const slot = s.slots.find((x) => x.challengeId === queued._id)!;
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(6),
+        {
+          type: "match.accept_slot",
+          challengeId: queued._id,
+          slotId: slot._id,
+        },
+        time,
+      ),
+    /prioridade/,
+  );
+  assert.equal(queued.status, "pending");
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.schedule",
+          challengeId: queued._id,
+          start: iso(1),
+          courtId: "c1",
+          minutes: 90,
+        },
+        time,
+      ),
+    /prioridade/,
+  );
+  assert.equal(queued.scheduleProposal, undefined);
+  const firstSlot = s.slots.find((x) => x.challengeId === first._id)!;
+  execute(
+    s,
+    actor(6),
+    {
+      type: "match.accept_slot",
+      challengeId: first._id,
+      slotId: firstSlot._id,
+    },
+    time,
+  );
+  assert.equal(first.status, "schedule_pending");
+  assert.equal(first.weeklyPriorityWinner, true);
+  assert.match(first.weeklyPriorityReason!, /disputada/);
+  assert.equal(s.matches.length, 0);
+  assert.equal(first.scheduleProposal!.challengerConfirmed, true);
+  assert.equal(first.scheduleProposal!.defenderConfirmed, true);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.match.approve",
+      challengeId: first._id,
+      proposalId: first.scheduleProposal!._id,
+      courtId: "c1",
+    },
+    time,
+  );
+  assert.equal(first.status, "scheduled");
+  assert.equal(queued.status, "cancelled");
+  assert.equal(queued.queueClosedByChallengeId, first._id);
+  assert.equal(
+    s.notifications.filter(
+      (n) => n.playerId === "p7" && n.dedupe?.startsWith("queue-closed:"),
+    ).length,
+    1,
+  );
+  assert.equal(s.matches.length, 1);
+});
+
+test("accepting a weekly challenge closes only incompatible pending requests, notifies waiting teams and frees them without results", () => {
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  s.weeklyRounds.push({
+    _id: "open",
+    weekStart: clubWeek(time).start,
+    publishedAt: iso(0),
+    weekType: "OPEN_ATTACK",
+    assignments: s.players.map((p) => ({
+      playerId: p._id,
+      role: p.position === 1 ? "defense" : "attack",
+    })),
+  });
+  const accepted = create(s, 3, 1),
+    waiting = create(s, 2, 1),
+    incoming = create(s, 4, 3),
+    unrelated = create(s, 16, 14);
+  const rankings = s.players.map((p) => p.position);
+  execute(
+    s,
+    actor(1),
+    { type: "challenge.respond", challengeId: accepted._id, accept: true },
+    time,
+  );
+  assert.equal(accepted.status, "accepted");
+  assert.equal(waiting.status, "cancelled");
+  assert.equal(incoming.status, "cancelled");
+  assert.equal(unrelated.status, "pending");
+  assert.equal(s.matches.length, 0);
+  assert.equal(s.results.length, 0);
+  assert.deepEqual(
+    s.players.map((p) => p.position),
+    rankings,
+  );
+  for (const pid of ["p2", "p4"]) {
+    const n = s.notifications.filter(
+      (n) => n.playerId === pid && n.dedupe?.startsWith("queue-closed:"),
+    );
+    assert.equal(n.length, 1);
+    assert.match(n[0].body, /sem derrota nem alteração do ranking/);
+    assert.deepEqual(n[0].deliveryChannels, ["push"]);
+  }
+  assert.equal(
+    s.audit.filter((a) => a.action === "challenge.queue.closed").length,
+    2,
+  );
+  const replacement = create(s, 4, 2);
+  assert.equal(replacement.status, "pending");
+  processDeadlines(s, time + 1000);
+  assert.equal(
+    s.notifications.filter((n) => n.dedupe?.startsWith("queue-closed:")).length,
+    2,
+  );
+});

@@ -232,8 +232,8 @@ export function weeklyBookingReason(
   return null;
 }
 
-/** Regulatory order, including rotation of a contested benefit in the previous week. */
-export function weeklyPriority(
+/** Pending incoming challenges remain visible while a team can also attack. */
+export function weeklyPendingReceived(
   s: State,
   defenderId: string,
   now = Date.now(),
@@ -241,7 +241,7 @@ export function weeklyPriority(
 ) {
   const members = teamMembers(s.players, defenderId).map((m) => m._id),
     week = weekStart;
-  const group = s.challenges
+  return s.challenges
     .filter(
       (c) =>
         (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
@@ -255,6 +255,17 @@ export function weeklyPriority(
         a.number - b.number ||
         a._id.localeCompare(b._id),
     );
+}
+
+/** Regulatory order, including rotation of a contested benefit in the previous week. */
+export function weeklyPriority(
+  s: State,
+  defenderId: string,
+  now = Date.now(),
+  weekStart = weeklyChallengeWeek(s, now),
+) {
+  const week = weekStart,
+    group = weeklyPendingReceived(s, defenderId, now, week);
   if (!group.length) return undefined;
   const previous = addClubDays(week, -7);
   const benefited = s.challenges

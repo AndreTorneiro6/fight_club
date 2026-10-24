@@ -1,3 +1,4 @@
+import { clubWeek } from "../lib/calendar";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -74,6 +75,11 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await player.goto("/ranking");
   const row = player.locator(".ranking-row").filter({ hasText: "Luís Costa" });
   await row.getByRole("button", { name: "Desafiar", exact: true }).click();
+  const includeSlots = player
+    .getByRole("dialog")
+    .getByLabel("Propor horários já (opcional)");
+  await expect(includeSlots).not.toBeChecked();
+  await includeSlots.check();
   await expect(
     player.getByRole("dialog").locator('.proposal-grid input[type="date"]'),
   ).toHaveCount(4);
@@ -292,6 +298,14 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
     }),
     page = await context.newPage();
   await login(page, "admin@fightclub.local");
+  if (
+    await page
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .isVisible()
+  )
+    await page
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
   await page.getByRole("button", { name: "Escolher tema de cores" }).click();
   await page
     .getByRole("button", { name: "Tema Fight Club", exact: true })
@@ -370,6 +384,14 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
   const playerContext = await browser.newContext(),
     player = await playerContext.newPage();
   await login(player, "jogador@fightclub.local");
+  if (
+    await player
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .isVisible()
+  )
+    await player
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
   await player.goto("/desafios");
   await player.getByRole("button", { name: "Enviados", exact: true }).click();
   await expect(
@@ -400,7 +422,23 @@ test("admin sees weekly calendar on existing challenges and players see why new 
   const admin = await adminContext.newPage(),
     player = await playerContext.newPage();
   await login(admin, "admin@fightclub.local");
+  if (
+    await admin
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .isVisible()
+  )
+    await admin
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
   await login(player, "jogador@fightclub.local");
+  if (
+    await player
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .isVisible()
+  )
+    await player
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
   const state = await (await admin.request.get("/api/league")).json();
   const existing = state.challenges.find(
     (c: { status: string; challengerId: string; defenderId: string }) =>
@@ -481,6 +519,10 @@ test("admin sees weekly calendar on existing challenges and players see why new 
     admin.getByRole("heading", { name: "Jogo confirmado", exact: true }),
   ).toBeVisible();
   await defenderContext.close();
+  if (clubWeek(day).start !== clubWeek().start)
+    await admin
+      .getByRole("button", { name: "Semana seguinte", exact: true })
+      .click();
   const matchDate = admin.locator(".calendar-day.match");
   await expect(matchDate).toHaveCount(1);
   await matchDate.click();
@@ -556,7 +598,7 @@ test("a proposed time has a visible accept button and only the club can finalize
   ).toBeVisible();
   await defender
     .getByRole("button", {
-      name: "Escolher e aceitar este horário",
+      name: "Aceitar desafio e horário",
       exact: true,
     })
     .first()
