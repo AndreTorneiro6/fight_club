@@ -1,3 +1,5 @@
+import { challengeSide } from "@/lib/team-competition";
+import { teamName } from "@/lib/ranking-groups";
 import { clubWeek } from "@/lib/calendar";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
@@ -33,7 +35,7 @@ export async function GET(request: Request) {
       if (
         !c ||
         clubWeek(m.start).start !== week ||
-        ![c.challengerId, c.defenderId].includes(actor.playerId) ||
+        !challengeSide(c, actor.playerId, s.players) ||
         ["cancelled", "expired", "refused"].includes(c.status)
       )
         continue;
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
         `DTSTAMP:${stamp(new Date().toISOString())}`,
         `DTSTART:${stamp(m.start)}`,
         `DTEND:${stamp(m.end)}`,
-        `SUMMARY:${escape(s.players.find((p) => p._id === c.challengerId)?.name + " vs " + s.players.find((p) => p._id === c.defenderId)?.name)}`,
+        `SUMMARY:${escape((c.challengerTeam?.map((m) => m.name).join(" + ") || teamName(s.players, c.challengerId)) + " vs " + (c.defenderTeam?.map((m) => m.name).join(" + ") || teamName(s.players, c.defenderId)))}`,
         `LOCATION:${escape("Neiva Padel Club · " + (s.courts.find((x) => x._id === m.courtId)?.name ?? "Campo por definir"))}`,
         "END:VEVENT",
       );

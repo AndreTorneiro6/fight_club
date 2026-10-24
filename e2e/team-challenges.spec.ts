@@ -159,6 +159,31 @@ test("partner sees the same private challenge and can accept and arrange time fo
     expect(c.scheduleProposal.challengerConfirmed).toBe(true);
     expect(c.scheduleProposal.defenderConfirmed).toBe(true);
     expect(c.status).toBe("schedule_pending");
+    await switchWorkspace(page, "admin");
+    await post(page, {
+      type: "admin.match.approve",
+      challengeId: created.id,
+      proposalId: c.scheduleProposal._id,
+      courtId: shared.courts.find((court: { active: boolean }) => court.active)
+        ._id,
+    });
+    await switchWorkspace(page, "player");
+    const partnerCalendar = await page.request.get(
+      `/api/calendar?week=${week}`,
+    );
+    const defenderCalendar = await defender.request.get(
+      `/api/calendar?week=${week}`,
+    );
+    expect(partnerCalendar.ok()).toBe(true);
+    expect(defenderCalendar.ok()).toBe(true);
+    const firstCalendar = await partnerCalendar.text(),
+      secondCalendar = await defenderCalendar.text();
+    expect(firstCalendar).toContain("BEGIN:VEVENT");
+    expect(firstCalendar.match(/UID:[^\r\n]+/)?.[0]).toBe(
+      secondCalendar.match(/UID:[^\r\n]+/)?.[0],
+    );
+    for (const member of c.defenderTeam)
+      expect(firstCalendar).toContain(member.name);
   } finally {
     await ctx.close();
     await defctx.close();
