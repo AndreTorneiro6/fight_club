@@ -342,6 +342,24 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
   await expect(
     page.getByText("Respeita os adversários e os horários.", { exact: true }),
   ).toBeVisible();
+  // Earlier result-flow coverage can move Carlos above Luís; restore a valid upward attack for this assignment scenario.
+  const roster = await (await page.request.get("/api/league")).json();
+  if (
+    roster.players.find((p: { _id: string }) => p._id === "player-7")
+      .teamPosition <
+    roster.players.find((p: { _id: string }) => p._id === "player-5")
+      .teamPosition
+  ) {
+    const moved = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data: {
+        type: "admin.ranking.move",
+        playerId: "player-7",
+        targetPlayerId: "player-5",
+      },
+    });
+    expect(moved.ok(), await moved.text()).toBe(true);
+  }
   await page.goto("/desafios");
   await page
     .getByRole("button", { name: "Atribuir ataque / defesa", exact: true })
@@ -576,6 +594,22 @@ test("a proposed time has a visible accept button and only the club can finalize
     });
     expect(result.ok()).toBe(true);
   }
+  if (
+    state.players.find((p: { _id: string }) => p._id === "player-5")
+      .teamPosition <
+    state.players.find((p: { _id: string }) => p._id === "player-7")
+      .teamPosition
+  ) {
+    const moved = await club.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data: {
+        type: "admin.ranking.move",
+        playerId: "player-5",
+        targetPlayerId: "player-7",
+      },
+    });
+    expect(moved.ok(), await moved.text()).toBe(true);
+  }
   const initialSlots = [3, 4, 5].map((n) => {
     const start = new Date(Date.now() + n * 86400000);
     start.setUTCHours(18, 0, 0, 0);
@@ -588,7 +622,7 @@ test("a proposed time has a visible accept button and only the club can finalize
     headers: { Origin: "http://localhost:3100" },
     data: { type: "challenge.create", defenderId: "player-7", initialSlots },
   });
-  expect(response.ok()).toBe(true);
+  expect(response.ok(), await response.text()).toBe(true);
   const { id } = await response.json();
   await defender.goto("/desafios/" + id);
   await expect(

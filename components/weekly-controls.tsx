@@ -17,6 +17,8 @@ import {
   weeklyOpeningAt,
   weeklyPendingReceived,
   weeklyPriority,
+  weeklyChallengePriority,
+  weeklyTeamCommitment,
 } from "@/lib/weekly";
 import { rankingEntries } from "@/lib/ranking-groups";
 import type { Challenge, Player, View } from "@/lib/types";
@@ -142,17 +144,12 @@ export function WeeklyQueueNotice({
     Date.parse(challenge.respondBy) <= Date.now()
   )
     return null;
-  const priority = weeklyPriority(
-    s,
-    challenge.defenderId,
-    Date.now(),
-    challenge.weekStart,
-  );
-  if (!priority || priority.id === challenge._id) return null;
+  const priority = weeklyChallengePriority(s, challenge);
+  if (priority.eligible) return null;
   return (
     <p className="inset" role="status">
-      Em fila — esta dupla já recebeu outro desafio com prioridade. Este desafio
-      permanece pendente e só pode ser aceite quando tiver prioridade
+      Em fila — uma das duplas tem um desafio anterior com prioridade. Este
+      desafio permanece pendente e só pode ser aceite quando tiver prioridade
       regulamentar.
     </p>
   );
@@ -214,6 +211,7 @@ export function WeeklyRoles({
   );
   const published = !!round?.publishedAt;
   const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
+  const ownTeamCommitment = weeklyTeamCommitment(s, me._id);
   const save = async (publish: boolean) => {
     await run(
       {
@@ -396,6 +394,7 @@ export function WeeklyRoles({
       )}
       {!admin &&
         published &&
+        !ownTeamCommitment &&
         opening !== null &&
         (!opening || Date.now() >= Date.parse(opening)) &&
         weeklyRole(s, me._id) === "attack" &&

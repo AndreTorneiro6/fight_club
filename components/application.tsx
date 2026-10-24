@@ -1,5 +1,12 @@
 "use client";
-import { teamPosition, challengeSide } from "@/lib/team-competition";
+import {
+  teamPosition,
+  challengeSide,
+  challengeRepresentative,
+  challengeMemberIds,
+  challengeParticipants,
+  challengeTeamName,
+} from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
 import {
   SetScoreFields,
@@ -137,6 +144,9 @@ import {
   weeklyWindow,
   weeklyRole,
   weeklyPriority,
+  weeklyChallengePriority,
+  weeklyTeamCommitment,
+  weeklyTeamCommitmentMessage,
   weeklyPendingReceived,
   weeklyChallengeWeek,
   weeklyOpeningAt,
@@ -1462,7 +1472,7 @@ function Versus({ s, c }: { s: View; c: Challenge }) {
         return (
           <div key={id}>
             <Avatar p={p} />
-            <h3>{teamName(s.players, id)}</h3>
+            <h3>{challengeTeamName(c, id, s.players)}</h3>
             <small>
               #{p ? teamPosition(s.players, p._id) : "—"} ·{" "}
               <span className="role-label">
@@ -1713,10 +1723,7 @@ function Rankings(a: Actions) {
   );
 }
 function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
-  const name = (id: string) =>
-    terminal.has(effectiveStatus(c))
-      ? (s.players.find((player) => player._id === id)?.name ?? "Jogador")
-      : teamName(s.players, id) || "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   const when =
     c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
   return (
@@ -1768,7 +1775,7 @@ function Challenges(a: Actions) {
     p = s.players.find((p) => p._id === s.actor.playerId)!;
   const managed = usesManagedCompetition(s, p.divisionId);
   const pool = s.challenges.filter(
-    (c) => (admin && scope === "league") || involves(c, p._id),
+    (c) => (admin && scope === "league") || involves(c, p._id, s.players),
   );
   const list = pool
     .filter(
@@ -1777,10 +1784,10 @@ function Challenges(a: Actions) {
         (state === "all" || effectiveStatus(c) === state) &&
         (filter === "all" ||
           (filter === "received" &&
-            c.defenderId === p._id &&
+            challengeSide(c, p._id, s.players) === "defense" &&
             !terminal.has(effectiveStatus(c))) ||
           (filter === "sent" &&
-            c.challengerId === p._id &&
+            challengeSide(c, p._id, s.players) === "attack" &&
             !terminal.has(effectiveStatus(c))) ||
           (filter === "active" && !terminal.has(effectiveStatus(c))) ||
           (filter === "completed" && terminal.has(effectiveStatus(c)))),
@@ -1811,8 +1818,10 @@ function Challenges(a: Actions) {
           ? `Os desafios abrem em ${new Date(opening).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal). Os adversários elegíveis aparecem nessa altura.`
           : ""
       : "";
+  const ownTeamCommitment = weeklyTeamCommitment(s, p._id);
   const blockedReason =
     openingBlock ||
+    (ownTeamCommitment ? weeklyTeamCommitmentMessage(ownTeamCommitment) : "") ||
     (s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
       ? "A aguardar a publicação do teu papel semanal pelo administrador."
       : s.settings[0].weeklyCompetition && weeklyRole(s, p._id) === "defense"
@@ -1821,7 +1830,7 @@ function Challenges(a: Actions) {
           ? "A tua conta de jogador não está ativa."
           : active.length >= s.settings[0].maxActiveChallenges
             ? `Já tens ${active.length} desafios ativos. O limite é ${s.settings[0].maxActiveChallenges}. Continua um dos desafios abaixo ou pede ao administrador para resolver um pendente.`
-            : p.position === 1
+            : teamPosition(s.players, p._id) === 1
               ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
               : eligible.length === 0
                 ? "Os adversários dentro do teu alcance já estão ocupados ou têm um desafio contigo. Consulta os teus desafios em curso."
@@ -1848,8 +1857,9 @@ function Challenges(a: Actions) {
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
-          ) : s.settings[0].weeklyCompetition &&
-            (weeklyRole(s, p._id) !== "attack" || !!openingBlock) ? null : (
+          ) : ownTeamCommitment ||
+            (s.settings[0].weeklyCompetition &&
+              (weeklyRole(s, p._id) !== "attack" || !!openingBlock)) ? null : (
             <a
               className="button primary"
               href={
@@ -1899,7 +1909,13 @@ function Challenges(a: Actions) {
           >
             <p>{blockedReason}</p>
             <div className="row wrap">
-              {active.map((c) => (
+              {[
+                ...active,
+                ...(ownTeamCommitment &&
+                !active.some((c) => c._id === ownTeamCommitment._id)
+                  ? [ownTeamCommitment]
+                  : []),
+              ].map((c) => (
                 <Link
                   className="button small"
                   key={c._id}
@@ -1943,7 +1959,8 @@ function Challenges(a: Actions) {
             icon: Shield,
             count: pool.filter(
               (c) =>
-                c.defenderId === p._id && !terminal.has(effectiveStatus(c)),
+                challengeSide(c, p._id, s.players) === "defense" &&
+                !terminal.has(effectiveStatus(c)),
             ).length,
             filter: "received",
           },
@@ -1952,7 +1969,8 @@ function Challenges(a: Actions) {
             icon: Sword,
             count: pool.filter(
               (c) =>
-                c.challengerId === p._id && !terminal.has(effectiveStatus(c)),
+                challengeSide(c, p._id, s.players) === "attack" &&
+                !terminal.has(effectiveStatus(c)),
             ).length,
             filter: "sent",
           },
@@ -2058,7 +2076,13 @@ function Challenges(a: Actions) {
         </div>
       ) : (
         <Section title="Gestão dos teus desafios">
-          <Empty text="Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo." />
+          <Empty
+            text={
+              ownTeamCommitment
+                ? "Não existem desafios neste filtro. Consulta o desafio da tua dupla em Enviados, Recebidos ou Em curso."
+                : "Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo."
+            }
+          />
         </Section>
       )}
       {scope === "mine" && !managed && !s.settings[0].weeklyCompetition && (
@@ -2142,9 +2166,11 @@ function ChallengeDetail(a: Actions & { id: string }) {
     admin = s.actor.role === "admin",
     status = effectiveStatus(c),
     opponentId =
-      c.challengerId === s.actor.playerId ? c.defenderId : c.challengerId;
+      challengeSide(c, s.actor.playerId, s.players) === "attack"
+        ? c.defenderId
+        : c.challengerId;
   const weeklyResponsePriority = s.settings[0].weeklyCompetition
-    ? weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)
+    ? weeklyChallengePriority(s, c, Date.now())
     : undefined;
   const canRespondByRole =
     !s.settings[0].weeklyCompetition ||
@@ -2155,9 +2181,11 @@ function ChallengeDetail(a: Actions & { id: string }) {
           weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
     )?.weekType === "OPEN_ATTACK" ||
       weeklyRole(s, c.defenderId, Date.now(), c.weekStart) === "defense") &&
-      weeklyResponsePriority?.id === c._id);
+      weeklyResponsePriority?.eligible);
   const mySlots = s.slots.filter(
-      (x) => x.challengeId === id && x.playerId === s.actor.playerId,
+      (x) =>
+        x.challengeId === id &&
+        x.playerId === challengeRepresentative(c, s.actor.playerId, s.players),
     ),
     theirSlots = s.slots.filter(
       (x) => x.challengeId === id && x.playerId === opponentId,
@@ -2175,8 +2203,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
   const chat = s.messages
     .filter((x) => x.challengeId === id)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const name = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Link href="/desafios" className="link row" style={{ marginBottom: 20 }}>
@@ -2234,7 +2261,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
               </div>
             )}
             {status === "pending" &&
-              (c.defenderId === s.actor.playerId ||
+              (challengeSide(c, s.actor.playerId, s.players) === "defense" ||
                 c.defenderTeam?.some(
                   (m) => m.playerId === s.actor.playerId,
                 )) && (
@@ -2329,9 +2356,9 @@ function ChallengeDetail(a: Actions & { id: string }) {
             >
               <div className="stack">
                 <p style={{ fontSize: 12 }}>
-                  Cada jogador propõe uma janela. O jogo dura{" "}
-                  {c.durationMinutes} minutos e tem de terminar até{" "}
-                  {fmtDate(c.playBy)}.
+                  Cada dupla propõe uma janela. Qualquer parceiro pode gerir os
+                  horários. O jogo dura {c.durationMinutes} minutos e tem de
+                  terminar até {fmtDate(c.playBy)}.
                 </p>
                 <div>
                   <h3 style={{ marginBottom: 12 }}>A tua disponibilidade</h3>
@@ -2721,7 +2748,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                 <select name="winnerId" defaultValue={c.winnerId}>
                   {[c.challengerId, c.defenderId].map((pid) => (
                     <option value={pid} key={pid}>
-                      {s.players.find((p) => p._id === pid)?.name}
+                      {challengeTeamName(c, pid, s.players)}
                     </option>
                   ))}
                 </select>
@@ -2747,7 +2774,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                   <option value="">Escolher jogador</option>
                   {[c.challengerId, c.defenderId].map((pid) => (
                     <option value={pid} key={pid}>
-                      {s.players.find((p) => p._id === pid)?.name}
+                      {challengeTeamName(c, pid, s.players)}
                     </option>
                   ))}
                 </select>
@@ -3804,8 +3831,8 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
           >
             <p>
               <strong>
-                {s.players.find((p) => p._id === c.challengerId)?.name} vs{" "}
-                {s.players.find((p) => p._id === c.defenderId)?.name}
+                {challengeTeamName(c, c.challengerId, s.players)} vs{" "}
+                {challengeTeamName(c, c.defenderId, s.players)}
               </strong>
             </p>
             <p>
@@ -3967,8 +3994,8 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
             }}
           >
             <p>
-              {s.players.find((p) => p._id === c.challengerId)?.name} vs{" "}
-              {s.players.find((p) => p._id === c.defenderId)?.name}
+              {challengeTeamName(c, c.challengerId, s.players)} vs{" "}
+              {challengeTeamName(c, c.defenderId, s.players)}
             </p>
             <label>
               Quem venceu?
@@ -3982,7 +4009,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                 </option>
                 {[c.challengerId, c.defenderId].map((pid) => (
                   <option key={pid} value={pid}>
-                    {s.players.find((p) => p._id === pid)?.name}
+                    {challengeTeamName(c, pid, s.players)}
                   </option>
                 ))}
               </select>
@@ -6805,7 +6832,8 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
   const canPropose =
     (mine || admin) &&
     (status === "accepted" ||
-      (status === "pending" && (admin || s.actor.playerId === c.challengerId)));
+      (status === "pending" &&
+        (admin || challengeSide(c, s.actor.playerId, s.players) === "attack")));
   const selectedSlots = slots.filter((x) => clubDay(x.start) === selected),
     scheduledDay = c.scheduledAt ? clubDay(c.scheduledAt) : null;
   const compatible = compatibleStarts(
@@ -6819,11 +6847,10 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
   const proposal = c.scheduleProposal,
     myConfirmed =
       proposal &&
-      (s.actor.playerId === c.challengerId
+      (challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed);
-  const name = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Section
@@ -7007,10 +7034,12 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                   </div>
                 </div>
                 {mine &&
-                  x.playerId !== s.actor.playerId &&
+                  x.playerId !==
+                    challengeRepresentative(c, s.actor.playerId, s.players) &&
                   (status === "accepted" ||
                     (status === "pending" &&
-                      s.actor.playerId === c.defenderId)) &&
+                      challengeSide(c, s.actor.playerId, s.players) ===
+                        "defense")) &&
                   Date.parse(x.start) > Date.now() && (
                     <button
                       className="primary"
@@ -7018,12 +7047,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                         busy ||
                         (s.settings[0].weeklyCompetition &&
                           status === "pending" &&
-                          weeklyPriority(
-                            s,
-                            c.defenderId,
-                            Date.now(),
-                            c.weekStart,
-                          )?.id !== c._id)
+                          !weeklyChallengePriority(s, c, Date.now()).eligible)
                       }
                       onClick={() =>
                         run(
@@ -7043,7 +7067,13 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                     </button>
                   )}
                 {["pending", "accepted"].includes(status) &&
-                  (admin || x.playerId === s.actor.playerId) && (
+                  (admin ||
+                    x.playerId ===
+                      challengeRepresentative(
+                        c,
+                        s.actor.playerId,
+                        s.players,
+                      )) && (
                     <button
                       className="icon-button"
                       aria-label={`Remover proposta de ${name(x.playerId)}`}
@@ -7078,7 +7108,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
             )}
             {status === "pending" &&
               !admin &&
-              s.actor.playerId === c.defenderId && (
+              challengeSide(c, s.actor.playerId, s.players) === "defense" && (
                 <small>
                   Aceita o desafio para propor a tua disponibilidade.
                 </small>
@@ -7229,14 +7259,16 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
   if (
     !mine ||
     !["pending", "accepted"].includes(status) ||
-    (status === "pending" && s.actor.playerId !== c.defenderId)
+    (status === "pending" &&
+      challengeSide(c, s.actor.playerId, s.players) !== "defense")
   )
     return null;
   const offers = s.slots
     .filter(
       (x) =>
         x.challengeId === c._id &&
-        x.playerId !== s.actor.playerId &&
+        x.playerId !==
+          challengeRepresentative(c, s.actor.playerId, s.players) &&
         Date.parse(x.start) > Date.now(),
     )
     .sort((a, b) => a.start.localeCompare(b.start));
@@ -7244,7 +7276,7 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
   const priorityBlocked =
     s.settings[0].weeklyCompetition &&
     status === "pending" &&
-    weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)?.id !== c._id;
+    weeklyChallengePriority(s, c, Date.now())?.id !== c._id;
   return (
     <Section
       title="Horários propostos pelo adversário"
@@ -7308,11 +7340,10 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
     both = proposal.challengerConfirmed && proposal.defenderConfirmed,
     isFinal = c.status === "scheduled",
     myConfirmed =
-      s.actor.playerId === c.challengerId
+      challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed;
-  const label = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const label = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Section
@@ -7393,7 +7424,7 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
             >
               <Check size={16} />
               {proposal.previousStatus === "pending" &&
-              s.actor.playerId === c.defenderId
+              challengeSide(c, s.actor.playerId, s.players) === "defense"
                 ? "Aceitar desafio e horário"
                 : "Aceitar horário proposto"}
             </button>

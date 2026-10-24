@@ -1670,6 +1670,15 @@ export function executeCompetition(
         now,
         `challenge-pending:${challengeId}:${m.playerId}`,
       );
+    for (const m of a.members)
+      notify(
+        s,
+        m.playerId,
+        "A tua dupla enviou um desafio",
+        `Jornada ${r.number}: a tua dupla desafiou ${d.members.map((m) => m.name).join(" + ")}. Aguarda resposta do adversário.`,
+        now,
+        `challenge-sent:${challengeId}:${m.playerId}`,
+      );
     challengeAdminNotice(
       s,
       s.competitionChallenges.find((c) => c._id === challengeId)!,

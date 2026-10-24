@@ -1,4 +1,9 @@
-import { rankingEntries } from "./ranking-groups";
+import {
+  challengeSide,
+  challengeMemberIds,
+  teamPosition,
+} from "./team-competition";
+import { rankingEntries, teamMembers } from "./ranking-groups";
 import { weeklyReason } from "./weekly";
 import type { Challenge, Player, Settings, Slot, State } from "./types";
 
@@ -23,8 +28,8 @@ export const terminal = new Set([
   "refused",
   "expired",
 ]);
-export const involves = (c: Challenge, id: string) =>
-  c.challengerId === id || c.defenderId === id;
+export const involves = (c: Challenge, id: string, players?: Player[]) =>
+  !!challengeSide(c, id, players);
 export function effectiveStatus(c: Challenge, now = Date.now()) {
   if (c.status === "pending" && Date.parse(c.respondBy) < now) return "expired";
   if (
@@ -43,7 +48,7 @@ export function effectiveStatus(c: Challenge, now = Date.now()) {
 }
 export function activeChallenges(s: State, id: string, now: number) {
   return s.challenges.filter(
-    (c) => involves(c, id) && !terminal.has(effectiveStatus(c, now)),
+    (c) => involves(c, id, s.players) && !terminal.has(effectiveStatus(c, now)),
   );
 }
 export function challengeReason(
@@ -56,7 +61,8 @@ export function challengeReason(
   const rules = s.settings[0];
   const weekly = weeklyReason(s, me, defender, now);
   if (weekly) return weekly;
-  if (me._id === defender._id) return "Não podes desafiar-te a ti próprio.";
+  if (teamMembers(s.players, me._id).some((m) => m._id === defender._id))
+    return "Não podes desafiar-te a ti próprio.";
   if (me.status !== "active" || defender.status !== "active")
     return "Jogador indisponível.";
   if (me.divisionId !== defender.divisionId)
@@ -65,21 +71,30 @@ export function challengeReason(
     aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
     dRank =
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
-  if (!title && (dRank >= aRank || aRank - dRank > rules.maxPositionsAbove))
+  if (dRank >= aRank || aRank - dRank > rules.maxPositionsAbove)
     return "Adversário fora do limite de posições.";
   if (dRank === 1 && aRank > rules.titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
   if (title && aRank > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
-    activeChallenges(s, me._id, now).length >= rules.maxActiveChallenges ||
+    activeChallenges(s, me._id, now).filter(
+      (c) =>
+        !rules.weeklyCompetition ||
+        c.status !== "pending" ||
+        challengeSide(c, me._id, s.players) === "attack",
+    ).length >= rules.maxActiveChallenges ||
     activeChallenges(s, defender._id, now).filter(
       (c) => !rules.weeklyCompetition || c.status !== "pending",
     ).length >= rules.maxActiveChallenges
   )
     return "Limite de desafios simultâneos atingido.";
   const previous = s.challenges
-    .filter((c) => c.challengerId === me._id)
+    .filter(
+      (c) =>
+        challengeMemberIds(c, "attack", s.players).includes(me._id) &&
+        c.status !== "cancelled",
+    )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (
     previous &&
@@ -90,8 +105,8 @@ export function challengeReason(
     s.challenges.some(
       (c) =>
         !terminal.has(effectiveStatus(c, now)) &&
-        involves(c, me._id) &&
-        involves(c, defender._id),
+        involves(c, me._id, s.players) &&
+        involves(c, defender._id, s.players),
     )
   )
     return "Já existe um desafio entre estes jogadores.";
@@ -126,7 +141,7 @@ export function canRefuse(s: State, c: Challenge, now = Date.now()) {
     s.challenges.some(
       (x) =>
         x._id !== c._id &&
-        involves(x, c.defenderId) &&
+        involves(x, c.defenderId, s.players) &&
         [
           "accepted",
           "schedule_pending",

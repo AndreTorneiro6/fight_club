@@ -29,6 +29,11 @@ test("partners share dashboard rank and the title displays both team members", a
     partnerId: "player-5",
   });
   await post(page, {
+    type: "admin.champions.clear",
+    confirmation: "ESVAZIAR",
+    reason: "Preparar a atribuição da dupla no teste isolado",
+  });
+  await post(page, {
     type: "admin.champion",
     divisionId: "ouro",
     playerId: "player-5",

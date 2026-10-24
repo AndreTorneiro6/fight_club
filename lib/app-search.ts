@@ -1,3 +1,4 @@
+import { challengeTeamName } from "./team-competition";
 import type { View } from "./types";
 import { adminGroups } from "./admin-sections";
 import { managementLinks, playerLinks } from "./workspace-routes";
@@ -105,8 +106,7 @@ export function searchEntries(state: View): SearchEntry[] {
     ];
     if (!admin && !ids.includes(state.actor.playerId)) continue;
     if (c.competitionRoundId && !c.officialPublication) continue;
-    const name = (id: string) =>
-      state.players.find((p) => p._id === id)?.name ?? "Equipa";
+    const name = (id: string) => challengeTeamName(c, id, state.players);
     add(
       `match:${c._id}`,
       `Jogo #${c.number}`,

@@ -3,6 +3,16 @@
 Last updated: 24 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Team competition corrections — phase 2, 25 October 2026
+
+- Separate follow-up to the ranking/title delivery. Applies to every team and all three divisions; there is no name- or account-specific logic.
+- Challenge membership/permissions, private slots/messages and active commitments use both saved team members. Both partners can respond and arrange/confirm team times; same-side partners cannot accept their own offers or confirm an opponent's result. Canonical slot ownership keeps existing compatibility checks while offeredBy preserves the acting account.
+- A pending challenge may advance only when first for both teams across incoming/outgoing requests, with existing previous-week contested-priority rotation. Existing pending records keep original timestamps; accepted/published commitments are not undone. Receiving pending requests does not consume the team's one outgoing request; acceptance closes incompatible pending requests with existing audit/reasons. Managed competition priorities apply the same team-wide ordering.
+- The player challenge list and Sent/Received filters include requests created by either partner. Weekly commitments show a precise team message and continuation link; an already committed team does not see a false no-opponents/organization warning or an invitation to create another challenge.
+- Both partners receive challenge sent/received/accepted/scheduled notices and shared message/time updates; existing deadlines/openings, club confirmation and notification preferences remain effective. No historical notification replay or production broadcasts.
+- Validation: typecheck, all 298 automated tests and production build pass. New browser check proves the second partner sees private proposed slots, accepts the same challenge and agrees time while club approval remains pending; after club approval both members can export the same official calendar event with full team names. Updated upcoming-week browser regression also passes, explicitly blocking a later outgoing acceptance until the earlier incoming request is resolved. The former regression fixture relied on the priority bypass being corrected.
+- Deployment remains pending; ranking delivery must publish and be verified first. See docs/TEAM-COMPETITION.md for identity/history compatibility and queue behavior.
+
 ## Team competition corrections — phase 1, 25 October 2026
 
 - User requested two separate deliveries: ranking/title/results first; challenge queue, partner actions and notifications afterwards. Phase 1 deliberately preserves the existing challenge workflow and permissions.

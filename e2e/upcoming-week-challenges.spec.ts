@@ -177,7 +177,7 @@ test("published next-week Open Attack roles appear immediately to players and pe
     await expect(
       attacker.getByText(`Semana dos jogos: ${week}`, { exact: false }),
     ).toBeVisible();
-    await post(page, {
+    const earlierIncoming = await post(page, {
       type: "admin.challenge.create",
       challengerId: "player-4",
       defenderId: "player-3",
@@ -284,6 +284,18 @@ test("published next-week Open Attack roles appear immediately to players and pe
     expect(
       state.challenges.find((c: { _id: string }) => c._id === second.id).status,
     ).toBe("pending");
+    // The same team cannot accept a later outgoing request while its earlier incoming request is pending.
+    const deniedFirst = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data: { type: "challenge.respond", challengeId: first.id, accept: true },
+    });
+    expect(deniedFirst.status()).toBe(400);
+    expect(await deniedFirst.text()).toContain("prioridade");
+    await post(page, {
+      type: "challenge.cancel",
+      challengeId: earlierIncoming.id,
+      note: "Libertar a fila no cenário isolado de teste",
+    });
     await post(page, {
       type: "challenge.respond",
       challengeId: first.id,
