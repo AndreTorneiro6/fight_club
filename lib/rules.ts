@@ -69,7 +69,7 @@ export function challengeReason(
     return "Adversário fora do limite de posições.";
   if (dRank === 1 && aRank > rules.titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
-  if (title && me.position > rules.titleMaxPosition)
+  if (title && aRank > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
     activeChallenges(s, me._id, now).length >= rules.maxActiveChallenges ||
