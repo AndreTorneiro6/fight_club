@@ -1,3 +1,8 @@
+import {
+  teamPosition,
+  challengeSide,
+  challengeMemberIds,
+} from "./team-competition";
 import { scheduleWeeklyOpening, notifyWeeklyOpenings } from "./weekly-opening";
 import {
   notifyResponseReminder,
@@ -367,6 +372,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("admin.player.save"),
     playerId: id.optional(),
+    teamPosition: z.number().int().min(1).max(10000).optional(),
     ...playerFields,
   }),
   z.object({
@@ -747,6 +753,17 @@ export function execute(
     // Administrative notifications also appear in the activity log. Actor recipients are resolved by the server.
     notify("__admins__", title, body, cid, dedupe);
   };
+  const notifyTeam = (
+    pid: string,
+    title: string,
+    body: string,
+    cid: string,
+  ) => {
+    const c = s.challenges.find((c) => c._id === cid);
+    const side = c ? challengeSide(c, pid, s.players) : undefined;
+    for (const id of c && side ? challengeMemberIds(c, side, s.players) : [pid])
+      notify(id, title, body, cid);
+  };
   const history = (
     p: Player,
     old: number,
@@ -866,10 +883,22 @@ export function execute(
     }
   };
   const crown = (divisionId: string, pid: string, seasonId: string) => {
+    const members = teamMembers(s.players, pid);
+    const teamId = members
+      .map((m) => m._id)
+      .sort()
+      .join(":");
+    const snapshot = members.map((m) => ({ playerId: m._id, name: m.name }));
     const current = s.champions.find(
       (c) => c.divisionId === divisionId && !c.until,
     );
-    if (current?.playerId === pid) {
+    if (
+      current &&
+      (current.teamId === teamId ||
+        (!current.teamId && members.some((m) => m._id === current.playerId)))
+    ) {
+      current.teamId = teamId;
+      current.teamSnapshot ??= snapshot;
       current.defenses++;
       return;
     }
@@ -877,7 +906,9 @@ export function execute(
     s.champions.push({
       _id: uid(),
       divisionId,
-      playerId: pid,
+      playerId: members[0]._id,
+      teamId,
+      teamSnapshot: snapshot,
       since: now,
       defenses: 0,
       seasonId,
@@ -907,6 +938,17 @@ export function execute(
     );
     const w = player(winnerId),
       l = player(winnerId === c.challengerId ? c.defenderId : c.challengerId);
+    const winnerSide = winnerId === c.challengerId ? "attack" : "defense";
+    const winningMembers = challengeMemberIds(c, winnerSide, s.players).map(
+      player,
+    );
+    const losingMembers = challengeMemberIds(
+      c,
+      winnerSide === "attack" ? "defense" : "attack",
+      s.players,
+    ).map(player);
+    const defenderRankBefore = teamPosition(s.players, c.defenderId);
+
     ensure(
       w.divisionId === c.divisionId && l.divisionId === c.divisionId,
       "Os jogadores mudaram de divisão. Resolve a classificação antes de confirmar.",
@@ -920,31 +962,85 @@ export function execute(
     const championsBefore = structuredClone(
       s.champions.filter((entry) => entry.divisionId === c.divisionId),
     );
-    w.wins++;
-    w.challengesWon++;
-    l.losses++;
-    l.challengesLost++;
+    for (const p of winningMembers) {
+      p.wins++;
+      p.challengesWon++;
+    }
+    for (const p of losingMembers) {
+      p.losses++;
+      p.challengesLost++;
+    }
+    c.resultStatsPlayerIds = [...winningMembers, ...losingMembers].map(
+      (p) => p._id,
+    );
     if (
       !c.competitionRoundId &&
       (!c.titleFight || rules.titleAffectsRanking) &&
-      w._id === c.challengerId &&
-      w.position > l.position &&
+      winnerSide === "attack" &&
+      teamPosition(s.players, w._id) > teamPosition(s.players, l._id) &&
       w.status !== "removed" &&
       l.status !== "removed"
     ) {
-      if (rules.rankingModel === "swap") {
-        const wp = w.position,
-          lp = l.position;
-        w.previousPosition = wp;
-        l.previousPosition = lp;
-        w.position = lp;
-        l.position = wp;
-        history(w, wp, "Vitória em desafio", c._id);
-        history(l, lp, "Derrota em desafio", c._id);
-      } else movePosition(w, l.position, "Resultado de desafio", c._id);
+      ensure(
+        [...winningMembers, ...losingMembers].every(
+          (p) => !frozenRanking(s, p._id, timestamp),
+        ),
+        "O ranking da dupla está protegido por férias.",
+      );
+      const entries = rankingEntries(s.players, c.divisionId);
+      const beforeRanks = new Map(
+        entries.flatMap((t, i) =>
+          t.members.map((p) => [p._id, i + 1] as const),
+        ),
+      );
+      const from = entries.findIndex((t) =>
+          t.members.some((p) => p._id === w._id),
+        ),
+        to = entries.findIndex((t) => t.members.some((p) => p._id === l._id));
+      const slots = entries
+        .flatMap((t) => t.members.map((p) => p.position))
+        .sort((a, b) => a - b);
+      if (rules.rankingModel === "swap")
+        [entries[from], entries[to]] = [entries[to], entries[from]];
+      else {
+        const protectedIds = new Set(
+          entries
+            .filter((t) =>
+              t.members.some((p) => frozenRanking(s, p._id, timestamp)),
+            )
+            .map((t) => t.id),
+        );
+        const movable = entries.filter((t) => !protectedIds.has(t.id));
+        const a = movable.findIndex((t) =>
+            t.members.some((p) => p._id === w._id),
+          ),
+          d = movable.findIndex((t) => t.members.some((p) => p._id === l._id));
+        const [attacking] = movable.splice(a, 1);
+        movable.splice(d, 0, attacking);
+        let index = 0;
+        for (let i = 0; i < entries.length; i++)
+          if (!protectedIds.has(entries[i].id)) entries[i] = movable[index++];
+      }
+      let slot = 0;
+      for (const [index, team] of entries.entries())
+        for (const p of team.members) {
+          const old = p.position,
+            next = slots[slot++];
+          p.previousPosition = old;
+          if (old === next) continue;
+          p.position = next;
+          history(p, old, "Resultado da dupla — troca de posição", c._id);
+          const h = s.history.at(-1)!;
+          h.oldTeamPosition = beforeRanks.get(p._id);
+          h.newTeamPosition = index + 1;
+        }
     }
-    if (!c.competitionRoundId && c.titleFight && rules.titleChangesOnWin)
-      crown(c.divisionId, winnerId, c.seasonId);
+    const titleChange =
+      !c.competitionRoundId &&
+      rules.titleChangesOnWin &&
+      (c.titleFight || defenderRankBefore === 1);
+    if (titleChange)
+      crown(c.divisionId, teamMembers(s.players, w._id)[0]._id, c.seasonId);
     c.winnerId = winnerId;
     c.score = score;
     c.setScores = sets;
@@ -987,7 +1083,7 @@ export function execute(
       confirmedAt: now,
       approvedBy: actor.userId,
       seasonId: c.seasonId,
-      ...(c.titleFight && rules.titleChangesOnWin
+      ...(titleChange
         ? {
             championsBefore,
             championsAfter: structuredClone(
@@ -1003,7 +1099,7 @@ export function execute(
         actor.userId,
         timestamp,
       );
-    notify(
+    notifyTeam(
       w._id,
       "Vitória confirmada 🏆",
       c.competitionRoundId
@@ -1011,7 +1107,7 @@ export function execute(
         : "O resultado e o ranking foram atualizados.",
       c._id,
     );
-    notify(
+    notifyTeam(
       l._id,
       "Resultado confirmado",
       c.competitionRoundId
@@ -1345,6 +1441,11 @@ export function execute(
         ),
         "O ranking desta equipa está congelado durante as férias.",
       );
+      const beforeTeamRanks = new Map(
+        entries.flatMap((entry, index) =>
+          entry.members.map((m) => [m._id, index + 1] as const),
+        ),
+      );
       const before = entries.flatMap((entry) =>
         entry.members.map((member) => ({
           playerId: member._id,
@@ -1374,6 +1475,12 @@ export function execute(
           member.previousPosition = old;
           member.position = slots[index];
           history(member, old, "Posição da equipa alterada pelo administrador");
+          const h = s.history.at(-1)!;
+          h.oldTeamPosition = beforeTeamRanks.get(member._id);
+          h.newTeamPosition =
+            entries.findIndex((t) =>
+              t.members.some((m) => m._id === member._id),
+            ) + 1;
         }
       log("ranking.team.moved", {
         divisionId: source.divisionId,
@@ -2856,8 +2963,20 @@ export function execute(
       return { deletedPlayerId: p._id };
     }
     case "admin.player.save": {
-      const { type, playerId, ...data } = cmd;
+      const {
+        type,
+        playerId,
+        teamPosition: requestedTeamPosition,
+        ...data
+      } = cmd;
       const existing = playerId ? player(playerId) : undefined;
+      ensure(
+        !existing ||
+          requestedTeamPosition !== undefined ||
+          teamMembers(s.players, existing._id).length < 2 ||
+          data.position === existing.position,
+        "A posição pertence à dupla. Altera a posição da equipa, não a de um parceiro isolado.",
+      );
       ensure(
         !existing?.userId || data.email,
         "Um jogador com conta precisa de um email.",
@@ -2973,7 +3092,11 @@ export function execute(
           compact(oldDivision, "Remoção da época");
         }
       }
-      if (data.status !== "removed" && !frozenRanking(s, p._id, timestamp))
+      if (
+        requestedTeamPosition === undefined &&
+        data.status !== "removed" &&
+        !frozenRanking(s, p._id, timestamp)
+      )
         movePosition(p, data.position, "Alteração do administrador");
       const priorPool = s.players.map((member) =>
         member._id === p!._id && before ? before : member,
@@ -3021,6 +3144,23 @@ export function execute(
             ? ""
             : data.partner,
       );
+      if (requestedTeamPosition !== undefined && p.status !== "removed") {
+        const teams = rankingEntries(s.players, p.divisionId);
+        ensure(
+          requestedTeamPosition <= teams.length,
+          "Posição da dupla fora do ranking da divisão.",
+        );
+        execute(
+          s,
+          actor,
+          {
+            type: "admin.ranking.move",
+            playerId: p._id,
+            targetPlayerId: teams[requestedTeamPosition - 1].members[0]._id,
+          },
+          timestamp,
+        );
+      }
       log("player.saved", { before, after: p });
       return { id: p._id };
     }
@@ -3188,10 +3328,27 @@ export function execute(
       for (const result of results) {
         const winner = player(result.winnerId),
           loser = player(result.loserId);
-        winner.wins = Math.max(0, winner.wins - 1);
-        winner.challengesWon = Math.max(0, winner.challengesWon - 1);
-        loser.losses = Math.max(0, loser.losses - 1);
-        loser.challengesLost = Math.max(0, loser.challengesLost - 1);
+        const winnerSide = challengeSide(c, result.winnerId, s.players)!;
+        const winners = c.resultStatsPlayerIds
+          ? challengeMemberIds(c, winnerSide, s.players)
+          : [winner._id];
+        const losers = c.resultStatsPlayerIds
+          ? challengeMemberIds(
+              c,
+              winnerSide === "attack" ? "defense" : "attack",
+              s.players,
+            )
+          : [loser._id];
+        for (const id of winners) {
+          const p = player(id);
+          p.wins = Math.max(0, p.wins - 1);
+          p.challengesWon = Math.max(0, p.challengesWon - 1);
+        }
+        for (const id of losers) {
+          const p = player(id);
+          p.losses = Math.max(0, p.losses - 1);
+          p.challengesLost = Math.max(0, p.challengesLost - 1);
+        }
         if (result.championsBefore && result.championsAfter) {
           const current = s.champions.filter(
             (entry) => entry.divisionId === c.divisionId,
@@ -3306,14 +3463,31 @@ export function execute(
       if (result.winnerId !== cmd.winnerId) {
         const oldWinner = player(result.winnerId),
           oldLoser = player(result.loserId);
-        oldWinner.wins--;
-        oldWinner.challengesWon--;
-        oldWinner.losses++;
-        oldWinner.challengesLost++;
-        oldLoser.losses--;
-        oldLoser.challengesLost--;
-        oldLoser.wins++;
-        oldLoser.challengesWon++;
+        const winnerSide = challengeSide(c, result.winnerId, s.players)!;
+        const winners = c.resultStatsPlayerIds
+          ? challengeMemberIds(c, winnerSide, s.players)
+          : [oldWinner._id];
+        const losers = c.resultStatsPlayerIds
+          ? challengeMemberIds(
+              c,
+              winnerSide === "attack" ? "defense" : "attack",
+              s.players,
+            )
+          : [oldLoser._id];
+        for (const id of winners) {
+          const p = player(id);
+          p.wins--;
+          p.challengesWon--;
+          p.losses++;
+          p.challengesLost++;
+        }
+        for (const id of losers) {
+          const p = player(id);
+          p.losses--;
+          p.challengesLost--;
+          p.wins++;
+          p.challengesWon++;
+        }
         result.loserId = result.winnerId;
         result.winnerId = cmd.winnerId;
       }
@@ -3544,25 +3718,21 @@ export function execute(
         target.archivedDivisions = structuredClone(s.divisions);
         if (cmd.promote) {
           const divisions = [...s.divisions].sort((a, b) => a.tier - b.tier);
-          const lists = divisions.map((d) =>
-            s.players
-              .filter((p) => p.divisionId === d._id && p.status !== "removed")
-              .sort((a, b) => a.position - b.position),
-          );
+          const lists = divisions.map((d) => rankingEntries(s.players, d._id));
           const transfers = new Map<string, string>();
           for (let i = 0; i < divisions.length - 1; i++) {
             const down = lists[i].slice(
               Math.max(0, lists[i].length - rules.relegationCount),
             );
             const up = lists[i + 1].slice(0, rules.promotionCount);
-            for (const p of down) {
+            for (const p of down.flatMap((t) => t.members)) {
               ensure(
                 !transfers.has(p._id),
                 "As regras fazem um jogador subir e descer na mesma época. Reduz os números.",
               );
               transfers.set(p._id, divisions[i + 1]._id);
             }
-            for (const p of up) {
+            for (const p of up.flatMap((t) => t.members)) {
               ensure(
                 !transfers.has(p._id),
                 "As regras fazem um jogador subir e descer na mesma época. Reduz os números.",

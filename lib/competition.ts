@@ -2610,6 +2610,14 @@ export function updateCompetitionRanking(
         _id: randomUUID(),
         divisionId: r.divisionId,
         playerId: champion.members[0].playerId,
+        teamId: champion.members
+          .map((m) => m.playerId)
+          .sort()
+          .join(":"),
+        teamSnapshot: champion.members.map((m) => ({
+          playerId: m.playerId,
+          name: m.name,
+        })),
         since: now,
         defenses: 0,
         seasonId: effectiveCompetitionConfig(s, r).config.seasonId,

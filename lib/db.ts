@@ -1,3 +1,4 @@
+import { teamPosition } from "./team-competition";
 import { reconcileCoins } from "./coins";
 import { publicActor, workspaceActor } from "./workspace";
 import type { Session, User } from "./types";
@@ -466,6 +467,12 @@ export async function view(actor: Actor): Promise<View> {
       })),
     }));
   }
+  const allPlayers = s.players;
+  s.players = allPlayers.map((p) => ({
+    ...p,
+    teamPosition: teamPosition(allPlayers, p._id),
+    previousTeamPosition: teamPosition(allPlayers, p._id, true),
+  }));
   s.notifications = s.notifications.filter(
     (n) =>
       n.playerId === actor.playerId ||

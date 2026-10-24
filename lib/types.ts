@@ -49,6 +49,9 @@ export interface PaymentStatus {
   updatedBy: string;
 }
 export interface Player extends Entity {
+  /** Derived for API views; position remains an internal legacy ordering slot. */
+  teamPosition?: number;
+  previousTeamPosition?: number;
   membershipPayment?: PaymentStatus;
   awaitingApproval?: boolean;
   registrationRejectedAt?: string;
@@ -124,6 +127,7 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  resultStatsPlayerIds?: string[];
   queueClosedByChallengeId?: string;
   queueClosureReason?: string;
   weeklyPriorityWinner?: boolean;
@@ -236,6 +240,8 @@ export interface Notification extends Entity {
   dedupe?: string;
 }
 export interface History extends Entity {
+  oldTeamPosition?: number;
+  newTeamPosition?: number;
   playerId: string;
   divisionId: string;
   oldPosition: number;
@@ -275,6 +281,8 @@ export interface Result extends Entity {
   seasonId: string;
 }
 export interface Champion extends Entity {
+  teamId?: string;
+  teamSnapshot?: { playerId: string; name: string }[];
   divisionId: string;
   playerId: string;
   since: string;

@@ -1,4 +1,5 @@
 "use client";
+import { teamPosition, challengeSide } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
 import {
   SetScoreFields,
@@ -269,6 +270,16 @@ function Heading({
       {right}
     </div>
   );
+}
+function teamPlayerStats(s: View, p: Player) {
+  const record = teamRecord(s.challenges, teamMembers(s.players, p._id));
+  return {
+    ...p,
+    wins: record.wins,
+    losses: record.losses,
+    challengesWon: record.wins,
+    challengesLost: record.losses,
+  };
 }
 function Trend({ p }: { p: Pick<Player, "position" | "previousPosition"> }) {
   const diff = p.previousPosition - p.position;
@@ -1197,8 +1208,11 @@ function Auth({
 
 function Dashboard(a: Actions) {
   const { s } = a,
-    p = s.players.find((p) => p._id === s.actor.playerId)!,
-    mine = s.challenges.filter((c) => involves(c, p._id)),
+    p = teamPlayerStats(
+      s,
+      s.players.find((p) => p._id === s.actor.playerId)!,
+    ),
+    mine = s.challenges.filter((c) => !!challengeSide(c, p._id, s.players)),
     next = mine
       .filter((c) => !terminal.has(effectiveStatus(c)))
       .sort((a, b) =>
@@ -1229,7 +1243,11 @@ function Dashboard(a: Actions) {
       />
       <div className="stats-grid">
         {[
-          { label: "POSIÇÃO ATUAL", value: `#${p.position}`, icon: Medal },
+          {
+            label: "POSIÇÃO ATUAL",
+            value: `#${teamPosition(s.players, p._id)}`,
+            icon: Medal,
+          },
           { label: "VITÓRIAS", value: p.wins, icon: Trophy },
           { label: "JOGOS REALIZADOS", value: p.wins + p.losses, icon: Swords },
           { label: "SEQUÊNCIA DE VITÓRIAS", value: streak, icon: Flame },
@@ -1259,7 +1277,12 @@ function Dashboard(a: Actions) {
               <h2>{p.name.toUpperCase()}</h2>
               <div className="row wrap">
                 <span className="badge">JOGADOR #{p.number}</span>
-                <Trend p={p} />
+                <Trend
+                  p={{
+                    position: teamPosition(s.players, p._id),
+                    previousPosition: teamPosition(s.players, p._id, true),
+                  }}
+                />
                 <span className="badge">
                   <span className="dot" />
                   {p.status === "active"
@@ -1434,9 +1457,9 @@ function Versus({ s, c }: { s: View; c: Challenge }) {
         return (
           <div key={id}>
             <Avatar p={p} />
-            <h3>{p?.name.split(" ")[0]}</h3>
+            <h3>{teamName(s.players, id)}</h3>
             <small>
-              #{p?.position} ·{" "}
+              #{p ? teamPosition(s.players, p._id) : "—"} ·{" "}
               <span className="role-label">
                 {id === c.challengerId ? (
                   <Sword size={12} />
@@ -3336,28 +3359,29 @@ function Profile(a: Actions) {
   );
 }
 function PlayerHistory({ s, p }: { s: View; p: Player }) {
+  const record = teamRecord(s.challenges, teamMembers(s.players, p._id));
   const history = s.history
       .filter((x) => x.playerId === p._id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     challenges = s.challenges
-      .filter((c) => involves(c, p._id))
+      .filter((c) => !!challengeSide(c, p._id, s.players))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
     <Section
-      title="Histórico do jogador"
+      title="Histórico da dupla"
       right={<History size={18} className="gold" />}
     >
       <div className="stack">
         <div className="row between">
           <small>Vitórias / Derrotas</small>
           <strong>
-            {p.wins} / {p.losses}
+            {record.wins} / {record.losses}
           </strong>
         </div>
         <div className="row between">
           <small>Desafios ganhos / perdidos</small>
           <strong>
-            {p.challengesWon} / {p.challengesLost}
+            {record.wins} / {record.losses}
           </strong>
         </div>
         <div className="divider" />
@@ -3367,7 +3391,10 @@ function PlayerHistory({ s, p }: { s: View; p: Player }) {
             <div className="inset" key={h._id}>
               <div className="row between">
                 <strong className="gold">
-                  #{h.oldPosition} → #{h.newPosition}
+                  {h.oldTeamPosition !== undefined &&
+                  h.newTeamPosition !== undefined
+                    ? `#${h.oldTeamPosition} → #${h.newTeamPosition}`
+                    : "Registo de classificação anterior"}
                 </strong>
                 <small>{fmtDate(h.createdAt)}</small>
               </div>
@@ -3395,7 +3422,7 @@ function PlayerHistory({ s, p }: { s: View; p: Player }) {
                   s.players.find(
                     (x) =>
                       x._id ===
-                      (c.challengerId === p._id
+                      (challengeSide(c, p._id, s.players) === "attack"
                         ? c.defenderId
                         : c.challengerId),
                   )?.name
@@ -4485,7 +4512,7 @@ function AdminPlayers(
                       </td>
                       <td>
                         <DivisionBadge s={s} id={p.divisionId} />{" "}
-                        <strong>#{p.position}</strong>
+                        <strong>#{teamPosition(s.players, p._id)}</strong>
                       </td>
                       <td>
                         <span className="badge">
@@ -4939,7 +4966,7 @@ function AdminPartners(a: Actions) {
           >
             <div className="row between wrap">
               <strong>
-                #{p.position} · {p.name}
+                #{teamPosition(s.players, p._id)} · {p.name}
               </strong>
               {p.partner && <small>Parceiro atual: {p.partner}</small>}
             </div>
@@ -4972,7 +4999,7 @@ function AdminPartners(a: Actions) {
                   .filter((other) => other._id !== p._id)
                   .map((other) => (
                     <option key={other._id} value={other._id}>
-                      #{other.position} · {other.name}
+                      #{teamPosition(s.players, other._id)} · {other.name}
                     </option>
                   ))}
               </select>
@@ -5081,7 +5108,8 @@ function PlayerEditor({
                 playerId: p?._id,
                 ...data,
                 photo,
-                position: Number(data.position),
+                position: p?.position ?? Number(data.teamPosition),
+                teamPosition: Number(data.teamPosition),
               },
               "Jogador guardado.",
             )
@@ -5125,11 +5153,11 @@ function PlayerEditor({
             </select>
           </label>
           <label>
-            Posição
+            Posição da dupla
             <input
               type="number"
-              name="position"
-              defaultValue={p?.position || 1}
+              name="teamPosition"
+              defaultValue={p ? teamPosition(s.players, p._id) || 1 : 1}
               min={1}
               required
             />
@@ -5207,11 +5235,11 @@ const settingLabels: Record<
   refusalRule: "Regra de recusa",
   cancellationRule: "Regra de cancelamento",
   reminderHours: "Antecedência dos alertas · horas",
-  promotionCount: "Jogadores que sobem",
-  relegationCount: "Jogadores que descem",
+  promotionCount: "Duplas que sobem",
+  relegationCount: "Duplas que descem",
   promotionPlacement: "Posição de entrada dos promovidos",
   relegationPlacement: "Posição de entrada dos despromovidos",
-  titleMaxPosition: "Posição máxima do contender",
+  titleMaxPosition: "Posição máxima da dupla desafiante",
   titleChangesOnWin: "Transferir título se o contender vencer",
   titleAffectsRanking: "Title Fight altera o ranking",
   seasonMonths: "Duração sugerida de época · meses",
@@ -5480,7 +5508,7 @@ function TitleFights(a: Actions) {
       <Heading
         eyebrow="O COMBATE PELO TÍTULO"
         title="Title Fight"
-        description="O cinturão tem um dono. Por agora."
+        description="O cinturão pertence a uma dupla. Por agora."
         right={
           <Link href="/campeoes" className="button">
             <Crown size={15} />
@@ -5493,7 +5521,8 @@ function TitleFights(a: Actions) {
           const champion = s.champions.find(
               (c) => c.divisionId === d._id && !c.until,
             ),
-            holder = s.players.find((p) => p._id === champion?.playerId);
+            holder = s.players.find((p) => p._id === champion?.playerId),
+            holders = holder ? teamMembers(s.players, holder._id) : [];
           const reason = holder
             ? challengeReason(s, p, holder, Date.now(), true)
             : "Sem campeão";
@@ -5513,7 +5542,18 @@ function TitleFights(a: Actions) {
                     : "BRONZE"}{" "}
                 BELT
               </div>
-              <h2>{holder?.name ?? "Título por atribuir"}</h2>
+              <div className="row center">
+                {holders.map((member) => (
+                  <Avatar key={member._id} p={member} />
+                ))}
+              </div>
+              <h2>
+                {holders.map((member) => member.name).join(" + ") ||
+                  "Título por atribuir"}
+              </h2>
+              {holder && (
+                <p>Dupla campeã · #{teamPosition(s.players, holder._id)}</p>
+              )}
               <small>
                 {champion
                   ? `${champion.defenses} defesas · desde ${fmtDate(champion.since)}`
@@ -5530,12 +5570,12 @@ function TitleFights(a: Actions) {
               {!managed &&
                 holder &&
                 p.divisionId === d._id &&
-                holder._id !== p._id && (
+                !holders.some((member) => member._id === p._id) && (
                   <div className="space-top">
                     <button
                       className="primary wide"
                       disabled={busy || !!reason}
-                      title={reason ?? "Desafiar campeão"}
+                      title={reason ?? "Desafiar dupla campeã"}
                       onClick={async () => {
                         const res = await run(
                           {
@@ -5549,7 +5589,7 @@ function TitleFights(a: Actions) {
                       }}
                     >
                       <Swords size={14} />
-                      Desafiar campeão
+                      Desafiar dupla campeã
                     </button>
                     {reason && <small>{reason}</small>}
                   </div>
@@ -5577,13 +5617,13 @@ function TitleFights(a: Actions) {
                     name="playerId"
                     defaultValue={holder?._id}
                   >
-                    {s.players
-                      .filter(
-                        (p) => p.divisionId === d._id && p.status === "active",
+                    {rankingEntries(s.players, d._id)
+                      .filter((t) =>
+                        t.members.every((m) => m.status === "active"),
                       )
-                      .map((p) => (
-                        <option value={p._id} key={p._id}>
-                          {p.name}
+                      .map((t) => (
+                        <option value={t.members[0]._id} key={t.id}>
+                          {t.members.map((m) => m.name).join(" + ")}
                         </option>
                       ))}
                   </select>
@@ -5634,12 +5674,29 @@ function Champions({ s }: Actions) {
                 .sort((a, b) => b.since.localeCompare(a.since))
                 .map((c) => {
                   const p = s.players.find((p) => p._id === c.playerId);
+                  const members =
+                    c.teamSnapshot ??
+                    (!c.until && p
+                      ? teamMembers(s.players, p._id).map((m) => ({
+                          playerId: m._id,
+                          name: m.name,
+                        }))
+                      : p
+                        ? [{ playerId: p._id, name: p.name }]
+                        : []);
                   return (
                     <div className="inset" key={c._id}>
                       <div className="row">
-                        <Avatar p={p} />
+                        {members.map((m) => (
+                          <Avatar
+                            key={m.playerId}
+                            p={s.players.find((p) => p._id === m.playerId)}
+                          />
+                        ))}
                         <div>
-                          <strong style={{ fontSize: 12 }}>{p?.name}</strong>
+                          <strong style={{ fontSize: 12 }}>
+                            {members.map((m) => m.name).join(" + ")}
+                          </strong>
                           <div>
                             <small>
                               {c.defenses} defesas{" "}
@@ -5885,7 +5942,12 @@ function Seasons({ s, run, busy }: Actions) {
                         {entry.members.map((member) => (
                           <div className="row between wrap" key={member._id}>
                             <span>
-                              #{member.position} · {member.name}
+                              #
+                              {teamPosition(
+                                selected.archivedRankings!,
+                                member._id,
+                              )}{" "}
+                              · {member.name}
                             </span>
                             <small>
                               {member.wins} V / {member.losses} D
@@ -5905,14 +5967,37 @@ function Seasons({ s, run, busy }: Actions) {
   );
 }
 function Statistics({ s }: Actions) {
-  const p = s.players.find((p) => p._id === s.actor.playerId)!,
-    [opponent, setOpponent] = useState(""),
-    results = s.results.filter(
-      (r) => r.winnerId === p._id || r.loserId === p._id,
+  const p = teamPlayerStats(
+      s,
+      s.players.find((p) => p._id === s.actor.playerId)!,
     ),
-    head = results.filter(
-      (r) => r.winnerId === opponent || r.loserId === opponent,
-    );
+    [opponent, setOpponent] = useState(""),
+    results = s.results.filter((r) =>
+      s.challenges.some(
+        (c) => c._id === r.challengeId && !!challengeSide(c, p._id, s.players),
+      ),
+    ),
+    opponents = s.divisions
+      .flatMap((d) => rankingEntries(s.players, d._id))
+      .filter((t) => !t.members.some((m) => m._id === p._id)),
+    head = results.filter((r) =>
+      s.challenges.some(
+        (c) =>
+          c._id === r.challengeId && !!challengeSide(c, opponent, s.players),
+      ),
+    ),
+    won = (r: View["results"][number]) =>
+      s.challenges.some(
+        (c) =>
+          c._id === r.challengeId &&
+          challengeSide(c, p._id, s.players) ===
+            challengeSide(c, r.winnerId, s.players),
+      ),
+    leaders = s.divisions
+      .flatMap((d) => rankingEntries(s.players, d._id))
+      .map((t) => ({ ...t, ...teamRecord(s.challenges, t.members) }))
+      .sort((a, b) => b.wins - a.wins || a.id.localeCompare(b.id))
+      .slice(0, 8);
   return (
     <>
       <Heading
@@ -5965,14 +6050,12 @@ function Statistics({ s }: Actions) {
                 value={opponent}
                 onChange={(e) => setOpponent(e.target.value)}
               >
-                <option value="">Escolhe um jogador</option>
-                {s.players
-                  .filter((x) => x._id !== p._id)
-                  .map((x) => (
-                    <option value={x._id} key={x._id}>
-                      {x.name}
-                    </option>
-                  ))}
+                <option value="">Escolhe uma dupla</option>
+                {opponents.map((t) => (
+                  <option value={t.members[0]._id} key={t.id}>
+                    {t.members.map((m) => m.name).join(" + ")}
+                  </option>
+                ))}
               </select>
             </label>
             {opponent ? (
@@ -5980,8 +6063,8 @@ function Statistics({ s }: Actions) {
                 <div className="row between">
                   <span>Tu</span>
                   <strong className="display gold" style={{ fontSize: 35 }}>
-                    {head.filter((r) => r.winnerId === p._id).length} –{" "}
-                    {head.filter((r) => r.winnerId === opponent).length}
+                    {head.filter(won).length} –{" "}
+                    {head.filter((r) => !won(r)).length}
                   </strong>
                   <span>Adversário</span>
                 </div>
@@ -5994,12 +6077,10 @@ function Statistics({ s }: Actions) {
         </Section>
         <Section title="Mais vitórias na liga" className="full">
           <div className="stack">
-            {s.players
-              .slice()
-              .sort((a, b) => b.wins - a.wins)
-              .slice(0, 8)
-              .map((p, i) => (
-                <div className="row between" key={p._id}>
+            {leaders.map((team, i) => {
+              const p = team.members[0];
+              return (
+                <div className="row between" key={team.id}>
                   <div className="row">
                     <span
                       className="display gold"
@@ -6008,14 +6089,17 @@ function Statistics({ s }: Actions) {
                       {i + 1}
                     </span>
                     <Avatar p={p} />
-                    <strong style={{ fontSize: 12 }}>{p.name}</strong>
+                    <strong style={{ fontSize: 12 }}>
+                      {team.members.map((m) => m.name).join(" + ")}
+                    </strong>
                   </div>
                   <div className="row">
                     <DivisionBadge s={s} id={p.divisionId} />
-                    <strong>{p.wins} V</strong>
+                    <strong>{team.wins} V</strong>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
         </Section>
       </div>
@@ -6428,7 +6512,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Title Fight",
-      `Podem desafiar o campeão jogadores até à posição ${rules.titleMaxPosition}. ${rules.titleChangesOnWin ? "O vencedor fica com o título." : "O título é gerido pelo administrador."}`,
+      `Podem desafiar a dupla campeã as duplas até à posição ${rules.titleMaxPosition}. ${rules.titleChangesOnWin ? "O vencedor fica com o título." : "O título é gerido pelo administrador."}`,
     ],
     [
       "Promoções e despromoções",

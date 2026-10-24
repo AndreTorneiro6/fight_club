@@ -1,4 +1,5 @@
 "use client";
+import { teamPosition } from "@/lib/team-competition";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usesManagedCompetition } from "@/lib/competition-mode";
@@ -568,7 +569,7 @@ export function WeeklyRoles({
                 <div className="row wrap">
                   {members.map((member) => (
                     <small key={member._id}>
-                      #{member.position} · {member.name}
+                      #{teamPosition(s.players, member._id)} · {member.name}
                       {member.status !== "active" ? " · Inativo" : ""}
                       {frozenRanking(s, member._id)
                         ? " · Férias · ranking congelado"

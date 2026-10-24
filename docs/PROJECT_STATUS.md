@@ -3,6 +3,15 @@
 Last updated: 24 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Team competition corrections — phase 1, 25 October 2026
+
+- User requested two separate deliveries: ranking/title/results first; challenge queue, partner actions and notifications afterwards. Phase 1 deliberately preserves the existing challenge workflow and permissions.
+- Competitive positions are derived from grouped teams for both accounts; legacy Player.position remains a unique internal ordering slot for compatibility. No historical ranking or placement data is rewritten.
+- Dashboard, admin player/partner lists, weekly member labels, season archives, team history, head-to-head and win leaders display team positions/statistics. Champion cards show both partners; new reigns preserve team membership snapshots. Old historical reigns without snapshots are not assigned invented past partners.
+- Confirmed legacy attacker victories move whole teams under the configured ranking model, credit both partners and record team positions. Defender victories leave positions unchanged. Newly credited statistics are marked so correction/deletion reverses both partners while old representative-only credits remain compatible. Managed result settlement remains team-based; new champion records also save the team snapshot.
+- Admin position edits move the whole team; single-partner raw-position changes are rejected. Promotion/relegation counts apply to complete teams.
+- Validation: typecheck, all 286 automated tests and production build pass. Both browser checks pass: existing desktop/mobile team ranking regression and new partner dashboard/title presentation check. No production test challenges, result writes, role publications or broadcasts were performed for verification. Phase 2 remains outstanding until separately tested and deployed.
+
 ## Pending challenge queue labels — 24 October 2026
 
 - User confirmed keeping the existing pending queue, allowing a team to send and receive compatible pending challenges during Open Attack; no reservation on the first pending submission and no new matchmaking rule. Existing first-valid priority/previous-week rotation and accepted weekly-slot locking remain enforced server-side.
