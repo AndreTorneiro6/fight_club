@@ -124,6 +124,8 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  queueClosedByChallengeId?: string;
+  queueClosureReason?: string;
   weeklyPriorityWinner?: boolean;
   weeklyPriorityReason?: string;
   competitionRoundId?: string;

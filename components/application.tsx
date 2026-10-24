@@ -137,6 +137,8 @@ import {
   weeklyRole,
   weeklyPriority,
   weeklyPendingReceived,
+  weeklyChallengeWeek,
+  weeklyOpeningAt,
   frozenRanking,
 } from "@/lib/weekly";
 import {
@@ -1713,6 +1715,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
         {name(c.defenderId)}
       </h3>
       <WeeklyQueueNotice s={s} challenge={c} />
+      {c.queueClosureReason && <small>{c.queueClosureReason}</small>}
       <div className="row between wrap">
         <DivisionBadge s={s} id={c.divisionId} />
         <small>
@@ -1765,8 +1768,24 @@ function Challenges(a: Actions) {
     }))
     .filter((entry) => entry.target);
   const active = activeChallenges(s, p._id, Date.now());
+  const challengeWeek = weeklyChallengeWeek(s);
+  const publishedWeek = s.weeklyRounds.find(
+    (r) => r.weekStart === challengeWeek && r.publishedAt,
+  );
+  const opening = publishedWeek
+    ? weeklyOpeningAt(publishedWeek, p.divisionId)
+    : undefined;
+  const openingBlock =
+    s.settings[0].weeklyCompetition && publishedWeek
+      ? opening === null
+        ? "Os desafios desta divisão aguardam abertura pelo administrador."
+        : opening && Date.parse(opening) > Date.now()
+          ? `Os desafios abrem em ${new Date(opening).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal). Os adversários elegíveis aparecem nessa altura.`
+          : ""
+      : "";
   const blockedReason =
-    s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
+    openingBlock ||
+    (s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
       ? "A aguardar a publicação do teu papel semanal pelo administrador."
       : s.settings[0].weeklyCompetition && weeklyRole(s, p._id) === "defense"
         ? "Esta semana estás em defesa. Consulta os desafios recebidos."
@@ -1778,7 +1797,7 @@ function Challenges(a: Actions) {
               ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
               : eligible.length === 0
                 ? "Os adversários dentro do teu alcance já estão ocupados ou têm um desafio contigo. Consulta os teus desafios em curso."
-                : "";
+                : "");
   return (
     <>
       <Heading
@@ -1802,7 +1821,7 @@ function Challenges(a: Actions) {
               Atribuir ataque / defesa
             </button>
           ) : s.settings[0].weeklyCompetition &&
-            weeklyRole(s, p._id) !== "attack" ? null : (
+            (weeklyRole(s, p._id) !== "attack" || !!openingBlock) ? null : (
             <a
               className="button primary"
               href={
@@ -1843,6 +1862,7 @@ function Challenges(a: Actions) {
         </div>
       ) : (
         !managed &&
+        !openingBlock &&
         blockedReason && (
           <div
             className="inset stack"
@@ -2152,6 +2172,11 @@ function ChallengeDetail(a: Actions & { id: string }) {
           >
             <Status c={c} />
             <WeeklyQueueNotice s={s} challenge={c} />
+            {c.queueClosureReason && (
+              <p className="inset" role="status">
+                {c.queueClosureReason}
+              </p>
+            )}
             <Versus s={s} c={c} />
             <div className="inset row between wrap">
               <span>
@@ -6010,7 +6035,7 @@ function ChallengeComposer(
   const [proposals, setProposals] = useState(() =>
       initialProposals(s, p, Date.now(), weeklyWindowValue),
     ),
-    [include, setInclude] = useState(true);
+    [include, setInclude] = useState(false);
   const selected = proposals.filter((p) => p.selected);
   return (
     <Modal
@@ -6035,7 +6060,9 @@ function ChallengeComposer(
                 titleFight: a.titleFight ?? false,
                 initialSlots,
               },
-              "Desafio enviado com as tuas propostas.",
+              include
+                ? "Desafio enviado com as tuas propostas."
+                : "Desafio enviado. Os horários são combinados após a aceitação.",
             );
             if (res?.id) {
               close();
@@ -6057,15 +6084,16 @@ function ChallengeComposer(
           </span>
         </div>
         <p style={{ fontSize: 12 }}>
-          Propõe {s.settings[0].initialSuggestionCount} opções para facilitar a
-          marcação. O adversário tem {s.settings[0].acceptHours} horas para
-          responder e pode aceitar logo um horário.
+          Envia o desafio primeiro. O adversário tem {s.settings[0].acceptHours}{" "}
+          horas para aceitar. Depois da aceitação, as duas duplas combinam o
+          horário e o clube confirma o jogo. Se preferires, podes propor
+          horários já.
         </p>
         {weeklyWindowValue && (
           <p className="inset">
             {weeklyWindowValue.deferredUntil
               ? `Desafio adiado por férias: o jogo pode realizar-se a partir de ${weeklyWindowValue.deferredUntil}.`
-              : "Um jogo por jogador nesta semana. Só podes desafiar defensores atribuídos pelo administrador."}
+              : "Um jogo por dupla nesta semana. Os adversários apresentados respeitam o tipo de semana e a distância configurada."}
           </p>
         )}
         <label className="check">
@@ -6074,7 +6102,7 @@ function ChallengeComposer(
             checked={include}
             onChange={(e) => setInclude(e.target.checked)}
           />
-          Propor horários já
+          Propor horários já (opcional)
         </label>
         {include && (
           <div className="stack proposal-grid">
@@ -6897,7 +6925,17 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                   Date.parse(x.start) > Date.now() && (
                     <button
                       className="primary"
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        (s.settings[0].weeklyCompetition &&
+                          status === "pending" &&
+                          weeklyPriority(
+                            s,
+                            c.defenderId,
+                            Date.now(),
+                            c.weekStart,
+                          )?.id !== c._id)
+                      }
                       onClick={() =>
                         run(
                           {
@@ -6909,7 +6947,10 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                         )
                       }
                     >
-                      <Check size={14} /> Escolher e aceitar este horário
+                      <Check size={14} />{" "}
+                      {status === "pending"
+                        ? "Aceitar desafio e horário"
+                        : "Escolher e aceitar este horário"}
                     </button>
                   )}
                 {["pending", "accepted"].includes(status) &&
@@ -7111,6 +7152,10 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
     )
     .sort((a, b) => a.start.localeCompare(b.start));
   if (!offers.length) return null;
+  const priorityBlocked =
+    s.settings[0].weeklyCompetition &&
+    status === "pending" &&
+    weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)?.id !== c._id;
   return (
     <Section
       title="Horários propostos pelo adversário"
@@ -7119,8 +7164,12 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
       <div className="stack">
         <p style={{ fontSize: 12 }}>
           Escolhe uma proposta e toca em{" "}
-          <strong className="gold">Aceitar este horário</strong>. Depois dos
-          jogadores, o clube confirma o campo.
+          <strong className="gold">
+            {status === "pending"
+              ? "Aceitar desafio e horário"
+              : "Aceitar este horário"}
+          </strong>
+          . Depois dos jogadores, o clube confirma o campo.
         </p>
         {offers.map((offer, i) => (
           <div key={offer._id} className="inset stack gap-sm">
@@ -7134,7 +7183,7 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
             </small>
             <button
               className="primary"
-              disabled={busy}
+              disabled={busy || priorityBlocked}
               onClick={() =>
                 run(
                   {
@@ -7142,12 +7191,16 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
                     challengeId: c._id,
                     slotId: offer._id,
                   },
-                  "Horário aceite. Consulta as confirmações dos jogadores e do clube.",
+                  status === "pending"
+                    ? "Desafio e horário aceites. Aguarda a confirmação do clube."
+                    : "Horário aceite. Consulta as confirmações dos jogadores e do clube.",
                 )
               }
             >
               <Check size={15} />
-              Aceitar este horário
+              {status === "pending"
+                ? "Aceitar desafio e horário"
+                : "Aceitar este horário"}
             </button>
           </div>
         ))}
@@ -7250,7 +7303,10 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
               }
             >
               <Check size={16} />
-              Aceitar horário proposto
+              {proposal.previousStatus === "pending" &&
+              s.actor.playerId === c.defenderId
+                ? "Aceitar desafio e horário"
+                : "Aceitar horário proposto"}
             </button>
           )}
           {!isFinal && mine && myConfirmed && (

@@ -1036,6 +1036,20 @@ export function execute(
     completed = false,
   ) => {
     const end = new Date(Date.parse(start) + minutes * 60000).toISOString();
+    if (rules.weeklyCompetition && c.status === "pending") {
+      const roleError = weeklyReason(
+        s,
+        player(c.challengerId),
+        player(c.defenderId),
+        timestamp,
+        c._id,
+      );
+      ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
+      ensure(
+        weeklyPriority(s, c.defenderId, timestamp, c.weekStart)?.id === c._id,
+        "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
+      );
+    }
     const weeklyBooking = weeklyBookingReason(s, c, start, timestamp);
     ensure(!weeklyBooking, weeklyBooking ?? "Jogo semanal inválido.");
     if (rules.weeklyCompetition)
@@ -1148,9 +1162,58 @@ export function execute(
         c._id,
       );
   };
+  const closeIncompatibleQueue = (accepted: Challenge) => {
+    if (!rules.weeklyCompetition || accepted.competitionRoundId) return;
+    const week = accepted.weekStart ?? clubWeek(accepted.createdAt).start;
+    const committed = new Set(
+      [accepted.challengerId, accepted.defenderId].flatMap((id) =>
+        teamMembers(s.players, id).map((m) => m._id),
+      ),
+    );
+    for (const waiting of s.challenges.filter(
+      (other) =>
+        other._id !== accepted._id &&
+        !other.competitionRoundId &&
+        other.status === "pending" &&
+        Date.parse(other.respondBy) > timestamp &&
+        (other.weekStart ?? clubWeek(other.createdAt).start) === week &&
+        [other.challengerId, other.defenderId].some((id) => committed.has(id)),
+    )) {
+      waiting.status = "cancelled";
+      waiting.queueClosedByChallengeId = accepted._id;
+      waiting.queueClosureReason =
+        "O adversário já tem outro desafio aceite nesta semana. O pedido em fila foi encerrado, sem derrota nem alteração do ranking. Podes escolher outro adversário elegível.";
+      const recipients = new Set(
+        [waiting.challengerId, waiting.defenderId]
+          .flatMap((id) => teamMembers(s.players, id).map((m) => m._id))
+          .filter((id) => !committed.has(id)),
+      );
+      for (const pid of recipients)
+        notify(
+          pid,
+          "Fila encerrada — adversário já tem desafio aceite",
+          waiting.queueClosureReason,
+          waiting._id,
+          `queue-closed:${waiting._id}:${accepted._id}:${pid}`,
+          { deliveryChannels: ["push"] },
+        );
+      notifyAdmins(
+        "Pedido em fila encerrado",
+        `O desafio #${waiting.number} ficou incompatível com o desafio aceite #${accepted.number}. As duplas em espera foram avisadas. Sem derrota nem alteração do ranking.`,
+        waiting._id,
+      );
+      log("challenge.queue.closed", {
+        challengeId: waiting._id,
+        acceptedChallengeId: accepted._id,
+        weekStart: week,
+        reason: waiting.queueClosureReason,
+      });
+    }
+  };
   const completeProposal = (c: Challenge) => {
     const proposal = c.scheduleProposal!;
     if (!proposal.challengerConfirmed || !proposal.defenderConfirmed) return;
+    closeIncompatibleQueue(c);
     if (rules.requireClubConfirmation && !proposal.clubConfirmed) {
       notifyAdmins(
         "Confirmar campo e horário",
@@ -2053,6 +2116,7 @@ export function execute(
         if (rules.refusalRule === "forfeit" && cmd.reason !== "Lesão")
           applyResult(c, c.challengerId, "Falta de comparência / recusa");
       }
+      if (cmd.accept) closeIncompatibleQueue(c);
       log("challenge.responded", {
         challengeId: c._id,
         accept: cmd.accept,
@@ -2192,6 +2256,28 @@ export function execute(
           "Só o defensor pode aceitar o desafio.",
           403,
         );
+        if (rules.weeklyCompetition) {
+          const roleError = weeklyReason(
+            s,
+            player(c.challengerId),
+            player(c.defenderId),
+            timestamp,
+            c._id,
+          );
+          ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
+          const priority = weeklyPriority(
+            s,
+            c.defenderId,
+            timestamp,
+            c.weekStart,
+          );
+          ensure(
+            priority?.id === c._id,
+            "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
+          );
+          c.weeklyPriorityWinner = true;
+          c.weeklyPriorityReason = priority.reason;
+        }
         c.status = "accepted";
         c.scheduleBy = new Date(
           Math.min(
@@ -2220,6 +2306,7 @@ export function execute(
         false,
         slot.offeredBy === slot.playerId ? slot.playerId : undefined,
       );
+      closeIncompatibleQueue(c);
       break;
     }
     case "match.confirm_time": {
