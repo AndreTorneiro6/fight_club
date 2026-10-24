@@ -2,6 +2,9 @@ import {
   teamPosition,
   challengeSide,
   challengeMemberIds,
+  challengeParticipants,
+  challengeRepresentative,
+  challengeTeamKey,
 } from "./team-competition";
 import { scheduleWeeklyOpening, notifyWeeklyOpenings } from "./weekly-opening";
 import {
@@ -49,6 +52,7 @@ import {
   frozenRanking,
   weeklyReason,
   weeklyPriority,
+  weeklyChallengePriority,
   weeklyWindow,
   weeklyBookingReason,
 } from "./weekly";
@@ -603,7 +607,11 @@ export function execute(
     return c;
   };
   const participant = (c: Challenge) =>
-    ensure(involves(c, actor.playerId) || admin, "Sem permissão.", 403);
+    ensure(
+      involves(c, actor.playerId, s.players) || admin,
+      "Sem permissão.",
+      403,
+    );
   const log = (action: string, details: unknown) =>
     s.audit.push({
       _id: uid(),
@@ -1142,7 +1150,7 @@ export function execute(
       );
       ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
       ensure(
-        weeklyPriority(s, c.defenderId, timestamp, c.weekStart)?.id === c._id,
+        weeklyChallengePriority(s, c, timestamp).eligible,
         "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
       );
     }
@@ -1186,7 +1194,7 @@ export function execute(
           "O horário não é compatível para ambos.",
         );
     }
-    for (const pid of [c.challengerId, c.defenderId]) {
+    for (const pid of challengeParticipants(c, s.players)) {
       ensure(
         !s.exceptions.some(
           (x) =>
@@ -1205,7 +1213,7 @@ export function execute(
               (x) =>
                 x._id === m.challengeId &&
                 !["cancelled", "refused", "expired"].includes(x.status) &&
-                involves(x, pid),
+                involves(x, pid, s.players),
             ),
         ),
         "Um jogador já tem outro jogo neste horário.",
@@ -1250,7 +1258,7 @@ export function execute(
       end,
       seasonId: c.seasonId,
     });
-    for (const pid of [c.challengerId, c.defenderId])
+    for (const pid of challengeParticipants(c, s.players))
       notify(
         pid,
         "Jogo marcado ✅",
@@ -1319,7 +1327,7 @@ export function execute(
       );
       return;
     }
-    for (const pid of [c.challengerId, c.defenderId])
+    for (const pid of challengeParticipants(c, s.players))
       ensure(
         player(pid).status === "active" &&
           player(pid).divisionId === c.divisionId,
@@ -1350,14 +1358,16 @@ export function execute(
       proposedBy: actor.playerId,
       createdAt: now,
       challengerConfirmed:
-        actor.playerId === c.challengerId || confirmedOwner === c.challengerId,
+        challengeSide(c, actor.playerId, s.players) === "attack" ||
+        confirmedOwner === c.challengerId,
       defenderConfirmed:
-        actor.playerId === c.defenderId || confirmedOwner === c.defenderId,
+        challengeSide(c, actor.playerId, s.players) === "defense" ||
+        confirmedOwner === c.defenderId,
       clubConfirmed: false,
       previousStatus,
     };
     c.status = "schedule_pending";
-    for (const pid of [c.challengerId, c.defenderId])
+    for (const pid of challengeParticipants(c, s.players))
       notify(
         pid,
         "Horário proposto · confirma a tua presença",
@@ -1824,8 +1834,8 @@ export function execute(
           !s.challenges.some(
             (c) =>
               !terminal.has(effectiveStatus(c, timestamp)) &&
-              involves(c, p._id) &&
-              involves(c, d._id),
+              involves(c, p._id, s.players) &&
+              involves(c, d._id, s.players),
           ),
           "Já existe um desafio entre estes jogadores.",
         );
@@ -1853,8 +1863,17 @@ export function execute(
           playerId: member._id,
           name: member.name,
         })),
-        challengerPosition: p.position,
-        defenderPosition: d.position,
+        challengerPosition: teamPosition(s.players, p._id),
+        positionSnapshotModel: "team",
+        challengerTeamId: teamMembers(s.players, p._id)
+          .map((m) => m._id)
+          .sort()
+          .join(":"),
+        defenderTeamId: teamMembers(s.players, d._id)
+          .map((m) => m._id)
+          .sort()
+          .join(":"),
+        defenderPosition: teamPosition(s.players, d._id),
         status: "pending",
         createdAt: now,
         respondBy: new Date(
@@ -1918,7 +1937,7 @@ export function execute(
                 s.challenges.some(
                   (x) =>
                     x._id === m.challengeId &&
-                    involves(x, p._id) &&
+                    involves(x, p._id, s.players) &&
                     !["cancelled", "expired", "refused"].includes(x.status),
                 ),
             ),
@@ -1940,15 +1959,34 @@ export function execute(
       for (const member of c.defenderTeam ?? [{ playerId: d._id }])
         notify(
           member.playerId,
-          `🥊 ${p.name} desafiou-te`,
+          `🥊 ${teamMembers(s.players, p._id)
+            .map((m) => m.name)
+            .join(" + ")} desafiou a tua dupla`,
           `Tens ${responseWindowText(c.createdAt, c.respondBy)} para aceitar ou recusar o desafio. Prazo: ${responseDeadlineText(c.respondBy)} (Portugal).`,
           c._id,
           `challenge-received:${c._id}:${member.playerId}`,
           { deliveryChannels: ["push"] },
         );
+      for (const pid of challengeMemberIds(c, "attack", s.players))
+        notify(
+          pid,
+          "🥊 A tua dupla enviou um desafio",
+          `A tua dupla desafiou ${teamMembers(s.players, d._id)
+            .map((m) => m.name)
+            .join(
+              " + ",
+            )}. Aguarda resposta até ${responseDeadlineText(c.respondBy)} (Portugal).`,
+          c._id,
+          `challenge-sent:${c._id}:${pid}`,
+          { deliveryChannels: ["push"] },
+        );
       notifyAdmins(
         "Novo desafio",
-        `${p.name} desafiou ${d.name}. Desafio #${c.number}.`,
+        `${teamMembers(s.players, p._id)
+          .map((m) => m.name)
+          .join(" + ")} desafiou ${teamMembers(s.players, d._id)
+          .map((m) => m.name)
+          .join(" + ")}. Desafio #${c.number}.`,
         c._id,
       );
       if (cmd.type === "admin.challenge.create")
@@ -1998,6 +2036,17 @@ export function execute(
         attacker.status === "active" && defender.status === "active",
         "Os jogadores devem estar ativos.",
       );
+      const attackerRank = teamPosition(s.players, attacker._id),
+        defenderRank = teamPosition(s.players, defender._id);
+      ensure(
+        attackerRank > defenderRank &&
+          attackerRank - defenderRank <= rules.maxPositionsAbove,
+        "Adversário fora do limite de posições.",
+      );
+      ensure(
+        defenderRank !== 1 || attackerRank <= rules.titleMaxPosition,
+        "Posição fora das regras do jogo do título.",
+      );
       const weekly = weeklyReason(s, attacker, defender, timestamp, c._id);
       ensure(!weekly, weekly ?? "Papéis semanais inválidos.");
       ensure(
@@ -2015,14 +2064,15 @@ export function execute(
           (x) =>
             x._id !== c._id &&
             !terminal.has(effectiveStatus(x, timestamp)) &&
-            involves(x, attacker._id) &&
-            involves(x, defender._id),
+            involves(x, attacker._id, s.players) &&
+            involves(x, defender._id, s.players),
         ),
         "Já existe outro desafio entre estes jogadores.",
       );
       const before = { challengerId: c.challengerId, defenderId: c.defenderId };
+      const priorParticipants = challengeParticipants(c, s.players);
       for (const message of s.messages.filter((m) => m.challengeId === c._id))
-        message.audienceIds ??= [before.challengerId, before.defenderId];
+        message.audienceIds ??= priorParticipants;
       c.challengerId = attacker._id;
       c.defenderId = defender._id;
       c.challengerTeam = teamMembers(s.players, attacker._id).map((member) => ({
@@ -2033,8 +2083,11 @@ export function execute(
         playerId: member._id,
         name: member.name,
       }));
-      c.challengerPosition = attacker.position;
-      c.defenderPosition = defender.position;
+      c.challengerTeamId = challengeTeamKey(c, "attack", s.players);
+      c.defenderTeamId = challengeTeamKey(c, "defense", s.players);
+      c.challengerPosition = teamPosition(s.players, attacker._id);
+      c.positionSnapshotModel = "team";
+      c.defenderPosition = teamPosition(s.players, defender._id);
       c.status = "pending";
       c.respondBy = new Date(
         Math.min(Date.parse(c.playBy), timestamp + rules.acceptHours * 3600000),
@@ -2042,9 +2095,8 @@ export function execute(
       // Consent and proposed windows belonged to the former assignment. Messages remain in the audit/history.
       s.slots = s.slots.filter((x) => x.challengeId !== c._id);
       for (const pid of new Set([
-        ...Object.values(before),
-        attacker._id,
-        defender._id,
+        ...priorParticipants,
+        ...challengeParticipants(c, s.players),
       ]))
         notify(
           pid,
@@ -2091,9 +2143,7 @@ export function execute(
     case "challenge.respond": {
       const c = challenge(cmd.challengeId);
       ensure(
-        teamMembers(s.players, c.defenderId).some(
-          (m) => m._id === actor.playerId,
-        ) || admin,
+        challengeSide(c, actor.playerId, s.players) === "defense" || admin,
         "Só o defensor pode responder.",
         403,
       );
@@ -2111,14 +2161,9 @@ export function execute(
           c._id,
         );
         ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
-        const priority = weeklyPriority(
-          s,
-          c.defenderId,
-          timestamp,
-          c.weekStart,
-        );
+        const priority = weeklyChallengePriority(s, c, timestamp);
         ensure(
-          priority?.id === c._id,
+          priority.eligible,
           "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
         );
         if (cmd.accept) {
@@ -2134,7 +2179,7 @@ export function execute(
             timestamp + rules.scheduleDays * 86400000,
           ),
         ).toISOString();
-        for (const pid of [c.challengerId, c.defenderId])
+        for (const pid of challengeParticipants(c, s.players))
           notify(
             pid,
             "Desafio aceite ⚔️",
@@ -2180,7 +2225,12 @@ export function execute(
             undefined,
             c.durationMinutes,
             false,
-            source && source.offeredBy === source.playerId
+            source &&
+              challengeSide(
+                c,
+                source.offeredBy ?? source.playerId,
+                s.players,
+              ) === challengeSide(c, source.playerId, s.players)
               ? source.playerId
               : undefined,
           );
@@ -2209,7 +2259,7 @@ export function execute(
         c.refusalReason = cmd.reason;
         c.refusalNote = cmd.note;
         c.status = "refused";
-        notify(
+        notifyTeam(
           c.challengerId,
           "Desafio recusado",
           `${player(c.defenderId).name}: ${cmd.reason}`,
@@ -2242,7 +2292,7 @@ export function execute(
         "Só o administrador pode cancelar desafios.",
       );
       c.status = "cancelled";
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         notify(pid, "Desafio cancelado", cmd.note, c._id);
       notifyAdmins(
         "Desafio cancelado",
@@ -2254,14 +2304,19 @@ export function execute(
     }
     case "slot.add": {
       const c = challenge(cmd.challengeId);
-      const playerId = cmd.playerId ?? actor.playerId;
+      const requestedPlayerId = cmd.playerId ?? actor.playerId;
+      const side = challengeSide(c, actor.playerId, s.players);
+      const playerId =
+        challengeRepresentative(c, requestedPlayerId, s.players) ??
+        requestedPlayerId;
       ensure(
-        playerId === actor.playerId || admin,
+        (side && challengeSide(c, requestedPlayerId, s.players) === side) ||
+          admin,
         "Só podes propor a tua disponibilidade.",
         403,
       );
       ensure(
-        involves(c, playerId),
+        involves(c, playerId, s.players),
         "Só podes propor a tua disponibilidade.",
         403,
       );
@@ -2285,7 +2340,11 @@ export function execute(
       ensure(
         !s.exceptions.some(
           (x) =>
-            x.playerId === playerId &&
+            challengeMemberIds(
+              c,
+              playerId === c.challengerId ? "attack" : "defense",
+              s.players,
+            ).includes(x.playerId) &&
             x.from <= lisbonDay(Date.parse(cmd.end) - 1) &&
             x.to >= lisbonDay(Date.parse(cmd.start)),
         ),
@@ -2299,7 +2358,7 @@ export function execute(
         start: cmd.start,
         end: cmd.end,
       });
-      notify(
+      notifyTeam(
         playerId === c.challengerId ? c.defenderId : c.challengerId,
         "Nova disponibilidade",
         "O adversário propôs um horário. Consulta as opções compatíveis.",
@@ -2317,7 +2376,15 @@ export function execute(
     case "slot.delete": {
       const slot = s.slots.find((x) => x._id === cmd.slotId);
       ensure(slot, "Horário não encontrado.", 404);
-      ensure(slot.playerId === actor.playerId || admin, "Sem permissão.", 403);
+      const slotChallenge = challenge(slot.challengeId);
+      ensure(
+        (challengeSide(slotChallenge, slot.playerId, s.players) &&
+          challengeSide(slotChallenge, slot.playerId, s.players) ===
+            challengeSide(slotChallenge, actor.playerId, s.players)) ||
+          admin,
+        "Sem permissão.",
+        403,
+      );
       ensure(
         ["pending", "accepted"].includes(challenge(slot.challengeId).status),
         "Jogo já marcado.",
@@ -2344,12 +2411,14 @@ export function execute(
           (x) => x._id === cmd.slotId && x.challengeId === c._id,
         );
       ensure(
-        involves(c, actor.playerId),
+        involves(c, actor.playerId, s.players),
         "Só os jogadores podem aceitar um horário.",
         403,
       );
       ensure(
-        slot && slot.playerId !== actor.playerId,
+        slot &&
+          challengeSide(c, slot.playerId, s.players) !==
+            challengeSide(c, actor.playerId, s.players),
         "Escolhe uma proposta do adversário.",
       );
       ensure(
@@ -2359,7 +2428,7 @@ export function execute(
       );
       if (c.status === "pending") {
         ensure(
-          actor.playerId === c.defenderId,
+          challengeSide(c, actor.playerId, s.players) === "defense",
           "Só o defensor pode aceitar o desafio.",
           403,
         );
@@ -2372,14 +2441,9 @@ export function execute(
             c._id,
           );
           ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
-          const priority = weeklyPriority(
-            s,
-            c.defenderId,
-            timestamp,
-            c.weekStart,
-          );
+          const priority = weeklyChallengePriority(s, c, timestamp);
           ensure(
-            priority?.id === c._id,
+            priority.eligible,
             "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
           );
           c.weeklyPriorityWinner = true;
@@ -2400,7 +2464,7 @@ export function execute(
       s.slots.push({
         _id: uid(),
         challengeId: c._id,
-        playerId: actor.playerId,
+        playerId: challengeRepresentative(c, actor.playerId, s.players)!,
         offeredBy: actor.playerId,
         start: slot.start,
         end,
@@ -2411,7 +2475,10 @@ export function execute(
         undefined,
         c.durationMinutes,
         false,
-        slot.offeredBy === slot.playerId ? slot.playerId : undefined,
+        challengeSide(c, slot.offeredBy ?? slot.playerId, s.players) ===
+          challengeSide(c, slot.playerId, s.players)
+          ? slot.playerId
+          : undefined,
       );
       closeIncompatibleQueue(c);
       break;
@@ -2419,13 +2486,13 @@ export function execute(
     case "match.confirm_time": {
       const c = challenge(cmd.challengeId);
       ensure(
-        involves(c, actor.playerId),
+        involves(c, actor.playerId, s.players),
         "Só os jogadores podem confirmar a sua presença.",
         403,
       );
       const proposal = currentProposal(c, cmd.proposalId);
       if (
-        actor.playerId === c.challengerId
+        challengeSide(c, actor.playerId, s.players) === "attack"
           ? proposal.challengerConfirmed
           : proposal.defenderConfirmed
       )
@@ -2438,7 +2505,7 @@ export function execute(
         true,
         false,
       );
-      if (actor.playerId === c.challengerId)
+      if (challengeSide(c, actor.playerId, s.players) === "attack")
         proposal.challengerConfirmed = true;
       else proposal.defenderConfirmed = true;
       log("schedule.player.confirmed", {
@@ -2446,8 +2513,10 @@ export function execute(
         proposalId: proposal._id,
         playerId: actor.playerId,
       });
-      notify(
-        actor.playerId === c.challengerId ? c.defenderId : c.challengerId,
+      notifyTeam(
+        challengeSide(c, actor.playerId, s.players) === "attack"
+          ? c.defenderId
+          : c.challengerId,
         "Adversário confirmou o horário",
         "Consulta as confirmações do jogo.",
         c._id,
@@ -2477,14 +2546,14 @@ export function execute(
       const c = challenge(cmd.challengeId);
       if (cmd.type === "match.reject_time")
         ensure(
-          involves(c, actor.playerId),
+          involves(c, actor.playerId, s.players),
           "Só os participantes podem recusar o horário.",
           403,
         );
       const proposal = currentProposal(c, cmd.proposalId);
       c.status = proposal.previousStatus;
       delete c.scheduleProposal;
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         notify(pid, "Horário não confirmado", cmd.note, c._id);
       notifyAdmins(
         "Horário não confirmado",
@@ -2502,7 +2571,7 @@ export function execute(
     case "result.report": {
       const c = challenge(cmd.challengeId);
       ensure(
-        involves(c, actor.playerId),
+        involves(c, actor.playerId, s.players),
         "Só os jogadores podem registar o resultado.",
         403,
       );
@@ -2529,8 +2598,10 @@ export function execute(
       c.winnerId = cmd.winnerId;
       c.reportedBy = actor.playerId;
       c.score = sets ? formatSetScores(sets) : cmd.score;
-      notify(
-        actor.playerId === c.challengerId ? c.defenderId : c.challengerId,
+      notifyTeam(
+        challengeSide(c, actor.playerId, s.players) === "attack"
+          ? c.defenderId
+          : c.challengerId,
         "Confirma o resultado do jogo",
         "Confirma ou contesta o resultado submetido.",
         c._id,
@@ -2547,7 +2618,9 @@ export function execute(
       const c = challenge(cmd.challengeId);
       ensure(c.status === "result_pending", "Não existe resultado pendente.");
       ensure(
-        involves(c, actor.playerId) && c.reportedBy !== actor.playerId,
+        involves(c, actor.playerId, s.players) &&
+          challengeSide(c, c.reportedBy ?? "", s.players) !==
+            challengeSide(c, actor.playerId, s.players),
         "Só o adversário pode confirmar.",
         403,
       );
@@ -2558,7 +2631,9 @@ export function execute(
       const c = challenge(cmd.challengeId);
       ensure(c.status === "result_pending", "Não existe resultado pendente.");
       ensure(
-        involves(c, actor.playerId) && c.reportedBy !== actor.playerId,
+        involves(c, actor.playerId, s.players) &&
+          challengeSide(c, c.reportedBy ?? "", s.players) !==
+            challengeSide(c, actor.playerId, s.players),
         "Só o adversário pode contestar.",
         403,
       );
@@ -2580,7 +2655,7 @@ export function execute(
         createdAt: now,
       });
       if (admin) {
-        for (const playerId of [c.challengerId, c.defenderId])
+        for (const playerId of challengeParticipants(c, s.players))
           notify(
             playerId,
             "Mensagem do clube no desafio",
@@ -2588,8 +2663,10 @@ export function execute(
             c._id,
           );
       } else {
-        notify(
-          actor.playerId === c.challengerId ? c.defenderId : c.challengerId,
+        notifyTeam(
+          challengeSide(c, actor.playerId, s.players) === "attack"
+            ? c.defenderId
+            : c.challengerId,
           "Nova mensagem",
           cmd.text.slice(0, 120),
           c._id,
@@ -2702,7 +2779,7 @@ export function execute(
               s.challenges.some(
                 (c) =>
                   c._id === m.challengeId &&
-                  involves(c, target._id) &&
+                  involves(c, target._id, s.players) &&
                   !terminal.has(c.status),
               ) &&
               clubDay(m.start) <= cmd.to &&
@@ -2722,7 +2799,7 @@ export function execute(
       if (cmd.vacation && rules.weeklyCompetition)
         for (const c of s.challenges.filter(
           (c) =>
-            involves(c, target._id) &&
+            involves(c, target._id, s.players) &&
             !c.competitionRoundId &&
             !terminal.has(c.status) &&
             !c.scheduledAt,
@@ -2773,7 +2850,7 @@ export function execute(
       if (e.vacation && rules.weeklyCompetition)
         for (const c of s.challenges.filter(
           (c) =>
-            involves(c, e.playerId) &&
+            involves(c, e.playerId, s.players) &&
             c.deferredUntil &&
             !terminal.has(c.status) &&
             !c.scheduledAt,
@@ -3285,7 +3362,7 @@ export function execute(
         ).toISOString();
       }
       log("admin.resolve", cmd);
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         notify(pid, "Desafio atualizado pelo administrador", cmd.action, c._id);
       break;
     }
@@ -3510,7 +3587,7 @@ export function execute(
         note: cmd.note,
         rankingAction: "manual_review",
       });
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         notify(
           pid,
           "Resultado corrigido pelo administrador",
@@ -3972,7 +4049,7 @@ export function processDeadlines(
       deadline &&
       Date.parse(deadline) - timestamp <= rules.reminderHours * 3600000
     )
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         add(
           pid,
           "O prazo está próximo",
@@ -3986,7 +4063,7 @@ export function processDeadlines(
       Date.parse(c.scheduledAt) > timestamp &&
       Date.parse(c.scheduledAt) - timestamp <= rules.reminderHours * 3600000
     )
-      for (const pid of [c.challengerId, c.defenderId])
+      for (const pid of challengeParticipants(c, s.players))
         add(
           pid,
           "O teu jogo está próximo 🎾",
@@ -4006,7 +4083,7 @@ export function expireRejectedRegistrations(s: State, timestamp = Date.now()) {
       Date.parse(p.registrationRejectedAt) <= cutoff &&
       p.status !== "active" &&
       !p.awaitingApproval &&
-      !s.challenges.some((c) => involves(c, p._id)) &&
+      !s.challenges.some((c) => involves(c, p._id, s.players)) &&
       !s.champions.some((c) => c.playerId === p._id),
   );
   const ids = new Set(expired.map((p) => p._id));

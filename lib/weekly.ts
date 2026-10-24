@@ -1,3 +1,4 @@
+import { challengeMemberIds, challengeSide } from "./team-competition";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import type { Challenge, Player, State, WeeklyRound } from "./types";
 import { addClubDays, clubDay, clubWeek } from "./calendar";
@@ -131,7 +132,7 @@ export function weeklyReason(
             (c) =>
               c._id === match.challengeId &&
               c._id !== ignoreId &&
-              [c.challengerId, c.defenderId].includes(p._id) &&
+              !!challengeSide(c, p._id, s.players) &&
               !["cancelled", "refused", "expired"].includes(c.status),
           ),
       )
@@ -147,9 +148,11 @@ export function weeklyReason(
           !(c.status === "pending" && Date.parse(c.respondBy) <= now) &&
           (c.status !== "pending" ||
             (attackingTeam.some((m) => m._id === p._id) &&
-              attackingTeam.some((m) => m._id === c.challengerId))) &&
+              challengeMemberIds(c, "attack", s.players).some((id) =>
+                attackingTeam.some((m) => m._id === id),
+              ))) &&
           (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
-          [c.challengerId, c.defenderId].includes(p._id) &&
+          !!challengeSide(c, p._id, s.players) &&
           !["cancelled", "refused", "expired"].includes(c.status),
       )
     )
@@ -257,36 +260,109 @@ export function weeklyPendingReceived(
     );
 }
 
-/** Regulatory order, including rotation of a contested benefit in the previous week. */
-export function weeklyPriority(
-  s: State,
-  defenderId: string,
-  now = Date.now(),
-  weekStart = weeklyChallengeWeek(s, now),
-) {
-  const week = weekStart,
-    group = weeklyPendingReceived(s, defenderId, now, week);
-  if (!group.length) return undefined;
-  const previous = addClubDays(week, -7);
-  const benefited = s.challenges
+/** A single order for both ends prevents cross-partner/cross-role priority bypasses. */
+function weeklyQueue(s: State, now: number, week: string) {
+  const ordered = s.challenges
     .filter(
       (c) =>
-        (c.weekStart ?? clubWeek(c.createdAt).start) === previous &&
-        c.weeklyPriorityWinner &&
-        c.weeklyPriorityReason?.includes("disputada"),
+        !c.competitionRoundId &&
+        (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
+        c.status === "pending" &&
+        Date.parse(c.respondBy) > now,
     )
-    .flatMap((c) => teamMembers(s.players, c.challengerId).map((m) => m._id));
-  const rotated = group.length > 1 && benefited.includes(group[0].challengerId);
-  const winner = rotated
-    ? (group.find((c) => !benefited.includes(c.challengerId)) ?? group[0])
-    : group[0];
-  return {
-    id: winner._id,
-    reason:
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.number - b.number ||
+        a._id.localeCompare(b._id),
+    );
+  const previous = addClubDays(week, -7);
+  const benefited = new Set(
+    s.challenges
+      .filter(
+        (c) =>
+          (c.weekStart ?? clubWeek(c.createdAt).start) === previous &&
+          c.weeklyPriorityWinner &&
+          c.weeklyPriorityReason?.includes("disputada"),
+      )
+      .flatMap((c) => challengeMemberIds(c, "attack", s.players)),
+  );
+  const defenders = [
+    ...new Set(
+      ordered.map((c) =>
+        teamMembers(s.players, c.defenderId)
+          .map((m) => m._id)
+          .sort()
+          .join(":"),
+      ),
+    ),
+  ];
+  const reasons = new Map<string, string>();
+  for (const key of defenders) {
+    const ids = new Set(key.split(":"));
+    const group = ordered.filter((c) =>
+      challengeMemberIds(c, "defense", s.players).some((id) => ids.has(id)),
+    );
+    if (!group.length) continue;
+    const rotated =
+      group.length > 1 &&
+      challengeMemberIds(group[0], "attack", s.players).some((id) =>
+        benefited.has(id),
+      );
+    const winner = rotated
+      ? (group.find(
+          (c) =>
+            !challengeMemberIds(c, "attack", s.players).some((id) =>
+              benefited.has(id),
+            ),
+        ) ?? group[0])
+      : group[0];
+    if (rotated && winner !== group[0]) {
+      ordered.splice(ordered.indexOf(winner), 1);
+      ordered.splice(ordered.indexOf(group[0]), 0, winner);
+    }
+    reasons.set(
+      winner._id,
       group.length > 1
         ? rotated
           ? "Rotação de prioridade disputada"
           : "Primeira submissão válida disputada"
-        : "Único desafio válido",
+        : "Primeiro desafio válido da dupla",
+    );
+  }
+  return { ordered, reasons };
+}
+export function weeklyPriority(
+  s: State,
+  playerId: string,
+  now = Date.now(),
+  weekStart = weeklyChallengeWeek(s, now),
+) {
+  const { ordered, reasons } = weeklyQueue(s, now, weekStart);
+  const head = ordered.find((c) => !!challengeSide(c, playerId, s.players));
+  return head
+    ? {
+        id: head._id,
+        reason: reasons.get(head._id) ?? "Primeiro desafio válido da dupla",
+      }
+    : undefined;
+}
+export function weeklyChallengePriority(
+  s: State,
+  c: Challenge,
+  now = Date.now(),
+) {
+  const week = c.weekStart ?? clubWeek(c.createdAt).start;
+  const { ordered, reasons } = weeklyQueue(s, now, week);
+  const heads = [c.challengerId, c.defenderId].map((id) =>
+    ordered.find((other) => !!challengeSide(other, id, s.players)),
+  );
+  const blocker = heads.find((head) => head && head._id !== c._id);
+  return {
+    eligible: !blocker && heads.every((head) => head?._id === c._id),
+    id: blocker?._id ?? c._id,
+    reason: blocker
+      ? `O desafio #${blocker.number} tem prioridade na fila da dupla.`
+      : (reasons.get(c._id) ?? "Primeiro desafio válido da dupla"),
   };
 }

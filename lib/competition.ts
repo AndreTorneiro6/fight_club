@@ -1670,6 +1670,15 @@ export function executeCompetition(
         now,
         `challenge-pending:${challengeId}:${m.playerId}`,
       );
+    for (const m of a.members)
+      notify(
+        s,
+        m.playerId,
+        "A tua dupla enviou um desafio",
+        `Jornada ${r.number}: a tua dupla desafiou ${d.members.map((m) => m.name).join(" + ")}. Aguarda resposta do adversário.`,
+        now,
+        `challenge-sent:${challengeId}:${m.playerId}`,
+      );
     challengeAdminNotice(
       s,
       s.competitionChallenges.find((c) => c._id === challengeId)!,
@@ -2633,7 +2642,8 @@ export function updateCompetitionRanking(
           c.seasonId === effectiveCompetitionConfig(s, r).config.seasonId &&
           c.status === "completed" &&
           c.titleFight &&
-          c.winnerId === reigning.playerId &&
+          (c.defenderTeam?.some((m) => m.playerId === reigning.playerId) ||
+            c.defenderId === reigning.playerId) &&
           c.winnerId === c.defenderId &&
           (c.completedAt ?? "") >= reigning.since,
       ).length;

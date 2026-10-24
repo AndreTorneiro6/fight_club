@@ -81,6 +81,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check shared partner challenge actions
+        run: npx playwright test e2e/team-challenges.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check team ranks and champion presentation
         run: npx playwright test e2e/team-rankings.spec.ts
         env:

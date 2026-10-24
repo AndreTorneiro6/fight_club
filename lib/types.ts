@@ -127,6 +127,9 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  challengerTeamId?: string;
+  defenderTeamId?: string;
+  positionSnapshotModel?: "team";
   resultStatsPlayerIds?: string[];
   queueClosedByChallengeId?: string;
   queueClosureReason?: string;

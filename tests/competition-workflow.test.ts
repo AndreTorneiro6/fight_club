@@ -1633,21 +1633,11 @@ test("accepted contested priority is preserved when rival challenges expire befo
   assert.equal(first.priorityWinner, true);
 });
 
-test("open attack priority advances past a challenger whose accepted defense occupies its slot", () => {
+test("an earlier incoming challenge has team-wide priority over a later outgoing attack", () => {
   const s = fixture();
   command(s, configCommand(s, { defaultDistance: 3 }));
   const r = round(s);
   roles(s, r);
-  command(
-    s,
-    {
-      type: "competition.challenge.submit",
-      roundId: r._id,
-      defenderId: "ouro-1",
-    },
-    actor(3),
-  );
-  const unavailable = s.competitionChallenges!.at(-1)!;
   command(
     s,
     {
@@ -1658,6 +1648,16 @@ test("open attack priority advances past a challenger whose accepted defense occ
     actor(4),
   );
   const defense = s.competitionChallenges!.at(-1)!;
+  command(
+    s,
+    {
+      type: "competition.challenge.submit",
+      roundId: r._id,
+      defenderId: "ouro-1",
+    },
+    actor(3),
+  );
+  const unavailable = s.competitionChallenges!.at(-1)!;
   command(
     s,
     {

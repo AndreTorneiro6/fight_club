@@ -206,5 +206,26 @@ export function competitionPriorities(
           : "Único desafio válido"),
     });
   }
-  return winners;
+  // A pending request can only advance when first for both teams, across attack and defense.
+  const ordered = [...challenges];
+  for (const winner of winners) {
+    const first = ordered.find((c) => c.defenderId === winner.defenderId);
+    const row = ordered.find((c) => c._id === winner._id);
+    if (first && row && first !== row) {
+      ordered.splice(ordered.indexOf(row), 1);
+      ordered.splice(ordered.indexOf(first), 0, row);
+    }
+  }
+  const heads = new Map<string, string>();
+  for (const c of [
+    ...ordered.filter((c) => c.status === "ACCEPTED"),
+    ...ordered.filter((c) => c.status !== "ACCEPTED"),
+  ])
+    for (const id of [c.attackerId, c.defenderId])
+      if (!heads.has(id)) heads.set(id, c._id);
+  return winners.filter(
+    (c) =>
+      c.status === "ACCEPTED" ||
+      (heads.get(c.attackerId) === c._id && heads.get(c.defenderId) === c._id),
+  );
 }

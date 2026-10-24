@@ -25,7 +25,7 @@ import {
   processDeadlines,
   expireRejectedRegistrations,
 } from "./engine";
-import { ensure } from "./rules";
+import { ensure, involves } from "./rules";
 
 const globalDb = globalThis as unknown as {
   mongo?: Promise<MongoClient>;
@@ -403,10 +403,7 @@ export async function view(actor: Actor): Promise<View> {
   // Expiration is persisted by jobs/commands. Derived UI status stays accurate between scheduler runs.
   const mine = s.challenges
     .filter(
-      (c) =>
-        actor.role === "admin" ||
-        c.challengerId === actor.playerId ||
-        c.defenderId === actor.playerId,
+      (c) => actor.role === "admin" || involves(c, actor.playerId, s.players),
     )
     .map((c) => c._id);
   if (actor.role !== "admin") {

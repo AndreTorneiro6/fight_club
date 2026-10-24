@@ -1,5 +1,11 @@
 "use client";
-import { teamPosition, challengeSide } from "@/lib/team-competition";
+import {
+  teamPosition,
+  challengeSide,
+  challengeRepresentative,
+  challengeMemberIds,
+  challengeParticipants,
+} from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
 import {
   SetScoreFields,
@@ -137,6 +143,7 @@ import {
   weeklyWindow,
   weeklyRole,
   weeklyPriority,
+  weeklyChallengePriority,
   weeklyPendingReceived,
   weeklyChallengeWeek,
   weeklyOpeningAt,
@@ -1225,7 +1232,12 @@ function Dashboard(a: Actions) {
     .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
   let streak = 0;
   for (const c of completed) {
-    if (c.winnerId === p._id) streak++;
+    if (
+      c.winnerId &&
+      challengeSide(c, c.winnerId, s.players) ===
+        challengeSide(c, p._id, s.players)
+    )
+      streak++;
     else break;
   }
   return (
@@ -1772,10 +1784,10 @@ function Challenges(a: Actions) {
         (state === "all" || effectiveStatus(c) === state) &&
         (filter === "all" ||
           (filter === "received" &&
-            c.defenderId === p._id &&
+            challengeSide(c, p._id, s.players) === "defense" &&
             !terminal.has(effectiveStatus(c))) ||
           (filter === "sent" &&
-            c.challengerId === p._id &&
+            challengeSide(c, p._id, s.players) === "attack" &&
             !terminal.has(effectiveStatus(c))) ||
           (filter === "active" && !terminal.has(effectiveStatus(c))) ||
           (filter === "completed" && terminal.has(effectiveStatus(c)))),
@@ -1816,7 +1828,7 @@ function Challenges(a: Actions) {
           ? "A tua conta de jogador não está ativa."
           : active.length >= s.settings[0].maxActiveChallenges
             ? `Já tens ${active.length} desafios ativos. O limite é ${s.settings[0].maxActiveChallenges}. Continua um dos desafios abaixo ou pede ao administrador para resolver um pendente.`
-            : p.position === 1
+            : teamPosition(s.players, p._id) === 1
               ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
               : eligible.length === 0
                 ? "Os adversários dentro do teu alcance já estão ocupados ou têm um desafio contigo. Consulta os teus desafios em curso."
@@ -1938,7 +1950,8 @@ function Challenges(a: Actions) {
             icon: Shield,
             count: pool.filter(
               (c) =>
-                c.defenderId === p._id && !terminal.has(effectiveStatus(c)),
+                challengeSide(c, p._id, s.players) === "defense" &&
+                !terminal.has(effectiveStatus(c)),
             ).length,
             filter: "received",
           },
@@ -1947,7 +1960,8 @@ function Challenges(a: Actions) {
             icon: Sword,
             count: pool.filter(
               (c) =>
-                c.challengerId === p._id && !terminal.has(effectiveStatus(c)),
+                challengeSide(c, p._id, s.players) === "attack" &&
+                !terminal.has(effectiveStatus(c)),
             ).length,
             filter: "sent",
           },
@@ -2137,9 +2151,11 @@ function ChallengeDetail(a: Actions & { id: string }) {
     admin = s.actor.role === "admin",
     status = effectiveStatus(c),
     opponentId =
-      c.challengerId === s.actor.playerId ? c.defenderId : c.challengerId;
+      challengeSide(c, s.actor.playerId, s.players) === "attack"
+        ? c.defenderId
+        : c.challengerId;
   const weeklyResponsePriority = s.settings[0].weeklyCompetition
-    ? weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)
+    ? weeklyChallengePriority(s, c, Date.now())
     : undefined;
   const canRespondByRole =
     !s.settings[0].weeklyCompetition ||
@@ -2150,9 +2166,11 @@ function ChallengeDetail(a: Actions & { id: string }) {
           weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
     )?.weekType === "OPEN_ATTACK" ||
       weeklyRole(s, c.defenderId, Date.now(), c.weekStart) === "defense") &&
-      weeklyResponsePriority?.id === c._id);
+      weeklyResponsePriority?.eligible);
   const mySlots = s.slots.filter(
-      (x) => x.challengeId === id && x.playerId === s.actor.playerId,
+      (x) =>
+        x.challengeId === id &&
+        x.playerId === challengeRepresentative(c, s.actor.playerId, s.players),
     ),
     theirSlots = s.slots.filter(
       (x) => x.challengeId === id && x.playerId === opponentId,
@@ -2229,7 +2247,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
               </div>
             )}
             {status === "pending" &&
-              (c.defenderId === s.actor.playerId ||
+              (challengeSide(c, s.actor.playerId, s.players) === "defense" ||
                 c.defenderTeam?.some(
                   (m) => m.playerId === s.actor.playerId,
                 )) && (
@@ -6800,7 +6818,8 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
   const canPropose =
     (mine || admin) &&
     (status === "accepted" ||
-      (status === "pending" && (admin || s.actor.playerId === c.challengerId)));
+      (status === "pending" &&
+        (admin || challengeSide(c, s.actor.playerId, s.players) === "attack")));
   const selectedSlots = slots.filter((x) => clubDay(x.start) === selected),
     scheduledDay = c.scheduledAt ? clubDay(c.scheduledAt) : null;
   const compatible = compatibleStarts(
@@ -6814,7 +6833,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
   const proposal = c.scheduleProposal,
     myConfirmed =
       proposal &&
-      (s.actor.playerId === c.challengerId
+      (challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed);
   const name = (id: string) =>
@@ -7002,10 +7021,12 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                   </div>
                 </div>
                 {mine &&
-                  x.playerId !== s.actor.playerId &&
+                  x.playerId !==
+                    challengeRepresentative(c, s.actor.playerId, s.players) &&
                   (status === "accepted" ||
                     (status === "pending" &&
-                      s.actor.playerId === c.defenderId)) &&
+                      challengeSide(c, s.actor.playerId, s.players) ===
+                        "defense")) &&
                   Date.parse(x.start) > Date.now() && (
                     <button
                       className="primary"
@@ -7013,12 +7034,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                         busy ||
                         (s.settings[0].weeklyCompetition &&
                           status === "pending" &&
-                          weeklyPriority(
-                            s,
-                            c.defenderId,
-                            Date.now(),
-                            c.weekStart,
-                          )?.id !== c._id)
+                          !weeklyChallengePriority(s, c, Date.now()).eligible)
                       }
                       onClick={() =>
                         run(
@@ -7038,7 +7054,13 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                     </button>
                   )}
                 {["pending", "accepted"].includes(status) &&
-                  (admin || x.playerId === s.actor.playerId) && (
+                  (admin ||
+                    x.playerId ===
+                      challengeRepresentative(
+                        c,
+                        s.actor.playerId,
+                        s.players,
+                      )) && (
                     <button
                       className="icon-button"
                       aria-label={`Remover proposta de ${name(x.playerId)}`}
@@ -7073,7 +7095,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
             )}
             {status === "pending" &&
               !admin &&
-              s.actor.playerId === c.defenderId && (
+              challengeSide(c, s.actor.playerId, s.players) === "defense" && (
                 <small>
                   Aceita o desafio para propor a tua disponibilidade.
                 </small>
@@ -7224,14 +7246,16 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
   if (
     !mine ||
     !["pending", "accepted"].includes(status) ||
-    (status === "pending" && s.actor.playerId !== c.defenderId)
+    (status === "pending" &&
+      challengeSide(c, s.actor.playerId, s.players) !== "defense")
   )
     return null;
   const offers = s.slots
     .filter(
       (x) =>
         x.challengeId === c._id &&
-        x.playerId !== s.actor.playerId &&
+        x.playerId !==
+          challengeRepresentative(c, s.actor.playerId, s.players) &&
         Date.parse(x.start) > Date.now(),
     )
     .sort((a, b) => a.start.localeCompare(b.start));
@@ -7239,7 +7263,7 @@ function IncomingTimeOffers({ s, c, run, busy }: Actions & { c: Challenge }) {
   const priorityBlocked =
     s.settings[0].weeklyCompetition &&
     status === "pending" &&
-    weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)?.id !== c._id;
+    weeklyChallengePriority(s, c, Date.now())?.id !== c._id;
   return (
     <Section
       title="Horários propostos pelo adversário"
@@ -7303,7 +7327,7 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
     both = proposal.challengerConfirmed && proposal.defenderConfirmed,
     isFinal = c.status === "scheduled",
     myConfirmed =
-      s.actor.playerId === c.challengerId
+      challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed;
   const label = (id: string) =>
@@ -7388,7 +7412,7 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
             >
               <Check size={16} />
               {proposal.previousStatus === "pending" &&
-              s.actor.playerId === c.defenderId
+              challengeSide(c, s.actor.playerId, s.players) === "defense"
                 ? "Aceitar desafio e horário"
                 : "Aceitar horário proposto"}
             </button>
