@@ -1844,7 +1844,9 @@ export function execute(
         ensure(
           s.champions.some(
             (c) =>
-              c.divisionId === p.divisionId && c.playerId === d._id && !c.until,
+              c.divisionId === p.divisionId &&
+              teamMembers(s.players, d._id).some((m) => m._id === c.playerId) &&
+              !c.until,
           ),
           "O defensor não é o campeão atual.",
         );
@@ -3621,7 +3623,13 @@ export function execute(
       const current = s.champions.find(
         (c) => c.divisionId === cmd.divisionId && !c.until,
       );
-      ensure(current?.playerId !== p._id, "Este jogador já é o campeão.");
+      ensure(
+        !current ||
+          !teamMembers(s.players, p._id).some(
+            (m) => m._id === current.playerId,
+          ),
+        "Esta dupla já é campeã.",
+      );
       crown(
         cmd.divisionId,
         p._id,

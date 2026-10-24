@@ -350,3 +350,38 @@ for (const division of ["ouro", "prata", "bronze"]) {
     assert.equal(later.status, "cancelled");
   });
 }
+
+test("title challenges can target either member of the champion team", () => {
+  const s = fixture();
+  weekly(s);
+  execute(
+    s,
+    admin,
+    { type: "admin.champion", divisionId: "gold", playerId: "p1" },
+    now,
+  );
+  execute(
+    s,
+    actor("p6"),
+    {
+      type: "challenge.create",
+      defenderId: "p2",
+      weekStart: "2026-10-26",
+      titleFight: true,
+    },
+    now + 1000,
+  );
+  assert.equal(s.challenges.at(-1)?.titleFight, true);
+  assert.equal(s.challenges.at(-1)?.defenderTeam?.length, 2);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        { type: "admin.champion", divisionId: "gold", playerId: "p2" },
+        now + 2000,
+      ),
+    /dupla já é campeã/,
+  );
+  assert.equal(s.champions[0].defenses, 0);
+});
