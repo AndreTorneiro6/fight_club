@@ -71,3 +71,25 @@ export function challengeTeamKey(
 ) {
   return challengeMemberIds(c, side, players).sort().join(":");
 }
+
+/** Preserve the names of both participating teams when displaying historical matches. */
+export function challengeTeamName(
+  c: Challenge,
+  playerId: string,
+  players: Player[],
+) {
+  const saved =
+    playerId === c.challengerId
+      ? c.challengerTeam
+      : playerId === c.defenderId
+        ? c.defenderTeam
+        : undefined;
+  if (saved?.length) return saved.map((m) => m.name).join(" + ");
+  if (playerId === c.challengerId || playerId === c.defenderId)
+    return (
+      teamMembers(players, playerId)
+        .map((m) => m.name)
+        .join(" + ") || "Dupla"
+    );
+  return players.find((p) => p._id === playerId)?.name ?? "Jogador";
+}

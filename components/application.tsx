@@ -5,6 +5,7 @@ import {
   challengeRepresentative,
   challengeMemberIds,
   challengeParticipants,
+  challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
 import {
@@ -1469,7 +1470,7 @@ function Versus({ s, c }: { s: View; c: Challenge }) {
         return (
           <div key={id}>
             <Avatar p={p} />
-            <h3>{teamName(s.players, id)}</h3>
+            <h3>{challengeTeamName(c, id, s.players)}</h3>
             <small>
               #{p ? teamPosition(s.players, p._id) : "—"} ·{" "}
               <span className="role-label">
@@ -1720,10 +1721,7 @@ function Rankings(a: Actions) {
   );
 }
 function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
-  const name = (id: string) =>
-    terminal.has(effectiveStatus(c))
-      ? (s.players.find((player) => player._id === id)?.name ?? "Jogador")
-      : teamName(s.players, id) || "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   const when =
     c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
   return (
@@ -2188,8 +2186,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
   const chat = s.messages
     .filter((x) => x.challengeId === id)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const name = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Link href="/desafios" className="link row" style={{ marginBottom: 20 }}>
@@ -2734,7 +2731,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                 <select name="winnerId" defaultValue={c.winnerId}>
                   {[c.challengerId, c.defenderId].map((pid) => (
                     <option value={pid} key={pid}>
-                      {s.players.find((p) => p._id === pid)?.name}
+                      {challengeTeamName(c, pid, s.players)}
                     </option>
                   ))}
                 </select>
@@ -2760,7 +2757,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                   <option value="">Escolher jogador</option>
                   {[c.challengerId, c.defenderId].map((pid) => (
                     <option value={pid} key={pid}>
-                      {s.players.find((p) => p._id === pid)?.name}
+                      {challengeTeamName(c, pid, s.players)}
                     </option>
                   ))}
                 </select>
@@ -3817,8 +3814,8 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
           >
             <p>
               <strong>
-                {s.players.find((p) => p._id === c.challengerId)?.name} vs{" "}
-                {s.players.find((p) => p._id === c.defenderId)?.name}
+                {challengeTeamName(c, c.challengerId, s.players)} vs{" "}
+                {challengeTeamName(c, c.defenderId, s.players)}
               </strong>
             </p>
             <p>
@@ -3980,8 +3977,8 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
             }}
           >
             <p>
-              {s.players.find((p) => p._id === c.challengerId)?.name} vs{" "}
-              {s.players.find((p) => p._id === c.defenderId)?.name}
+              {challengeTeamName(c, c.challengerId, s.players)} vs{" "}
+              {challengeTeamName(c, c.defenderId, s.players)}
             </p>
             <label>
               Quem venceu?
@@ -3995,7 +3992,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                 </option>
                 {[c.challengerId, c.defenderId].map((pid) => (
                   <option key={pid} value={pid}>
-                    {s.players.find((p) => p._id === pid)?.name}
+                    {challengeTeamName(c, pid, s.players)}
                   </option>
                 ))}
               </select>
@@ -6836,8 +6833,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
       (challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed);
-  const name = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Section
@@ -7330,8 +7326,7 @@ function TimeConfirmation({ s, c, run, busy }: Actions & { c: Challenge }) {
       challengeSide(c, s.actor.playerId, s.players) === "attack"
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed;
-  const label = (id: string) =>
-    s.players.find((p) => p._id === id)?.name ?? "Jogador";
+  const label = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
       <Section
