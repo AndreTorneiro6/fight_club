@@ -1,5 +1,5 @@
 import { rankingEntries, teamMembers } from "./ranking-groups";
-import type { Challenge, Player, State } from "./types";
+import type { Challenge, Player, State, WeeklyRound } from "./types";
 import { addClubDays, clubDay, clubWeek } from "./calendar";
 
 export function weeklyPositionReason(
@@ -27,10 +27,42 @@ export function frozenRanking(s: State, playerId: string, now = Date.now()) {
       entry.to >= today,
   );
 }
-export function weeklyRole(s: State, playerId: string, now = Date.now()) {
-  const round = s.weeklyRounds.find(
-    (entry) => entry.weekStart === clubWeek(now).start,
-  );
+/** Publication opens preparation for the immediately following playing week.
+ * Older commitments keep their saved week; drafts and distant weeks cannot open challenges. */
+export function weeklyChallengeWeek(s: State, now = Date.now()) {
+  const current = clubWeek(now).start,
+    next = addClubDays(current, 7);
+  const season =
+    s.seasons.find((season) => season.status === "active") ??
+    s.seasons.find((season) => season.status === "paused");
+  return s.weeklyRounds.some(
+    (r) =>
+      r.weekStart === next &&
+      r.publishedAt &&
+      Date.parse(r.publishedAt) <= now &&
+      (!r.seasonId || r.seasonId === season?._id),
+  )
+    ? next
+    : current;
+}
+export function weeklyOpeningAt(
+  round: Pick<WeeklyRound, "challengesOpenAt" | "divisionChallengeOpenings">,
+  divisionId: string,
+) {
+  return Object.prototype.hasOwnProperty.call(
+    round.divisionChallengeOpenings ?? {},
+    divisionId,
+  )
+    ? round.divisionChallengeOpenings![divisionId]
+    : round.challengesOpenAt;
+}
+export function weeklyRole(
+  s: State,
+  playerId: string,
+  now = Date.now(),
+  weekStart = weeklyChallengeWeek(s, now),
+) {
+  const round = s.weeklyRounds.find((entry) => entry.weekStart === weekStart);
   return round?.publishedAt
     ? round.assignments.find((entry) => entry.playerId === playerId)?.role
     : undefined;
@@ -50,31 +82,38 @@ export function weeklyReason(
   )
     return "Não podes desafiar a tua própria equipa.";
   if (!s.settings[0].weeklyCompetition) return null;
-  const week = clubWeek(now).start;
+  const week =
+    (ignoreId
+      ? s.challenges.find((c) => c._id === ignoreId)?.weekStart
+      : undefined) ?? weeklyChallengeWeek(s, now);
   if (
     !s.weeklyRounds.some(
       (round) => round.weekStart === week && round.publishedAt,
     )
   )
     return "A aguardar a publicação dos papéis semanais pelo administrador.";
-  const open =
-    s.weeklyRounds.find((r) => r.weekStart === week)?.weekType ===
-    "OPEN_ATTACK";
+  const selected = s.weeklyRounds.find((r) => r.weekStart === week)!;
+  const opensAt = weeklyOpeningAt(selected, attacker.divisionId);
+  if (opensAt === null)
+    return "Os desafios desta divisão aguardam abertura pelo administrador.";
+  if (opensAt && Date.parse(opensAt) > now)
+    return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
+  const open = selected.weekType === "OPEN_ATTACK";
   if (!open) {
-    if (weeklyRole(s, attacker._id, now) !== "attack")
+    if (weeklyRole(s, attacker._id, now, week) !== "attack")
       return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
-    if (weeklyRole(s, defender._id, now) !== "defense")
+    if (weeklyRole(s, defender._id, now, week) !== "defense")
       return "Este jogador não está em defesa esta semana.";
     if (
       attackingTeam.some(
         (member) =>
           member.status === "active" &&
-          weeklyRole(s, member._id, now) !== "attack",
+          weeklyRole(s, member._id, now, week) !== "attack",
       ) ||
       defendingTeam.some(
         (member) =>
           member.status === "active" &&
-          weeklyRole(s, member._id, now) !== "defense",
+          weeklyRole(s, member._id, now, week) !== "defense",
       )
     )
       return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";
@@ -120,7 +159,12 @@ export function weeklyReason(
   }
   return null;
 }
-export function weeklyWindow(s: State, ids: string[], now = Date.now()) {
+export function weeklyWindow(
+  s: State,
+  ids: string[],
+  now = Date.now(),
+  weekStart = weeklyChallengeWeek(s, now),
+) {
   ids = [
     ...new Set(
       ids.flatMap((id) =>
@@ -128,7 +172,7 @@ export function weeklyWindow(s: State, ids: string[], now = Date.now()) {
       ),
     ),
   ];
-  const week = clubWeek(now);
+  const week = clubWeek(weekStart);
   let deferredUntil: string | undefined;
   // Consecutive vacations can extend a deferred challenge until both players return.
   for (let pass = 0; pass <= s.exceptions.length; pass++) {
@@ -189,9 +233,14 @@ export function weeklyBookingReason(
 }
 
 /** Regulatory order, including rotation of a contested benefit in the previous week. */
-export function weeklyPriority(s: State, defenderId: string, now = Date.now()) {
+export function weeklyPriority(
+  s: State,
+  defenderId: string,
+  now = Date.now(),
+  weekStart = weeklyChallengeWeek(s, now),
+) {
   const members = teamMembers(s.players, defenderId).map((m) => m._id),
-    week = clubWeek(now).start;
+    week = weekStart;
   const group = s.challenges
     .filter(
       (c) =>

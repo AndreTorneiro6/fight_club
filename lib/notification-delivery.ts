@@ -80,19 +80,21 @@ export function deliveryContent(n: Notification) {
       n.responseDeadline?.status === "pending"
         ? new Date(n.responseDeadline.respondBy)
         : undefined,
-    path: n.rankingNotice
-      ? "/ranking"
-      : n.seasonId
-        ? "/epocas"
-        : n.adminTestId
-          ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
-          : n.challengeId
-            ? `/desafios/${encodeURIComponent(n.challengeId)}`
-            : n.competitionNotice
-              ? n.playerId === "__admins__"
-                ? "/admin?tab=matchmaking"
-                : "/jornadas"
-              : "/notificacoes",
+    path: n.weeklyChallengeOpening
+      ? "/desafios"
+      : n.rankingNotice
+        ? "/ranking"
+        : n.seasonId
+          ? "/epocas"
+          : n.adminTestId
+            ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
+            : n.challengeId
+              ? `/desafios/${encodeURIComponent(n.challengeId)}`
+              : n.competitionNotice
+                ? n.playerId === "__admins__"
+                  ? "/admin?tab=matchmaking"
+                  : "/jornadas"
+                : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */
@@ -368,7 +370,32 @@ export async function dispatchNotifications(
             player?._id ?? "",
           ) &&
           notification.testChannels?.includes(job.channel));
+      const openingRound = notification?.weeklyChallengeOpening
+        ? await db.collection("weeklyRounds").findOne({
+            weekStart: notification.weeklyChallengeOpening.weekStart,
+          })
+        : null;
+      const openingDivision =
+        notification?.weeklyChallengeOpening?.divisionId ?? player?.divisionId;
+      const effectiveOpening =
+        openingDivision &&
+        Object.prototype.hasOwnProperty.call(
+          openingRound?.divisionChallengeOpenings ?? {},
+          openingDivision,
+        )
+          ? openingRound?.divisionChallengeOpenings[openingDivision]
+          : openingRound?.challengesOpenAt;
+      const openingCurrent =
+        !notification?.weeklyChallengeOpening ||
+        (openingRound?.publishedAt &&
+          !!effectiveOpening &&
+          effectiveOpening === notification.weeklyChallengeOpening.opensAt &&
+          (!notification.weeklyChallengeOpening.divisionId ||
+            notification.weeklyChallengeOpening.divisionId ===
+              player?.divisionId) &&
+          Date.parse(effectiveOpening) <= Date.now());
       const allowed =
+        openingCurrent &&
         responseCurrent &&
         testAccess &&
         challengeAccess &&

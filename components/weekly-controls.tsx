@@ -2,12 +2,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usesManagedCompetition } from "@/lib/competition-mode";
+import WeeklyOpeningControl from "./weekly-opening-control";
 import RoundChallengeCoverage from "./round-challenge-coverage";
 import RankingExport from "./ranking-export";
 import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
-import { frozenRanking, weeklyRole, weeklyPositionReason } from "@/lib/weekly";
+import {
+  frozenRanking,
+  weeklyRole,
+  weeklyPositionReason,
+  weeklyChallengeWeek,
+  weeklyOpeningAt,
+} from "@/lib/weekly";
 import { rankingEntries } from "@/lib/ranking-groups";
 import type { Player, View } from "@/lib/types";
 
@@ -132,7 +139,8 @@ export function WeeklyRoles({
 }) {
   const admin = s.actor.role === "admin";
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
-  const [week, setWeek] = useState(clubWeek().start);
+  const [selectedWeek, setWeek] = useState(() => weeklyChallengeWeek(s));
+  const week = admin ? selectedWeek : weeklyChallengeWeek(s);
   const [exportOpen, setExportOpen] = useState(false);
   const [weekType, setWeekType] = useState<"NORMAL" | "OPEN_ATTACK">("NORMAL");
   const [division, setDivision] = useState(admin ? "all" : me.divisionId);
@@ -173,6 +181,7 @@ export function WeeklyRoles({
           entry.members.some((m) => !challengeReason(s, me, m)))),
   );
   const published = !!round?.publishedAt;
+  const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
   const save = async (publish: boolean) => {
     await run(
       {
@@ -218,7 +227,7 @@ export function WeeklyRoles({
         <WeekNavigation week={week} onChange={setWeek} />
       ) : (
         <p>
-          Semana de {week} · Ranking:{" "}
+          Semana dos jogos: {week} · Ranking:{" "}
           {rankingEntries(s.players, me.divisionId).findIndex((t) =>
             t.members.some((m) => m._id === me._id),
           ) + 1}{" "}
@@ -311,10 +320,36 @@ export function WeeklyRoles({
           podem desafiar, exceto o campeão.
         </p>
       )}
+      {admin && round && (
+        <WeeklyOpeningControl
+          key={`opening:${round._id}:${round.version}`}
+          round={round}
+          divisions={s.divisions}
+          run={run}
+          busy={busy}
+        />
+      )}
+      {opening && (
+        <p className="inset" role="status">
+          {Date.now() < Date.parse(opening)
+            ? "Os desafios abrem em"
+            : "Desafios abertos desde"}{" "}
+          {new Date(opening).toLocaleString("pt-PT", {
+            timeZone: "Europe/Lisbon",
+          })}{" "}
+          (Portugal). A semana dos jogos mantém-se {week}.
+        </p>
+      )}
       <p role="status">
-        {published
-          ? "Papéis publicados. Os atacantes podem desafiar os defensores elegíveis."
-          : "Os desafios só abrem depois de o administrador atribuir e publicar os papéis da semana."}
+        {published && opening === null
+          ? "Papéis publicados. Esta divisão aguarda abertura pelo administrador."
+          : published && opening && Date.now() < Date.parse(opening)
+            ? "Papéis publicados. A aguardar a hora de abertura dos desafios."
+            : published
+              ? round?.weekType === "OPEN_ATTACK"
+                ? "Papéis publicados. Todas as duplas elegíveis podem desafiar acima, exceto o campeão."
+                : "Papéis publicados. Os atacantes podem desafiar os defensores elegíveis."
+              : "Os desafios só abrem depois de o administrador atribuir e publicar os papéis da semana."}
       </p>
       {!admin && (
         <p>

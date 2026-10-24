@@ -20,6 +20,8 @@ export function weeklyApprovalSnapshot(s: State, r: WeeklyRound) {
       a.playerId.localeCompare(b.playerId),
     ),
     weekType: r.weekType ?? "NORMAL",
+    challengesOpenAt: r.challengesOpenAt,
+    divisionChallengeOpenings: r.divisionChallengeOpenings,
     teams: s.divisions.map((d) =>
       rankingEntries(s.players, d._id).map((t) => ({
         id: t.id,
@@ -121,6 +123,8 @@ export function generateWeeklyRoles(
     _id: existing?._id ?? weekStart,
     weekStart,
     seasonId: season._id,
+    challengesOpenAt: existing?.challengesOpenAt,
+    divisionChallengeOpenings: existing?.divisionChallengeOpenings,
     weekType,
     version: (existing?.version ?? 0) + 1,
     assignments,

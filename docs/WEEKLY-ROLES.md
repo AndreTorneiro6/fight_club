@@ -21,6 +21,16 @@ O servidor verifica as permissões, a versão, as equipas, o campeão e a últim
 
 O painel mostra **RASCUNHO**, **APROVADO — aguarda publicação** ou **PUBLICADO**. **Histórico de papéis das jornadas anteriores** e **Histórico dos papéis semanais** mostram as atribuições e o estado de cada semana. Os papéis publicados guardam a composição da equipa da altura; os registos antigos sem snapshot continuam legíveis. A aprovação/publicação dos confrontos oficiais continua independente da aprovação/publicação dos papéis.
 
+## Semana dos jogos e abertura por divisão
+
+No modo semanal, publicar a semana imediatamente seguinte mostra logo os papéis na área dos jogadores e no ranking. Os desafios e as propostas de horário referem-se à semana dos jogos indicada, mesmo que sejam enviados na semana anterior. Desafios já existentes conservam a sua semana e prioridade.
+
+Em **Papéis semanais → Abertura dos desafios**, o administrador pode definir uma data/hora de Portugal. A opção geral mantém as exceções de cada divisão. Selecionar Ouro, Prata ou Bronze permite definir uma hora própria ou **Aguardar abertura pelo administrador**. Para abrir uma divisão que estava em espera, selecionar essa divisão, retirar a opção de espera e guardar uma hora atual/futura e o motivo. O servidor impede alterações concorrentes e alterações que invalidem compromissos existentes nessa divisão.
+
+Os papéis continuam visíveis enquanto a divisão está fechada. À abertura programada, o worker cria uma única notificação na app e push por jogador ativo/aprovado dessa divisão; não há email, WhatsApp nem reenvio do aviso dos papéis. O envio é processado no ciclo do worker (aproximadamente um minuto), nunca antes da hora. Uma divisão em espera não recebe o aviso até ser aberta pelo administrador.
+
+Vários desafios ao mesmo defensor podem permanecer pendentes. A primeira submissão válida tem prioridade, salvo a rotação regulamentar do benefício disputado na semana anterior. O defensor não pode aceitar um desafio de menor prioridade pela interface nem por chamada direta à API. A aceitação ocupa a vaga semanal e bloqueia novos compromissos incompatíveis; a marcação oficial continua dependente da aprovação/publicação do clube.
+
 ## Aviso de início da época
 
 Em **Épocas**, **Iniciar época e notificar jogadores** ativa a época e guarda uma notificação para cada jogador ativo e aprovado, incluindo administradores que também joguem. O aviso é enviado por push aos dispositivos com subscrição e permissão. Quem não tiver push encontra o aviso na app. Não é um envio WhatsApp nem uma campanha de email.
