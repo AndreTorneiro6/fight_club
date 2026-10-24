@@ -3,6 +3,13 @@
 Last updated: 24 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Pending challenge queue labels — 24 October 2026
+
+- User confirmed keeping the existing pending queue, allowing a team to send and receive compatible pending challenges during Open Attack; no reservation on the first pending submission and no new matchmaking rule. Existing first-valid priority/previous-week rotation and accepted weekly-slot locking remain enforced server-side.
+- Eligible opponents in weekly challenges and ranking now display “Já recebeu um desafio” when they have a live incoming pending challenge, explaining that another submission remains pending and subject to regulatory priority. Nonpriority challenges show “Em fila” in the list and detail. Reuses the same pending incoming group/order as backend priority; no new status or data migration.
+- Suppressed the misleading “Não existem duplas disponíveis” warning while roles are unpublished, opening is in the future or that division awaits manual opening. No changes to opening times, division overrides, ranking distance, notifications, roles, results or live league records.
+- Typecheck, all 277 tests and production build pass. Browser regression passes, checking absence of the false pre-opening warning, pending-opponent label with enabled valid challenge action, Open Attack simultaneous send/receive, and blocking acceptance of a queued lower-priority challenge. Deployment verification follows once released.
+
 ## Published upcoming-week roles and division opening times — 24 October 2026
 
 - Fixed legacy weekly player/ranking role lookup: published roles for the immediately following playing week are visible now, while existing challenges retain their saved week for responses, priority and scheduling. Drafts, distant weeks and different-season publications cannot activate challenges. New submissions carry the selected week and stale selections are rejected. Proposed playing dates start in the target week. Open Attack defenders can respond even when their published role is Attack; server priority remains mandatory and partners can use the existing authorized response action.

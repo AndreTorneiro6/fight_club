@@ -14,9 +14,11 @@ import {
   weeklyPositionReason,
   weeklyChallengeWeek,
   weeklyOpeningAt,
+  weeklyPendingReceived,
+  weeklyPriority,
 } from "@/lib/weekly";
 import { rankingEntries } from "@/lib/ranking-groups";
-import type { Player, View } from "@/lib/types";
+import type { Challenge, Player, View } from "@/lib/types";
 
 function PreviousWeekRole({
   s,
@@ -126,6 +128,35 @@ export function WeeklyBadge({
     </span>
   );
 }
+export function WeeklyQueueNotice({
+  s,
+  challenge,
+}: {
+  s: View;
+  challenge: Challenge;
+}) {
+  if (
+    !s.settings[0].weeklyCompetition ||
+    challenge.status !== "pending" ||
+    Date.parse(challenge.respondBy) <= Date.now()
+  )
+    return null;
+  const priority = weeklyPriority(
+    s,
+    challenge.defenderId,
+    Date.now(),
+    challenge.weekStart,
+  );
+  if (!priority || priority.id === challenge._id) return null;
+  return (
+    <p className="inset" role="status">
+      Em fila — esta dupla já recebeu outro desafio com prioridade. Este desafio
+      permanece pendente e só pode ser aceite quando tiver prioridade
+      regulamentar.
+    </p>
+  );
+}
+
 export function WeeklyRoles({
   s,
   run,
@@ -363,6 +394,9 @@ export function WeeklyRoles({
         </p>
       )}
       {!admin &&
+        published &&
+        opening !== null &&
+        (!opening || Date.now() >= Date.parse(opening)) &&
         weeklyRole(s, me._id) === "attack" &&
         visible.every((t) => t.members.some((m) => m._id === me._id)) && (
           <p>
@@ -637,7 +671,14 @@ export function WeeklyRoles({
                     <small>{reason}</small>
                   ) : (
                     <>
-                      <span className="success">Podes desafiar</span>
+                      {weeklyPendingReceived(s, members[0]._id).length > 0 ? (
+                        <p role="status">
+                          Já recebeu um desafio. Podes enviar o teu, mas fica
+                          pendente e sujeito à prioridade regulamentar.
+                        </p>
+                      ) : (
+                        <span className="success">Podes desafiar</span>
+                      )}
                       <button
                         className="small"
                         onClick={() => target && onChallenge?.(target)}

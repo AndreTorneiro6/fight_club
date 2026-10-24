@@ -132,6 +132,12 @@ test("published next-week Open Attack roles appear immediately to players and pe
     await expect(
       attacker.getByRole("button", { name: /Desafiar Luís Costa/ }),
     ).toHaveCount(0);
+    await expect(
+      attacker.getByText(
+        "Não existem duplas disponíveis para desafiar nesta jornada.",
+        { exact: false },
+      ),
+    ).toHaveCount(0);
     const blocked = await attacker.request.post("/api/league", {
       headers: { Origin: "http://localhost:3100" },
       data: {
@@ -165,6 +171,20 @@ test("published next-week Open Attack roles appear immediately to players and pe
     await expect(
       attacker.getByText(`Semana dos jogos: ${week}`, { exact: false }),
     ).toBeVisible();
+    await post(page, {
+      type: "admin.challenge.create",
+      challengerId: "player-4",
+      defenderId: "player-3",
+      weekStart: week,
+    });
+    await attacker.reload();
+    const pendingOpponent = attacker.locator('[data-weekly-team="player-3"]');
+    await expect(
+      pendingOpponent.getByText("Já recebeu um desafio.", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      pendingOpponent.getByRole("button", { name: /Desafiar Rui Santos/ }),
+    ).toBeEnabled();
     await attacker.getByRole("button", { name: /Desafiar Luís Costa/ }).click();
     const dialog = attacker.getByRole("dialog");
     for (const field of await dialog.locator('input[type="date"]').all())
@@ -202,6 +222,36 @@ test("published next-week Open Attack roles appear immediately to players and pe
         (m: { challengeId: string }) => m.challengeId === created.id,
       ),
     ).toHaveLength(0);
+    const first = await post(page, {
+      type: "admin.challenge.create",
+      challengerId: "player-3",
+      defenderId: "player-1",
+      weekStart: week,
+    });
+    const second = await post(page, {
+      type: "admin.challenge.create",
+      challengerId: "player-2",
+      defenderId: "player-1",
+      weekStart: week,
+    });
+    await page.goto(`/desafios/${second.id}`);
+    await expect(page.getByText("Em fila —", { exact: false })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Aceitar", exact: true }),
+    ).toBeDisabled();
+    const denied = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data: { type: "challenge.respond", challengeId: second.id, accept: true },
+    });
+    expect(denied.status()).toBe(400);
+    expect(await denied.text()).toContain("prioridade");
+    state = await (await page.request.get("/api/league")).json();
+    expect(
+      state.challenges.find((c: { _id: string }) => c._id === first.id).status,
+    ).toBe("pending");
+    expect(
+      state.challenges.find((c: { _id: string }) => c._id === second.id).status,
+    ).toBe("pending");
   } finally {
     await attackerContext.close();
     await defenderContext.close();

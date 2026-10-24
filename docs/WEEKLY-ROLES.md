@@ -29,7 +29,7 @@ Em **Papéis semanais → Abertura dos desafios**, o administrador pode definir 
 
 Os papéis continuam visíveis enquanto a divisão está fechada. À abertura programada, o worker cria uma única notificação na app e push por jogador ativo/aprovado dessa divisão; não há email, WhatsApp nem reenvio do aviso dos papéis. O envio é processado no ciclo do worker (aproximadamente um minuto), nunca antes da hora. Uma divisão em espera não recebe o aviso até ser aberta pelo administrador.
 
-Vários desafios ao mesmo defensor podem permanecer pendentes. A primeira submissão válida tem prioridade, salvo a rotação regulamentar do benefício disputado na semana anterior. O defensor não pode aceitar um desafio de menor prioridade pela interface nem por chamada direta à API. A aceitação ocupa a vaga semanal e bloqueia novos compromissos incompatíveis; a marcação oficial continua dependente da aprovação/publicação do clube.
+Vários desafios ao mesmo defensor podem permanecer pendentes. O adversário mostra **Já recebeu um desafio** e os pedidos sem prioridade mostram **Em fila**. Em Ataque Livre, uma dupla pode enviar e receber desafios pendentes compatíveis, respeitando os limites configurados; um pedido pendente não reserva automaticamente o adversário. A primeira submissão válida tem prioridade, salvo a rotação regulamentar do benefício disputado na semana anterior. O defensor não pode aceitar um desafio de menor prioridade pela interface nem por chamada direta à API. A aceitação ocupa a vaga semanal e bloqueia novos compromissos incompatíveis; a marcação oficial continua dependente da aprovação/publicação do clube.
 
 ## Aviso de início da época
 

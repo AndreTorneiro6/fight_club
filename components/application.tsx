@@ -126,11 +126,17 @@ import {
   type Settings,
   type View,
 } from "@/lib/types";
-import { WeeklyRoles, WeeklyBadge, WeekNavigation } from "./weekly-controls";
+import {
+  WeeklyRoles,
+  WeeklyBadge,
+  WeekNavigation,
+  WeeklyQueueNotice,
+} from "./weekly-controls";
 import {
   weeklyWindow,
   weeklyRole,
   weeklyPriority,
+  weeklyPendingReceived,
   frozenRanking,
 } from "@/lib/weekly";
 import {
@@ -1540,6 +1546,14 @@ function RankingTable({
                   player={entry.members[0]}
                   team={entry.members}
                 />
+                {targetMember &&
+                  s.settings[0].weeklyCompetition &&
+                  weeklyPendingReceived(s, targetMember._id).length > 0 && (
+                    <small>
+                      Já recebeu um desafio. Podes enviar o teu; fica pendente e
+                      sujeito à prioridade regulamentar.
+                    </small>
+                  )}
               </div>
               <div
                 className="ranking-member-list ranking-member-values"
@@ -1698,6 +1712,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
         {name(c.challengerId)} <span className="gold">vs</span>{" "}
         {name(c.defenderId)}
       </h3>
+      <WeeklyQueueNotice s={s} challenge={c} />
       <div className="row between wrap">
         <DivisionBadge s={s} id={c.divisionId} />
         <small>
@@ -2136,6 +2151,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
             right={<DivisionBadge s={s} id={c.divisionId} />}
           >
             <Status c={c} />
+            <WeeklyQueueNotice s={s} challenge={c} />
             <Versus s={s} c={c} />
             <div className="inset row between wrap">
               <span>
