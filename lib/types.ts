@@ -207,6 +207,11 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  weeklyChallengeOpening?: {
+    weekStart: string;
+    opensAt: string;
+    divisionId?: string;
+  };
   responseDeadline?: {
     id: string;
     managed: boolean;
@@ -303,6 +308,10 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  challengesOpenAt?: string;
+  /** null holds this division until an administrator opens it. */
+  divisionChallengeOpenings?: Record<string, string | null>;
+  openingNotifiedAt?: string;
   teamSnapshot?: {
     id: string;
     name: string;

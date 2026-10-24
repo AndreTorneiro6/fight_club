@@ -1,3 +1,4 @@
+import { scheduleWeeklyOpening, notifyWeeklyOpenings } from "./weekly-opening";
 import {
   notifyResponseReminder,
   notifyResponseExpired,
@@ -39,6 +40,7 @@ import { courtPaymentPlayers } from "./payments";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import {
   weeklyPositionReason,
+  weeklyChallengeWeek,
   frozenRanking,
   weeklyReason,
   weeklyPriority,
@@ -138,6 +140,14 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.week.opening.set"),
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+    opensAt: date.nullable(),
+    divisionId: id.optional(),
+    reason: text.min(3),
+  }),
   z.object({ type: z.literal("admin.ranking.publishWeekly"), seasonId: id }),
   z.object({
     type: z.literal("admin.week.generate"),
@@ -192,12 +202,14 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("challenge.create"),
+    weekStart: day.optional(),
     defenderId: id,
     titleFight: z.boolean().default(false),
     initialSlots: initialSlotsSchema,
   }),
   z.object({
     type: z.literal("admin.challenge.create"),
+    weekStart: day.optional(),
     challengerId: id,
     defenderId: id,
     initialSlots: initialSlotsSchema,
@@ -1321,6 +1333,17 @@ export function execute(
     case "admin.ranking.publishWeekly": {
       return publishWeeklyRanking(s, cmd.seasonId, actor.userId, timestamp);
     }
+    case "admin.week.opening.set":
+      return scheduleWeeklyOpening(
+        s,
+        actor,
+        cmd.weekStart,
+        cmd.expectedVersion,
+        cmd.opensAt,
+        cmd.reason,
+        timestamp,
+        cmd.divisionId,
+      );
     case "admin.week.generate": {
       const old = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
       ensure(
@@ -1491,7 +1514,7 @@ export function execute(
             "Papel semanal publicado",
             `Semana de ${cmd.weekStart}: ${entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
           );
-      if (cmd.publish && cmd.weekStart === clubWeek(timestamp).start)
+      if (cmd.publish && cmd.weekStart === weeklyChallengeWeek(s, timestamp))
         for (const division of s.divisions)
           for (const team of rankingEntries(s.players, division._id)) {
             const p = team.members[0];
@@ -1592,6 +1615,12 @@ export function execute(
             : me(),
         d = player(cmd.defenderId);
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
+      if (rules.weeklyCompetition && cmd.weekStart)
+        ensure(
+          cmd.weekStart === weeklyChallengeWeek(s, timestamp),
+          "Os papéis da semana mudaram. Atualiza a página antes de enviar o desafio.",
+          409,
+        );
       const weekly = weeklyReason(s, p, d, timestamp);
       ensure(!weekly, weekly ?? "Desafio semanal inválido.");
       const window = rules.weeklyCompetition
@@ -1912,7 +1941,12 @@ export function execute(
           c._id,
         );
         ensure(!roleError, roleError ?? "Papéis da jornada inválidos.");
-        const priority = weeklyPriority(s, c.defenderId, timestamp);
+        const priority = weeklyPriority(
+          s,
+          c.defenderId,
+          timestamp,
+          c.weekStart,
+        );
         ensure(
           priority?.id === c._id,
           "Existe outro desafio com prioridade. Aguarda decisão administrativa.",
@@ -2503,6 +2537,7 @@ export function execute(
             s,
             [c.challengerId, c.defenderId],
             timestamp,
+            c.weekStart,
           );
           if (window.deferredUntil) {
             c.deferredUntil = window.deferredUntil;
@@ -2553,6 +2588,7 @@ export function execute(
             s,
             [c.challengerId, c.defenderId],
             timestamp,
+            c.weekStart,
           );
           c.deferredUntil = window.deferredUntil ?? clubDay(timestamp);
           c.playBy = window.playBy;
@@ -3570,6 +3606,7 @@ export function processDeadlines(
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);
     autoWeeklyRanking(s, timestamp);
+    notifyWeeklyOpenings(s, timestamp);
   }
   processCompetitionDeadlines(s, timestamp, generateRoles);
   const now = new Date(timestamp).toISOString(),

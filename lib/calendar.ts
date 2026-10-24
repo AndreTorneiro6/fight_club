@@ -45,7 +45,7 @@ export function initialProposals(
   s: View,
   p: Player,
   now = Date.now(),
-  weekly?: { deferredUntil?: string; playBy: string },
+  weekly?: { weekStart?: string; deferredUntil?: string; playBy: string },
 ): Proposal[] {
   const count = s.settings[0].initialSuggestionCount,
     items: Proposal[] = [],
@@ -59,7 +59,10 @@ export function initialProposals(
         "T23:59:59Z",
     ),
   );
-  const firstDay = weekly?.deferredUntil ?? today;
+  const firstDay = [today, weekly?.weekStart, weekly?.deferredUntil]
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(-1)!;
   const horizon = weekly
     ? Math.max(
         s.settings[0].playDays,

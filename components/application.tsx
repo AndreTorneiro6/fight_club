@@ -2081,11 +2081,17 @@ function ChallengeDetail(a: Actions & { id: string }) {
     opponentId =
       c.challengerId === s.actor.playerId ? c.defenderId : c.challengerId;
   const weeklyResponsePriority = s.settings[0].weeklyCompetition
-    ? weeklyPriority(s, c.defenderId)
+    ? weeklyPriority(s, c.defenderId, Date.now(), c.weekStart)
     : undefined;
   const canRespondByRole =
     !s.settings[0].weeklyCompetition ||
-    (weeklyRole(s, c.defenderId) === "defense" &&
+    ((s.weeklyRounds.find(
+      (r) =>
+        r.weekStart ===
+        (c.weekStart ??
+          weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
+    )?.weekType === "OPEN_ATTACK" ||
+      weeklyRole(s, c.defenderId, Date.now(), c.weekStart) === "defense") &&
       weeklyResponsePriority?.id === c._id);
   const mySlots = s.slots.filter(
       (x) => x.challengeId === id && x.playerId === s.actor.playerId,
@@ -2158,48 +2164,52 @@ function ChallengeDetail(a: Actions & { id: string }) {
                 {c.score && <div>{c.score}</div>}
               </div>
             )}
-            {status === "pending" && c.defenderId === s.actor.playerId && (
-              <div className="stack space-top">
-                <p>
-                  Foste desafiado. Responde até{" "}
-                  {new Date(c.respondBy).toLocaleString("pt-PT")}.{" "}
-                  {canRespondByRole
-                    ? "Aceita para encontrar um horário em comum."
-                    : "Outro desafio tem prioridade regulamentar. Aguarda decisão administrativa."}
-                </p>
-                <div className="row">
-                  <button
-                    className="primary flex-1"
-                    disabled={busy || !canRespondByRole}
-                    onClick={() =>
-                      run(
-                        {
-                          type: "challenge.respond",
-                          challengeId: id,
-                          accept: true,
-                        },
-                        "Desafio aceite.",
-                      )
-                    }
-                  >
-                    <Check size={15} />
-                    Aceitar
-                  </button>
-                  <button
-                    disabled={!canRefuse(s, c) || busy || !canRespondByRole}
-                    onClick={() => setRefuse(true)}
-                  >
-                    Recusar
-                  </button>
+            {status === "pending" &&
+              (c.defenderId === s.actor.playerId ||
+                c.defenderTeam?.some(
+                  (m) => m.playerId === s.actor.playerId,
+                )) && (
+                <div className="stack space-top">
+                  <p>
+                    Foste desafiado. Responde até{" "}
+                    {new Date(c.respondBy).toLocaleString("pt-PT")}.{" "}
+                    {canRespondByRole
+                      ? "Aceita para encontrar um horário em comum."
+                      : "Outro desafio tem prioridade regulamentar. Aguarda decisão administrativa."}
+                  </p>
+                  <div className="row">
+                    <button
+                      className="primary flex-1"
+                      disabled={busy || !canRespondByRole}
+                      onClick={() =>
+                        run(
+                          {
+                            type: "challenge.respond",
+                            challengeId: id,
+                            accept: true,
+                          },
+                          "Desafio aceite.",
+                        )
+                      }
+                    >
+                      <Check size={15} />
+                      Aceitar
+                    </button>
+                    <button
+                      disabled={!canRefuse(s, c) || busy || !canRespondByRole}
+                      onClick={() => setRefuse(true)}
+                    >
+                      Recusar
+                    </button>
+                  </div>
+                  {!canRefuse(s, c) && (
+                    <small>
+                      A recusa só é permitida quando já tens outro desafio
+                      aceite ou ativo.
+                    </small>
+                  )}
                 </div>
-                {!canRefuse(s, c) && (
-                  <small>
-                    A recusa só é permitida quando já tens outro desafio aceite
-                    ou ativo.
-                  </small>
-                )}
-              </div>
-            )}
+              )}
             {!terminal.has(c.status) &&
               (admin ||
                 (mine &&
@@ -2883,6 +2893,11 @@ function Notifications({ s, run, busy }: Actions) {
                   <small>
                     {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
                   </small>
+                  {n.weeklyChallengeOpening && (
+                    <Link className="link" href="/desafios">
+                      Ver desafios →
+                    </Link>
+                  )}
                   {n.rankingNotice && (
                     <Link className="link" href="/ranking">
                       Ver ranking →
@@ -5999,6 +6014,7 @@ function ChallengeComposer(
             const res = await run(
               {
                 type: "challenge.create",
+                weekStart: weeklyWindowValue?.weekStart,
                 defenderId: target._id,
                 titleFight: a.titleFight ?? false,
                 initialSlots,

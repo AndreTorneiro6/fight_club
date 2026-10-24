@@ -2833,3 +2833,384 @@ test("legacy defenders receive the configured response deadline, four deduplicat
     );
   assert.equal(s.results.length, 0);
 });
+
+test("next-week publication opens challenges immediately, keeps their playing week and respects the configured response deadline", async () => {
+  const { weeklyRole, weeklyChallengeWeek, weeklyWindow } =
+    await import("../lib/weekly");
+  const s = fixture(),
+    next = "2026-10-19";
+  s.settings[0].weeklyCompetition = true;
+  // Incomplete historical current-week publication must not hide the new full publication.
+  s.weeklyRounds.push({
+    _id: "old",
+    weekStart: "2026-10-12",
+    publishedAt: iso(-3),
+    assignments: [{ playerId: "p1", role: "defense" }],
+  });
+  const assignments = s.players.map((p) => ({
+    playerId: p._id,
+    role: (p.position === 1 ? "defense" : "attack") as "attack" | "defense",
+  }));
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: next,
+      expectedVersion: 0,
+      publish: false,
+      weekType: "OPEN_ATTACK",
+      assignments,
+    },
+    time,
+  );
+  assert.equal(weeklyChallengeWeek(s, time), "2026-10-12");
+  const r = s.weeklyRounds.find((r) => r.weekStart === next)!;
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.week.approve", weekStart: next, expectedVersion: r.version },
+    time,
+  );
+  assert.equal(weeklyRole(s, "p8", time), undefined);
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: next,
+      expectedVersion: r.version,
+      publish: true,
+      weekType: "OPEN_ATTACK",
+      assignments,
+    },
+    time,
+  );
+  assert.equal(weeklyChallengeWeek(s, time), next);
+  assert.equal(weeklyRole(s, "p8", time), "attack");
+  const c = create(s);
+  assert.equal(c.weekStart, next);
+  const { initialProposals } = await import("../lib/calendar");
+  const proposals = initialProposals(
+    { ...s, actor: actor(8), demo: true },
+    s.players.find((p) => p._id === "p8")!,
+    time,
+    weeklyWindow(s, ["p8", "p6"], time),
+  );
+  assert.ok(proposals.every((p) => p.day >= next && p.day <= "2026-10-25"));
+  assert.equal(c.respondBy, iso(2));
+  assert.equal(clubWeek(c.playBy).start, next);
+  assert.equal(s.results.length, 0);
+  execute(
+    s,
+    actor(6),
+    { type: "challenge.respond", challengeId: c._id, accept: true },
+    time,
+  );
+  assert.equal(c.status, "accepted");
+  assert.match(weeklyBookingReason(s, c, iso(1), time)!, /semana do desafio/);
+});
+
+test("existing current-week challenges retain their own roles and priority after next-week publication", async () => {
+  const { weeklyChallengeWeek } = await import("../lib/weekly");
+  const s = fixture();
+  publishWeek(s);
+  const c = create(s);
+  const next = "2026-10-19",
+    assignments = s.players.map((p) => ({
+      playerId: p._id,
+      role: (p.position === 8 ? "attack" : "defense") as "attack" | "defense",
+    }));
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: next,
+      expectedVersion: 0,
+      publish: false,
+      assignments,
+    },
+    time,
+  );
+  const r = s.weeklyRounds.find((r) => r.weekStart === next)!;
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.week.approve", weekStart: next, expectedVersion: r.version },
+    time,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.save",
+      weekStart: next,
+      expectedVersion: r.version,
+      publish: true,
+      assignments,
+    },
+    time,
+  );
+  assert.equal(weeklyChallengeWeek(s, time), next);
+  execute(
+    s,
+    actor(6),
+    { type: "challenge.respond", challengeId: c._id, accept: true },
+    time,
+  );
+  assert.equal(c.status, "accepted");
+  assert.equal(c.weekStart, "2026-10-12");
+});
+
+test("unpublished and distant weeks cannot open challenges; stale client week selection is rejected", async () => {
+  const { weeklyChallengeWeek } = await import("../lib/weekly");
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  s.weeklyRounds.push({
+    _id: "far",
+    weekStart: "2026-10-26",
+    publishedAt: iso(0),
+    assignments: [
+      { playerId: "p8", role: "attack" },
+      { playerId: "p6", role: "defense" },
+    ],
+  });
+  assert.equal(weeklyChallengeWeek(s, time), "2026-10-12");
+  assert.throws(() => create(s), /publicação/);
+  publishWeek(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(8),
+        { type: "challenge.create", defenderId: "p6", weekStart: "2026-10-19" },
+        time,
+      ),
+    /mudaram/,
+  );
+});
+
+test("scheduled opening keeps published next-week roles visible, blocks until the exact Lisbon opening and notifies once", async () => {
+  const { weeklyRole } = await import("../lib/weekly"),
+    { clubDateTime } = await import("../lib/calendar"),
+    { deliveryContent } = await import("../lib/notification-delivery");
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  const next = "2026-10-19",
+    opensAt = clubDateTime("2026-10-15", "20:00"),
+    opens = Date.parse(opensAt);
+  s.weeklyRounds.push({
+    _id: next,
+    weekStart: next,
+    seasonId: "s1",
+    version: 1,
+    weekType: "OPEN_ATTACK",
+    publishedAt: iso(0),
+    assignments: s.players.map((p) => ({
+      playerId: p._id,
+      role: p.position === 1 ? "defense" : "attack",
+    })),
+  });
+  execute(
+    s,
+    actor(1, "admin"),
+    {
+      type: "admin.week.opening.set",
+      weekStart: next,
+      expectedVersion: 1,
+      opensAt,
+      reason: "Abertura anunciada pelo clube às 20h",
+    },
+    time,
+  );
+  assert.equal(weeklyRole(s, "p8", time), "attack");
+  assert.throws(() => create(s), /abrem/);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(8),
+        { type: "challenge.create", defenderId: "p6", weekStart: next },
+        opens - 1,
+      ),
+    /abrem/,
+  );
+  processDeadlines(s, opens - 1);
+  assert.equal(
+    s.notifications.filter((n) => n.weeklyChallengeOpening).length,
+    0,
+  );
+  processDeadlines(s, opens);
+  const notices = s.notifications.filter((n) => n.weeklyChallengeOpening);
+  assert.equal(notices.length, 24);
+  for (const n of notices) {
+    assert.deepEqual(n.deliveryChannels, ["push"]);
+    assert.equal(deliveryContent(n).path, "/desafios");
+  }
+  processDeadlines(s, opens + 1000);
+  assert.equal(
+    s.notifications.filter((n) => n.weeklyChallengeOpening).length,
+    24,
+  );
+  execute(
+    s,
+    actor(8),
+    { type: "challenge.create", defenderId: "p6", weekStart: next },
+    opens,
+  );
+  assert.equal(s.challenges.at(-1)!.weekStart, next);
+  assert.equal(s.results.length, 0);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(1, "admin"),
+        {
+          type: "admin.week.opening.set",
+          weekStart: next,
+          expectedVersion: s.weeklyRounds.find((r) => r.weekStart === next)!
+            .version,
+          opensAt: new Date(opens + 3600000).toISOString(),
+          reason: "Reprogramar a abertura",
+        },
+        opens,
+      ),
+    /Já existem desafios/,
+  );
+});
+
+test("opening schedules require admin, valid version/date and publication before an opening notification", async () => {
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  const week = "2026-10-19";
+  s.weeklyRounds.push({
+    _id: week,
+    weekStart: week,
+    seasonId: "s1",
+    version: 1,
+    assignments: [],
+  });
+  const cmd = {
+    type: "admin.week.opening.set",
+    weekStart: week,
+    expectedVersion: 1,
+    opensAt: iso(0, 1),
+    reason: "Teste de abertura",
+  };
+  assert.throws(() => execute(s, actor(8), cmd, time), /administrador/);
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...cmd, expectedVersion: 0 }, time),
+    /alterou/,
+  );
+  assert.throws(
+    () => execute(s, actor(1, "admin"), { ...cmd, opensAt: iso(-1) }, time),
+    /futura/,
+  );
+  execute(s, actor(1, "admin"), cmd, time);
+  processDeadlines(s, time + 2 * 3600000);
+  assert.equal(
+    s.notifications.filter((n) => n.weeklyChallengeOpening).length,
+    0,
+  );
+});
+
+test("division openings notify only Ouro and Prata, hold Bronze until admin release, and retain published roles", async () => {
+  const { weeklyRole } = await import("../lib/weekly");
+  const s = fixture();
+  s.settings[0].weeklyCompetition = true;
+  const week = "2026-10-19",
+    opens = time + 3600000;
+  s.weeklyRounds.push({
+    _id: week,
+    weekStart: week,
+    seasonId: "s1",
+    version: 1,
+    publishedAt: iso(0),
+    weekType: "OPEN_ATTACK",
+    assignments: s.players.map((p) => ({
+      playerId: p._id,
+      role: p.position === 1 ? "defense" : "attack",
+    })),
+  });
+  const r = s.weeklyRounds[0],
+    original = JSON.stringify(r.assignments);
+  const command = (
+    divisionId: string | undefined,
+    opensAt: string | null,
+    at = time,
+  ) =>
+    execute(
+      s,
+      actor(1, "admin"),
+      {
+        type: "admin.week.opening.set",
+        weekStart: week,
+        expectedVersion: r.version,
+        divisionId,
+        opensAt,
+        reason: "Abertura por divisão definida pelo clube",
+      },
+      at,
+    );
+  command(undefined, new Date(opens).toISOString());
+  command("bronze", null);
+  assert.equal(weeklyRole(s, "p24", time), "attack");
+  assert.throws(() => create(s, 24, 22), /aguardam abertura/);
+  processDeadlines(s, opens - 1);
+  assert.equal(
+    s.notifications.filter((n) => n.weeklyChallengeOpening).length,
+    0,
+  );
+  processDeadlines(s, opens);
+  const openingNotices = () =>
+    s.notifications.filter((n) => n.weeklyChallengeOpening);
+  assert.equal(openingNotices().length, 16);
+  assert.ok(
+    openingNotices().every(
+      (n) => n.weeklyChallengeOpening!.divisionId !== "bronze",
+    ),
+  );
+  execute(
+    s,
+    actor(8),
+    { type: "challenge.create", defenderId: "p6", weekStart: week },
+    opens,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(24),
+        { type: "challenge.create", defenderId: "p22", weekStart: week },
+        opens,
+      ),
+    /aguardam abertura/,
+  );
+  processDeadlines(s, opens + 86400000);
+  assert.equal(openingNotices().length, 16);
+  const release = opens + 86400000;
+  command("bronze", new Date(release).toISOString(), release);
+  processDeadlines(s, release);
+  assert.equal(openingNotices().length, 24);
+  assert.equal(
+    openingNotices().filter(
+      (n) => n.weeklyChallengeOpening!.divisionId === "bronze",
+    ).length,
+    8,
+  );
+  processDeadlines(s, release + 1);
+  assert.equal(openingNotices().length, 24);
+  execute(
+    s,
+    actor(24),
+    { type: "challenge.create", defenderId: "p22", weekStart: week },
+    release,
+  );
+  assert.equal(JSON.stringify(r.assignments), original);
+  assert.throws(() => command("unknown", null, release), /Divisão inválida/);
+  assert.throws(
+    () => command(undefined, null, release),
+    /Seleciona uma divisão/,
+  );
+});

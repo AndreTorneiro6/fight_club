@@ -76,6 +76,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check published upcoming-week roles and scheduled opening
+        run: npx playwright test e2e/upcoming-week-challenges.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check team weekly role approval and publication
         run: npx playwright test e2e/weekly-teams.spec.ts
         env:
