@@ -2633,7 +2633,8 @@ export function updateCompetitionRanking(
           c.seasonId === effectiveCompetitionConfig(s, r).config.seasonId &&
           c.status === "completed" &&
           c.titleFight &&
-          c.winnerId === reigning.playerId &&
+          (c.defenderTeam?.some((m) => m.playerId === reigning.playerId) ||
+            c.defenderId === reigning.playerId) &&
           c.winnerId === c.defenderId &&
           (c.completedAt ?? "") >= reigning.since,
       ).length;

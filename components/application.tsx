@@ -1225,7 +1225,12 @@ function Dashboard(a: Actions) {
     .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
   let streak = 0;
   for (const c of completed) {
-    if (c.winnerId === p._id) streak++;
+    if (
+      c.winnerId &&
+      challengeSide(c, c.winnerId, s.players) ===
+        challengeSide(c, p._id, s.players)
+    )
+      streak++;
     else break;
   }
   return (
