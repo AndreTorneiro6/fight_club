@@ -93,6 +93,46 @@ test("partner sees the same private challenge and can accept and arrange time fo
     await defender
       .getByRole("button", { name: "Saltar visita", exact: true })
       .click();
+    // A challenge sent by the other partner must appear in the player's own Sent list.
+    const sentByPartner = await post(defender, {
+      type: "challenge.create",
+      defenderId: "player-4",
+      weekStart: week,
+    });
+    await switchWorkspace(page, "player");
+    await page
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
+    await page.goto("/desafios");
+    await expect(
+      page.getByText("A tua dupla já enviou um desafio nesta jornada.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Não existem duplas disponíveis para desafiar nesta jornada.",
+        { exact: false },
+      ),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "Enviados", exact: true }).click();
+    await expect(
+      page.locator(`.challenge-card[href="/desafios/${sentByPartner.id}"]`),
+    ).toBeVisible();
+    await page.goto(`/desafios/${sentByPartner.id}`);
+    await expect(
+      page.getByRole("button", {
+        name: "Propor horário neste dia",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await switchWorkspace(page, "admin");
+    await post(page, {
+      type: "challenge.cancel",
+      challengeId: sentByPartner.id,
+      note: "Preparar o segundo cenário de participação da dupla",
+    });
+    await switchWorkspace(page, "player");
     const created = await post(attacker, {
       type: "challenge.create",
       defenderId: "player-5",
@@ -106,13 +146,7 @@ test("partner sees the same private challenge and can accept and arrange time fo
       start,
       end,
     });
-    await switchWorkspace(page, "player");
-    const tour = page.getByRole("button", {
-      name: "Saltar visita",
-      exact: true,
-    });
-    await expect(tour).toBeVisible();
-    await tour.click();
+
     await page.goto(`/desafios/${created.id}`);
     await defender.goto(`/desafios/${created.id}`);
     await expect(
@@ -144,6 +178,28 @@ test("partner sees the same private challenge and can accept and arrange time fo
         (m: { challengeId: string }) => m.challengeId === created.id,
       ),
     ).toBe(false);
+    await page.goto("/desafios");
+    await expect(
+      page.getByText("A tua dupla já tem um desafio aceite nesta jornada.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.locator(`.challenge-card[href="/desafios/${created.id}"]`),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Não existem duplas disponíveis para desafiar nesta jornada.",
+        { exact: false },
+      ),
+    ).toHaveCount(0);
+    await page.goto(`/desafios/${created.id}`);
+    await expect(
+      page.getByRole("button", {
+        name: "Propor horário neste dia",
+        exact: true,
+      }),
+    ).toBeEnabled();
     const slot = shared.slots.find(
       (s: { challengeId: string }) => s.challengeId === created.id,
     );

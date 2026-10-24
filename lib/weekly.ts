@@ -366,3 +366,40 @@ export function weeklyChallengePriority(
       : (reasons.get(c._id) ?? "Primeiro desafio válido da dupla"),
   };
 }
+
+/** One weekly competitive slot belongs to the pair, including a partner's outgoing request. */
+export function weeklyTeamCommitment(
+  s: State,
+  playerId: string,
+  now = Date.now(),
+) {
+  if (!s.settings[0].weeklyCompetition) return undefined;
+  const week = weeklyChallengeWeek(s, now);
+  return s.challenges
+    .filter(
+      (c) =>
+        !c.competitionRoundId &&
+        (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
+        !!challengeSide(c, playerId, s.players) &&
+        !["cancelled", "refused", "expired"].includes(c.status) &&
+        (c.status !== "pending" ||
+          (Date.parse(c.respondBy) > now &&
+            challengeSide(c, playerId, s.players) === "attack")),
+    )
+    .sort(
+      (a, b) =>
+        Number(a.status === "pending") - Number(b.status === "pending") ||
+        a.createdAt.localeCompare(b.createdAt),
+    )[0];
+}
+export function weeklyTeamCommitmentMessage(c: Challenge) {
+  if (c.status === "pending")
+    return "A tua dupla já enviou um desafio nesta jornada. Aguarda a resposta do adversário; podes continuar a propor horários nesse desafio.";
+  if (c.status === "accepted")
+    return "A tua dupla já tem um desafio aceite nesta jornada. Combina os dias e horários no desafio da dupla.";
+  if (c.status === "schedule_pending")
+    return "A tua dupla já tem um desafio aceite com horário em confirmação. Continua esse desafio para acompanhar as confirmações.";
+  if (c.status === "completed")
+    return "A tua dupla já disputou o jogo desta jornada. Consulta o resultado no desafio da dupla.";
+  return "A tua dupla já tem um jogo nesta jornada. Consulta o desafio da dupla para acompanhar o jogo.";
+}

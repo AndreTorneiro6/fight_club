@@ -18,6 +18,7 @@ import {
   weeklyPendingReceived,
   weeklyPriority,
   weeklyChallengePriority,
+  weeklyTeamCommitment,
 } from "@/lib/weekly";
 import { rankingEntries } from "@/lib/ranking-groups";
 import type { Challenge, Player, View } from "@/lib/types";
@@ -210,6 +211,7 @@ export function WeeklyRoles({
   );
   const published = !!round?.publishedAt;
   const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
+  const ownTeamCommitment = weeklyTeamCommitment(s, me._id);
   const save = async (publish: boolean) => {
     await run(
       {
@@ -392,6 +394,7 @@ export function WeeklyRoles({
       )}
       {!admin &&
         published &&
+        !ownTeamCommitment &&
         opening !== null &&
         (!opening || Date.now() >= Date.parse(opening)) &&
         weeklyRole(s, me._id) === "attack" &&

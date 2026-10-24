@@ -1,3 +1,7 @@
+import {
+  weeklyTeamCommitment,
+  weeklyTeamCommitmentMessage,
+} from "../lib/weekly";
 import { weeklyPriority, weeklyChallengePriority } from "../lib/weekly";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -384,4 +388,33 @@ test("title challenges can target either member of the champion team", () => {
     /dupla já é campeã/,
   );
   assert.equal(s.champions[0].defenses, 0);
+});
+
+test("a teammates accepted challenge is the shared weekly commitment and has a precise continuation message", () => {
+  const s = fixture();
+  weekly(s);
+  const c = send(s, "p5", "p3");
+  execute(
+    s,
+    actor("p4"),
+    { type: "challenge.respond", challengeId: c._id, accept: true },
+    now + 1000,
+  );
+  for (const id of ["p5", "p6"])
+    assert.equal(weeklyTeamCommitment(s, id, now + 2000)?._id, c._id);
+  assert.match(
+    weeklyTeamCommitmentMessage(c),
+    /dupla já tem um desafio aceite/,
+  );
+  assert.match(weeklyTeamCommitmentMessage(c), /Combina os dias e horários/);
+  assert.throws(() => send(s, "p6", "p1", now + 3000), /desafio atribuído/);
+});
+test("receiving a pending challenge alone is not an outgoing weekly commitment", () => {
+  const s = fixture();
+  weekly(s);
+  send(s, "p9", "p5");
+  assert.equal(weeklyTeamCommitment(s, "p6", now + 1000), undefined);
+  const c = send(s, "p6", "p3", now + 2000);
+  assert.equal(weeklyTeamCommitment(s, "p5", now + 3000)?._id, c._id);
+  assert.match(weeklyTeamCommitmentMessage(c), /dupla já enviou/);
 });

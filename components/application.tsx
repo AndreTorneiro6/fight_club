@@ -145,6 +145,8 @@ import {
   weeklyRole,
   weeklyPriority,
   weeklyChallengePriority,
+  weeklyTeamCommitment,
+  weeklyTeamCommitmentMessage,
   weeklyPendingReceived,
   weeklyChallengeWeek,
   weeklyOpeningAt,
@@ -1773,7 +1775,7 @@ function Challenges(a: Actions) {
     p = s.players.find((p) => p._id === s.actor.playerId)!;
   const managed = usesManagedCompetition(s, p.divisionId);
   const pool = s.challenges.filter(
-    (c) => (admin && scope === "league") || involves(c, p._id),
+    (c) => (admin && scope === "league") || involves(c, p._id, s.players),
   );
   const list = pool
     .filter(
@@ -1816,8 +1818,10 @@ function Challenges(a: Actions) {
           ? `Os desafios abrem em ${new Date(opening).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal). Os adversários elegíveis aparecem nessa altura.`
           : ""
       : "";
+  const ownTeamCommitment = weeklyTeamCommitment(s, p._id);
   const blockedReason =
     openingBlock ||
+    (ownTeamCommitment ? weeklyTeamCommitmentMessage(ownTeamCommitment) : "") ||
     (s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
       ? "A aguardar a publicação do teu papel semanal pelo administrador."
       : s.settings[0].weeklyCompetition && weeklyRole(s, p._id) === "defense"
@@ -1853,8 +1857,9 @@ function Challenges(a: Actions) {
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
-          ) : s.settings[0].weeklyCompetition &&
-            (weeklyRole(s, p._id) !== "attack" || !!openingBlock) ? null : (
+          ) : ownTeamCommitment ||
+            (s.settings[0].weeklyCompetition &&
+              (weeklyRole(s, p._id) !== "attack" || !!openingBlock)) ? null : (
             <a
               className="button primary"
               href={
@@ -1904,7 +1909,13 @@ function Challenges(a: Actions) {
           >
             <p>{blockedReason}</p>
             <div className="row wrap">
-              {active.map((c) => (
+              {[
+                ...active,
+                ...(ownTeamCommitment &&
+                !active.some((c) => c._id === ownTeamCommitment._id)
+                  ? [ownTeamCommitment]
+                  : []),
+              ].map((c) => (
                 <Link
                   className="button small"
                   key={c._id}
@@ -2065,7 +2076,13 @@ function Challenges(a: Actions) {
         </div>
       ) : (
         <Section title="Gestão dos teus desafios">
-          <Empty text="Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo." />
+          <Empty
+            text={
+              ownTeamCommitment
+                ? "Não existem desafios neste filtro. Consulta o desafio da tua dupla em Enviados, Recebidos ou Em curso."
+                : "Não existem desafios nesta lista. Consulta os enviados ou escolhe um novo adversário abaixo."
+            }
+          />
         </Section>
       )}
       {scope === "mine" && !managed && !s.settings[0].weeklyCompetition && (
@@ -2339,9 +2356,9 @@ function ChallengeDetail(a: Actions & { id: string }) {
             >
               <div className="stack">
                 <p style={{ fontSize: 12 }}>
-                  Cada jogador propõe uma janela. O jogo dura{" "}
-                  {c.durationMinutes} minutos e tem de terminar até{" "}
-                  {fmtDate(c.playBy)}.
+                  Cada dupla propõe uma janela. Qualquer parceiro pode gerir os
+                  horários. O jogo dura {c.durationMinutes} minutos e tem de
+                  terminar até {fmtDate(c.playBy)}.
                 </p>
                 <div>
                   <h3 style={{ marginBottom: 12 }}>A tua disponibilidade</h3>
