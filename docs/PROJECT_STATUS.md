@@ -3,6 +3,12 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Notification worker egress fixed live; UI release preparing — 25 October 2026
+
+- User authorized apply, then reminded Bronze ranking caption remains2. Added proxy network to worker only in local and live Compose; data network stays internal, no worker ports/routes exposed. Remote docker compose config --quiet passes. Connected existing worker to web-app_default without app restart/image change, and persisted Compose for recreation.
+- Same diagnostic repeated inside worker now passes SMTP connection/auth and reaches Apple/FCM/Mozilla origins (405/404/406 are origin HEAD responses, not push sends). VAPID pair/subscription crypto valid. No test messages sent, failed-job replay or historical notification rewrite. Ordinary queued jobs retain existing worker behavior; connectivity fix cannot guarantee every individual endpoint succeeds.
+- Typecheck,361 tests and production build pass. Preparing release including previously committed ranking selected-division caption and obsolete response deadline removal, both browser-tested. Production application image still67ca0ae at checkpoint; live network correction already applied. Record completed release below.
+
 ## Notification failure root cause diagnosed — 25 October 2026
 
 - Read-only diagnosis of running containers: SMTP connection/auth verification passes in app; VAPID key pair/subscription crypto valid, Apple/FCM/Mozilla origins reachable. Same checks in worker fail SMTP EDNS/getaddrinfo and all three push origins EAI_AGAIN.

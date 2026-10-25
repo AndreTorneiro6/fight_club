@@ -113,7 +113,10 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    # External access is required for SMTP and browser push providers.
+    # No ports or Traefik routes are exposed for this service.
     networks:
+      - proxy
       - data
     security_opt:
       - no-new-privileges:true
