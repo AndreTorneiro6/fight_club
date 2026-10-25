@@ -86,6 +86,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check direct administrator scheduling without player proposals
+        run: npx playwright test e2e/admin-direct-scheduling.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check team ranks and champion presentation
         run: npx playwright test e2e/team-rankings.spec.ts
         env:

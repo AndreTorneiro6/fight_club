@@ -449,3 +449,134 @@ test("mandatory opponent assignment still requires agreement on time and club ap
   assert.equal(s.matches.length, 1);
   assert.equal(s.results.length, 0);
 });
+
+function assignedFixture() {
+  const s = fixture();
+  s.settings[0].weeklyMandatoryChallenges = true;
+  s.courts = [{ _id: "court", name: "Campo 1", active: true }];
+  execute(
+    s,
+    { role: "player", userId: "p3", playerId: "p3" },
+    { type: "challenge.create", defenderId: "p1" },
+    now,
+  );
+  return s;
+}
+function directCommand(s: State) {
+  const c = s.challenges[0];
+  return {
+    type: "admin.match.update",
+    challengeId: c._id,
+    expectedScheduleState: JSON.stringify([
+      c.status,
+      c.scheduledAt ?? null,
+      c.scheduleProposal?._id ?? null,
+    ]),
+    start: "2026-10-27T19:00:00Z",
+    courtId: "court",
+    minutes: 90,
+    note: "Marcação direta pelo clube.",
+  };
+}
+test("admin can directly schedule an assigned challenge without any player proposal or confirmation and notifies all four partners", () => {
+  const s = assignedFixture(),
+    before = structuredClone(s.players);
+  assert.equal(s.slots.length, 0);
+  execute(s, admin, directCommand(s), now + 1000);
+  const c = s.challenges[0];
+  assert.equal(c.status, "scheduled");
+  assert.equal(c.scheduledAt, "2026-10-27T19:00:00Z");
+  assert.equal(c.scheduleProposal, undefined);
+  assert.equal(s.matches.length, 1);
+  assert.equal(s.slots.length, 0);
+  assert.deepEqual(s.players, before);
+  assert.equal(s.results.length, 0);
+  for (const id of ["p1", "p2", "p3", "p4"])
+    assert.equal(
+      s.notifications.filter(
+        (n) => n.playerId === id && n.title === "Jogo marcado ✅",
+      ).length,
+      1,
+    );
+  const audit = s.audit.find((a) => a.action === "admin.match.updated")!;
+  assert.equal(JSON.parse(audit.details).directScheduling, true);
+});
+test("direct scheduling remains admin-only and blocks stale concurrent confirmation or duplicate notifications", () => {
+  const s = assignedFixture(),
+    cmd = directCommand(s),
+    before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(s, { role: "player", userId: "p3", playerId: "p3" }, cmd, now),
+    /administrador/,
+  );
+  assert.deepEqual(s, before);
+  execute(s, admin, cmd, now + 1000);
+  const after = structuredClone(s);
+  assert.throws(() => execute(s, admin, cmd, now + 2000), /alterado/);
+  assert.deepEqual(s, after);
+});
+test("direct scheduling respects court conflicts, all partners absences, active membership and deferred dates", () => {
+  const absent = assignedFixture();
+  absent.exceptions = [
+    {
+      _id: "absence",
+      playerId: "p2",
+      from: "2026-10-27",
+      to: "2026-10-27",
+      note: "Ausência",
+      vacation: true,
+    },
+  ];
+  assert.throws(
+    () => execute(absent, admin, directCommand(absent), now),
+    /indisponível/,
+  );
+  assert.equal(absent.matches.length, 0);
+  const inactive = assignedFixture();
+  inactive.players[1].status = "suspended";
+  assert.throws(
+    () => execute(inactive, admin, directCommand(inactive), now),
+    /ativos/,
+  );
+  const frozen = assignedFixture();
+  frozen.challenges[0].deferredUntil = "2026-11-16";
+  assert.throws(
+    () => execute(frozen, admin, directCommand(frozen), now),
+    /regresso/,
+  );
+  const conflict = assignedFixture();
+  execute(
+    conflict,
+    { role: "player", userId: "p7", playerId: "p7" },
+    { type: "challenge.create", defenderId: "p5" },
+    now,
+  );
+  conflict.challenges[1].status = "scheduled";
+  conflict.matches = [
+    {
+      _id: "other-match",
+      challengeId: conflict.challenges[1]._id,
+      courtId: "court",
+      start: "2026-10-27T19:00:00Z",
+      end: "2026-10-27T20:30:00Z",
+      seasonId: "season",
+    },
+  ];
+  assert.throws(
+    () => execute(conflict, admin, directCommand(conflict), now),
+    /campo já reservado/,
+  );
+  assert.equal(conflict.challenges[0].status, "accepted");
+});
+test("direct scheduling does not bypass pending opponent assignment or approved managed-round publication", () => {
+  const s = assignedFixture();
+  s.challenges[0].status = "pending";
+  assert.throws(() => execute(s, admin, directCommand(s), now), /atribuído/);
+  s.challenges[0].status = "accepted";
+  s.challenges[0].competitionRoundId = "managed";
+  assert.throws(
+    () => execute(s, admin, directCommand(s), now),
+    /revisão aprovada/,
+  );
+});

@@ -315,6 +315,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("admin.match.update"),
     challengeId: id,
+    expectedScheduleState: z.string().max(2000).optional(),
     start: date,
     courtId: id,
     minutes: z.number().int().min(15).max(240),
@@ -3643,10 +3644,38 @@ export function execute(
     case "admin.match.update": {
       const c = challenge(cmd.challengeId);
       ensure(
-        ["scheduled", "schedule_pending", "completed"].includes(c.status),
-        "Só podes editar jogos marcados, concluídos ou a aguardar confirmação.",
+        ["accepted", "scheduled", "schedule_pending", "completed"].includes(
+          c.status,
+        ),
+        "O desafio deve estar atribuído antes de marcar o jogo.",
       );
-      const before = { ...c };
+      const direct = c.status === "accepted" || c.status === "schedule_pending";
+      ensure(
+        (c.status !== "accepted" || cmd.expectedScheduleState !== undefined) &&
+          (cmd.expectedScheduleState === undefined ||
+            cmd.expectedScheduleState ===
+              JSON.stringify([
+                c.status,
+                c.scheduledAt ?? null,
+                c.scheduleProposal?._id ?? null,
+              ])),
+        "O desafio ou horário foi alterado. Atualiza antes de confirmar.",
+        409,
+      );
+      if (direct) {
+        season();
+        ensure(
+          effectiveStatus(c, timestamp) !== "expired",
+          "O prazo expirou. Prolonga-o antes de marcar.",
+        );
+        for (const pid of challengeParticipants(c, s.players))
+          ensure(
+            player(pid).status === "active" &&
+              player(pid).divisionId === c.divisionId,
+            "Os participantes devem estar ativos na divisão do desafio.",
+          );
+      }
+      const before = structuredClone(c);
       schedule(
         c,
         cmd.start,
@@ -3657,11 +3686,14 @@ export function execute(
         c.status === "completed",
       );
       delete c.scheduleProposal;
+      if (direct) closeIncompatibleQueue(c);
       log("admin.match.updated", {
         challengeId: c._id,
         before,
         after: { ...c },
         note: cmd.note,
+        directScheduling: direct,
+        playerTimeConfirmationRequired: direct ? false : undefined,
       });
       break;
     }

@@ -2830,7 +2830,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
               </div>
             </>
           )}
-          {!terminal.has(c.status) && (
+          {c.status === "pending" && (
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -2843,7 +2843,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                     courtId: f.get("courtId"),
                     minutes: Number(f.get("minutes")),
                   },
-                  "Jogo marcado pelo administrador.",
+                  "Horário proposto pelo clube. A aguardar confirmações.",
                 );
               }}
             >
@@ -3778,11 +3778,16 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
   const { s, c, run, busy, notify } = a;
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [expectedScheduleState, setExpectedScheduleState] = useState("");
   const [deleting, setDeleting] = useState(false);
   if (s.actor.role !== "admin") return null;
-  const editable = ["scheduled", "schedule_pending", "completed"].includes(
-    c.status,
-  );
+  const direct = c.status === "accepted" || c.status === "schedule_pending";
+  const editable = [
+    "accepted",
+    "scheduled",
+    "schedule_pending",
+    "completed",
+  ].includes(c.status);
   const start = c.scheduleProposal?.start ?? c.scheduledAt;
   const localStart = start
     ? new Date(Date.parse(start) - new Date(start).getTimezoneOffset() * 60000)
@@ -3793,7 +3798,22 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
     <div className="stack space-top">
       <CourtPaymentDetails s={s} c={c} run={run} busy={busy} />
       {editable && (
-        <button onClick={() => setEditing(true)}>Editar jogo</button>
+        <button
+          className={direct ? "primary" : undefined}
+          disabled={busy}
+          onClick={() => {
+            setExpectedScheduleState(
+              JSON.stringify([
+                c.status,
+                c.scheduledAt ?? null,
+                c.scheduleProposal?._id ?? null,
+              ]),
+            );
+            setEditing(true);
+          }}
+        >
+          {direct ? "Marcar e confirmar jogo" : "Editar jogo"}
+        </button>
       )}
       <button
         className="danger"
@@ -3864,7 +3884,10 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
         </Modal>
       )}
       {editing && (
-        <Modal title="Editar jogo" close={() => setEditing(false)}>
+        <Modal
+          title={direct ? "Marcar e confirmar jogo" : "Editar jogo"}
+          close={() => setEditing(false)}
+        >
           <form
             onSubmit={async (event) => {
               event.preventDefault();
@@ -3873,19 +3896,23 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
                 {
                   type: "admin.match.update",
                   challengeId: c._id,
+                  expectedScheduleState,
                   start: new Date(String(data.get("start"))).toISOString(),
                   courtId: data.get("courtId"),
                   minutes: Number(data.get("minutes")),
                   note: data.get("note"),
                 },
-                "Jogo atualizado. Os jogadores foram notificados.",
+                direct
+                  ? "Jogo marcado e confirmado pelo clube. As duas duplas foram notificadas."
+                  : "Jogo atualizado. As duas duplas foram notificadas.",
               );
               if (result) setEditing(false);
             }}
           >
             <p>
-              O clube confirma a alteração diretamente e avisa os dois
-              jogadores.
+              {direct
+                ? "Define o dia, a hora e o campo. O clube marca e confirma o jogo diretamente, mesmo sem propostas ou confirmações dos jogadores. Todos os membros das duas duplas são notificados."
+                : "O clube confirma a alteração diretamente e avisa os membros das duas duplas."}
             </p>
             <label>
               Data e hora
@@ -3927,11 +3954,19 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
               />
             </label>
             <label>
-              Motivo da alteração
-              <textarea name="note" minLength={3} maxLength={2000} required />
+              {direct ? "Nota da marcação" : "Motivo da alteração"}
+              <textarea
+                name="note"
+                defaultValue={direct ? "Marcação direta pelo clube." : ""}
+                minLength={3}
+                maxLength={2000}
+                required
+              />
             </label>
             <button className="primary" disabled={busy}>
-              Guardar alterações
+              {direct
+                ? "Confirmar marcação e notificar duplas"
+                : "Guardar alterações"}
             </button>
           </form>
         </Modal>

@@ -3,6 +3,15 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Direct administrator scheduling prepared — 25 October 2026
+
+- User requested direct confirmation inside each assigned challenge, even without player time proposals, including the game time. Extended existing admin.match.update and its challenge-page form instead of introducing a parallel scheduling path.
+- Assigned/accepted and schedule_pending challenges expose **Marcar e confirmar jogo**. Admin chooses date/start time, court and duration, reviews an editable note and confirms. No availability slots or player confirmations are fabricated. Existing schedule helper validates future time, challenge deadline/week/deferral, all partners' absences, active participants and court/player conflicts, creates the official booking and notifies all team members. Prior proposal and administrative reason are retained in audit, then stale proposal removed.
+- New accepted-to-scheduled transition requires a matching expectedScheduleState. Form captures status/start/proposal ID when opened, so another admin's intervening scheduling/proposal change blocks submission without duplicate booking/notices. Players cannot call the admin command; pending opponent assignments and managed matches requiring approved/published revisions remain blocked. Ordinary player scheduling still requires bilateral agreement and configured club confirmation.
+- Removed misleading club-proposal form for assigned challenges; it remains available only for pending requests and correctly says it proposes rather than confirms. Existing scheduled/completed game editing is preserved.
+- Verification: typecheck, all 329 tests and production build pass. New browser scenario passes (5.3s): open assigned challenge with no proposals, enter date + 19:30 + court + 90 minutes, confirm and verify scheduled booking with no fabricated proposal/slots. Added a separate fresh-demo CI step for this scenario. First browser attempt used an exact label locator unsuitable for the select's nested option text; fixed to use its combobox role, with no app workaround.
+- This extension is committed locally only and has not been pushed/deployed. Production remains the verified 91ec8bf release, mandatory challenge rule enabled. No real game time/booking or notification was created as part of this development/testing.
+
 ## Mandatory challenges deployed and notices clarified — 25 October 2026
 
 - User explicitly authorized deployment. Pushed validated revision 91ec8bf90cb719d2fd77c5740d7a6f3214f18286 to deploy. Release 40184670182 passed all CI unit/type/build/browser checks and Raspberry Pi deployment. Verified .deployed-revision matches, public health OK, app healthy, worker running, zero restarts, both image sha256:05a83588232df152233577e2a7d0a98baf4cf83b4392cc9d720af54dc3ef6b29.
