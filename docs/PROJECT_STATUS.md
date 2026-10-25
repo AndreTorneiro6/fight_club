@@ -3,6 +3,14 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Prepared challenge reconciliation — 25 October 2026 — DO NOT DEPLOY/APPLY
+
+- User explicitly requested implementation, testing and an operation report only. Do not deploy, apply cancellations or send notices until a later explicit instruction. This restriction supersedes earlier deployment authorization for this work.
+- Local branch `feature/challenge-reconciliation`. Added deterministic, file-only preview tool and admin domain preview/apply commands. No new job, startup hook or automatic deployment action. Future apply uses existing Mongo transaction, a reviewed fingerprint, unique operation ID, explicit confirmation/reason, server admin authorization and notification deduplication.
+- One-off policy: retain earliest submission across both sides/members of each team; propose cancelling later incompatible pending requests, including queued requests. Ongoing pending-queue/priority rotation behavior is unchanged. Protected later commitments or ambiguous membership block application for manual review.
+- Fresh sanitized production read and in-memory application simulate 8 retained (#1, #2, #3, #5, #7, #8, #10, #12), 5 cancellations (#6→#2, #9→#7, #11→#10, #13→#10, #14→#3), zero protected conflicts, 66 player notice drafts plus one admin summary. Existing cancelled #4 stays closed. #1 remains accepted, #12 keeps its proposed schedule. No production writes/notification sends occurred.
+- 310 tests, typecheck and build pass, including Mongo replica concurrency/idempotency. Read-only production marker remains bfb291778e413ec65741334288d7957aa3c0ab4c; no deployment was triggered. See docs/CHALLENGE-RECONCILIATION.md and docs/reports/challenge-reconciliation-2026-10-26.md. Refresh the plan before any authorized application because live data may change.
+
 ## Team competition corrections — phase 2, 25 October 2026
 
 - Separate follow-up to the ranking/title delivery. Applies to every team and all three divisions; there is no name- or account-specific logic.

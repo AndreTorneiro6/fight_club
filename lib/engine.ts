@@ -1,3 +1,4 @@
+import { planChallengeReconciliation } from "./challenge-reconciliation";
 import {
   teamPosition,
   challengeSide,
@@ -149,6 +150,24 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.challenges.reconciliation.preview"),
+    seasonId: id,
+    weekStart: day,
+    divisionId: id.optional(),
+  }),
+  z.object({
+    type: z.literal("admin.challenges.reconciliation.apply"),
+    seasonId: id,
+    weekStart: day,
+    divisionId: id.optional(),
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    operationId: id,
+    reason: text.min(10),
+    confirmation: z.literal("RECONCILIAR"),
+    notifyPlayers: z.literal(true),
+  }),
+
   z.object({
     type: z.literal("admin.week.opening.set"),
     weekStart: day,
@@ -1426,6 +1445,107 @@ export function execute(
     );
 
   switch (cmd.type) {
+    case "admin.challenges.reconciliation.preview": {
+      ensure(
+        s.seasons.some((x) => x._id === cmd.seasonId),
+        "Época inexistente.",
+      );
+      ensure(
+        clubWeek(cmd.weekStart).start === cmd.weekStart,
+        "Escolhe a segunda-feira da jornada.",
+      );
+      ensure(
+        !cmd.divisionId || s.divisions.some((d) => d._id === cmd.divisionId),
+        "Divisão inexistente.",
+      );
+      return planChallengeReconciliation(s, cmd, timestamp);
+    }
+    case "admin.challenges.reconciliation.apply": {
+      const prior = s.audit.find(
+        (a) =>
+          a.action === "challenge.reconciliation.applied" &&
+          JSON.parse(a.details).operationId === cmd.operationId,
+      );
+      if (prior) {
+        const saved = JSON.parse(prior.details);
+        ensure(
+          saved.fingerprint === cmd.fingerprint &&
+            saved.seasonId === cmd.seasonId &&
+            saved.weekStart === cmd.weekStart &&
+            saved.divisionId === cmd.divisionId,
+          "Identificador da operação já utilizado com outro plano.",
+          409,
+        );
+        return { alreadyApplied: true, ...saved.summary };
+      }
+      ensure(
+        s.seasons.some((x) => x._id === cmd.seasonId),
+        "Época inexistente.",
+      );
+      ensure(
+        clubWeek(cmd.weekStart).start === cmd.weekStart,
+        "Escolhe a segunda-feira da jornada.",
+      );
+      ensure(
+        !cmd.divisionId || s.divisions.some((d) => d._id === cmd.divisionId),
+        "Divisão inexistente.",
+      );
+      const plan = planChallengeReconciliation(s, cmd, timestamp);
+      ensure(
+        plan.fingerprint === cmd.fingerprint,
+        "Os desafios mudaram. Gera e revê uma nova simulação antes de aplicar.",
+        409,
+      );
+      ensure(
+        plan.canApply,
+        "Existem compromissos protegidos ou identidades por resolver. Nenhum desafio foi alterado.",
+        409,
+      );
+      for (const row of plan.cancelled) {
+        const c = challenge(row.id);
+        c.status = "cancelled";
+        c.queueClosedByChallengeId = row.retainedId;
+        c.queueClosureReason = row.reason;
+        log("challenge.reconciliation.cancelled", {
+          operationId: cmd.operationId,
+          challengeId: c._id,
+          retainedChallengeId: row.retainedId,
+          reason: cmd.reason,
+          explanation: row.reason,
+        });
+      }
+      for (const draft of plan.notificationDrafts)
+        notify(
+          draft.playerId,
+          draft.title,
+          draft.body,
+          draft.challengeId,
+          `challenge-reconciliation:${cmd.operationId}:${draft.playerId}`,
+          { kind: "update", deliveryChannels: ["push"] },
+        );
+      const summary = {
+        retained: plan.kept.length,
+        cancelled: plan.cancelled.length,
+        notified: plan.notificationDrafts.length,
+      };
+      log("challenge.reconciliation.applied", {
+        operationId: cmd.operationId,
+        fingerprint: cmd.fingerprint,
+        seasonId: cmd.seasonId,
+        weekStart: cmd.weekStart,
+        divisionId: cmd.divisionId,
+        reason: cmd.reason,
+        policy: plan.policy,
+        summary,
+      });
+      notifyAdmins(
+        "Revisão dos desafios por dupla",
+        `${summary.retained} mantidos; ${summary.cancelled} cancelados; ${summary.notified} jogadores avisados.`,
+        undefined,
+        `challenge-reconciliation-admin:${cmd.operationId}`,
+      );
+      return { alreadyApplied: false, ...summary };
+    }
     case "admin.ranking.move": {
       const source = player(cmd.playerId),
         target = player(cmd.targetPlayerId);
