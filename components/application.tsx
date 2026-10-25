@@ -2309,6 +2309,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
             {!terminal.has(c.status) &&
               (admin ||
                 (mine &&
+                  !c.mandatoryAssignment &&
                   s.settings[0].cancellationRule === "participants")) && (
                 <button
                   className="ghost small space-top"
@@ -5248,6 +5249,8 @@ const settingLabels: Record<
   string
 > = {
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
+  weeklyMandatoryChallenges:
+    "Desafios semanais obrigatórios · combinar apenas horário",
   autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
   roleDraftLeadDays: "Antecedência dos rascunhos de papéis · dias",
   autoWeeklyRanking: "Publicar e notificar o resumo do ranking automaticamente",
@@ -5280,6 +5283,7 @@ const settingLabels: Record<
 };
 function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState({
+    weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
     autoWeeklyRanking: true,
@@ -5288,6 +5292,7 @@ function Rules({ s, run, busy }: Actions) {
     ...s.settings[0],
   });
   const incomingSettings = JSON.stringify({
+    weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
     autoWeeklyRanking: true,
@@ -6178,7 +6183,10 @@ function ChallengeComposer(
               },
               include
                 ? "Desafio enviado com as tuas propostas."
-                : "Desafio enviado. Os horários são combinados após a aceitação.",
+                : s.settings[0].weeklyCompetition &&
+                    s.settings[0].weeklyMandatoryChallenges
+                  ? "Adversário definido. Combinem o horário."
+                  : "Desafio enviado. Os horários são combinados após a aceitação.",
             );
             if (res?.id) {
               close();
@@ -6200,10 +6208,17 @@ function ChallengeComposer(
           </span>
         </div>
         <p style={{ fontSize: 12 }}>
-          Envia o desafio primeiro. O adversário tem {s.settings[0].acceptHours}{" "}
-          horas para aceitar. Depois da aceitação, as duas duplas combinam o
-          horário e o clube confirma o jogo. Se preferires, podes propor
-          horários já.
+          {s.settings[0].weeklyCompetition &&
+          s.settings[0].weeklyMandatoryChallenges ? (
+            "O desafio válido define logo o adversário: não há aceitação nem recusa. As duas duplas combinam o horário e o clube confirma o jogo. Podes propor horários já."
+          ) : (
+            <>
+              Envia o desafio primeiro. O adversário tem{" "}
+              {s.settings[0].acceptHours} horas para aceitar. Depois da
+              aceitação, as duas duplas combinam o horário e o clube confirma o
+              jogo. Se preferires, podes propor horários já.
+            </>
+          )}
         </p>
         {weeklyWindowValue && (
           <p className="inset">
@@ -6512,7 +6527,9 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Prazos",
-      `${rules.acceptHours} horas para aceitar, ${rules.scheduleDays} dias para marcar após a aceitação e ${rules.playDays} dias para jogar após a criação.`,
+      rules.weeklyCompetition && rules.weeklyMandatoryChallenges
+        ? "Não é necessário aceitar o adversário. O prazo para combinar e jogar é apresentado no desafio da jornada."
+        : `${rules.acceptHours} horas para aceitar, ${rules.scheduleDays} dias para marcar após a aceitação e ${rules.playDays} dias para jogar após a criação.`,
     ],
     [
       "Marcação",
@@ -6526,11 +6543,13 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Recusas",
-      rules.refusalRule === "busy_only"
-        ? "Só podes recusar quando já tens outro desafio aceite ou ativo."
-        : rules.refusalRule === "forfeit"
-          ? "A recusa dá derrota, exceto por lesão."
-          : "Podes recusar indicando um motivo. O administrador é notificado.",
+      rules.weeklyCompetition && rules.weeklyMandatoryChallenges
+        ? "Os desafios válidos são obrigatórios. Apenas a organização pode cancelar um confronto; as duplas combinam o horário."
+        : rules.refusalRule === "busy_only"
+          ? "Só podes recusar quando já tens outro desafio aceite ou ativo."
+          : rules.refusalRule === "forfeit"
+            ? "A recusa dá derrota, exceto por lesão."
+            : "Podes recusar indicando um motivo. O administrador é notificado.",
     ],
     [
       "Cancelamentos",

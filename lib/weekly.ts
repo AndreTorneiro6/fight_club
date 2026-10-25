@@ -395,6 +395,8 @@ export function weeklyTeamCommitment(
 export function weeklyTeamCommitmentMessage(c: Challenge) {
   if (c.status === "pending")
     return "A tua dupla já enviou um desafio nesta jornada. Aguarda a resposta do adversário; podes continuar a propor horários nesse desafio.";
+  if (c.status === "accepted" && c.mandatoryAssignment)
+    return "O adversário da tua dupla já está definido nesta jornada. Combina os dias e horários no desafio da dupla.";
   if (c.status === "accepted")
     return "A tua dupla já tem um desafio aceite nesta jornada. Combina os dias e horários no desafio da dupla.";
   if (c.status === "schedule_pending")

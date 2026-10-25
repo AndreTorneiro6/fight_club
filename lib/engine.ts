@@ -1,3 +1,4 @@
+import { pauseWeeklyChallenges } from "./weekly-challenge-hold";
 import { planChallengeReconciliation } from "./challenge-reconciliation";
 import {
   teamPosition,
@@ -117,6 +118,7 @@ const playerFields = {
 };
 export const settingsSchema = z.object({
   weeklyCompetition: z.boolean().default(false),
+  weeklyMandatoryChallenges: z.boolean().optional(),
   autoWeeklyRoles: z.boolean().optional(),
   roleDraftLeadDays: z.number().int().min(0).max(28).optional(),
   autoWeeklyRanking: z.boolean().optional(),
@@ -150,6 +152,14 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.week.challenges.pause"),
+    weekStart: day,
+    divisionIds: z.array(id).min(1).max(10),
+    expectedVersion: z.number().int().min(0),
+    operationId: id,
+    reason: text.min(10),
+  }),
   z.object({
     type: z.literal("admin.challenges.reconciliation.preview"),
     seasonId: id,
@@ -1445,6 +1455,8 @@ export function execute(
     );
 
   switch (cmd.type) {
+    case "admin.week.challenges.pause":
+      return pauseWeeklyChallenges(s, actor, cmd, timestamp);
     case "admin.challenges.reconciliation.preview": {
       ensure(
         s.seasons.some((x) => x._id === cmd.seasonId),
@@ -2067,7 +2079,26 @@ export function execute(
           );
         }
       }
+      if (rules.weeklyCompetition && rules.weeklyMandatoryChallenges) {
+        // Include the candidate only in the priority projection until all guards pass.
+        const priority = weeklyChallengePriority(
+          { ...s, challenges: [...s.challenges, c] },
+          c,
+          timestamp,
+        );
+        ensure(
+          priority.eligible,
+          "Existe um desafio anterior com prioridade. A organização tem de resolver a fila antes de atribuir outro adversário.",
+          409,
+        );
+        c.status = "accepted";
+        c.mandatoryAssignment = true;
+        c.weeklyPriorityWinner = true;
+        c.weeklyPriorityReason = priority.reason;
+        c.scheduleBy = c.playBy;
+      }
       s.challenges.push(c);
+      if (c.mandatoryAssignment) closeIncompatibleQueue(c);
       if (cmd.initialSlots)
         s.slots.push(
           ...cmd.initialSlots.map((slot) => ({
@@ -2078,46 +2109,67 @@ export function execute(
             ...slot,
           })),
         );
-      for (const member of c.defenderTeam ?? [{ playerId: d._id }])
-        notify(
-          member.playerId,
-          `🥊 ${teamMembers(s.players, p._id)
+      if (c.mandatoryAssignment) {
+        for (const pid of challengeParticipants(c, s.players))
+          notify(
+            pid,
+            "🥊 Adversário da jornada definido",
+            "O desafio é obrigatório. As duas duplas devem combinar o horário; não é necessário aceitar ou recusar o adversário. O clube confirma a marcação conforme as regras.",
+            c._id,
+            `mandatory-challenge:${c._id}:${pid}`,
+            { deliveryChannels: ["push"], kind: "challenge" },
+          );
+        notifyAdmins(
+          "Confronto obrigatório atribuído",
+          `Desafio #${c.number}: adversário definido, a aguardar combinação do horário.`,
+          c._id,
+        );
+        log("challenge.automatically-assigned", {
+          challengeId: c._id,
+          priorityReason: c.weeklyPriorityReason,
+        });
+      } else {
+        for (const member of c.defenderTeam ?? [{ playerId: d._id }])
+          notify(
+            member.playerId,
+            `🥊 ${teamMembers(s.players, p._id)
+              .map((m) => m.name)
+              .join(" + ")} desafiou a tua dupla`,
+            `Tens ${responseWindowText(c.createdAt, c.respondBy)} para aceitar ou recusar o desafio. Prazo: ${responseDeadlineText(c.respondBy)} (Portugal).`,
+            c._id,
+            `challenge-received:${c._id}:${member.playerId}`,
+            { deliveryChannels: ["push"] },
+          );
+        for (const pid of challengeMemberIds(c, "attack", s.players))
+          notify(
+            pid,
+            "🥊 A tua dupla enviou um desafio",
+            `A tua dupla desafiou ${teamMembers(s.players, d._id)
+              .map((m) => m.name)
+              .join(
+                " + ",
+              )}. Aguarda resposta até ${responseDeadlineText(c.respondBy)} (Portugal).`,
+            c._id,
+            `challenge-sent:${c._id}:${pid}`,
+            { deliveryChannels: ["push"] },
+          );
+        notifyAdmins(
+          "Novo desafio",
+          `${teamMembers(s.players, p._id)
             .map((m) => m.name)
-            .join(" + ")} desafiou a tua dupla`,
-          `Tens ${responseWindowText(c.createdAt, c.respondBy)} para aceitar ou recusar o desafio. Prazo: ${responseDeadlineText(c.respondBy)} (Portugal).`,
-          c._id,
-          `challenge-received:${c._id}:${member.playerId}`,
-          { deliveryChannels: ["push"] },
-        );
-      for (const pid of challengeMemberIds(c, "attack", s.players))
-        notify(
-          pid,
-          "🥊 A tua dupla enviou um desafio",
-          `A tua dupla desafiou ${teamMembers(s.players, d._id)
+            .join(" + ")} desafiou ${teamMembers(s.players, d._id)
             .map((m) => m.name)
-            .join(
-              " + ",
-            )}. Aguarda resposta até ${responseDeadlineText(c.respondBy)} (Portugal).`,
-          c._id,
-          `challenge-sent:${c._id}:${pid}`,
-          { deliveryChannels: ["push"] },
-        );
-      notifyAdmins(
-        "Novo desafio",
-        `${teamMembers(s.players, p._id)
-          .map((m) => m.name)
-          .join(" + ")} desafiou ${teamMembers(s.players, d._id)
-          .map((m) => m.name)
-          .join(" + ")}. Desafio #${c.number}.`,
-        c._id,
-      );
-      if (cmd.type === "admin.challenge.create")
-        notify(
-          p._id,
-          "Ataque atribuído pelo administrador",
-          `Vais desafiar ${d.name}.`,
+            .join(" + ")}. Desafio #${c.number}.`,
           c._id,
         );
+        if (cmd.type === "admin.challenge.create")
+          notify(
+            p._id,
+            "Ataque atribuído pelo administrador",
+            `Vais desafiar ${d.name}.`,
+            c._id,
+          );
+      }
       log(
         cmd.type === "admin.challenge.create"
           ? "admin.challenge.created"
@@ -2410,7 +2462,8 @@ export function execute(
       participant(c);
       ensure(!terminal.has(c.status), "Desafio já encerrado.");
       ensure(
-        admin || rules.cancellationRule === "participants",
+        admin ||
+          (!c.mandatoryAssignment && rules.cancellationRule === "participants"),
         "Só o administrador pode cancelar desafios.",
       );
       c.status = "cancelled";

@@ -86,6 +86,7 @@ export interface Division extends Entity {
 }
 export interface Settings extends Entity {
   weeklyCompetition: boolean;
+  weeklyMandatoryChallenges?: boolean;
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
   autoWeeklyRanking?: boolean;
@@ -127,6 +128,7 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  mandatoryAssignment?: boolean;
   challengerTeamId?: string;
   defenderTeamId?: string;
   positionSnapshotModel?: "team";
@@ -461,6 +463,7 @@ export interface View extends State {
 
 export const defaultSettings: Settings = {
   weeklyCompetition: false,
+  weeklyMandatoryChallenges: false,
   autoWeeklyRoles: true,
   roleDraftLeadDays: 7,
   autoWeeklyRanking: true,
