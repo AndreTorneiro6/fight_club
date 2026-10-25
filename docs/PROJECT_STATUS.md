@@ -3,6 +3,12 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Admin UX/UI deployed — 25 October 2026
+
+- User explicitly authorized deployment for admin. Published1666c474d9f53fbe614df3bbc8920ec7ca03e600 through deploy workflow40230754862; checks and Pi deployment succeeded. Typecheck,361 tests, production build and all required browser groups passed, including the new isolated overview/navigation/mobile scenario.
+- Live deployed revision matches; app healthy, worker running, zero restarts, both image sha256:6215572f7ae46bfd338751f9e8c58d7bbd9dbf315e67878225b6e74ce09f8d70. Public health ok. DNS lookup from recreated worker to FCM passes, retaining previous egress fix.
+- New decision-first admin overview, weekly status, compact daily navigation and searchable secondary tools are live. No operational competition mutation or notification replay performed by deployment. Prepared entry below is historical.
+
 ## Admin UX/UI first pass prepared locally — 25 October 2026
 
 - User requested admin UX hierarchy improvements. Replaced duplicated dashboard totals/task cards with decision queue (club-confirmed proposals, results, disputes, current selected-week overdue items, registrations), direct challenge review links, weekly division publication/opening status and four always-open league totals. Zero-count task cards omitted; historic expirations no longer flood overview. Scheduling/approval/domain actions unchanged.
