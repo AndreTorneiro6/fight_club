@@ -239,7 +239,7 @@ test("partner sees the same private challenge and can accept and arrange time fo
       secondCalendar.match(/UID:[^\r\n]+/)?.[0],
     );
     for (const member of c.defenderTeam)
-      expect(firstCalendar).toContain(member.name);
+      expect(firstCalendar.replace(/\r\n[ \t]/g, "")).toContain(member.name);
   } finally {
     await ctx.close();
     await defctx.close();
