@@ -91,6 +91,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check Bronze distance and dynamic team role assignments
+        run: npx playwright test e2e/dynamic-weekly.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check player league agenda and season first-week navigation
         run: npx playwright test e2e/player-agenda.spec.ts
         env:

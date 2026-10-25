@@ -1,4 +1,5 @@
 "use client";
+import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
 import { useEffect, useState } from "react";
@@ -43,8 +44,9 @@ function PreviousWeekRole({
     team
       .map(
         (member) =>
-          previous.assignments.find((entry) => entry.playerId === member._id)
-            ?.role,
+          (previous.dynamicAssignments ?? previous.assignments).find(
+            (entry) => entry.playerId === member._id,
+          )?.role,
       )
       .filter(Boolean),
   );
@@ -181,7 +183,14 @@ export function WeeklyRoles({
   const [weekType, setWeekType] = useState<"NORMAL" | "OPEN_ATTACK">("NORMAL");
   const [division, setDivision] = useState(admin ? "all" : me.divisionId);
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
-  const saved = JSON.stringify(round?.assignments ?? []);
+  const saved = JSON.stringify(
+    round?.assignments.map((entry) => ({
+      ...entry,
+      role: round.publishedAt
+        ? (weeklyRole(s, entry.playerId, Date.now(), week) ?? entry.role)
+        : entry.role,
+    })) ?? [],
+  );
   const [roles, setRoles] = useState<Record<string, "attack" | "defense">>({});
   useEffect(() => {
     setRoles(
@@ -268,7 +277,9 @@ export function WeeklyRoles({
           {rankingEntries(s.players, me.divisionId).findIndex((t) =>
             t.members.some((m) => m._id === me._id),
           ) + 1}{" "}
-          · Distância máxima: {s.settings[0].maxPositionsAbove} posições.
+          · Distância máxima:{" "}
+          {challengeDistance(s, division === "all" ? me.divisionId : division)}{" "}
+          posições.
         </p>
       )}
       {admin && (

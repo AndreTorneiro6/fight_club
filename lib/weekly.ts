@@ -1,3 +1,8 @@
+import {
+  dynamicWeeklyEnabled,
+  dynamicRole,
+  dynamicTargetReason,
+} from "./dynamic-weekly";
 import { firstCompetitionWeek } from "./competition-calendar";
 import { challengeMemberIds, challengeSide } from "./team-competition";
 import { rankingEntries, teamMembers } from "./ranking-groups";
@@ -67,8 +72,16 @@ export function weeklyRole(
   weekStart = weeklyChallengeWeek(s, now),
 ) {
   const round = s.weeklyRounds.find((entry) => entry.weekStart === weekStart);
+  if (round?.publishedAt && dynamicWeeklyEnabled(s))
+    return (
+      dynamicRole(s, playerId, weekStart) ??
+      round.dynamicAssignments?.find((e) => e.playerId === playerId)?.role ??
+      round.assignments.find((e) => e.playerId === playerId)?.role
+    );
   return round?.publishedAt
-    ? round.assignments.find((entry) => entry.playerId === playerId)?.role
+    ? (round.dynamicAssignments ?? round.assignments).find(
+        (entry) => entry.playerId === playerId,
+      )?.role
     : undefined;
 }
 export function weeklyReason(
@@ -162,6 +175,10 @@ export function weeklyReason(
       return attackingTeam.some((member) => member._id === p._id)
         ? "Já tens um desafio atribuído nesta semana."
         : "Este defensor já tem um desafio nesta semana.";
+  }
+  if (dynamicWeeklyEnabled(s) && !ignoreId) {
+    const reason = dynamicTargetReason(s, attacker._id, defender._id, week);
+    if (reason) return reason;
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { challengeDistance } from "./challenge-distance";
 import { seasonWeek } from "./competition-calendar";
 import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound } from "./types";
@@ -35,6 +36,7 @@ export function weeklyApprovalSnapshot(s: State, r: WeeklyRound) {
       })),
     ),
     distance: s.settings[0].maxPositionsAbove,
+    divisionDistances: s.settings[0].divisionChallengeDistances,
   });
 }
 export function generateWeeklyRoles(
@@ -103,7 +105,7 @@ export function generateWeeklyRoles(
     }));
     const plan = proposeTeamRoles({
       teams,
-      distance: s.settings[0].maxPositionsAbove,
+      distance: challengeDistance(s, d._id),
       champions: [2, 3],
       weekType,
       round: 1,

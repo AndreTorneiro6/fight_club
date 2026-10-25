@@ -1,3 +1,9 @@
+import { challengeDistance } from "./challenge-distance";
+import {
+  dynamicWeeklyEnabled,
+  dynamicWeeklyPlan,
+  dynamicRole,
+} from "./dynamic-weekly";
 import { firstCompetitionWeek } from "./competition-calendar";
 import { validateFirstCompetitionWeek } from "./season-weeks";
 import { pauseWeeklyChallenges } from "./weekly-challenge-hold";
@@ -66,6 +72,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   activeChallenges,
+  LeagueError,
   canRefuse,
   challengeReason,
   effectiveStatus,
@@ -121,6 +128,10 @@ const playerFields = {
 export const settingsSchema = z.object({
   weeklyCompetition: z.boolean().default(false),
   weeklyMandatoryChallenges: z.boolean().optional(),
+  weeklyDynamicRoles: z.boolean().optional(),
+  divisionChallengeDistances: z
+    .record(z.string(), z.number().int().min(1).max(100))
+    .optional(),
   autoWeeklyRoles: z.boolean().optional(),
   roleDraftLeadDays: z.number().int().min(0).max(28).optional(),
   autoWeeklyRanking: z.boolean().optional(),
@@ -2010,6 +2021,7 @@ export function execute(
         })),
         challengerPosition: teamPosition(s.players, p._id),
         positionSnapshotModel: "team",
+        effectiveChallengeDistance: challengeDistance(s, p.divisionId),
         challengerTeamId: teamMembers(s.players, p._id)
           .map((m) => m._id)
           .sort()
@@ -2124,8 +2136,13 @@ export function execute(
         for (const pid of challengeParticipants(c, s.players))
           notify(
             pid,
-            "🥊 Adversário da jornada definido",
-            "O desafio é obrigatório. As duas duplas devem combinar o horário; não é necessário aceitar ou recusar o adversário. O clube confirma a marcação conforme as regras.",
+            actor.userId === "system:weekly-matchmaking"
+              ? "🥊 Adversário atribuído pela prioridade"
+              : "🥊 Adversário da jornada definido",
+            (actor.userId === "system:weekly-matchmaking"
+              ? "Este confronto é necessário para permitir o máximo de jogos após os desafios prioritários. "
+              : "") +
+              "O desafio é obrigatório. As duas duplas devem combinar o horário; não é necessário aceitar ou recusar o adversário. O clube confirma a marcação conforme as regras.",
             c._id,
             `mandatory-challenge:${c._id}:${pid}`,
             { deliveryChannels: ["push"], kind: "challenge" },
@@ -2192,6 +2209,148 @@ export function execute(
           initialSlots: cmd.initialSlots,
         },
       );
+      if (c.mandatoryAssignment && dynamicWeeklyEnabled(s)) {
+        const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
+        for (const forced of plan.forced) {
+          const latest = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
+          if (
+            !latest.forced.some(
+              (p) =>
+                p.attackerKey === forced.attackerKey &&
+                p.defenderKey === forced.defenderKey,
+            )
+          )
+            continue;
+          // A trusted system action applies only a pairing proven necessary by the exact solver.
+          try {
+            const draft = structuredClone(s);
+            const result = execute(
+              draft,
+              {
+                role: "admin",
+                userId: "system:weekly-matchmaking",
+                playerId: actor.playerId,
+              },
+              {
+                type: "admin.challenge.create",
+                weekStart: c.weekStart,
+                challengerId: forced.attackerId,
+                defenderId: forced.defenderId,
+              },
+              timestamp,
+            ) as { id: string };
+            Object.assign(s, draft);
+            log("challenge.forced-by-priority", {
+              challengeId: result.id,
+              triggerChallengeId: c._id,
+              reason:
+                "Emparelhamento necessário em todas as soluções de cobertura máxima",
+              maximumMatches: plan.maximumMatches,
+            });
+          } catch (error) {
+            if (!(error instanceof LeagueError)) throw error;
+            notifyAdmins(
+              "Emparelhamento automático exige revisão",
+              `O desafio prioritário #${c.number} foi preservado. ${error.message}`,
+              c._id,
+              `dynamic-conflict:${c._id}:${forced.attackerKey}:${forced.defenderKey}`,
+            );
+            log("week.dynamic-roles.conflict", {
+              triggerChallengeId: c._id,
+              forced,
+              error: error.message,
+            });
+          }
+        }
+        const finalPlan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
+        const round = s.weeklyRounds.find((r) => r.weekStart === c.weekStart)!;
+        const beforeRoles = round.dynamicAssignments ?? round.assignments;
+        const teamIds = new Set(
+          finalPlan.teams.flatMap((t) => t.members.map((m) => m._id)),
+        );
+        const divisionRoles = finalPlan.teams.flatMap((t) => {
+          const role =
+            dynamicRole(s, t.members[0]._id, c.weekStart!) ??
+            beforeRoles.find((r) => t.members.some((m) => m._id === r.playerId))
+              ?.role ??
+            (finalPlan.teams.indexOf(t) === 0
+              ? ("defense" as const)
+              : ("attack" as const));
+          return t.members.map((m) => ({ playerId: m._id, role }));
+        });
+        const afterRoles = [
+          ...beforeRoles.filter((r) => !teamIds.has(r.playerId)),
+          ...divisionRoles,
+        ];
+        if (
+          JSON.stringify(
+            [...beforeRoles].sort((a, b) =>
+              a.playerId.localeCompare(b.playerId),
+            ),
+          ) !==
+          JSON.stringify(
+            [...afterRoles].sort((a, b) =>
+              a.playerId.localeCompare(b.playerId),
+            ),
+          )
+        ) {
+          round.dynamicAssignments = afterRoles;
+          round.version = (round.version ?? 0) + 1;
+          const fixedPlayers = new Set(
+            finalPlan.fixed
+              .flatMap((p) => [p.attackerKey, p.defenderKey])
+              .flatMap(
+                (key) =>
+                  finalPlan.teams
+                    .find((t) => t.id === key)
+                    ?.members.map((m) => m._id) ?? [],
+              ),
+          );
+          for (const r of divisionRoles)
+            if (
+              !fixedPlayers.has(r.playerId) &&
+              beforeRoles.find((old) => old.playerId === r.playerId)?.role !==
+                r.role
+            )
+              notify(
+                r.playerId,
+                "Papel semanal atualizado",
+                `O teu papel na semana de ${c.weekStart} passou para ${r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
+                undefined,
+                `dynamic-role:${c.weekStart}:${round.version}:${r.playerId}`,
+                { kind: "update", deliveryChannels: ["push"] },
+              );
+          log("week.dynamic-roles.changed", {
+            weekStart: c.weekStart,
+            divisionId: c.divisionId,
+            triggerChallengeId: c._id,
+            before: beforeRoles,
+            after: afterRoles,
+            version: round.version,
+          });
+        }
+        const activeTeams = finalPlan.teams.filter((t) =>
+          t.members.every(
+            (m) =>
+              m.status === "active" &&
+              !m.awaitingApproval &&
+              !m.registrationRejectedAt,
+          ),
+        ).length;
+        if (finalPlan.maximumMatches * 2 < activeTeams)
+          notifyAdmins(
+            "Jornada com duplas sem adversário",
+            `Após preservar o desafio prioritário #${c.number}, as regras permitem no máximo ${finalPlan.maximumMatches} jogos para ${activeTeams} duplas. Revê as ausências e as opções disponíveis.`,
+            c._id,
+            `dynamic-partial:${c.weekStart}:${c.divisionId}:${finalPlan.maximumMatches}`,
+          );
+        log("week.dynamic-roles.updated", {
+          weekStart: c.weekStart,
+          divisionId: c.divisionId,
+          triggerChallengeId: c._id,
+          maximumMatches: plan.maximumMatches,
+        });
+      }
       return { id: c._id };
     }
     case "admin.challenge.assign": {
@@ -2225,7 +2384,7 @@ export function execute(
         defenderRank = teamPosition(s.players, defender._id);
       ensure(
         attackerRank > defenderRank &&
-          attackerRank - defenderRank <= rules.maxPositionsAbove,
+          attackerRank - defenderRank <= challengeDistance(s, c.divisionId),
         "Adversário fora do limite de posições.",
       );
       ensure(
@@ -3450,6 +3609,34 @@ export function execute(
       break;
     }
     case "admin.settings.save": {
+      ensure(
+        !cmd.settings.weeklyDynamicRoles ||
+          (cmd.settings.weeklyCompetition &&
+            cmd.settings.weeklyMandatoryChallenges),
+        "Os papéis dinâmicos exigem competição semanal e desafios obrigatórios.",
+      );
+      if (cmd.settings.weeklyDynamicRoles && !rules.weeklyDynamicRoles)
+        ensure(
+          !s.challenges.some(
+            (c) =>
+              !c.competitionRoundId &&
+              c.status === "pending" &&
+              Date.parse(c.respondBy) > timestamp,
+          ),
+          "Resolve os desafios pendentes antes de ativar os papéis dinâmicos.",
+        );
+      for (const [divisionId, distance] of Object.entries(
+        cmd.settings.divisionChallengeDistances ?? {},
+      )) {
+        ensure(
+          s.divisions.some((d) => d._id === divisionId),
+          "Divisão de distância inválida.",
+        );
+        ensure(
+          distance < rankingEntries(s.players, divisionId).length,
+          "A distância deve ser inferior ao número de duplas da divisão.",
+        );
+      }
       ensure(
         cmd.settings.scheduleDays <= cmd.settings.playDays,
         "O prazo de marcação deve caber no prazo para jogar.",

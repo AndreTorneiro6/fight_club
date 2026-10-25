@@ -8,6 +8,7 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import { challengeDistance } from "@/lib/challenge-distance";
 import { initialAgendaWeek } from "@/lib/game-agenda";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import {
@@ -1716,7 +1717,8 @@ function Rankings(a: Actions) {
             ))}
           </div>
           <small>
-            Podes desafiar até {s.settings[0].maxPositionsAbove} posições acima.
+            Podes desafiar até {challengeDistance(s, p.divisionId)} posições
+            acima.
           </small>
         </div>
         <RankingTable {...a} divisionId={division} />
@@ -5295,10 +5297,19 @@ function PlayerEditor({
 }
 
 const settingLabels: Record<
-  keyof Omit<Settings, "_id" | "rulesText" | "prizes" | "contentVersion">,
+  keyof Omit<
+    Settings,
+    | "_id"
+    | "rulesText"
+    | "prizes"
+    | "contentVersion"
+    | "divisionChallengeDistances"
+  >,
   string
 > = {
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
+  weeklyDynamicRoles:
+    "Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade",
   weeklyMandatoryChallenges:
     "Desafios semanais obrigatórios · combinar apenas horário",
   autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
@@ -5333,6 +5344,8 @@ const settingLabels: Record<
 };
 function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState({
+    weeklyDynamicRoles: false,
+    divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
@@ -5342,6 +5355,8 @@ function Rules({ s, run, busy }: Actions) {
     ...s.settings[0],
   });
   const incomingSettings = JSON.stringify({
+    weeklyDynamicRoles: false,
+    divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
     roleDraftLeadDays: 7,
@@ -5409,6 +5424,29 @@ function Rules({ s, run, busy }: Actions) {
           desafios mantêm-se até uma intervenção do administrador.
         </p>
         <div className="form-grid">
+          {s.divisions.map((d) => (
+            <label key={d._id}>
+              Distância de ataque · {d.name}
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, rankingEntries(s.players, d._id).length - 1)}
+                value={
+                  settings.divisionChallengeDistances?.[d._id] ??
+                  settings.maxPositionsAbove
+                }
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    divisionChallengeDistances: {
+                      ...settings.divisionChallengeDistances,
+                      [d._id]: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+          ))}
           {Object.entries(settingLabels).map(([key, label]) => (
             <label
               key={key}
@@ -6569,7 +6607,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Quem podes desafiar",
-      `Até ${rules.maxPositionsAbove} posições acima, na mesma divisão, com ambos os jogadores ativos.`,
+      `Até ${challengeDistance(s, s.players.find((p) => p._id === s.actor.playerId)!.divisionId)} posições acima, na mesma divisão, com ambas as duplas ativas. As distâncias podem variar por divisão.`,
     ],
     [
       "Desafios em simultâneo",

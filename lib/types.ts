@@ -87,6 +87,8 @@ export interface Division extends Entity {
 export interface Settings extends Entity {
   weeklyCompetition: boolean;
   weeklyMandatoryChallenges?: boolean;
+  weeklyDynamicRoles?: boolean;
+  divisionChallengeDistances?: Record<string, number>;
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
   autoWeeklyRanking?: boolean;
@@ -129,6 +131,7 @@ export interface Prize {
 }
 export interface Challenge extends Entity {
   mandatoryAssignment?: boolean;
+  effectiveChallengeDistance?: number;
   challengerTeamId?: string;
   defenderTeamId?: string;
   positionSnapshotModel?: "team";
@@ -324,6 +327,7 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  dynamicAssignments?: { playerId: string; role: "attack" | "defense" }[];
   challengesOpenAt?: string;
   /** null holds this division until an administrator opens it. */
   divisionChallengeOpenings?: Record<string, string | null>;
@@ -465,6 +469,8 @@ export interface View extends State {
 export const defaultSettings: Settings = {
   weeklyCompetition: false,
   weeklyMandatoryChallenges: false,
+  weeklyDynamicRoles: false,
+  divisionChallengeDistances: {},
   autoWeeklyRoles: true,
   roleDraftLeadDays: 7,
   autoWeeklyRanking: true,

@@ -1,3 +1,4 @@
+import { challengeDistance } from "./challenge-distance";
 import {
   challengeSide,
   challengeMemberIds,
@@ -71,7 +72,7 @@ export function challengeReason(
     aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
     dRank =
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
-  if (dRank >= aRank || aRank - dRank > rules.maxPositionsAbove)
+  if (dRank >= aRank || aRank - dRank > challengeDistance(s, me.divisionId))
     return "Adversário fora do limite de posições.";
   if (dRank === 1 && aRank > rules.titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
