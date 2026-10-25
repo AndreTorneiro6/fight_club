@@ -1,4 +1,5 @@
 "use client";
+import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Download } from "lucide-react";
 import { WeekNavigation } from "./weekly-controls";
@@ -8,7 +9,7 @@ import { renderMatchdayPoster, POSTER_PAGE_SIZE } from "@/lib/matchday-poster";
 import type { View } from "@/lib/types";
 
 export default function MatchdayGenerator({ s }: { s: View }) {
-  const [week, setWeek] = useState(clubWeek().start),
+  const [selectedWeek, setWeek] = useState(() => seasonWeek(s)),
     [division, setDivision] = useState("all"),
     [mode, setMode] = useState<PosterMode>("fixtures"),
     [day, setDay] = useState(""),
@@ -18,6 +19,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
     ),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const week = seasonWeek(s, selectedWeek);
   const allCards = matchdayCards(s, week, division, mode).filter(
     (card) => !day || (card.start && clubDay(card.start) === day),
   );
@@ -71,7 +73,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
     };
   }, [signature]);
   function changeWeek(value: string) {
-    setWeek(value);
+    setWeek(seasonWeek(s, value));
     setDay("");
     setPage(0);
   }
@@ -85,13 +87,18 @@ export default function MatchdayGenerator({ s }: { s: View }) {
           registados são preenchidos automaticamente.
         </p>
       </div>
-      <WeekNavigation week={week} onChange={changeWeek} />
+      <WeekNavigation
+        week={week}
+        onChange={changeWeek}
+        minWeek={firstCompetitionWeek(s)}
+      />
       <div className="form-grid">
         <label>
           Semana do cartaz
           <input
             type="date"
             value={week}
+            min={firstCompetitionWeek(s)}
             onChange={(event) => {
               if (event.target.value)
                 changeWeek(clubWeek(event.target.value).start);

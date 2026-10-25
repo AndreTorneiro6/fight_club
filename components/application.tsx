@@ -8,6 +8,8 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import { initialAgendaWeek } from "@/lib/game-agenda";
+import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import {
   SetScoreFields,
   SetScoreDisplay,
@@ -2885,15 +2887,18 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
 }
 function Games(a: Actions) {
   const { s } = a;
-  const [all, setAll] = useState(s.actor.role === "admin");
-  const [week, setWeek] = useState(clubWeek().start);
+  const [all, setAll] = useState(true);
+  const [selectedWeek, setWeek] = useState(() =>
+    initialAgendaWeek(s.challenges),
+  );
+  const week = seasonWeek(s, selectedWeek);
   const games = s.challenges
     .filter(
       (c) =>
         (c.scheduledAt || c.scheduleProposal) &&
         clubWeek(c.scheduleProposal?.start ?? c.scheduledAt ?? c.createdAt)
           .start === week &&
-        (all || involves(c, s.actor.playerId)) &&
+        (all || involves(c, s.actor.playerId, s.players)) &&
         !["cancelled", "refused", "expired"].includes(c.status),
     )
     .sort((a, b) =>
@@ -2917,7 +2922,11 @@ function Games(a: Actions) {
       <Section title="Disponibilidade dos campos">
         <CourtAvailability revision={JSON.stringify([s.courts, s.matches])} />
       </Section>
-      <WeekNavigation week={week} onChange={setWeek} />
+      <WeekNavigation
+        week={week}
+        onChange={setWeek}
+        minWeek={firstCompetitionWeek(s)}
+      />
       <div className="toolbar">
         <div className="tabs">
           <button
@@ -2943,7 +2952,13 @@ function Games(a: Actions) {
         </div>
       ) : (
         <Section title="Próximos jogos">
-          <Empty text="Ainda não existem jogos marcados." />
+          <Empty
+            text={
+              all
+                ? "Não existem jogos marcados para esta semana. Consulta as outras semanas na agenda."
+                : "A tua dupla não tem jogos marcados nesta semana. Consulta Jogos da liga para ver os outros confrontos."
+            }
+          />
         </Section>
       )}
     </>
@@ -6880,7 +6895,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
       (c.deferredUntil ? c.deferredUntil + "T12:00:00Z" : undefined) ??
       slots.slice().sort((a, b) => a.start.localeCompare(b.start))[0]?.start ??
       new Date().toISOString();
-  const [week, setWeek] = useState(() => clubWeek(anchor).start),
+  const [week, setWeek] = useState(() => seasonWeek(s, anchor)),
     [selected, setSelected] = useState(() => clubDay(anchor)),
     [adding, setAdding] = useState(false);
   const canPropose =
@@ -6992,6 +7007,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
           )}
           <div className="calendar-month">
             <WeekNavigation
+              minWeek={firstCompetitionWeek(s)}
               week={week}
               onChange={(value) => {
                 setWeek(value);

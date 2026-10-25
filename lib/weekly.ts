@@ -1,3 +1,4 @@
+import { firstCompetitionWeek } from "./competition-calendar";
 import { challengeMemberIds, challengeSide } from "./team-competition";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import type { Challenge, Player, State, WeeklyRound } from "./types";
@@ -36,7 +37,7 @@ export function weeklyChallengeWeek(s: State, now = Date.now()) {
   const season =
     s.seasons.find((season) => season.status === "active") ??
     s.seasons.find((season) => season.status === "paused");
-  return s.weeklyRounds.some(
+  const selected = s.weeklyRounds.some(
     (r) =>
       r.weekStart === next &&
       r.publishedAt &&
@@ -45,6 +46,8 @@ export function weeklyChallengeWeek(s: State, now = Date.now()) {
   )
     ? next
     : current;
+  const first = firstCompetitionWeek(s);
+  return first && selected < first ? first : selected;
 }
 export function weeklyOpeningAt(
   round: Pick<WeeklyRound, "challengesOpenAt" | "divisionChallengeOpenings">,

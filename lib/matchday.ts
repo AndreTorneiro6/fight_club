@@ -94,12 +94,19 @@ export function matchdayNumber(state: State, week: string) {
   const season = state.seasons.find(
     (season) => season.start <= clubWeek(week).end && season.end >= week,
   );
-  if (!season) return undefined;
+  if (
+    !season ||
+    (season.firstCompetitionWeek && week < season.firstCompetitionWeek)
+  )
+    return undefined;
   return Math.max(
     1,
     Math.floor(
       (Date.parse(week + "T12:00:00Z") -
-        Date.parse(clubWeek(season.start).start + "T12:00:00Z")) /
+        Date.parse(
+          (season.firstCompetitionWeek ?? clubWeek(season.start).start) +
+            "T12:00:00Z",
+        )) /
         (7 * 86400000),
     ) + 1,
   );

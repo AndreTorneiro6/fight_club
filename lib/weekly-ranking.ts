@@ -1,3 +1,4 @@
+import { seasonWeek } from "./competition-calendar";
 import { randomUUID } from "node:crypto";
 import type { State } from "./types";
 import { clubWeek, wallTime } from "./calendar";
@@ -17,7 +18,7 @@ export function publishWeeklyRanking(
     season?.status === "active",
     "A época precisa de estar ativa para publicar o ranking semanal.",
   );
-  const week = clubWeek(timestamp).start;
+  const week = seasonWeek(s, timestamp);
   if (season.weeklyRankingPublication?.weekStart === week)
     return { published: false };
   const snapshot = s.divisions.map((division) => ({
@@ -84,6 +85,8 @@ export function autoWeeklyRanking(s: State, timestamp: number) {
   for (const season of s.seasons.filter(
     (season) =>
       season.status === "active" &&
+      (!season.firstCompetitionWeek ||
+        clubWeek(timestamp).start >= season.firstCompetitionWeek) &&
       season.start <= local.day &&
       season.end >= local.day,
   )) {

@@ -296,6 +296,7 @@ export interface Champion extends Entity {
   seasonId: string;
 }
 export interface Season extends Entity {
+  firstCompetitionWeek?: string;
   weeklyRankingPublication?: {
     weekStart: string;
     publishedAt: string;

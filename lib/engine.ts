@@ -1,3 +1,5 @@
+import { firstCompetitionWeek } from "./competition-calendar";
+import { validateFirstCompetitionWeek } from "./season-weeks";
 import { pauseWeeklyChallenges } from "./weekly-challenge-hold";
 import { planChallengeReconciliation } from "./challenge-reconciliation";
 import {
@@ -470,6 +472,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("admin.season.update"),
+    firstCompetitionWeek: z.union([day, z.literal("")]).optional(),
     seasonId: id,
     expectedVersion: z.number().int().min(0),
     name: short.min(2),
@@ -617,6 +620,13 @@ export function execute(
         )?.settledAt,
         "Resultado já liquidado. Exige revisão explícita do ranking e histórico.",
       );
+  }
+  if (cmd.type.startsWith("admin.week.") && "weekStart" in cmd) {
+    const first = firstCompetitionWeek(s);
+    ensure(
+      !first || String(cmd.weekStart) >= first,
+      "Esta semana é anterior ao início competitivo da época.",
+    );
   }
   const now = new Date(timestamp).toISOString();
   const rules = s.settings[0];
@@ -3885,6 +3895,17 @@ export function execute(
             cmd.pauseStart <= cmd.pauseEnd),
         "Período de pausa inválido.",
       );
+      const competitionStart =
+        cmd.firstCompetitionWeek === undefined
+          ? target.firstCompetitionWeek
+          : cmd.firstCompetitionWeek || undefined;
+      validateFirstCompetitionWeek(
+        s,
+        target,
+        competitionStart,
+        cmd.start,
+        cmd.end,
+      );
       const datesChanged = target.start !== cmd.start || target.end !== cmd.end;
       const pauseChanged =
         target.pauseStart !== cmd.pauseStart ||
@@ -3968,6 +3989,7 @@ export function execute(
         );
       const before = { ...target };
       Object.assign(target, {
+        firstCompetitionWeek: competitionStart,
         name: cmd.name,
         start: cmd.start,
         end: cmd.end,

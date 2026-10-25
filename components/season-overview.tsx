@@ -93,6 +93,7 @@ export function SeasonEditor({
 }) {
   const [draft, setDraft] = useState(() => ({
     name: season.name,
+    firstCompetitionWeek: season.firstCompetitionWeek ?? "",
     start: season.start,
     end: season.end,
     pauseStart: season.pauseStart,
@@ -135,6 +136,7 @@ export function SeasonEditor({
             onClick={() => {
               setDraft({
                 name: season.name,
+                firstCompetitionWeek: season.firstCompetitionWeek ?? "",
                 start: season.start,
                 end: season.end,
                 pauseStart: season.pauseStart,
@@ -163,6 +165,10 @@ export function SeasonEditor({
           [
             ["start", "Início da época"],
             ["end", "Fim da época"],
+            [
+              "firstCompetitionWeek",
+              "Primeira semana competitiva · segunda-feira",
+            ],
             ["pauseStart", "Pausa · início opcional"],
             ["pauseEnd", "Pausa · fim opcional"],
           ] as const

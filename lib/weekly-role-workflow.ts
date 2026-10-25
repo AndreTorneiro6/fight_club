@@ -1,3 +1,4 @@
+import { seasonWeek } from "./competition-calendar";
 import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound } from "./types";
 import { clubWeek, addClubDays, clubDay } from "./calendar";
@@ -44,7 +45,7 @@ export function generateWeeklyRoles(
 ) {
   ensure(
     clubWeek(weekStart).start === weekStart &&
-      weekStart >= clubWeek(timestamp).start,
+      weekStart >= seasonWeek(s, timestamp),
     "Escolhe uma semana atual ou futura.",
   );
   const existing = s.weeklyRounds.find((r) => r.weekStart === weekStart);
@@ -67,7 +68,11 @@ export function generateWeeklyRoles(
   const weekType =
     existing?.weekType ??
     (s.weeklyRounds.some(
-      (r) => r.seasonId === season._id && r.weekStart < weekStart,
+      (r) =>
+        r.seasonId === season._id &&
+        r.weekStart < weekStart &&
+        (!season.firstCompetitionWeek ||
+          r.weekStart >= season.firstCompetitionWeek),
     )
       ? "NORMAL"
       : "OPEN_ATTACK");
@@ -75,6 +80,8 @@ export function generateWeeklyRoles(
     .filter(
       (r) =>
         r.publishedAt &&
+        (!season.firstCompetitionWeek ||
+          r.weekStart >= season.firstCompetitionWeek) &&
         r.weekStart < weekStart &&
         (!r.seasonId || r.seasonId === season._id),
     )
@@ -156,7 +163,7 @@ export function autoWeeklyRoles(s: State, timestamp: number) {
   if (!season) return;
   // Managed leagues have independent round dates and their own private role drafts.
   if (s.competitionConfigurations?.some((c) => c.enabled)) return;
-  const current = clubWeek(timestamp).start;
+  const current = seasonWeek(s, timestamp);
   for (
     let week = current;
     week <=

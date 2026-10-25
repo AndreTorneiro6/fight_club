@@ -1,4 +1,5 @@
 "use client";
+import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -32,10 +33,12 @@ function PreviousWeekRole({
   team: Player[];
   week?: string;
 }) {
+  const first = firstCompetitionWeek(s);
   const previous = s.weeklyRounds.find(
     (round) => round.weekStart === addClubDays(week, -7),
   );
-  if (!previous?.publishedAt) return null;
+  if (!previous?.publishedAt || (first && previous.weekStart < first))
+    return null;
   const roles = new Set(
     team
       .map(
@@ -62,9 +65,11 @@ function PreviousWeekRole({
 export function WeekNavigation({
   week,
   onChange,
+  minWeek,
 }: {
   week: string;
   onChange: (week: string) => void;
+  minWeek?: string;
 }) {
   const label = (day: string) =>
     new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
@@ -78,6 +83,7 @@ export function WeekNavigation({
       <button
         className="icon-button"
         aria-label="Semana anterior"
+        disabled={!!minWeek && addClubDays(week, -7) < minWeek}
         onClick={() => onChange(addClubDays(week, -7))}
       >
         <ArrowLeft size={18} />
@@ -169,7 +175,8 @@ export function WeeklyRoles({
   const admin = s.actor.role === "admin";
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
   const [selectedWeek, setWeek] = useState(() => weeklyChallengeWeek(s));
-  const week = admin ? selectedWeek : weeklyChallengeWeek(s);
+  const first = firstCompetitionWeek(s);
+  const week = admin ? seasonWeek(s, selectedWeek) : weeklyChallengeWeek(s);
   const [exportOpen, setExportOpen] = useState(false);
   const [weekType, setWeekType] = useState<"NORMAL" | "OPEN_ATTACK">("NORMAL");
   const [division, setDivision] = useState(admin ? "all" : me.divisionId);
@@ -254,7 +261,7 @@ export function WeeklyRoles({
         </p>
       )}
       {admin ? (
-        <WeekNavigation week={week} onChange={setWeek} />
+        <WeekNavigation week={week} onChange={setWeek} minWeek={first} />
       ) : (
         <p>
           Semana dos jogos: {week} · Ranking:{" "}
@@ -301,7 +308,9 @@ export function WeeklyRoles({
           <details>
             <summary>Histórico dos papéis semanais</summary>
             {[...s.weeklyRounds]
-              .filter((r) => r.weekStart < week)
+              .filter(
+                (r) => r.weekStart < week && (!first || r.weekStart >= first),
+              )
               .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
               .map((r) => (
                 <div className="inset stack" key={r._id}>
