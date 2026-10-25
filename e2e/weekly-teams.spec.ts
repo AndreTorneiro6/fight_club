@@ -211,7 +211,8 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   const previousAttacker = admin
     .locator("[data-weekly-team]")
     .filter({ hasText: "Luís Costa" });
-  await expect(previousAttacker).toContainText("Semana anterior: Ataque");
+  await expect(previousAttacker).toContainText("Inicial: ATAQUE");
+  await expect(previousAttacker).toContainText("Final: ATAQUE");
   await expect(
     previousAttacker.getByRole("button", { name: /^Defesa:/ }),
   ).toHaveAttribute("aria-pressed", "true");
