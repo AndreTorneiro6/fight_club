@@ -3,6 +3,12 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Bronze rules and division countdown deployed — 25 October 2026
+
+- Release67ca0aebd8d724a22e5f431728bef83511f41805 deployed via workflow40193029453; all361 tests/typecheck/build and every browser group passed, including isolated opening-clock and dynamic partner checks. Live deployed revision matches; app healthy, worker running, zero restarts, both image sha256:85e9e4c33c5e1208a8e26fe064ac65129e35972db6b459ea0a418d684cfe018e. Public health ok.
+- Through authenticated actual administrator identity and existing Mongo transaction, enabled weeklyDynamicRoles=true with weeklyDynamicDivisionIds=[bronze], Bronze distance3. Dedicated distance command ran before activation. Full protected-state equality check confirmed no changes to competition records, papers, games, players or notices; settings/audit only. Separate persisted read-back confirms Ouro distance2/dynamicfalse and Prata distance2/dynamicfalse, both original opening2026-10-24T19:00Z; Bronze distance3/dynamictrue/openingnull.
+- Bronze still awaits manual admin opening. No countdown time invented, no new papers/matches published, no live test challenge and no notification replay/creation in activation. Admin→Papéis semanais exposes clocks and per-division interval activation; future Ouro/Prata rounds supported without altering their current fixtures. Temporary maintenance scripts removed from host/container. Older prepared notes below are historical.
+
 ## Bronze-only activation and opening countdown ready — 25 October 2026
 
 - User authorized deploy/competition activation, then explicitly preserved Ouro/Prata current fixtures and left public release/opening to admins. Added optional weeklyDynamicDivisionIds; activation must use Bronze only, distance3, preserve existing Gold/Silver distances2 and all current commitments/published assignments/opening metadata. Production still04f30f3 at this checkpoint. Earlier run40191715175 cancelled in checks before deploy; do not activate unrestricted88a9bb5.

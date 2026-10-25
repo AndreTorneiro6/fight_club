@@ -1,6 +1,6 @@
 # Papéis dinâmicos por prioridade
 
-Alteração validada localmente; release e ativação limitadas à Bronze autorizadas. Consultar PROJECT_STATUS.md para estado efetivo.
+Publicado em 25/10/2026 (67ca0ae). Modo dinâmico ativo apenas na Bronze, alcance 3; abertura continua manual. Ouro e Prata atuais preservados. Consultar PROJECT_STATUS.md para verificação.
 
 Depois de um deploy autorizado, em **Admin → Regras da competição**:
 
