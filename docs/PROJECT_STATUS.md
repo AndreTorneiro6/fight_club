@@ -3,6 +3,13 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Version1.1.0 bundle ready — 25 October 2026
+
+- User added: synchronize actual current Ouro/Prata roles too, use effective roles for all future divisions, admin challenge provenance, initial/final history, match-focused Title Fight, visible version/changelog. All implemented. synchronizeWeeklyRoles preserves initial published papers and records actual protected challenge roles separately for both partners. Future tracked untouched drafts refresh across all divisions, independently from Bronze-only forced-opponent scope.
+- Title Fight now lists confirmed games against snapshot rank1 (plus explicit legacy title flags), completed results and admin-only assigned games awaiting scheduling. Removed manual champion selection and challenge-creation controls from that page; no challenge/result/ranking flags rewritten. Test confirms a normal title matchup without explicit title flag shows both partners after official admin scheduling.
+- Package/lock and human changelog1.1.0 aligned. Admin header version link and secondary Versões e alterações page; player workspace cannot see the page. Build-ID reload detection unchanged.373 tests/typecheck/build pass; extended dynamic browser tests, updated weekly-history browser, official title-game browser and changelog/admin privacy checks pass.
+- First workflow40233015561 stopped at old browser text expectation, no deployment; assertion corrected.40233386026 explicitly cancelled during checks to incorporate newly requested Title Fight/versioning in one release, no deploy. Ready to push final bundle then apply prepared audited current/future role maintenance transaction. Running production still1666c47; no current-task data mutation yet.
+
 ## Effective weekly roles, future draft refresh and challenge origins prepared — 25 October 2026
 
 - User reported future Bronze papers retained old rules, then requested current/future Ouro and Prata too, admin-only challenge origin distinction, and initial/final previous-week roles. Read-only live diagnosis:26Oct Bronze actual/effective roles correct, but private2/9/16Nov drafts dated23Oct still had champion attack/last team defense. Root: automation skipped every existing draft permanently.
@@ -627,3 +634,8 @@ docker compose --env-file .env.production -f compose.production.yaml -f compose.
 ## Continuing in a new chat
 
 Open this workspace and read this file plus `AGENTS.md`. Check Git and live health for changes since the snapshot, then continue from the user's new request. The user prefers completed implementation and clear, concise updates. Reuse existing authorization within its actual scope; this note does not authorize unrelated future actions.
+
+## Versioning convention introduced — prepared 25 October 2026
+
+- First visible release is1.1.0 (package.json/lock, lib/release-notes.ts).1.0.0 is the prior application baseline, not a claim of retrospective formal releases. Admin→Mais ferramentas→Versões e alterações lists immutable Portuguese changes with date; header links current version.
+- For each subsequent release, increment package/lock SemVer, add the matching release-notes entry (patch fixes, minor compatible features, major breaking changes), run required checks and deploy. Release consistency test enforces package/current/latest note alignment. Keep the build ID mechanism for reload detection separate from human-facing version.

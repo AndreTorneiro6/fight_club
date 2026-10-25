@@ -1,7 +1,11 @@
 import { weeklyChallengeWeek } from "../lib/weekly";
 import { effectiveStatus } from "../lib/rules";
 import { test, expect } from "@playwright/test";
-import { enterAdminWorkspace, openAdminSection } from "./workspace-helper";
+import {
+  enterAdminWorkspace,
+  openAdminSection,
+  switchWorkspace,
+} from "./workspace-helper";
 
 test("admin sees decisions before tools; secondary navigation and mobile layout stay usable", async ({
   page,
@@ -85,4 +89,22 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     path: "/var/tmp/fc-admin-mobile.png",
     fullPage: true,
   });
+  await page.goto("/admin?tab=changelog");
+  await expect(
+    page.getByRole("heading", { name: "Versões e alterações", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Versão atual · 1.1.0", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Histórico dos papéis com o papel inicial publicado e o papel final de cada dupla.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await switchWorkspace(page, "player");
+  await page.goto("/admin?tab=changelog");
+  await expect(
+    page.getByRole("heading", { name: "Versões e alterações", exact: true }),
+  ).toHaveCount(0);
 });

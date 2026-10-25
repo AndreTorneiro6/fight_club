@@ -6,6 +6,7 @@ async function post(p: Page, data: unknown) {
     data,
   });
   expect(r.ok(), await r.text()).toBe(true);
+  return r.json();
 }
 async function login(p: Page, email: string) {
   await p.goto("/auth");
@@ -38,6 +39,31 @@ test("partners share dashboard rank and the title displays both team members", a
     divisionId: "ouro",
     playerId: "player-5",
   });
+  const created = await post(page, {
+    type: "admin.challenge.create",
+    challengerId: "player-2",
+    defenderId: "player-1",
+  });
+  await post(page, {
+    type: "challenge.respond",
+    challengeId: created.id,
+    accept: true,
+  });
+  const start = new Date(Date.now() + 2 * 86400000);
+  start.setUTCHours(19, 30, 0, 0);
+  await post(page, {
+    type: "admin.match.update",
+    expectedScheduleState: JSON.stringify(["accepted", null, null]),
+    note: "Confirmar jogo do título no teste",
+    challengeId: created.id,
+    start: start.toISOString(),
+    courtId: "campo-1",
+    minutes: 90,
+  });
+  await page.goto("/title-fight");
+  await expect(
+    page.getByRole("button", { name: "Definir campeão", exact: true }),
+  ).toHaveCount(0);
   const state = await (await page.request.get("/api/league")).json();
   const me = state.players.find((p: { _id: string }) => p._id === "player-1"),
     partner = state.players.find((p: { _id: string }) => p._id === "player-5");
@@ -51,12 +77,11 @@ test("partners share dashboard rank and the title displays both team members", a
     page.locator(".stat-card").filter({ hasText: "POSIÇÃO ATUAL" }),
   ).toContainText("#1");
   await page.goto("/title-fight");
-  await expect(
-    page.getByRole("heading", {
-      name: `${me.name} + ${partner.name}`,
-      exact: true,
-    }),
-  ).toBeVisible();
+  const titleGame = page.locator(
+    `a.challenge-card[href="/desafios/${created.id}"]`,
+  );
+  await expect(titleGame).toContainText(`${me.name} + ${partner.name}`);
+  await expect(titleGame).toContainText("TITLE FIGHT");
   await expect(
     page.getByRole("button", { name: "Desafiar dupla campeã", exact: true }),
   ).toHaveCount(0);

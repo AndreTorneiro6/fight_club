@@ -8,6 +8,9 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import AdminChangelog from "./admin-changelog";
+import { applicationVersion } from "@/lib/release-notes";
+import { isTitleMatch, isOfficialTitleMatch } from "@/lib/title-matches";
 import ChallengeOriginLabel from "./challenge-origin";
 import { challengeOrigin, challengeOriginLabels } from "@/lib/challenge-origin";
 import AdminOverview from "./admin-overview";
@@ -1752,7 +1755,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
       <div className="row between">
         <small>
           #{String(c.number).padStart(3, "0")}{" "}
-          {c.titleFight ? "· TITLE FIGHT" : ""}
+          {isTitleMatch(c) ? "· TITLE FIGHT" : ""}
         </small>
         <Status c={c} />
       </div>
@@ -2233,7 +2236,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
         Voltar aos desafios
       </Link>
       <Heading
-        eyebrow={c.titleFight ? "COMBATE PELO CINTURÃO" : "A TUA ARENA"}
+        eyebrow={isTitleMatch(c) ? "COMBATE PELO CINTURÃO" : "A TUA ARENA"}
         title={`Desafio #${String(c.number).padStart(3, "0")}`}
         description={`${name(c.challengerId)} vs ${name(c.defenderId)}`}
         right={<Status c={c} />}
@@ -2244,7 +2247,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
           <TimeConfirmation {...a} c={c} />
 
           <Section
-            title={c.titleFight ? "Title Fight" : "O confronto"}
+            title={isTitleMatch(c) ? "Title Fight" : "O confronto"}
             right={<DivisionBadge s={s} id={c.divisionId} />}
           >
             <Status c={c} />
@@ -3531,9 +3534,14 @@ function Admin(a: Actions) {
         title="Painel do administrador"
         description="Confirma jogos, acompanha a jornada e resolve o que está pendente."
         right={
-          <Link className="button ghost small" href="/ajuda/admin">
-            <BookOpen size={16} /> Ajuda
-          </Link>
+          <div className="row wrap">
+            <Link className="badge" href="/admin?tab=changelog">
+              v{applicationVersion}
+            </Link>
+            <Link className="button ghost small" href="/ajuda/admin">
+              <BookOpen size={16} /> Ajuda
+            </Link>
+          </div>
         }
       />
       <AdminNavigation
@@ -3552,6 +3560,8 @@ function Admin(a: Actions) {
             setTab("players");
           }}
         />
+      ) : tab === "changelog" ? (
+        <AdminChangelog />
       ) : tab === "approvals" ? (
         <Section title="Campos por confirmar">
           <p>
@@ -5576,161 +5586,104 @@ function Courts({ s, run, busy }: Actions) {
   );
 }
 
-function TitleFights(a: Actions) {
-  const { s, run, busy } = a,
-    p = s.players.find((p) => p._id === s.actor.playerId)!,
-    admin = s.actor.role === "admin";
-  const managed = usesManagedCompetition(s, p.divisionId);
+function TitleFights({ s }: Actions) {
+  const [division, setDivision] = useState("all");
+  const pool = s.challenges.filter(
+    (c) => (division === "all" || c.divisionId === division) && isTitleMatch(c),
+  );
+  const upcoming = pool
+    .filter((c) => isOfficialTitleMatch(c) && c.status !== "completed")
+    .sort((a, b) =>
+      (a.scheduledAt ?? a.createdAt).localeCompare(
+        b.scheduledAt ?? b.createdAt,
+      ),
+    );
+  const completed = pool
+    .filter((c) => isOfficialTitleMatch(c) && c.status === "completed")
+    .sort((a, b) =>
+      (b.scheduledAt ?? b.createdAt).localeCompare(
+        a.scheduledAt ?? a.createdAt,
+      ),
+    );
+  const pending = pool.filter(
+    (c) =>
+      ["accepted", "schedule_pending"].includes(c.status) &&
+      !isOfficialTitleMatch(c),
+  );
   return (
     <>
       <Heading
-        eyebrow="O COMBATE PELO TÍTULO"
+        eyebrow="JOGOS PELO TÍTULO"
         title="Title Fight"
-        description="O cinturão pertence a uma dupla. Por agora."
-        right={
-          <Link href="/campeoes" className="button">
-            <Crown size={15} />
-            Hall of Champions
-          </Link>
-        }
+        description="Os confrontos pelo primeiro lugar de cada divisão. A dupla no topo defende o título."
       />
-      <div className="three-grid">
-        {s.divisions.map((d) => {
-          const champion = s.champions.find(
-              (c) => c.divisionId === d._id && !c.until,
-            ),
-            holder = s.players.find((p) => p._id === champion?.playerId),
-            holders = holder ? teamMembers(s.players, holder._id) : [];
-          const reason = holder
-            ? challengeReason(s, p, holder, Date.now(), true)
-            : "Sem campeão";
-          return (
-            <div className={`panel belt ${d.code}`} key={d._id}>
-              <span className="eyebrow muted">
-                {d.name.toUpperCase()} DIVISION
-              </span>
-              <div className="belt-icon">
-                <Trophy size={39} />
-              </div>
-              <div className="eyebrow gold">
-                {d.code === "ouro"
-                  ? "GOLD"
-                  : d.code === "prata"
-                    ? "SILVER"
-                    : "BRONZE"}{" "}
-                BELT
-              </div>
-              <div className="row center">
-                {holders.map((member) => (
-                  <Avatar key={member._id} p={member} />
-                ))}
-              </div>
-              <h2>
-                {holders.map((member) => member.name).join(" + ") ||
-                  "Título por atribuir"}
-              </h2>
-              {holder && (
-                <p>Dupla campeã · #{teamPosition(s.players, holder._id)}</p>
-              )}
-              <small>
-                {champion
-                  ? `${champion.defenses} defesas · desde ${fmtDate(champion.since)}`
-                  : "O administrador define o primeiro campeão."}
-              </small>
-              {managed && p.divisionId === d._id && (
-                <Link
-                  className="button primary wide space-top"
-                  href="/jornadas"
-                >
-                  Consultar jogo do título na jornada
-                </Link>
-              )}
-              {!managed &&
-                holder &&
-                p.divisionId === d._id &&
-                !holders.some((member) => member._id === p._id) && (
-                  <div className="space-top">
-                    <button
-                      className="primary wide"
-                      disabled={busy || !!reason}
-                      title={reason ?? "Desafiar dupla campeã"}
-                      onClick={async () => {
-                        const res = await run(
-                          {
-                            type: "challenge.create",
-                            defenderId: holder._id,
-                            titleFight: true,
-                          },
-                          "Title Fight enviado.",
-                        );
-                        if (res?.id) location.href = "/desafios/" + res.id;
-                      }}
-                    >
-                      <Swords size={14} />
-                      Desafiar dupla campeã
-                    </button>
-                    {reason && <small>{reason}</small>}
-                  </div>
-                )}
-              {admin && (
-                <form
-                  className="space-top"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    await run(
-                      {
-                        type: "admin.champion",
-                        divisionId: d._id,
-                        playerId: new FormData(e.currentTarget).get("playerId"),
-                      },
-                      "Campeão definido.",
-                    );
-                  }}
-                >
-                  <label className="sr-only" htmlFor={"champion-" + d._id}>
-                    Campeão {d.name}
-                  </label>
-                  <select
-                    id={"champion-" + d._id}
-                    name="playerId"
-                    defaultValue={holder?._id}
-                  >
-                    {rankingEntries(s.players, d._id)
-                      .filter((t) =>
-                        t.members.every((m) => m.status === "active"),
-                      )
-                      .map((t) => (
-                        <option value={t.members[0]._id} key={t.id}>
-                          {t.members.map((m) => m.name).join(" + ")}
-                        </option>
-                      ))}
-                  </select>
-                  <button disabled={busy}>Definir campeão</button>
-                </form>
-              )}
-            </div>
-          );
-        })}
+      <div className="toolbar">
+        <label>
+          Divisão dos jogos do título
+          <select
+            value={division}
+            onChange={(e) => setDivision(e.target.value)}
+          >
+            <option value="all">Todas as divisões</option>
+            {s.divisions.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
-      <div className="space-top">
-        <Section title="Combates pelo título">
-          {s.challenges.some((c) => c.titleFight) ? (
-            <div className="challenge-grid">
-              {s.challenges
-                .filter((c) => c.titleFight)
-                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                .map((c) => (
-                  <ChallengeCard s={s} c={c} key={c._id} />
-                ))}
-            </div>
-          ) : (
-            <Empty text="O próximo Title Fight pode ser teu. Consulta as regras e desafia o campeão." />
-          )}
+      <Section title="Jogos pelo título">
+        <p className="muted">
+          Jogos confirmados pela organização. Consulta as duplas, o horário e o
+          estado do confronto.
+        </p>
+        {upcoming.length ? (
+          <div className="challenge-grid">
+            {upcoming.map((c) => (
+              <ChallengeCard key={c._id} s={s} c={c} />
+            ))}
+          </div>
+        ) : (
+          <Empty text="Ainda não existem jogos pelo título confirmados nesta divisão." />
+        )}
+      </Section>
+      {s.actor.role === "admin" && pending.length > 0 && (
+        <Section title="Confrontos pelo título por marcar">
+          <p className="muted">
+            O adversário já está atribuído. Falta combinar e confirmar o horário
+            para publicar o jogo.
+          </p>
+          <div className="challenge-grid">
+            {pending.map((c) => (
+              <ChallengeCard key={c._id} s={s} c={c} />
+            ))}
+          </div>
         </Section>
-      </div>
+      )}
+      <Section title="Histórico dos jogos pelo título">
+        {completed.length ? (
+          <div className="challenge-grid">
+            {completed.map((c) => (
+              <div key={c._id} className="stack">
+                <ChallengeCard s={s} c={c} />
+                <SetScoreDisplay challenge={c} />
+                {c.winnerId && (
+                  <small className="success">
+                    Vitória de {challengeTeamName(c, c.winnerId, s.players)}
+                  </small>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty text="Ainda não existem jogos pelo título concluídos nesta divisão." />
+        )}
+      </Section>
     </>
   );
 }
+
 function Champions({ s }: Actions) {
   return (
     <>

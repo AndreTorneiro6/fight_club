@@ -34,6 +34,7 @@ export const adminGroups = [
       ["rules", "Regras"],
       ["courts", "Campos"],
       ["audit", "Auditoria"],
+      ["changelog", "Versões e alterações"],
     ],
   },
 ] as const;
