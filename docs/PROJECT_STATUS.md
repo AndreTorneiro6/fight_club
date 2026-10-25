@@ -3,6 +3,12 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Notification network and pending UI fixes deployed — 25 October 2026
+
+- Release3073e739f8a06fe940ecf1adf00b0ec5744850da deployed successfully through workflow40200137319. Typecheck,361 tests, build and all browser groups passed, including Bronze/Ouro ranking reach and mandatory challenge detail without response deadline.
+- Live revision matches; app healthy, worker running, zero restarts, same image sha256:e9ca3e0fe3b3ff08921bd13deb8ad4625258e5ffb09bab6994ee36d8b5771052; public health ok. Recreated worker has both internal data and web-app_default with gateway. SMTP verify and provider-origin connectivity checks still pass after recreation; no test messages sent.
+- Previously prepared ranking caption fix (selected division reach) and removal of obsolete Responder até/Aceita o desafio instructions are now live. No competition setting/ranking/result/challenge rewrite or failed notification replay. Ordinary recent email/push jobs show successful sends after egress correction; historical failed rows remain for audit, not a claim all endpoints guaranteed. Diagnostic scripts removed.
+
 ## Notification worker egress fixed live; UI release preparing — 25 October 2026
 
 - User authorized apply, then reminded Bronze ranking caption remains2. Added proxy network to worker only in local and live Compose; data network stays internal, no worker ports/routes exposed. Remote docker compose config --quiet passes. Connected existing worker to web-app_default without app restart/image change, and persisted Compose for recreation.
