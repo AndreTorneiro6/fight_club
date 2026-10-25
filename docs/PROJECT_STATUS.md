@@ -3,6 +3,12 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Notification failure root cause diagnosed — 25 October 2026
+
+- Read-only diagnosis of running containers: SMTP connection/auth verification passes in app; VAPID key pair/subscription crypto valid, Apple/FCM/Mozilla origins reachable. Same checks in worker fail SMTP EDNS/getaddrinfo and all three push origins EAI_AGAIN.
+- Confirmed compose.production.yaml worker attaches only fightclub_data, declared internal:true; live worker has only that internal network and no gateway. App also attaches external web-app_default and succeeds. App league/jobs routes dispatch too, explaining mixed successes/retries while background worker exhausts attempts. Historical generic failures do not retain original exceptions, so do not claim every past failure proven individually.
+- Needs worker egress network in Compose plus controlled live application; not yet changed. No messages sent by diagnostics (SMTP verify and provider-origin HEAD only), no failed jobs replayed. Temporary scripts removed from both containers/host. WhatsApp unconfigured is separate and excluded from diagnosis.
+
 ## Obsolete response deadline removed locally — 25 October 2026
 
 - Removed Responder até from challenge detail deadlines and replaced Aceita o desafio instructional step with Confronto atribuído: combina o horário com a outra dupla. Mandatory accepted assignments already hide opponent acceptance/refusal controls; time agreement and admin confirmation remain separate. No deadline/domain/history/data rewrite.
