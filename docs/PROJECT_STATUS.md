@@ -3,6 +3,11 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Bronze publication notices checked — 25 October 2026, 12:52 UTC
+
+- User asked whether Bronze received publication notices. Read-only production check: all19 active/approved Bronze players already have the existing Papel semanal publicado notice for2026-10-26 and a rankingNotice. No additional notice sent, avoiding duplicates; no delivery-to-device claim made. Last settings activation itself deliberately sent none.
+- Live opening has since been explicitly scheduled to2026-10-25T14:45:03.230Z (Portugal14:45); earlier manual-hold snapshot is historical. This check did not change opening, papers, matches or notifications. Temporary read-only script removed from host/container.
+
 ## Ranking distance caption corrected locally — 25 October 2026
 
 - User reported Bronze ranking still showed reach2. Found ranking caption used account division while table tabs switch selected division. Caption now explicitly describes selected division and uses challengeDistance(s,division), so Bronze3/Ouro2/Prata2 display independently. Swap badge remains ranking movement model, separate from challenge reach.
