@@ -1,3 +1,4 @@
+import { applicationVersion, releaseNotes } from "../lib/release-notes";
 import { weeklyChallengeWeek } from "../lib/weekly";
 import { effectiveStatus } from "../lib/rules";
 import { test, expect } from "@playwright/test";
@@ -94,13 +95,10 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     page.getByRole("heading", { name: "Versões e alterações", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Versão atual · 1.1.0", { exact: true }),
+    page.getByText(`Versão atual · ${applicationVersion}`, { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      "Histórico dos papéis com o papel inicial publicado e o papel final de cada dupla.",
-      { exact: true },
-    ),
+    page.getByText(releaseNotes[0].changes[0], { exact: true }),
   ).toBeVisible();
   await switchWorkspace(page, "player");
   await page.goto("/admin?tab=changelog");

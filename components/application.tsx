@@ -8,6 +8,7 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import MatchCardExport from "./match-card-export";
 import AdminChangelog from "./admin-changelog";
 import { applicationVersion } from "@/lib/release-notes";
 import { isTitleMatch, isOfficialTitleMatch } from "@/lib/title-matches";
@@ -3711,6 +3712,7 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
     : "";
   return (
     <div className="stack space-top">
+      <MatchCardExport s={s} c={c} />
       <CourtPaymentDetails s={s} c={c} run={run} busy={busy} />
       {editable && (
         <button

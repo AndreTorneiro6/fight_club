@@ -1,4 +1,5 @@
 "use client";
+import CopyImageButton from "./copy-image-button";
 import { useEffect, useState } from "react";
 import { Download, Share2 } from "lucide-react";
 import {
@@ -178,6 +179,7 @@ export default function RankingExport({
               <Download size={16} />
               Descarregar PNG
             </a>
+            <CopyImageButton blob={preview.file} />
             {preview.canShare && (
               <button onClick={share}>
                 <Share2 size={16} />

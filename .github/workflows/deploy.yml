@@ -51,6 +51,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check match images and clipboard exports
+        run: npx playwright test e2e/image-sharing.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check season administration and start announcements
         run: npx playwright test e2e/seasons.spec.ts
         env:

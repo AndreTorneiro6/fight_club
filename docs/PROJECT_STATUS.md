@@ -3,6 +3,20 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Version1.2.0 image sharing prepared — 25 October 2026
+
+- User requested match cards as WhatsApp images and direct image clipboard copy for matches, weekly papers and rankings. Added admin-only expandable match export in existing AdminMatchActions (game agenda/detail), only for officially scheduled/result/completed states.1080x1080 PNG shows both members of each saved team, immutable rank snapshots, attack/defense, title badge, Portugal date/time/court/duration, and validated per-set result when completed. Canvas/text only; no public uploads/profile photo duplication or dependencies.
+- Shared CopyImageButton uses prepared PNG Blob on actual click (no pre-write await); native clipboard success/failure/unsupported messages, preserving download/share alternatives. Added to ranking/weekly previews and multi-match posters. Match preview supports PNG download/native file share/clipboard; images stay browser-local and object URLs cleaned on changes/unmount.
+- Package/lock/current changelog bumped1.2.0 with new entry;1.1.0 release/tag preserved. Typecheck,373 tests and production build pass. Browser validates real clipboard readback as image/png with exact1080²/1882x3344 dimensions for match/ranking/weekly, actual two-member teams, PNG download, denied permission fallback; updated version page test passes. Inspected /var/tmp/fc-match-card.png visually; no text overlap. Added isolated CI clipboard browser step.
+- No new live data mutation or deployment yet for1.2.0. Live1.1.0 roles/settings/fixtures from prior verified maintenance remain intact. Awaiting same active task release completion; user requested these additions while publication was ongoing.
+
+## Version1.1.0 deployed and live weekly roles corrected — 25 October 2026
+
+- Release4a74c9ed38bef826ebb5264eaab337cfdab39fd1 deployed via workflow40234329803, all373 tests/typecheck/build/browser groups passed. Annotated tag v1.1.0 pushed to same deployed commit. App healthy, worker running, zero restarts, both image sha256:f0dc6bcf23561238efe4381b02a891b51405613d2e7950cbcf6163d5d3ac2cb7; public health and worker DNS pass.
+- Authenticated actual admin and existing Mongo transaction: synchronized26Oct effective roles for all divisions (20 player roles changed), preserved original published assignments/time/openings; regenerated unpublished2/9/16Nov drafts for all divisions, approvals cleared. Protected players/games/challenges/results/history/notifications unchanged; zero new notices. Per latest same-for-Ouro/Prata steering, enabled dynamic priority mode for all3 via validated settings save, preserving all other settings and distances2/2/3. No matchup created/modified. This supersedes earlier Bronze-only activation scope.
+- Independent persisted verification:17 protected commitments match both partners' effective roles,3 private unapproved drafts valid at boundaries and distances, origins10 player/5 admin/2 rules. Title Fight match-first and admin changelog live. More distant draft roles are provisional until later published rounds/actual commitments update their inputs. Temporary diagnostic/maintenance scripts removed. Private operation evidence /var/tmp/fc-role-repair-result.json outside Git.
+- User added image export/clipboard for individual matches, weekly papers and rankings while finishing this release; handle as next compatible minor version1.2.0, do not rewrite the1.1.0 release notes/tag.
+
 ## Version1.1.0 bundle ready — 25 October 2026
 
 - User added: synchronize actual current Ouro/Prata roles too, use effective roles for all future divisions, admin challenge provenance, initial/final history, match-focused Title Fight, visible version/changelog. All implemented. synchronizeWeeklyRoles preserves initial published papers and records actual protected challenge roles separately for both partners. Future tracked untouched drafts refresh across all divisions, independently from Bronze-only forced-opponent scope.

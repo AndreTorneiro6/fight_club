@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.1.0";
+export const applicationVersion = "1.2.0";
 export const releaseNotes = [
+  {
+    version: "1.2.0",
+    date: "2026-10-25",
+    title: "Imagens para partilhar no WhatsApp",
+    changes: [
+      "Cartão individual de cada jogo confirmado com as duas duplas, horário, campo e resultado validado.",
+      "Botão Copiar imagem nos cartões de jogo, rankings, papéis semanais e cartazes da jornada.",
+      "Download em PNG e partilha pelo dispositivo, com alternativa quando o navegador não permite copiar imagens.",
+    ],
+  },
   {
     version: "1.1.0",
     date: "2026-10-25",

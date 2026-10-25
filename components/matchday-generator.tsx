@@ -1,4 +1,5 @@
 "use client";
+import CopyImageButton from "./copy-image-button";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Download } from "lucide-react";
@@ -179,6 +180,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
           Descarregar PNG
         </button>
       </div>
+      {preview && <CopyImageButton blob={preview.blob} />}
       {error && (
         <p role="alert" className="error">
           {error}
