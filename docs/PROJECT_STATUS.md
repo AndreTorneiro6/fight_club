@@ -3,6 +3,11 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Ranking distance caption corrected locally — 25 October 2026
+
+- User reported Bronze ranking still showed reach2. Found ranking caption used account division while table tabs switch selected division. Caption now explicitly describes selected division and uses challengeDistance(s,division), so Bronze3/Ouro2/Prata2 display independently. Swap badge remains ranking movement model, separate from challenge reach.
+- Typecheck, all361 tests, production build pass. Extended existing fresh-demo clock browser check passes with Bronze player alternating Bronze3→Ouro2→Bronze3 after admin distance updates. Demo fixture explicitly sets distances rather than relying on default3. No live settings, results, matches or notices changed. Correction not yet deployed; live remains67ca0ae.
+
 ## Bronze rules and division countdown deployed — 25 October 2026
 
 - Release67ca0aebd8d724a22e5f431728bef83511f41805 deployed via workflow40193029453; all361 tests/typecheck/build and every browser group passed, including isolated opening-clock and dynamic partner checks. Live deployed revision matches; app healthy, worker running, zero restarts, both image sha256:85e9e4c33c5e1208a8e26fe064ac65129e35972db6b459ea0a418d684cfe018e. Public health ok.

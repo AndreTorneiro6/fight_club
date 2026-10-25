@@ -1731,8 +1731,8 @@ function Rankings(a: Actions) {
             ))}
           </div>
           <small>
-            Podes desafiar até {challengeDistance(s, p.divisionId)} posições
-            acima.
+            Alcance dos desafios nesta divisão: até{" "}
+            {challengeDistance(s, division)} posições acima.
           </small>
         </div>
         <RankingTable {...a} divisionId={division} />

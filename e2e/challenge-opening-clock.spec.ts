@@ -44,7 +44,12 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
   s = await read();
   await post({
     type: "admin.settings.save",
-    settings: { ...s.settings[0], weeklyCompetition: true },
+    settings: {
+      ...s.settings[0],
+      weeklyCompetition: true,
+      maxPositionsAbove: 2,
+      divisionChallengeDistances: { bronze: 3 },
+    },
   });
   s = await read();
   const week = addClubDays(clubWeek().start, 7);
@@ -107,6 +112,14 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
   expect((await round()).divisionChallengeOpenings).toEqual(
     published.divisionChallengeOpenings,
   );
+  await page
+    .getByLabel("Distância de ataque · Bronze", { exact: true })
+    .selectOption("3");
+  await expect
+    .poll(
+      async () => (await read()).settings[0].divisionChallengeDistances?.bronze,
+    )
+    .toBe(3);
   const ctx = await browser.newContext();
   try {
     const player = await ctx.newPage();
@@ -120,6 +133,27 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
     await expect(timer).toBeVisible();
     const initial = await timer.textContent();
     await expect.poll(() => timer.textContent()).not.toBe(initial);
+    await player.goto("/ranking");
+    await expect(
+      player.getByText(
+        "Alcance dos desafios nesta divisão: até 3 posições acima.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await player.getByRole("button", { name: "OURO", exact: true }).click();
+    await expect(
+      player.getByText(
+        "Alcance dos desafios nesta divisão: até 2 posições acima.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await player.getByRole("button", { name: "BRONZE", exact: true }).click();
+    await expect(
+      player.getByText(
+        "Alcance dos desafios nesta divisão: até 3 posições acima.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     const state = await (await player.request.get("/api/league")).json();
     const teams = rankingEntries(state.players, "bronze");
     const response = await player.request.post("/api/league", {
