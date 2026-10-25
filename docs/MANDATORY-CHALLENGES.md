@@ -30,10 +30,10 @@ O servidor confirma a reserva e avisa os membros das duas duplas. Conserva as va
 
 Esta extensão foi publicada na versão e5a23ad em 25 de outubro de 2026, após todas as verificações e testes de navegador.
 
-## Primeira semana competitiva e agenda — atualização preparada
+## Primeira semana competitiva e agenda — publicada
 
 A época 1 tem **26 de outubro de 2026** guardado como primeira semana competitiva. A abertura da época em 24 de outubro mantém-se para permitir preparação e desafios. O registo de papéis de 19 de outubro fica preservado, fora da competição.
 
-Após publicar a atualização preparada, **Épocas → Editar → Primeira semana competitiva · segunda-feira** permite gerir este limite. Agenda de jogos, calendário dos desafios, papéis semanais e cartazes começam nessa semana, com numeração Jornada 1. O admin pode escolher as semanas seguintes, mas não retroceder à preparação. Alterações que excluam jogos/desafios existentes são bloqueadas.
+Na versão 04f30f3, publicada em 25 de outubro de 2026, **Épocas → Editar → Primeira semana competitiva · segunda-feira** permite gerir este limite. Agenda de jogos, calendário dos desafios, papéis semanais e cartazes começam nessa semana, com numeração Jornada 1. O admin pode escolher as semanas seguintes, mas não retroceder à preparação. Alterações que excluam jogos/desafios existentes são bloqueadas.
 
-A agenda abrirá em **Jogos da liga**, na semana do próximo jogo confirmado, mantendo **Meus jogos** para filtrar a dupla. Os jogos já marcados estavam disponíveis no servidor; os filtros iniciais da semana e da dupla é que os ocultavam.
+A agenda abre em **Jogos da liga**, na semana do próximo jogo confirmado, mantendo **Meus jogos** para filtrar a dupla. Os jogos já marcados estavam disponíveis no servidor; os filtros iniciais da semana e da dupla é que os ocultavam.

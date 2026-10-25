@@ -3,6 +3,13 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Player agenda and first competitive week deployed — 25 October 2026
+
+- User explicitly authorized publication. Pushed 04f30f3e9a4e02eb3f534f4873869cc1827eae29 to deploy. Release 40187662372 passed typecheck, 336 tests, production build and all required browser groups, including the new isolated player-agenda/season-week navigation checks; Raspberry Pi deployment succeeded.
+- Verified live .deployed-revision matches, app healthy, worker running, zero restarts, both image sha256:7028c2015c683c27596fe386d66ea28dfc6f737ac3ba7275e0589a570acec7f9. Public /api/health returns ok:true.
+- Read-only production projection confirms firstCompetitionWeek, selected challenge week, default admin week and default player agenda week all equal 2026-10-26. Player agenda receives two confirmed fixtures in that week. Only week 26 appears in the published competition-week selection; week 19 remains stored as history. Mandatory challenge rule remains enabled.
+- No deployment-time game, challenge, ranking mutation or notification replay was performed. Temporary read-only verification script removed from production host/container. Current delivery is live; earlier prepared notes below are historical.
+
 ## Player agenda and first competitive week prepared — 25 October 2026
 
 - User reported players could not see scheduled games. Production read-only verification found two confirmed fixtures, both in week 2026-10-26; player API correctly returned both, while the agenda defaulted to current week 2026-10-19 and My games. Prepared fix defaults everyone to Jogos da liga and the nearest upcoming/in-progress fixture week, retains the team-wide My games filter (explicit player roster supplied for legacy partner fallback), and gives accurate empty-state messages.
