@@ -40,26 +40,28 @@ function PreviousWeekRole({
   );
   if (!previous?.publishedAt || (first && previous.weekStart < first))
     return null;
-  const roles = new Set(
-    team
-      .map(
-        (member) =>
-          (previous.dynamicAssignments ?? previous.assignments).find(
-            (entry) => entry.playerId === member._id,
-          )?.role,
-      )
-      .filter(Boolean),
-  );
-  if (!roles.size) return null;
-  const role = [...roles][0];
+  const roleLabel = (role: string | undefined) =>
+    role === "attack"
+      ? "ATAQUE"
+      : role === "defense"
+        ? "DEFESA"
+        : "Por atribuir";
+  const initial = previous.assignments.find((a) =>
+    team.some((m) => m._id === a.playerId),
+  )?.role;
+  const final = (previous.dynamicAssignments ?? previous.assignments).find(
+    (a) => team.some((m) => m._id === a.playerId),
+  )?.role;
   return (
-    <span className="role-label">
-      Semana anterior:{" "}
-      {roles.size > 1
-        ? "Papéis diferentes"
-        : role === "attack"
-          ? "Ataque"
-          : "Defesa"}
+    <span className="stack" style={{ gap: 4, fontSize: 11 }}>
+      <span className="muted">Semana anterior</span>
+      <span>
+        Inicial: <strong>{roleLabel(initial)}</strong>
+      </span>
+      <span>
+        Final: <strong>{roleLabel(final)}</strong>
+        {initial !== final ? " · alterado" : ""}
+      </span>
     </span>
   );
 }
@@ -347,12 +349,22 @@ export function WeeklyRoles({
                     )
                     .map((t) => (
                       <small key={t.id}>
-                        {t.name}:{" "}
+                        {t.name}: Inicial:{" "}
                         {r.assignments.find((a) =>
                           t.playerIds.includes(a.playerId),
                         )?.role === "attack"
                           ? "ATAQUE"
                           : r.assignments.find((a) =>
+                                t.playerIds.includes(a.playerId),
+                              )?.role === "defense"
+                            ? "DEFESA"
+                            : "Por atribuir"}
+                        {" · "}Final:{" "}
+                        {(r.dynamicAssignments ?? r.assignments).find((a) =>
+                          t.playerIds.includes(a.playerId),
+                        )?.role === "attack"
+                          ? "ATAQUE"
+                          : (r.dynamicAssignments ?? r.assignments).find((a) =>
                                 t.playerIds.includes(a.playerId),
                               )?.role === "defense"
                             ? "DEFESA"
@@ -440,6 +452,14 @@ export function WeeklyRoles({
           </select>
         </label>
       )}
+      {admin && division !== "all" && (
+        <p className="inset">
+          Alcance de {s.divisions.find((d) => d._id === division)?.name}:{" "}
+          {challengeDistance(s, division)} posições. A proposta usa os papéis
+          efetivos da jornada anterior. Atualizar esta divisão mantém os papéis
+          das restantes.
+        </p>
+      )}
       {admin && (
         <>
           <button onClick={() => setExportOpen((value) => !value)}>
@@ -457,7 +477,7 @@ export function WeeklyRoles({
                 published &&
                 JSON.stringify(Object.entries(roles).sort()) ===
                   JSON.stringify(
-                    (round?.assignments ?? [])
+                    (JSON.parse(saved) as { playerId: string; role: string }[])
                       .map((x) => [x.playerId, x.role])
                       .sort(),
                   )
@@ -741,6 +761,7 @@ export function WeeklyRoles({
                 run(
                   {
                     type: "admin.week.generate",
+                    divisionId: division === "all" ? undefined : division,
                     weekStart: week,
                     expectedVersion: round?.version ?? 0,
                   },
@@ -748,7 +769,9 @@ export function WeeklyRoles({
                 )
               }
             >
-              Gerar papéis automaticamente
+              {division === "all"
+                ? "Gerar papéis automaticamente"
+                : `Atualizar papéis · ${s.divisions.find((d) => d._id === division)?.name}`}
             </button>
             <button
               disabled={busy || published || week < clubWeek().start}

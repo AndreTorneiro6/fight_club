@@ -424,7 +424,7 @@ test("a Gold submission cannot assign Bronze matches or change its initial role 
   );
 });
 
-test("Bronze-only activation leaves existing Gold roles, fixtures and schedules unchanged", () => {
+test("Bronze-only automatic pairing preserves Gold fixtures while recording actual committed roles", () => {
   const s = fixture("ouro", 12);
   s.settings[0].weeklyDynamicDivisionIds = ["bronze"];
   const before = structuredClone(s.weeklyRounds);
@@ -432,7 +432,9 @@ test("Bronze-only activation leaves existing Gold roles, fixtures and schedules 
   assert.equal(s.challenges.length, 1);
   assert.equal(pairing(s, 11, 9), undefined);
   assert.equal(weeklyRole(s, "t9a", now), "attack");
-  assert.deepEqual(s.weeklyRounds, before);
+  assert.deepEqual(s.weeklyRounds[0].assignments, before[0].assignments);
+  assert.equal(weeklyRole(s, "t10a", now), "defense");
+  assert.equal(weeklyRole(s, "t12a", now), "attack");
 });
 test("explicit division scope still enables Bronze priority-derived assignments", () => {
   const s = fixture();

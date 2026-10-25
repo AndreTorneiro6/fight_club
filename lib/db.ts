@@ -442,6 +442,7 @@ export async function view(actor: Actor): Promise<View> {
         (!x.audienceIds || x.audienceIds.includes(actor.playerId)),
     );
     s.audit = [];
+    for (const c of s.challenges) delete c.origin;
     s.challenges = s.challenges.map((c) =>
       mine.includes(c._id)
         ? c

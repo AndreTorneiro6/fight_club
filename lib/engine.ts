@@ -33,6 +33,8 @@ import type { Notification } from "./types";
 import {
   generateWeeklyRoles,
   autoWeeklyRoles,
+  refreshGeneratedWeeklyDrafts,
+  synchronizeWeeklyRoles,
   weeklyApprovalSnapshot,
   weeklyTeamSnapshot,
 } from "./weekly-role-workflow";
@@ -224,6 +226,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("admin.ranking.publishWeekly"), seasonId: id }),
   z.object({
     type: z.literal("admin.week.generate"),
+    divisionId: id.optional(),
     weekStart: day,
     expectedVersion: z.number().int().min(0),
   }),
@@ -1545,6 +1548,7 @@ export function execute(
         version: round.version,
       });
     }
+    refreshGeneratedWeeklyDrafts(s, timestamp);
     return finalPlan;
   };
   if (cmd.type.startsWith("result."))
@@ -1597,6 +1601,7 @@ export function execute(
           round = s.weeklyRounds.find((r) => r.weekStart === week);
         if (round?.publishedAt) refreshDynamicRoles(cmd.divisionId, week);
       }
+      refreshGeneratedWeeklyDrafts(s, timestamp);
       log("challenge.distance.changed", {
         divisionId: cmd.divisionId,
         previous,
@@ -1815,7 +1820,13 @@ export function execute(
         "Outro administrador alterou os papéis. Atualiza antes de continuar.",
         409,
       );
-      const r = generateWeeklyRoles(s, cmd.weekStart, actor.userId, timestamp);
+      const r = generateWeeklyRoles(
+        s,
+        cmd.weekStart,
+        actor.userId,
+        timestamp,
+        cmd.divisionId,
+      );
       return { id: r._id };
     }
     case "admin.week.approve": {
@@ -2149,6 +2160,16 @@ export function execute(
           "O defensor não é o campeão atual.",
         );
       const c: Challenge = {
+        origin: {
+          kind:
+            actor.userId === "system:weekly-matchmaking"
+              ? "rules"
+              : cmd.type === "admin.challenge.create"
+                ? "admin"
+                : "player",
+          actorUserId: actor.userId,
+          createdAt: now,
+        },
         _id: uid(),
         number: Math.max(0, ...s.challenges.map((c) => c.number)) + 1,
         seasonId: currentSeason._id,
@@ -2384,6 +2405,14 @@ export function execute(
               timestamp,
             ) as { id: string };
             Object.assign(s, draft);
+            const assigned = s.challenges.find((x) => x._id === result.id)!;
+            assigned.origin = {
+              ...assigned.origin!,
+              kind: "rules",
+              triggerChallengeId: c._id,
+              reason:
+                "Emparelhamento necessário em todas as soluções de cobertura máxima",
+            };
             log("challenge.forced-by-priority", {
               challengeId: result.id,
               triggerChallengeId: c._id,
@@ -2432,6 +2461,16 @@ export function execute(
           triggerChallengeId: c._id,
           maximumMatches: plan.maximumMatches,
         });
+      }
+      if (c.mandatoryAssignment && c.weekStart) {
+        synchronizeWeeklyRoles(
+          s,
+          c.weekStart,
+          actor.userId,
+          timestamp,
+          c.divisionId,
+        );
+        refreshGeneratedWeeklyDrafts(s, timestamp);
       }
       return { id: c._id };
     }

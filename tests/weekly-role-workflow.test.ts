@@ -10,7 +10,13 @@ import {
 } from "../lib/types";
 import { defaultCompetitionWeights } from "../lib/competition-types";
 import { filterFeatureView } from "../lib/feature-view";
-import { autoWeeklyRoles } from "../lib/weekly-role-workflow";
+import {
+  autoWeeklyRoles,
+  generateWeeklyRoles,
+  refreshGeneratedWeeklyDrafts,
+  synchronizeWeeklyRoles,
+  weeklyRoleGenerationInput,
+} from "../lib/weekly-role-workflow";
 import { proposeTeamRoles } from "../lib/role-proposals";
 const now = Date.parse("2026-10-19T12:00:00Z");
 const admin: Actor = { userId: "admin", playerId: "p0", role: "admin" };
@@ -479,4 +485,258 @@ test("weekly ranking notices respect Lisbon summer time, configuration, season s
   disabled.settings[0].weeklyRankingHour = 18;
   autoWeeklyRanking(disabled, Date.parse("2026-10-24T18:00:00Z"));
   assert.equal(disabled.notifications.length, 4);
+});
+
+function bronzeDraftFixture() {
+  const s = fixture();
+  s.settings[0] = {
+    ...s.settings[0],
+    maxPositionsAbove: 2,
+    weeklyMandatoryChallenges: true,
+    weeklyDynamicRoles: true,
+    weeklyDynamicDivisionIds: ["bronze"],
+    divisionChallengeDistances: { bronze: 3 },
+  };
+  s.divisions.push({
+    _id: "bronze",
+    code: "bronze",
+    name: "Bronze",
+    tier: 3,
+    capacity: 20,
+  });
+  const model = s.players[0];
+  s.players.push(
+    ...Array.from({ length: 10 }, (_, i) => ({
+      ...model,
+      _id: `b${i + 1}`,
+      name: `Bronze ${i + 1}`,
+      divisionId: "bronze",
+      position: i + 1,
+      previousPosition: i + 1,
+      number: 100 + i,
+    })),
+  );
+  s.seasons[0].firstCompetitionWeek = "2026-10-26";
+  const first = generateWeeklyRoles(s, "2026-10-26", "admin", now);
+  first.publishedAt = new Date(now).toISOString();
+  first.dynamicAssignments = [
+    ...first.assignments.filter((a) => !a.playerId.startsWith("b")),
+    ...Array.from({ length: 10 }, (_, i) => ({
+      playerId: `b${i + 1}`,
+      role: ([2, 4, 7, 9, 10].includes(i + 1) ? "attack" : "defense") as
+        "attack" | "defense",
+    })),
+  ];
+  return s;
+}
+
+test("scoped Bronze regeneration repairs legacy roles, preserves other divisions and opening plans, and requires reapproval", () => {
+  const s = bronzeDraftFixture();
+  const draft = generateWeeklyRoles(s, "2026-11-02", "admin", now);
+  draft.assignments.find((a) => a.playerId === "b1")!.role = "attack";
+  draft.assignments.find((a) => a.playerId === "b10")!.role = "defense";
+  draft.approvedAt = new Date(now).toISOString();
+  draft.approvedVersion = draft.version;
+  draft.approvedBy = "admin";
+  draft.divisionOpeningDelays = { bronze: 60 };
+  draft.divisionChallengeOpenings = { bronze: null };
+  const gold = structuredClone(
+      draft.assignments.filter((a) => a.playerId.startsWith("p")),
+    ),
+    notices = s.notifications.length,
+    published = structuredClone(s.weeklyRounds[0]);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.generate",
+      weekStart: draft.weekStart,
+      divisionId: "bronze",
+      expectedVersion: draft.version,
+    },
+    now,
+  );
+  const fixed = s.weeklyRounds.find((r) => r.weekStart === draft.weekStart)!;
+  assert.equal(
+    fixed.assignments.find((a) => a.playerId === "b1")?.role,
+    "defense",
+  );
+  assert.equal(
+    fixed.assignments.find((a) => a.playerId === "b10")?.role,
+    "attack",
+  );
+  assert.deepEqual(
+    fixed.assignments.filter((a) => a.playerId.startsWith("p")),
+    gold,
+  );
+  assert.deepEqual(fixed.divisionOpeningDelays, { bronze: 60 });
+  assert.deepEqual(fixed.divisionChallengeOpenings, { bronze: null });
+  assert.equal(fixed.approvedAt, undefined);
+  assert.equal(fixed.publishedAt, undefined);
+  assert.equal(s.notifications.length, notices);
+  assert.deepEqual(s.weeklyRounds[0], published);
+  const input = JSON.parse(fixed.divisionRoleGeneration!.bronze.input);
+  assert.equal(input.distance, 3);
+  assert.equal(input.previous.b7, "attack");
+  assert.equal(input.previous.b5, "defense");
+  assert.throws(() =>
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.week.generate",
+        weekStart: draft.weekStart,
+        divisionId: "bronze",
+        expectedVersion: draft.version,
+      },
+      now,
+    ),
+  );
+});
+
+test("automatic draft refresh follows effective role and distance changes, is idempotent, and preserves manual edits", () => {
+  const s = bronzeDraftFixture();
+  generateWeeklyRoles(s, "2026-11-02", "admin", now);
+  const previous = s.weeklyRounds.find((r) => r.weekStart === "2026-10-26")!,
+    initial = structuredClone(previous.assignments);
+  const gold = s.weeklyRounds[1].assignments.filter((a) =>
+    a.playerId.startsWith("p"),
+  );
+  previous.dynamicAssignments!.find((a) => a.playerId === "b2")!.role =
+    "defense";
+  previous.dynamicAssignments!.find((a) => a.playerId === "b3")!.role =
+    "attack";
+  refreshGeneratedWeeklyDrafts(s, now);
+  let draft = s.weeklyRounds.find((r) => r.weekStart === "2026-11-02")!;
+  assert.equal(
+    JSON.parse(draft.divisionRoleGeneration!.bronze.input).previous.b2,
+    "defense",
+  );
+  assert.deepEqual(
+    draft.assignments.filter((a) => a.playerId.startsWith("p")),
+    gold,
+  );
+  assert.deepEqual(previous.assignments, initial);
+  const version = draft.version;
+  refreshGeneratedWeeklyDrafts(s, now);
+  assert.equal(
+    s.weeklyRounds.find((r) => r.weekStart === draft.weekStart)!.version,
+    version,
+  );
+  s.settings[0].divisionChallengeDistances!.bronze = 2;
+  refreshGeneratedWeeklyDrafts(s, now);
+  draft = s.weeklyRounds.find((r) => r.weekStart === "2026-11-02")!;
+  assert.equal(
+    JSON.parse(draft.divisionRoleGeneration!.bronze.input).distance,
+    2,
+  );
+  draft.assignments.find((a) => a.playerId === "b2")!.role =
+    draft.assignments.find((a) => a.playerId === "b2")!.role === "attack"
+      ? "defense"
+      : "attack";
+  const manual = structuredClone(draft);
+  s.settings[0].divisionChallengeDistances!.bronze = 3;
+  refreshGeneratedWeeklyDrafts(s, now);
+  assert.deepEqual(
+    s.weeklyRounds.find((r) => r.weekStart === draft.weekStart),
+    manual,
+  );
+});
+
+test("published schedules, legacy manual drafts and players cannot be silently regenerated", () => {
+  const s = bronzeDraftFixture(),
+    draft = generateWeeklyRoles(s, "2026-11-02", "admin", now);
+  delete draft.divisionRoleGeneration;
+  s.settings[0].divisionChallengeDistances!.bronze = 2;
+  const before = structuredClone(s.weeklyRounds);
+  refreshGeneratedWeeklyDrafts(s, now);
+  assert.deepEqual(s.weeklyRounds, before);
+  assert.throws(() =>
+    execute(
+      s,
+      { ...admin, role: "player" },
+      {
+        type: "admin.week.generate",
+        weekStart: draft.weekStart,
+        divisionId: "bronze",
+        expectedVersion: draft.version,
+      },
+      now,
+    ),
+  );
+  assert.throws(() =>
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.week.generate",
+        weekStart: "2026-10-26",
+        divisionId: "bronze",
+        expectedVersion: s.weeklyRounds[0].version,
+      },
+      now,
+    ),
+  );
+});
+
+test("an unrelated league commitment does not block scoped Bronze regeneration", () => {
+  const s = bronzeDraftFixture(),
+    draft = generateWeeklyRoles(s, "2026-11-02", "admin", now);
+  s.challenges.push({
+    _id: "gold-protected",
+    divisionId: "gold",
+    challengerId: "p3",
+    defenderId: "p2",
+    status: "accepted",
+    weekStart: draft.weekStart,
+    createdAt: new Date(now).toISOString(),
+  } as State["challenges"][number]);
+  const protectedChallenge = structuredClone(s.challenges);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.generate",
+      weekStart: draft.weekStart,
+      divisionId: "bronze",
+      expectedVersion: draft.version,
+    },
+    now,
+  );
+  assert.deepEqual(s.challenges, protectedChallenge);
+});
+
+test("Gold and Silver future proposals follow actual assigned roles without enabling automatic opponent assignment", () => {
+  const s = bronzeDraftFixture();
+  s.challenges.push({
+    _id: "gold-current",
+    divisionId: "gold",
+    challengerId: "p3",
+    defenderId: "p1",
+    status: "accepted",
+    weekStart: "2026-10-26",
+    createdAt: new Date(now).toISOString(),
+  } as State["challenges"][number]);
+  generateWeeklyRoles(s, "2026-11-02", "admin", now);
+  const first = s.weeklyRounds.find((r) => r.weekStart === "2026-10-26")!,
+    initial = structuredClone(first.assignments),
+    games = structuredClone(s.challenges),
+    notices = structuredClone(s.notifications);
+  synchronizeWeeklyRoles(s, first.weekStart, "admin", now);
+  assert.deepEqual(first.assignments, initial);
+  assert.equal(
+    first.dynamicAssignments!.find((a) => a.playerId === "p1")?.role,
+    "defense",
+  );
+  assert.equal(
+    weeklyRoleGenerationInput(s, "2026-11-02", "gold", "NORMAL").previous.p1,
+    "defense",
+  );
+  refreshGeneratedWeeklyDrafts(s, now);
+  assert.deepEqual(s.challenges, games);
+  assert.deepEqual(s.notifications, notices);
+  assert.deepEqual(s.settings[0].weeklyDynamicDivisionIds, ["bronze"]);
+  const version = first.version;
+  synchronizeWeeklyRoles(s, first.weekStart, "admin", now);
+  assert.equal(first.version, version);
 });

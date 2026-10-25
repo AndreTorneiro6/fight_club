@@ -125,6 +125,19 @@ test("Bronze uses three positions and both partners see the forced matchup and u
         (r: { playerId: string }) => r.playerId === "player-7",
       ).role,
   ).toBe("defense");
+  await page.goto(`/desafios/${forced._id}`);
+  await expect(page.locator('[data-challenge-origin="rules"]')).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Originado pelo desafio/ }),
+  ).toBeVisible();
+  await page.goto("/admin?tab=challenges");
+  await page
+    .getByRole("combobox", { name: "Filtrar origem do desafio" })
+    .selectOption("rules");
+  await expect(page.locator(".challenge-card")).not.toHaveCount(0);
+  await expect(
+    page.locator('.challenge-card [data-challenge-origin="player"]'),
+  ).toHaveCount(0);
   const ctx = await browser.newContext();
   try {
     const player = await ctx.newPage();
@@ -161,6 +174,7 @@ test("Bronze uses three positions and both partners see the forced matchup and u
       player.locator(".ranking-row").filter({ hasText: p.name }),
     ).toContainText("Defesa");
     const v = await (await player.request.get("/api/league")).json();
+    expect(v.challenges.every((c: any) => c.origin === undefined)).toBe(true);
     expect(
       v.notifications.some(
         (n: { challengeId: string; title: string }) =>
@@ -170,4 +184,103 @@ test("Bronze uses three positions and both partners see the forced matchup and u
   } finally {
     await ctx.close();
   }
+});
+
+test("admin refreshes only Bronze future papers with three-position rules", async ({
+  page,
+}) => {
+  await page.goto("/auth");
+  await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
+  await page
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
+  await page.getByRole("button", { name: "Entrar na arena" }).click();
+  await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
+  await page
+    .getByRole("button", { name: "Saltar visita", exact: true })
+    .click();
+  const read = async () => (await page.request.get("/api/league")).json();
+  const post = async (data: unknown) => {
+    const r = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data,
+    });
+    expect(r.ok(), await r.text()).toBe(true);
+    return r.json();
+  };
+  let s = await read();
+  await post({
+    type: "admin.settings.save",
+    settings: {
+      ...s.settings[0],
+      weeklyCompetition: true,
+      divisionChallengeDistances: { bronze: 3 },
+    },
+  });
+  const week = addClubDays(clubWeek().start, 14);
+  await post({
+    type: "admin.week.generate",
+    weekStart: week,
+    expectedVersion: 0,
+  });
+  s = await read();
+  const before = s.weeklyRounds.find((r: any) => r.weekStart === week);
+  await page.goto("/admin?tab=weekly");
+  while (
+    !(await page.locator("#weekly-role-assignment").textContent())?.includes(
+      new Date(`${week}T12:00:00Z`).toLocaleDateString("pt-PT", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    )
+  ) {
+    await page
+      .getByRole("button", { name: "Semana seguinte", exact: true })
+      .click();
+  }
+  await page
+    .getByRole("combobox", { name: "Categoria dos papéis" })
+    .selectOption("bronze");
+  await expect(page.getByText(/Alcance de Bronze: 3 posições/)).toBeVisible();
+  await page
+    .getByRole("button", { name: "Atualizar papéis · Bronze", exact: true })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await read()).weeklyRounds.find((r: any) => r.weekStart === week)
+          .version,
+    )
+    .toBeGreaterThan(before.version);
+  const after = (await read()).weeklyRounds.find(
+    (r: any) => r.weekStart === week,
+  );
+  const bronzeIds = new Set(
+    s.players
+      .filter((p: any) => p.divisionId === "bronze")
+      .map((p: any) => p._id),
+  );
+  expect(
+    after.assignments.filter((a: any) => !bronzeIds.has(a.playerId)),
+  ).toEqual(before.assignments.filter((a: any) => !bronzeIds.has(a.playerId)));
+  expect(JSON.parse(after.divisionRoleGeneration.bronze.input).distance).toBe(
+    3,
+  );
+  await expect(
+    page
+      .locator("#weekly-role-assignment")
+      .getByText(/^Inicial:/)
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("#weekly-role-assignment")
+      .getByText(/^Final:/)
+      .first(),
+  ).toBeVisible();
+  expect(after.publishedAt).toBeUndefined();
+  expect(after.approvedAt).toBeFalsy();
 });

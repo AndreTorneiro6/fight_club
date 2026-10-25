@@ -131,6 +131,7 @@ export interface Prize {
   placement: string;
 }
 export interface Challenge extends Entity {
+  origin?: import("./challenge-origin").ChallengeOrigin;
   mandatoryAssignment?: boolean;
   effectiveChallengeDistance?: number;
   challengerTeamId?: string;
@@ -328,6 +329,10 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  divisionRoleGeneration?: Record<
+    string,
+    { input: string; assignments: string }
+  >;
   divisionOpeningDelays?: Record<string, number>;
   dynamicAssignments?: { playerId: string; role: "attack" | "defense" }[];
   challengesOpenAt?: string;

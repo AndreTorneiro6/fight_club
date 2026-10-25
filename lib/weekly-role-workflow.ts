@@ -1,3 +1,4 @@
+import { challengeMemberIds } from "./team-competition";
 import { challengeDistance } from "./challenge-distance";
 import { seasonWeek } from "./competition-calendar";
 import { randomUUID } from "node:crypto";
@@ -40,12 +41,201 @@ export function weeklyApprovalSnapshot(s: State, r: WeeklyRound) {
     divisionDistances: s.settings[0].divisionChallengeDistances,
   });
 }
+function divisionPlayerIds(
+  s: State,
+  round: WeeklyRound | undefined,
+  divisionId: string,
+) {
+  return new Set([
+    ...s.players.filter((p) => p.divisionId === divisionId).map((p) => p._id),
+    ...(round?.teamSnapshot ?? [])
+      .filter((t) => t.divisionId === divisionId)
+      .flatMap((t) => t.playerIds),
+  ]);
+}
+function roleSignature(assignments: WeeklyRound["assignments"]) {
+  return JSON.stringify(
+    [...assignments].sort((a, b) => a.playerId.localeCompare(b.playerId)),
+  );
+}
+export function effectiveWeeklyRoleAssignments(
+  s: State,
+  round: WeeklyRound,
+  divisionId?: string,
+) {
+  const roles = new Map(
+    (round.dynamicAssignments ?? round.assignments).map((a) => [
+      a.playerId,
+      a.role,
+    ]),
+  );
+  const actual = new Map<string, "attack" | "defense">();
+  for (const c of s.challenges.filter(
+    (c) =>
+      (!divisionId || c.divisionId === divisionId) &&
+      (c.weekStart ?? clubWeek(c.createdAt).start) === round.weekStart &&
+      !c.competitionRoundId &&
+      [
+        "accepted",
+        "schedule_pending",
+        "scheduled",
+        "result_pending",
+        "disputed",
+        "completed",
+      ].includes(c.status),
+  )) {
+    for (const side of ["attack", "defense"] as const)
+      for (const playerId of challengeMemberIds(c, side, s.players)) {
+        ensure(
+          !actual.has(playerId) || actual.get(playerId) === side,
+          "Existem papéis incompatíveis nos confrontos; é necessária revisão administrativa.",
+        );
+        actual.set(playerId, side);
+        roles.set(playerId, side);
+      }
+  }
+  return [...roles].map(([playerId, role]) => ({ playerId, role }));
+}
+/** Records effective roles without changing original publication or any matchup. */
+export function synchronizeWeeklyRoles(
+  s: State,
+  weekStart: string,
+  by: string,
+  timestamp: number,
+  divisionId?: string,
+) {
+  const round = s.weeklyRounds.find((r) => r.weekStart === weekStart);
+  ensure(round?.publishedAt, "Escolhe papéis já publicados.");
+  const before = round.dynamicAssignments ?? round.assignments;
+  const after = effectiveWeeklyRoleAssignments(s, round, divisionId);
+  if (roleSignature(before) === roleSignature(after)) return { changed: 0 };
+  const changed = after.filter(
+    (a) => before.find((b) => b.playerId === a.playerId)?.role !== a.role,
+  ).length;
+  round.dynamicAssignments = after;
+  round.version = (round.version ?? 0) + 1;
+  s.audit.push({
+    _id: randomUUID(),
+    userId: by,
+    action: "week.effective-roles.synchronized",
+    createdAt: new Date(timestamp).toISOString(),
+    details: JSON.stringify({
+      weekStart,
+      divisionId,
+      before,
+      after,
+      changed,
+      version: round.version,
+    }),
+  });
+  return { changed };
+}
+export function weeklyRoleGenerationInput(
+  s: State,
+  week: string,
+  divisionId: string,
+  weekType: "NORMAL" | "OPEN_ATTACK",
+) {
+  const season = s.seasons.find(
+    (e) => e.status === "active" || e.status === "paused",
+  );
+  const previous = s.weeklyRounds
+    .filter(
+      (r) =>
+        r.publishedAt &&
+        r.weekStart < week &&
+        (!season?.firstCompetitionWeek ||
+          r.weekStart >= season.firstCompetitionWeek) &&
+        (!r.seasonId || r.seasonId === season?._id),
+    )
+    .sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0];
+  const entries = rankingEntries(s.players, divisionId);
+  return {
+    teams: entries.map((t, i) => ({
+      id: t.id,
+      rank: i + 1,
+      active: t.members.every(
+        (m) =>
+          m.status === "active" &&
+          !m.awaitingApproval &&
+          !m.registrationRejectedAt,
+      ),
+      members: t.members.map((m) => ({ playerId: m._id, name: m.name })),
+    })),
+    distance: challengeDistance(s, divisionId),
+    champions: Array.from(
+      { length: Math.max(0, s.settings[0].titleMaxPosition - 1) },
+      (_, i) => i + 2,
+    ),
+    weekType,
+    round: 1,
+    previous: Object.fromEntries(
+      entries.flatMap((t) => {
+        const role = (
+          previous ? effectiveWeeklyRoleAssignments(s, previous) : []
+        )?.find((a) => t.members.some((m) => m._id === a.playerId))?.role;
+        return role ? [[t.id, role]] : [];
+      }),
+    ),
+  };
+}
+/** Recalculate only tracked, unedited drafts in explicitly enabled dynamic divisions. */
+export function refreshGeneratedWeeklyDrafts(s: State, timestamp: number) {
+  if (
+    !s.settings[0].weeklyCompetition ||
+    s.settings[0].autoWeeklyRoles === false
+  )
+    return;
+  for (const round of [...s.weeklyRounds]) {
+    if (round.publishedAt || round.weekStart < seasonWeek(s, timestamp))
+      continue;
+    for (const d of s.divisions) {
+      const current = s.weeklyRounds.find((r) => r._id === round._id)!;
+      const meta = current.divisionRoleGeneration?.[d._id];
+      if (!meta) continue; // Legacy/manual drafts require an explicit admin regeneration once.
+      const ids = divisionPlayerIds(s, current, d._id);
+      if (
+        roleSignature(
+          current.assignments.filter((a) => ids.has(a.playerId)),
+        ) !== meta.assignments
+      )
+        continue;
+      if (
+        JSON.stringify(
+          weeklyRoleGenerationInput(
+            s,
+            current.weekStart,
+            d._id,
+            current.weekType ?? "NORMAL",
+          ),
+        ) === meta.input
+      )
+        continue;
+      if (
+        s.challenges.some(
+          (c) =>
+            c.divisionId === d._id &&
+            (c.weekStart ?? clubWeek(c.createdAt).start) ===
+              current.weekStart &&
+            !["cancelled", "refused", "expired"].includes(c.status),
+        )
+      )
+        continue;
+      generateWeeklyRoles(s, current.weekStart, "system", timestamp, d._id);
+    }
+  }
+}
 export function generateWeeklyRoles(
   s: State,
   weekStart: string,
   by: string,
   timestamp: number,
+  divisionId?: string,
 ) {
+  ensure(
+    !divisionId || s.divisions.some((d) => d._id === divisionId),
+    "Divisão inválida.",
+  );
   ensure(
     clubWeek(weekStart).start === weekStart &&
       weekStart >= seasonWeek(s, timestamp),
@@ -59,6 +249,7 @@ export function generateWeeklyRoles(
   ensure(
     !s.challenges.some(
       (c) =>
+        (!divisionId || c.divisionId === divisionId) &&
         (c.weekStart ?? clubWeek(c.createdAt).start) === weekStart &&
         !["cancelled", "refused", "expired"].includes(c.status),
     ),
@@ -79,57 +270,54 @@ export function generateWeeklyRoles(
     )
       ? "NORMAL"
       : "OPEN_ATTACK");
-  const previous = s.weeklyRounds
-    .filter(
-      (r) =>
-        r.publishedAt &&
-        (!season.firstCompetitionWeek ||
-          r.weekStart >= season.firstCompetitionWeek) &&
-        r.weekStart < weekStart &&
-        (!r.seasonId || r.seasonId === season._id),
-    )
-    .sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0];
-  const assignments: WeeklyRound["assignments"] = [],
-    warnings: string[] = [];
-  for (const d of s.divisions) {
-    const entries = rankingEntries(s.players, d._id);
-    const teams = entries.map((t, i) => ({
-      id: t.id,
-      rank: i + 1,
-      active: t.members.every(
-        (m) =>
-          m.status === "active" &&
-          !m.awaitingApproval &&
-          !m.registrationRejectedAt,
-      ),
-      members: t.members.map((m) => ({ playerId: m._id, name: m.name })),
-    }));
-    const plan = proposeTeamRoles({
-      teams,
-      distance: challengeDistance(s, d._id),
-      champions: [2, 3],
-      weekType,
-      round: 1,
-      previous: Object.fromEntries(
-        entries.flatMap((t) => {
-          const role = (
-            previous?.dynamicAssignments ?? previous?.assignments
-          )?.find((a) => t.members.some((m) => m._id === a.playerId))?.role;
-          return role ? [[t.id, role]] : [];
-        }),
-      ),
-    });
-    warnings.push(...plan.warnings.map((w) => `${d.name}: ${w}`));
-    for (const t of entries)
-      for (const m of t.members)
-        if (
-          m.status === "active" &&
-          !m.awaitingApproval &&
-          !m.registrationRejectedAt
+  const assignments: WeeklyRound["assignments"] = divisionId
+      ? (existing?.assignments ?? []).filter(
+          (a) => !divisionPlayerIds(s, existing, divisionId).has(a.playerId),
         )
-          assignments.push({ playerId: m._id, role: plan.roles[t.id] });
+      : [],
+    warnings: string[] = divisionId
+      ? (existing?.warnings ?? []).filter(
+          (w) =>
+            !w.startsWith(
+              `${s.divisions.find((d) => d._id === divisionId)!.name}:`,
+            ),
+        )
+      : [];
+  const divisionRoleGeneration = { ...existing?.divisionRoleGeneration };
+  for (const d of s.divisions.filter(
+    (d) => !divisionId || d._id === divisionId,
+  )) {
+    const input = weeklyRoleGenerationInput(s, weekStart, d._id, weekType);
+    const plan = proposeTeamRoles(input);
+    warnings.push(...plan.warnings.map((w) => `${d.name}: ${w}`));
+    const generated = rankingEntries(s.players, d._id).flatMap((t) =>
+      t.members
+        .filter(
+          (m) =>
+            m.status === "active" &&
+            !m.awaitingApproval &&
+            !m.registrationRejectedAt,
+        )
+        .map((m) => ({ playerId: m._id, role: plan.roles[t.id] })),
+    );
+    assignments.push(...generated);
+    divisionRoleGeneration[d._id] = {
+      input: JSON.stringify(input),
+      assignments: roleSignature(generated),
+    };
   }
   const round: WeeklyRound = {
+    ...existing,
+    approvedAt: undefined,
+    approvedBy: undefined,
+    approvedVersion: undefined,
+    approvalSnapshot: undefined,
+    divisionRoleGeneration,
+    dynamicAssignments: divisionId
+      ? existing?.dynamicAssignments?.filter(
+          (a) => !divisionPlayerIds(s, existing, divisionId).has(a.playerId),
+        )
+      : undefined,
     _id: existing?._id ?? weekStart,
     weekStart,
     seasonId: season._id,
@@ -138,7 +326,14 @@ export function generateWeeklyRoles(
     weekType,
     version: (existing?.version ?? 0) + 1,
     assignments,
-    teamSnapshot: weeklyTeamSnapshot(s),
+    teamSnapshot: divisionId
+      ? [
+          ...(existing?.teamSnapshot ?? weeklyTeamSnapshot(s)).filter(
+            (t) => t.divisionId !== divisionId,
+          ),
+          ...weeklyTeamSnapshot(s).filter((t) => t.divisionId === divisionId),
+        ]
+      : weeklyTeamSnapshot(s),
     generatedAt: new Date(timestamp).toISOString(),
     generatedBy: by,
     warnings,
@@ -151,7 +346,12 @@ export function generateWeeklyRoles(
     _id: randomUUID(),
     userId: by,
     action: "admin.week.generate",
-    details: JSON.stringify({ weekStart, before: existing, after: round }),
+    details: JSON.stringify({
+      weekStart,
+      divisionId,
+      before: existing,
+      after: round,
+    }),
     createdAt: round.generatedAt!,
   });
   return round;
@@ -202,4 +402,5 @@ export function autoWeeklyRoles(s: State, timestamp: number) {
         });
     }
   }
+  refreshGeneratedWeeklyDrafts(s, timestamp);
 }

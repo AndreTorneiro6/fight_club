@@ -8,6 +8,8 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import ChallengeOriginLabel from "./challenge-origin";
+import { challengeOrigin, challengeOriginLabels } from "@/lib/challenge-origin";
 import AdminOverview from "./admin-overview";
 import ChallengeOpeningCountdown from "./challenge-opening-countdown";
 import { challengeDistance } from "@/lib/challenge-distance";
@@ -1768,6 +1770,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
         {name(c.challengerId)} <span className="gold">vs</span>{" "}
         {name(c.defenderId)}
       </h3>
+      <ChallengeOriginLabel s={s} c={c} />
       <WeeklyQueueNotice s={s} challenge={c} />
       {c.queueClosureReason && <small>{c.queueClosureReason}</small>}
       <div className="row between wrap">
@@ -2251,6 +2254,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
                 {c.queueClosureReason}
               </p>
             )}
+            <ChallengeOriginLabel s={s} c={c} detailed />
             <Versus s={s} c={c} />
             <div className="inset row between wrap">
               <span>
@@ -4225,10 +4229,12 @@ function AdminResults(a: Actions) {
 function AdminChallenges(a: Actions) {
   const { s } = a,
     [division, setDivision] = useState("all"),
-    [status, setStatus] = useState("all");
+    [status, setStatus] = useState("all"),
+    [origin, setOrigin] = useState("all");
   const list = s.challenges
     .filter(
       (c) =>
+        (origin === "all" || challengeOrigin(s, c).kind === origin) &&
         (division === "all" || c.divisionId === division) &&
         (status === "all" || effectiveStatus(c) === status),
     )
@@ -4258,6 +4264,18 @@ function AdminChallenges(a: Actions) {
             {Object.entries(statusLabels).map(([v, l]) => (
               <option value={v} key={v}>
                 {l}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar origem do desafio"
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+          >
+            <option value="all">Todas as origens</option>
+            {Object.entries(challengeOriginLabels).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
               </option>
             ))}
           </select>
