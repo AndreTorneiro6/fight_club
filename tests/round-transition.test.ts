@@ -505,3 +505,48 @@ test("rule changes refresh only unpublished divisions of a partially published d
   );
   assert.equal(weeklyPublishedAt(refreshed, "silver"), undefined);
 });
+
+test("independent paper publication honors a saved countdown, otherwise waits for explicit opening", async () => {
+  const { generateWeeklyRoles } = await import("../lib/weekly-role-workflow");
+  const s = fixture();
+  generateWeeklyRoles(s, next, admin.userId, now);
+  let r = s.weeklyRounds.find((r) => r.weekStart === next)!;
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.opening.delay.set",
+      weekStart: next,
+      divisionId: "gold",
+      expectedVersion: r.version,
+      minutes: 60,
+      activate: false,
+      reason: "Contagem preparada antes da publicação",
+    },
+    now,
+  );
+  papers(s, true);
+  papers(s, false);
+  r = s.weeklyRounds.find((r) => r.weekStart === next)!;
+  assert.equal(
+    r.divisionChallengeOpenings?.gold,
+    new Date(now + 3600000).toISOString(),
+  );
+  assert.equal(weeklyPublishedAt(r, "silver"), undefined);
+  for (const type of [
+    "admin.week.division.approve",
+    "admin.week.division.publish",
+  ])
+    execute(
+      s,
+      admin,
+      {
+        type,
+        divisionId: "silver",
+        weekStart: next,
+        expectedVersion: r.version,
+      },
+      now,
+    );
+  assert.equal(r.divisionChallengeOpenings?.silver, null);
+});

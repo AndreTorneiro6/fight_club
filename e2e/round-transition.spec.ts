@@ -167,6 +167,13 @@ test("last result selects its division, guides ranking and private papers, then 
       path: "/var/tmp/fc-1.3-admin-filters.png",
       fullPage: true,
     });
+    await page.goto(`/admin?tab=weekly&week=${next.weekStart}`);
+    await expect(
+      page.getByText(
+        "PARCIALMENTE PUBLICADO — seleciona uma divisão para continuar",
+        { exact: true },
+      ),
+    ).toBeVisible();
   } finally {
     await ctx.close();
   }

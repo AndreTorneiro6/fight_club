@@ -320,16 +320,20 @@ export function WeeklyRoles({
         <>
           <p>
             <strong>
-              {published
-                ? "PUBLICADO"
-                : (
-                      division === "all"
-                        ? round?.approvedAt &&
-                          round.approvedVersion === round.version
-                        : round?.divisionPublications?.[division]?.approvedAt
-                    )
-                  ? "APROVADO — aguarda publicação"
-                  : "RASCUNHO — aguarda aprovação"}
+              {division === "all" &&
+              published &&
+              s.divisions.some((d) => !weeklyPublishedAt(round, d._id))
+                ? "PARCIALMENTE PUBLICADO — seleciona uma divisão para continuar"
+                : published
+                  ? "PUBLICADO"
+                  : (
+                        division === "all"
+                          ? round?.approvedAt &&
+                            round.approvedVersion === round.version
+                          : round?.divisionPublications?.[division]?.approvedAt
+                      )
+                    ? "APROVADO — aguarda publicação"
+                    : "RASCUNHO — aguarda aprovação"}
             </strong>
           </p>
           {round?.generatedAt && (

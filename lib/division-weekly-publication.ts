@@ -97,11 +97,31 @@ export function publishDivisionPapers(
     );
     Object.assign(publication, { publishedAt: now, publishedBy: by });
     // The final opening is always an explicit administrator action in a guided transition.
-    if (source)
+    const minutes = r.divisionOpeningDelays?.[divisionId];
+    if (
+      source ||
+      (minutes === undefined &&
+        !Object.prototype.hasOwnProperty.call(
+          r.divisionChallengeOpenings ?? {},
+          divisionId,
+        ) &&
+        !r.challengesOpenAt)
+    ) {
       r.divisionChallengeOpenings = {
         ...r.divisionChallengeOpenings,
         [divisionId]: null,
       };
+    } else if (minutes !== undefined) {
+      const opensAt = new Date(timestamp + minutes * 60000).toISOString();
+      ensure(
+        Date.parse(opensAt) <= Date.parse(clubWeek(weekStart).endsAt),
+        "O intervalo de abertura ultrapassa o fim da jornada.",
+      );
+      r.divisionChallengeOpenings = {
+        ...r.divisionChallengeOpenings,
+        [divisionId]: opensAt,
+      };
+    }
     for (const a of r.assignments) {
       const p = s.players.find((p) => p._id === a.playerId);
       if (
