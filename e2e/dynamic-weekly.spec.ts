@@ -136,6 +136,26 @@ test("Bronze uses three positions and both partners see the forced matchup and u
     await expect(
       player.locator(`a.challenge-card[href="/desafios/${forced._id}"]`),
     ).toBeVisible();
+    await player.goto(`/desafios/${forced._id}`);
+    await expect(
+      player.getByText("Responder até", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      player.getByText("Aceita o desafio", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      player.getByRole("button", { name: "Aceitar", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      player.getByRole("button", { name: "Recusar", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      player.getByText(
+        "Confronto atribuído: combina o horário com a outra dupla",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(player.getByText("Marcar até", { exact: true })).toBeVisible();
     await player.goto("/ranking");
     await expect(
       player.locator(".ranking-row").filter({ hasText: p.name }),

@@ -3,6 +3,11 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Obsolete response deadline removed locally — 25 October 2026
+
+- Removed Responder até from challenge detail deadlines and replaced Aceita o desafio instructional step with Confronto atribuído: combina o horário com a outra dupla. Mandatory accepted assignments already hide opponent acceptance/refusal controls; time agreement and admin confirmation remain separate. No deadline/domain/history/data rewrite.
+- Typecheck,361 tests, production build and extended dynamic partner browser scenario pass. Browser explicitly confirms assigned challenge has no response deadline/accept/refuse buttons and retains Marcar até and scheduling instructions. Not deployed yet; live remains67ca0ae, also awaiting ranking caption UI fix.
+
 ## Bronze publication notices checked — 25 October 2026, 12:52 UTC
 
 - User asked whether Bronze received publication notices. Read-only production check: all19 active/approved Bronze players already have the existing Papel semanal publicado notice for2026-10-26 and a rankingNotice. No additional notice sent, avoiding duplicates; no delivery-to-device claim made. Last settings activation itself deliberately sent none.

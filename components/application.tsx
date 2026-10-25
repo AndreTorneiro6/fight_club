@@ -2591,7 +2591,6 @@ function ChallengeDetail(a: Actions & { id: string }) {
             <div className="stack">
               {[
                 ["Criado em", c.createdAt],
-                ["Responder até", c.respondBy],
                 ["Marcar até", c.scheduleBy],
                 ["Jogar até", c.playBy],
               ].map(([label, value]) => (
@@ -2605,7 +2604,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
           <Section title="Como funciona">
             <div className="stack">
               {[
-                "Aceita o desafio",
+                "Confronto atribuído: combina o horário com a outra dupla",
                 "Ambos propõem disponibilidade",
                 "Atacante e defensor aceitam o horário",
                 "Clube confirma o campo",
