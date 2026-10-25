@@ -1,6 +1,6 @@
 # Fight Club — project handoff
 
-Last updated: 24 October 2026 (Europe/Lisbon).
+Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
 ## Team competition corrections — phase 2, 25 October 2026
@@ -11,7 +11,11 @@ This is a saved snapshot, not a substitute for checking Git and live service sta
 - The player challenge list and Sent/Received filters include requests created by either partner. Weekly commitments show a precise team message and continuation link; an already committed team does not see a false no-opponents/organization warning or an invitation to create another challenge.
 - Both partners receive challenge sent/received/accepted/scheduled notices and shared message/time updates; existing deadlines/openings, club confirmation and notification preferences remain effective. No historical notification replay or production broadcasts.
 - Validation: typecheck, all 298 automated tests and production build pass. New browser check proves the second partner sees private proposed slots, accepts the same challenge and agrees time while club approval remains pending; after club approval both members can export the same official calendar event with full team names. Updated upcoming-week browser regression also passes, explicitly blocking a later outgoing acceptance until the earlier incoming request is resolved. The former regression fixture relied on the priority bypass being corrected.
-- Deployment remains pending; ranking delivery must publish and be verified first. See docs/TEAM-COMPETITION.md for identity/history compatibility and queue behavior.
+- Ranking phase was deployed first via PR #19: production revision d80215f9353b8b1591e131a4862e357c93bf689d, release 40142815256 successful, app healthy/worker running with zero restarts and matching image sha256:21dad02f2536863873fb3f77e77d20033996fce1ff388924a375b58609c9c782. Read-only player views confirm matching positions for both partners, including Andre Torneiro and Ruizinho at Prata #3.
+- Challenge PR #20 passed checks 40144232357 and merged as bfb291778e413ec65741334288d7957aa3c0ab4c. Release 40144546678 passed. Verified this production revision, healthy app/running worker with zero restarts, matching image sha256:3ca54acf5786f86e259e40e0004879e38d0905f55f9dcee326a4a1743f17fb3d and public health OK. Both separate deliveries are live. See docs/TEAM-COMPETITION.md for identity/history compatibility and queue behavior.
+- User's actual pair is Andre Torneiro + Ruizinho, Prata #3. Their existing challenge #1 was sent by Ruizinho against Tiago Torres + Pedro Silva; accepted with no proposed slots at the read-only check. Read-only post-deployment verification of both actual player views confirms rank 3, challenge #1 in the own/Sent list, the shared accepted commitment, permission to propose for the team, and the precise continuation message. No replacement challenge or historic notification replay was performed. Existing browser tabs must refresh/reopen to load the new interface.
+- Final read-only checks cover every team: Ouro 12, Prata 12, Bronze 10, zero shared-rank violations. Existing pending queue priority now correctly gives #7 precedence over #9 and #10 precedence over #11/#13; original submissions/statuses are preserved. Published week 2026-10-26 remains version 10, 66 assignments, original publication/opening timestamps and Bronze manual hold. No live test challenge, scheduling proposal, result or broadcast was created.
+- Final validation: typecheck, all 298 tests and production build pass. Shared-partner browser coverage now explicitly checks a partner-created challenge in Sent, its enabled proposal action, accepted-team messages/continuation, absence of false no-opponent warnings, shared private slots/consent and matching calendar exports. Ranking/champion, upcoming-week queue, three managed role/result and six legacy browser scenarios pass; deployment CI passed all required browser groups.
 
 ## Team competition corrections — phase 1, 25 October 2026
 
