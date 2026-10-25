@@ -3,6 +3,14 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Mandatory challenges deployed and notices clarified — 25 October 2026
+
+- User explicitly authorized deployment. Pushed validated revision 91ec8bf90cb719d2fd77c5740d7a6f3214f18286 to deploy. Release 40184670182 passed all CI unit/type/build/browser checks and Raspberry Pi deployment. Verified .deployed-revision matches, public health OK, app healthy, worker running, zero restarts, both image sha256:05a83588232df152233577e2a7d0a98baf4cf83b4392cc9d720af54dc3ef6b29.
+- Enabled weeklyMandatoryChallenges=true via deployed admin.settings.save in the existing Mongo transaction after authenticating the real admin account. Club confirmation remains true. Protected state comparison confirmed this setting change did not alter existing players/challenges/games/results/slots/rounds/notifications. All 47 Ouro/Prata accounts still covered, Bronze manual hold intact, Ouro #19 deferred until 2026-11-16. José Gil's #12 was already scheduled at this later read; the configuration operation did not modify it.
+- User then asked to explain first-valid-challenge priority in the assignment notice. Read-only delivery check found 47 in-app notices, 6 push jobs sent, 7 push jobs retrying. Tested local domain clarification updates these existing notices in place, preserving IDs/dedupe/read flags/timestamps and auditing original bodies. Applied in the existing transaction: 47/47 notices amended, the 7 still-queued/retrying delivery payloads updated in place, no new notification or delivery created, no successful push replayed. Already delivered pushes cannot be edited. No competition data changed.
+- Clarification states that the first valid team challenge has priority and defines the opponent for both partners; afterwards they arrange time, without opponent acceptance/refusal. This week's explicit organization-defined fixtures still apply. Existing pending historical requests are not silently changed by enabling the rule.
+- Verification of the clarification helper: typecheck, 325 tests and production build pass locally. The helper is a tested operational domain function, not an automatic startup job or additional application deployment. Temporary clarification source/runner removed from production host/container after use. Earlier first-submission reconciliation campaign remains superseded and must not run.
+
 ## Fixed weekly confrontations and mandatory challenges — 25 October 2026
 
 - User replaced the earlier first-submission repair with explicit Ouro/Prata matchups for 26 October, and clarified that opponents do not accept/refuse: they arrange the time. The older reconciliation preview below is superseded; **do not apply its cancellations or 66-player notification campaign**.

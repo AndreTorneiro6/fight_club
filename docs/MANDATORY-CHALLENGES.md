@@ -6,9 +6,9 @@ Os confrontos de Ouro e Prata indicados pelo administrador já estão atribuído
 
 Ouro 1–2 está adiado por ausência aprovada, com disponibilidade a partir de 16 de novembro. Isto não constitui uma reserva de campo. O horário de Prata 12–10 continua a aguardar a confirmação já existente do clube. Bronze não foi alterado.
 
-## Regra futura — código local, sem deploy
+## Regra publicada e ativa
 
-Após um deploy autorizado, o administrador pode ativar em **Regras da competição → Desafios semanais obrigatórios · combinar apenas horário**. A opção apenas atua com a competição semanal ativa. O valor omitido/desativado preserva o funcionamento anterior.
+A versão 91ec8bf foi publicada em 25 de outubro de 2026 e a regra está ativa. O administrador pode configurar em **Regras da competição → Desafios semanais obrigatórios · combinar apenas horário**. A opção apenas atua com a competição semanal ativa. O valor omitido/desativado preserva o funcionamento anterior.
 
 Um novo desafio que cumpra as regras e a prioridade da fila fica imediatamente atribuído às duas duplas. As regras de divisão, papéis publicados, abertura, distância, campeonato e compromissos semanais continuam a ser verificadas no servidor. Os dois parceiros e a organização recebem o aviso adequado, sem pedido de aceitação em 48 horas. Horários iniciais são opcionais. A dupla adversária pode discordar do horário e propor outro; não pode recusar ou cancelar o confronto obrigatório. Apenas a organização pode cancelar com motivo auditado.
 
