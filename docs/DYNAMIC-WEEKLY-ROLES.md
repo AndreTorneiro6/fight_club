@@ -1,12 +1,12 @@
 # Papéis dinâmicos por prioridade
 
-Esta alteração está preparada e testada, mas ainda não publicada nem ativada na competição real.
+Alteração validada localmente; release e ativação limitadas à Bronze autorizadas. Consultar PROJECT_STATUS.md para estado efetivo.
 
 Depois de um deploy autorizado, em **Admin → Regras da competição**:
 
-- Definir **Distância de ataque · Ouro = 2**, **Prata = 2**, **Bronze = 3**.
+- Selecionar **Distância de ataque · Bronze = 3**: guarda imediatamente, sem o botão geral de guardar. Preservar Ouro e Prata atuais.
 - Manter **Competição semanal** e **Desafios semanais obrigatórios** ativos.
-- Ativar **Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade**.
+- Ativar **Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade** e selecionar apenas **Bronze**. Ouro e Prata desta semana ficam fora do modo dinâmico.
 
 Os valores são configurações independentes por divisão. O título mantém a elegibilidade configurada: alargar a distância da Bronze não permite automaticamente ao 4.º desafiar o campeão. A publicação e abertura dos papéis continuam obrigatórias. Ativar a regra não abre uma divisão que esteja em espera pelo administrador, não recria jogos e não altera os confrontos já atribuídos.
 
@@ -30,4 +30,12 @@ Ausências que cubram a semana inteira retiram a dupla das novas opções autom�
 
 ## Validação
 
-354 testes, typecheck e build passaram. A simulação automática cobre as escolhas iniciais da Bronze compatíveis com cobertura total, obtendo cinco jogos sem repetir duplas, e os exemplos de prioridade de Ouro/Bronze. O teste de navegador verifica o desafio e o novo papel do segundo parceiro. O teste Mongo executa pedidos simultâneos e confirma que só um ocupa a vaga, incluindo os emparelhamentos derivados.
+361 testes, typecheck e build passaram. A simulação automática cobre as escolhas iniciais da Bronze compatíveis com cobertura total, obtendo cinco jogos sem repetir duplas, e os exemplos de prioridade de Ouro/Bronze. O teste de navegador verifica o desafio e o novo papel do segundo parceiro. O teste Mongo executa pedidos simultâneos e confirma que só um ocupa a vaga, incluindo os emparelhamentos derivados.
+
+## Contagem decrescente por divisão
+
+Em Admin → Papéis semanais → Intervalo entre os papéis e a abertura, escolher divisão e minutos. Num rascunho, guardar o intervalo antes de aprovar: a contagem começa apenas na publicação administrativa. Se os papéis já estão publicados, **Ativar contagem desta divisão** começa o intervalo nesse momento. Sem ativação, a Bronze mantém a espera pelo administrador. Também é possível indicar dia/hora exatos no formulário existente.
+
+Admin e jogadores veem o mesmo prazo em hora de Portugal, atualizado a cada segundo. A autorização permanece no servidor, e o aviso de abertura existente é enviado uma única vez quando chega a hora. Esta funcionalidade serve Ouro e Prata nas próximas jornadas, sem alterar os jogos atuais. Não existe intervalo universal imposto: cada administrador escolhe o valor.
+
+O papel efetivo final, guardado separadamente do papel inicial, é usado como preferência de rotação na preparação da próxima semana. Continua a ser uma preferência sujeita às regras de ranking e cobertura.

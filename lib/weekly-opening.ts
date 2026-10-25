@@ -73,6 +73,8 @@ export function scheduleWeeklyOpening(
   } else {
     r.challengesOpenAt = canonical!;
   }
+  if (divisionId && r.divisionOpeningDelays)
+    delete r.divisionOpeningDelays[divisionId];
   r.version = (r.version ?? 0) + 1;
   delete r.openingNotifiedAt;
   if (!r.publishedAt) {
@@ -151,4 +153,78 @@ export function notifyWeeklyOpenings(s: State, timestamp = Date.now()) {
       createdAt: now,
     });
   }
+}
+
+/** Admin opt-in only: draft plans start on publication; published rounds start on explicit activation. */
+export function configureWeeklyOpeningDelay(
+  s: State,
+  actor: Actor,
+  input: {
+    weekStart: string;
+    divisionId: string;
+    expectedVersion: number;
+    minutes: number;
+    activate: boolean;
+    reason: string;
+  },
+  timestamp = Date.now(),
+) {
+  ensure(
+    actor.role === "admin",
+    "Apenas administradores podem ativar a contagem.",
+    403,
+  );
+  const r = s.weeklyRounds.find((r) => r.weekStart === input.weekStart);
+  ensure(r, "Papéis semanais não encontrados.", 404);
+  ensure(
+    s.divisions.some((d) => d._id === input.divisionId),
+    "Divisão inválida.",
+  );
+  ensure(
+    Number.isInteger(input.minutes) &&
+      input.minutes >= 0 &&
+      input.minutes <= 10080,
+    "Intervalo inválido.",
+  );
+  ensure(
+    (r.version ?? 0) === input.expectedVersion,
+    "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+    409,
+  );
+  ensure(input.reason.trim().length >= 3, "Indica o motivo.");
+  if (r.publishedAt) {
+    ensure(input.activate, "Confirma a ativação da contagem.");
+    scheduleWeeklyOpening(
+      s,
+      actor,
+      input.weekStart,
+      input.expectedVersion,
+      new Date(timestamp + input.minutes * 60000).toISOString(),
+      input.reason,
+      timestamp,
+      input.divisionId,
+    );
+  } else {
+    ensure(!input.activate, "Publica os papéis antes de ativar a contagem.");
+    r.version = (r.version ?? 0) + 1;
+    delete r.approvedAt;
+    delete r.approvedBy;
+    delete r.approvedVersion;
+    delete r.approvalSnapshot;
+  }
+  r.divisionOpeningDelays = {
+    ...r.divisionOpeningDelays,
+    [input.divisionId]: input.minutes,
+  };
+  s.audit.push({
+    _id: randomUUID(),
+    userId: actor.userId,
+    action: "week.opening.delay.configured",
+    createdAt: new Date(timestamp).toISOString(),
+    details: JSON.stringify({
+      ...input,
+      opensAt: r.publishedAt ? weeklyOpeningAt(r, input.divisionId) : null,
+    }),
+  });
+  return { ok: true, version: r.version };
 }

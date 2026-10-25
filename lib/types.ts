@@ -88,6 +88,7 @@ export interface Settings extends Entity {
   weeklyCompetition: boolean;
   weeklyMandatoryChallenges?: boolean;
   weeklyDynamicRoles?: boolean;
+  weeklyDynamicDivisionIds?: string[];
   divisionChallengeDistances?: Record<string, number>;
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
@@ -327,6 +328,7 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  divisionOpeningDelays?: Record<string, number>;
   dynamicAssignments?: { playerId: string; role: "attack" | "defense" }[];
   challengesOpenAt?: string;
   /** null holds this division until an administrator opens it. */

@@ -423,3 +423,80 @@ test("a Gold submission cannot assign Bronze matches or change its initial role 
     bronzeRoles,
   );
 });
+
+test("Bronze-only activation leaves existing Gold roles, fixtures and schedules unchanged", () => {
+  const s = fixture("ouro", 12);
+  s.settings[0].weeklyDynamicDivisionIds = ["bronze"];
+  const before = structuredClone(s.weeklyRounds);
+  send(s, 12, 10);
+  assert.equal(s.challenges.length, 1);
+  assert.equal(pairing(s, 11, 9), undefined);
+  assert.equal(weeklyRole(s, "t9a", now), "attack");
+  assert.deepEqual(s.weeklyRounds, before);
+});
+test("explicit division scope still enables Bronze priority-derived assignments", () => {
+  const s = fixture();
+  s.settings[0].weeklyDynamicDivisionIds = ["bronze"];
+  send(s, 9, 6);
+  send(s, 8, 5);
+  assert.ok(pairing(s, 10, 7));
+  assert.equal(weeklyRole(s, "t7a", now), "defense");
+});
+
+test("distance selection applies immediately to new options, preserves committed games and rejects stale admin updates", () => {
+  const s = fixture();
+  s.settings[0].weeklyDynamicDivisionIds = ["bronze"];
+  send(s, 9, 6);
+  const existing = structuredClone(pairing(s, 9, 6)!);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.challenge.distance.set",
+      divisionId: "bronze",
+      distance: 2,
+      expectedDistance: 3,
+      reason: "Alteração de teste pelo administrador",
+    },
+    now,
+  );
+  assert.equal(challengeDistance(s, "bronze"), 2);
+  assert.deepEqual(
+    s.challenges.find((c) => c._id === existing._id),
+    existing,
+  );
+  assert.throws(() => send(s, 8, 5), /limite|posições/);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.challenge.distance.set",
+          divisionId: "bronze",
+          distance: 3,
+          expectedDistance: 3,
+          reason: "Tentativa administrativa desatualizada",
+        },
+        now,
+      ),
+    /administrador alterou/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(2),
+        {
+          type: "admin.challenge.distance.set",
+          divisionId: "bronze",
+          distance: 3,
+          expectedDistance: 2,
+          reason: "Jogador tenta alterar alcance",
+        },
+        now,
+      ),
+    /administradores/,
+  );
+});

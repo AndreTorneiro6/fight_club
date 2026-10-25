@@ -72,7 +72,13 @@ export function weeklyRole(
   weekStart = weeklyChallengeWeek(s, now),
 ) {
   const round = s.weeklyRounds.find((entry) => entry.weekStart === weekStart);
-  if (round?.publishedAt && dynamicWeeklyEnabled(s))
+  if (
+    round?.publishedAt &&
+    dynamicWeeklyEnabled(
+      s,
+      s.players.find((p) => p._id === playerId)?.divisionId,
+    )
+  )
     return (
       dynamicRole(s, playerId, weekStart) ??
       round.dynamicAssignments?.find((e) => e.playerId === playerId)?.role ??
@@ -176,7 +182,7 @@ export function weeklyReason(
         ? "Já tens um desafio atribuído nesta semana."
         : "Este defensor já tem um desafio nesta semana.";
   }
-  if (dynamicWeeklyEnabled(s) && !ignoreId) {
+  if (dynamicWeeklyEnabled(s, attacker.divisionId) && !ignoreId) {
     const reason = dynamicTargetReason(s, attacker._id, defender._id, week);
     if (reason) return reason;
   }

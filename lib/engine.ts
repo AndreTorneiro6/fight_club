@@ -16,7 +16,11 @@ import {
   challengeRepresentative,
   challengeTeamKey,
 } from "./team-competition";
-import { scheduleWeeklyOpening, notifyWeeklyOpenings } from "./weekly-opening";
+import {
+  scheduleWeeklyOpening,
+  configureWeeklyOpeningDelay,
+  notifyWeeklyOpenings,
+} from "./weekly-opening";
 import {
   notifyResponseReminder,
   notifyResponseExpired,
@@ -65,6 +69,7 @@ import {
   weeklyChallengePriority,
   weeklyWindow,
   weeklyBookingReason,
+  weeklyOpeningAt,
 } from "./weekly";
 import { clubWeek, clubDay } from "./calendar";
 import { whatsappNumber } from "./notification-delivery";
@@ -129,6 +134,7 @@ export const settingsSchema = z.object({
   weeklyCompetition: z.boolean().default(false),
   weeklyMandatoryChallenges: z.boolean().optional(),
   weeklyDynamicRoles: z.boolean().optional(),
+  weeklyDynamicDivisionIds: z.array(z.string()).max(10).optional(),
   divisionChallengeDistances: z
     .record(z.string(), z.number().int().min(1).max(100))
     .optional(),
@@ -165,6 +171,22 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.challenge.distance.set"),
+    divisionId: id,
+    distance: z.number().int().min(1).max(100),
+    expectedDistance: z.number().int().min(1),
+    reason: text.min(3),
+  }),
+  z.object({
+    type: z.literal("admin.week.opening.delay.set"),
+    weekStart: day,
+    divisionId: id,
+    expectedVersion: z.number().int().min(0),
+    minutes: z.number().int().min(0).max(10080),
+    activate: z.boolean().default(false),
+    reason: text.min(3),
+  }),
   z.object({
     type: z.literal("admin.week.challenges.pause"),
     weekStart: day,
@@ -1452,6 +1474,79 @@ export function execute(
     return c.scheduleProposal;
   };
 
+  const refreshDynamicRoles = (
+    divisionId: string,
+    weekStart: string,
+    triggerChallengeId?: string,
+  ) => {
+    const finalPlan = dynamicWeeklyPlan(s, divisionId, weekStart);
+    const round = s.weeklyRounds.find((r) => r.weekStart === weekStart)!;
+    const beforeRoles = round.dynamicAssignments ?? round.assignments;
+    const teamIds = new Set(
+      finalPlan.teams.flatMap((t) => t.members.map((m) => m._id)),
+    );
+    const divisionRoles = finalPlan.teams.flatMap((t) => {
+      const role =
+        dynamicRole(s, t.members[0]._id, weekStart) ??
+        beforeRoles.find((r) => t.members.some((m) => m._id === r.playerId))
+          ?.role ??
+        (finalPlan.teams.indexOf(t) === 0
+          ? ("defense" as const)
+          : ("attack" as const));
+      return t.members.map((m) => ({ playerId: m._id, role }));
+    });
+    const afterRoles = [
+      ...beforeRoles.filter((r) => !teamIds.has(r.playerId)),
+      ...divisionRoles,
+    ];
+    if (
+      JSON.stringify(
+        [...beforeRoles].sort((a, b) => a.playerId.localeCompare(b.playerId)),
+      ) !==
+      JSON.stringify(
+        [...afterRoles].sort((a, b) => a.playerId.localeCompare(b.playerId)),
+      )
+    ) {
+      round.dynamicAssignments = afterRoles;
+      round.version = (round.version ?? 0) + 1;
+      const fixedPlayers = new Set(
+        finalPlan.fixed
+          .flatMap((p) => [p.attackerKey, p.defenderKey])
+          .flatMap(
+            (key) =>
+              finalPlan.teams
+                .find((t) => t.id === key)
+                ?.members.map((m) => m._id) ?? [],
+          ),
+      );
+      for (const r of divisionRoles)
+        if (
+          weeklyOpeningAt(round, divisionId) !== null &&
+          (!weeklyOpeningAt(round, divisionId) ||
+            Date.parse(weeklyOpeningAt(round, divisionId)!) <= timestamp) &&
+          !fixedPlayers.has(r.playerId) &&
+          beforeRoles.find((old) => old.playerId === r.playerId)?.role !==
+            r.role
+        )
+          notify(
+            r.playerId,
+            "Papel semanal atualizado",
+            `O teu papel na semana de ${weekStart} passou para ${r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
+            undefined,
+            `dynamic-role:${weekStart}:${round.version}:${r.playerId}`,
+            { kind: "update", deliveryChannels: ["push"] },
+          );
+      log("week.dynamic-roles.changed", {
+        weekStart: weekStart,
+        divisionId: divisionId,
+        triggerChallengeId: triggerChallengeId,
+        before: beforeRoles,
+        after: afterRoles,
+        version: round.version,
+      });
+    }
+    return finalPlan;
+  };
   if (cmd.type.startsWith("result."))
     ensure(
       admin,
@@ -1477,6 +1572,41 @@ export function execute(
     );
 
   switch (cmd.type) {
+    case "admin.challenge.distance.set": {
+      ensure(
+        s.divisions.some((d) => d._id === cmd.divisionId),
+        "Divisão inexistente.",
+      );
+      const previous = challengeDistance(s, cmd.divisionId);
+      ensure(
+        previous === cmd.expectedDistance,
+        "Outro administrador alterou a distância. Atualiza antes de guardar.",
+        409,
+      );
+      ensure(
+        cmd.distance < rankingEntries(s.players, cmd.divisionId).length,
+        "A distância deve ser inferior ao número de duplas.",
+      );
+      if (previous === cmd.distance) return { ok: true };
+      rules.divisionChallengeDistances = {
+        ...rules.divisionChallengeDistances,
+        [cmd.divisionId]: cmd.distance,
+      };
+      if (dynamicWeeklyEnabled(s, cmd.divisionId)) {
+        const week = weeklyChallengeWeek(s, timestamp),
+          round = s.weeklyRounds.find((r) => r.weekStart === week);
+        if (round?.publishedAt) refreshDynamicRoles(cmd.divisionId, week);
+      }
+      log("challenge.distance.changed", {
+        divisionId: cmd.divisionId,
+        previous,
+        distance: cmd.distance,
+        reason: cmd.reason,
+      });
+      return { ok: true, distance: cmd.distance };
+    }
+    case "admin.week.opening.delay.set":
+      return configureWeeklyOpeningDelay(s, actor, cmd, timestamp);
     case "admin.week.challenges.pause":
       return pauseWeeklyChallenges(s, actor, cmd, timestamp);
     case "admin.challenges.reconciliation.preview": {
@@ -1837,6 +1967,20 @@ export function execute(
               approvalSnapshot: undefined,
             }),
       };
+      if (cmd.publish)
+        for (const [divisionId, minutes] of Object.entries(
+          round.divisionOpeningDelays ?? {},
+        )) {
+          const opensAt = new Date(timestamp + minutes * 60000).toISOString();
+          ensure(
+            Date.parse(opensAt) <= Date.parse(clubWeek(cmd.weekStart).endsAt),
+            "O intervalo de abertura ultrapassa o fim da jornada.",
+          );
+          round.divisionChallengeOpenings = {
+            ...round.divisionChallengeOpenings,
+            [divisionId]: opensAt,
+          };
+        }
       s.weeklyRounds = [
         ...s.weeklyRounds.filter((entry) => entry.weekStart !== cmd.weekStart),
         round,
@@ -2209,7 +2353,7 @@ export function execute(
           initialSlots: cmd.initialSlots,
         },
       );
-      if (c.mandatoryAssignment && dynamicWeeklyEnabled(s)) {
+      if (c.mandatoryAssignment && dynamicWeeklyEnabled(s, c.divisionId)) {
         const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
         for (const forced of plan.forced) {
           const latest = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
@@ -2262,73 +2406,11 @@ export function execute(
             });
           }
         }
-        const finalPlan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
-        const round = s.weeklyRounds.find((r) => r.weekStart === c.weekStart)!;
-        const beforeRoles = round.dynamicAssignments ?? round.assignments;
-        const teamIds = new Set(
-          finalPlan.teams.flatMap((t) => t.members.map((m) => m._id)),
+        const finalPlan = refreshDynamicRoles(
+          c.divisionId,
+          c.weekStart!,
+          c._id,
         );
-        const divisionRoles = finalPlan.teams.flatMap((t) => {
-          const role =
-            dynamicRole(s, t.members[0]._id, c.weekStart!) ??
-            beforeRoles.find((r) => t.members.some((m) => m._id === r.playerId))
-              ?.role ??
-            (finalPlan.teams.indexOf(t) === 0
-              ? ("defense" as const)
-              : ("attack" as const));
-          return t.members.map((m) => ({ playerId: m._id, role }));
-        });
-        const afterRoles = [
-          ...beforeRoles.filter((r) => !teamIds.has(r.playerId)),
-          ...divisionRoles,
-        ];
-        if (
-          JSON.stringify(
-            [...beforeRoles].sort((a, b) =>
-              a.playerId.localeCompare(b.playerId),
-            ),
-          ) !==
-          JSON.stringify(
-            [...afterRoles].sort((a, b) =>
-              a.playerId.localeCompare(b.playerId),
-            ),
-          )
-        ) {
-          round.dynamicAssignments = afterRoles;
-          round.version = (round.version ?? 0) + 1;
-          const fixedPlayers = new Set(
-            finalPlan.fixed
-              .flatMap((p) => [p.attackerKey, p.defenderKey])
-              .flatMap(
-                (key) =>
-                  finalPlan.teams
-                    .find((t) => t.id === key)
-                    ?.members.map((m) => m._id) ?? [],
-              ),
-          );
-          for (const r of divisionRoles)
-            if (
-              !fixedPlayers.has(r.playerId) &&
-              beforeRoles.find((old) => old.playerId === r.playerId)?.role !==
-                r.role
-            )
-              notify(
-                r.playerId,
-                "Papel semanal atualizado",
-                `O teu papel na semana de ${c.weekStart} passou para ${r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
-                undefined,
-                `dynamic-role:${c.weekStart}:${round.version}:${r.playerId}`,
-                { kind: "update", deliveryChannels: ["push"] },
-              );
-          log("week.dynamic-roles.changed", {
-            weekStart: c.weekStart,
-            divisionId: c.divisionId,
-            triggerChallengeId: c._id,
-            before: beforeRoles,
-            after: afterRoles,
-            version: round.version,
-          });
-        }
         const activeTeams = finalPlan.teams.filter((t) =>
           t.members.every(
             (m) =>
@@ -3615,11 +3697,23 @@ export function execute(
             cmd.settings.weeklyMandatoryChallenges),
         "Os papéis dinâmicos exigem competição semanal e desafios obrigatórios.",
       );
-      if (cmd.settings.weeklyDynamicRoles && !rules.weeklyDynamicRoles)
+      if (cmd.settings.weeklyDynamicDivisionIds)
+        ensure(
+          new Set(cmd.settings.weeklyDynamicDivisionIds).size ===
+            cmd.settings.weeklyDynamicDivisionIds.length &&
+            cmd.settings.weeklyDynamicDivisionIds.every((id) =>
+              s.divisions.some((d) => d._id === id),
+            ),
+          "Divisões de papéis dinâmicos inválidas.",
+        );
+      if (cmd.settings.weeklyDynamicRoles)
         ensure(
           !s.challenges.some(
             (c) =>
               !c.competitionRoundId &&
+              (!cmd.settings.weeklyDynamicDivisionIds ||
+                cmd.settings.weeklyDynamicDivisionIds.includes(c.divisionId)) &&
+              !dynamicWeeklyEnabled(s, c.divisionId) &&
               c.status === "pending" &&
               Date.parse(c.respondBy) > timestamp,
           ),

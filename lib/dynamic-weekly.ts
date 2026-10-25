@@ -3,11 +3,15 @@ import { rankingEntries } from "./ranking-groups";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
-export function dynamicWeeklyEnabled(s: State) {
+export function dynamicWeeklyEnabled(s: State, divisionId?: string) {
   return !!(
     s.settings[0].weeklyCompetition &&
     s.settings[0].weeklyMandatoryChallenges &&
-    s.settings[0].weeklyDynamicRoles
+    s.settings[0].weeklyDynamicRoles &&
+    (!s.settings[0].weeklyDynamicDivisionIds ||
+      (divisionId
+        ? s.settings[0].weeklyDynamicDivisionIds.includes(divisionId)
+        : s.settings[0].weeklyDynamicDivisionIds.length > 0))
   );
 }
 export type DynamicPair = {

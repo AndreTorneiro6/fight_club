@@ -24,6 +24,7 @@ export function weeklyApprovalSnapshot(s: State, r: WeeklyRound) {
     weekType: r.weekType ?? "NORMAL",
     challengesOpenAt: r.challengesOpenAt,
     divisionChallengeOpenings: r.divisionChallengeOpenings,
+    divisionOpeningDelays: r.divisionOpeningDelays,
     teams: s.divisions.map((d) =>
       rankingEntries(s.players, d._id).map((t) => ({
         id: t.id,
@@ -111,9 +112,9 @@ export function generateWeeklyRoles(
       round: 1,
       previous: Object.fromEntries(
         entries.flatMap((t) => {
-          const role = previous?.assignments.find((a) =>
-            t.members.some((m) => m._id === a.playerId),
-          )?.role;
+          const role = (
+            previous?.dynamicAssignments ?? previous?.assignments
+          )?.find((a) => t.members.some((m) => m._id === a.playerId))?.role;
           return role ? [[t.id, role]] : [];
         }),
       ),

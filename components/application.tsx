@@ -8,6 +8,7 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import ChallengeOpeningCountdown from "./challenge-opening-countdown";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { initialAgendaWeek } from "@/lib/game-agenda";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
@@ -748,6 +749,19 @@ export function Application({
         <GlobalSearch state={s} />
         <main className="content">
           <PlayerAppRegistration />
+          {!admin && s.settings[0]?.weeklyCompetition && (
+            <ChallengeOpeningCountdown
+              round={s.weeklyRounds.find(
+                (r) => r.weekStart === weeklyChallengeWeek(s),
+              )}
+              divisionId={p.divisionId}
+              divisionName={
+                s.divisions.find((d) => d._id === p.divisionId)?.name ?? "Liga"
+              }
+              onOpen={() => void refresh()}
+            />
+          )}
+
           {updateAvailable && (
             <div
               className="inset row between wrap app-update-banner"
@@ -5304,6 +5318,7 @@ const settingLabels: Record<
     | "prizes"
     | "contentVersion"
     | "divisionChallengeDistances"
+    | "weeklyDynamicDivisionIds"
   >,
   string
 > = {
@@ -5345,6 +5360,7 @@ const settingLabels: Record<
 function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState({
     weeklyDynamicRoles: false,
+    weeklyDynamicDivisionIds: s.divisions.map((d) => d._id),
     divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
@@ -5356,6 +5372,7 @@ function Rules({ s, run, busy }: Actions) {
   });
   const incomingSettings = JSON.stringify({
     weeklyDynamicRoles: false,
+    weeklyDynamicDivisionIds: s.divisions.map((d) => d._id),
     divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
@@ -5425,26 +5442,74 @@ function Rules({ s, run, busy }: Actions) {
         </p>
         <div className="form-grid">
           {s.divisions.map((d) => (
+            <label className="check" key={`dynamic-${d._id}`}>
+              <input
+                type="checkbox"
+                checked={(
+                  settings.weeklyDynamicDivisionIds ??
+                  s.divisions.map((d) => d._id)
+                ).includes(d._id)}
+                onChange={(e) => {
+                  const ids =
+                    settings.weeklyDynamicDivisionIds ??
+                    s.divisions.map((d) => d._id);
+                  setSettings({
+                    ...settings,
+                    weeklyDynamicDivisionIds: e.target.checked
+                      ? [...ids, d._id]
+                      : ids.filter((id) => id !== d._id),
+                  });
+                }}
+              />
+              Papéis dinâmicos · {d.name}
+            </label>
+          ))}
+          {s.divisions.map((d) => (
             <label key={d._id}>
               Distância de ataque · {d.name}
-              <input
-                type="number"
-                min={1}
-                max={Math.max(1, rankingEntries(s.players, d._id).length - 1)}
+              <select
+                aria-label={`Distância de ataque · ${d.name}`}
+                disabled={busy}
                 value={
                   settings.divisionChallengeDistances?.[d._id] ??
                   settings.maxPositionsAbove
                 }
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    divisionChallengeDistances: {
-                      ...settings.divisionChallengeDistances,
-                      [d._id]: Number(e.target.value),
+                onChange={async (e) => {
+                  const distance = Number(e.target.value);
+                  const result = await run(
+                    {
+                      type: "admin.challenge.distance.set",
+                      divisionId: d._id,
+                      distance,
+                      expectedDistance: challengeDistance(s, d._id),
+                      reason: "Distância de ataque alterada pelo administrador",
                     },
-                  })
-                }
-              />
+                    "Distância atualizada. As novas opções já estão em vigor; os confrontos existentes foram preservados.",
+                  );
+                  if (result)
+                    setSettings((current) => ({
+                      ...current,
+                      divisionChallengeDistances: {
+                        ...current.divisionChallengeDistances,
+                        [d._id]: distance,
+                      },
+                    }));
+                }}
+              >
+                {Array.from(
+                  {
+                    length: Math.max(
+                      1,
+                      rankingEntries(s.players, d._id).length - 1,
+                    ),
+                  },
+                  (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1} posições
+                    </option>
+                  ),
+                )}
+              </select>
             </label>
           ))}
           {Object.entries(settingLabels).map(([key, label]) => (

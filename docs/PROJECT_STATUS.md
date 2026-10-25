@@ -3,6 +3,13 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Bronze-only activation and opening countdown ready — 25 October 2026
+
+- User authorized deploy/competition activation, then explicitly preserved Ouro/Prata current fixtures and left public release/opening to admins. Added optional weeklyDynamicDivisionIds; activation must use Bronze only, distance3, preserve existing Gold/Silver distances2 and all current commitments/published assignments/opening metadata. Production still04f30f3 at this checkpoint. Earlier run40191715175 cancelled in checks before deploy; do not activate unrestricted88a9bb5.
+- Added immediate per-division distance select with validated admin command/CAS/audit; preserves accepted match distances. Future role generation uses final effective dynamicAssignments, not initial papers.
+- Opening countdown shared between admin and player: per-division minutes opt-in; draft plans start upon approved publication, existing papers start only on explicit admin activation. Absolute scheduling/manual hold still supported. Bronze remains on manual hold until admin chooses; same mechanism available to Ouro/Prata future weeks. No live opening/paper publication or player notice performed during preparation.
+- Validation: typecheck,361 tests and production build pass. New isolated browser check passes: admin/player clock and immediate distance persistence. CI includes fresh-demo clock test. Guide updated. Deployment/operational verification to be recorded below when completed.
+
 ## Dynamic priority-driven roles and Bronze distance prepared — 25 October 2026
 
 - User clarified whole-schedule reasoning: Gold 12→10 makes 11→9 necessary because 11 has no other upper target, even though 9 could locally attack 7/8; 4→2 forces 3→1 and leaves 5 defending. Requested the same logic for Bronze with three ranking positions. No player-/name-specific rules.

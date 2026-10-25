@@ -96,6 +96,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check division opening clocks and immediate distance controls
+        run: npx playwright test e2e/challenge-opening-clock.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check player league agenda and season first-week navigation
         run: npx playwright test e2e/player-agenda.spec.ts
         env:
