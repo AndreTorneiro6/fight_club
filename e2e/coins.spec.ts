@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 
@@ -16,7 +17,7 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page.getByRole("button", { name: "Moedas e bar", exact: true }).click();
+  await openAdminSection(page, "Moedas e bar");
   await page.getByLabel("Ativar moedas em teste privado").check();
   await page.getByLabel("Moedas por jogo marcado", { exact: true }).fill("12");
   await page
@@ -64,7 +65,7 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
     page.getByRole("button", { name: "Trocar por Água no clube", exact: true }),
   ).toBeDisabled();
   await page.reload();
-  await page.getByRole("button", { name: "Moedas e bar", exact: true }).click();
+  await openAdminSection(page, "Moedas e bar");
   await expect(
     page.getByText("Saldo: 5 moedas", { exact: true }),
   ).toBeVisible();
@@ -74,7 +75,7 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole("button", { name: "Ideias", exact: true }).click();
+  await openAdminSection(page, "Ideias");
   await page
     .getByLabel("Título da ideia", { exact: true })
     .fill("Teste de estado de implementação");

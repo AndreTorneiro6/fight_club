@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page, email: string) {
@@ -38,7 +39,7 @@ test("admin chooses an isolated workspace, saves private ideas and can switch to
   ).toHaveCount(0);
   await expect(page.locator('.sidebar a[href="/regras"]')).toBeVisible();
   await expect(page.locator('.sidebar a[href="/campeoes"]')).toBeVisible();
-  await page.getByRole("button", { name: "Ideias", exact: true }).click();
+  await openAdminSection(page, "Ideias");
   const title = `Ideia privada ${Date.now()}`;
   await page.getByLabel("Título da ideia", { exact: true }).fill(title);
   await page
@@ -53,7 +54,7 @@ test("admin chooses an isolated workspace, saves private ideas and can switch to
     page.getByText("Ideia guardada.", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Ideias", exact: true }).click();
+  await openAdminSection(page, "Ideias");
   await page.getByRole("button", { name: new RegExp(title) }).click();
   await expect(page.getByLabel("Texto da ideia", { exact: true })).toHaveValue(
     /Organizar uma jornada/,
@@ -66,7 +67,7 @@ test("admin chooses an isolated workspace, saves private ideas and can switch to
     .click();
   await expect(colleague).toHaveURL(/\/admin/);
   await skipTour(colleague);
-  await colleague.getByRole("button", { name: "Ideias", exact: true }).click();
+  await openAdminSection(colleague, "Ideias");
   await colleague.getByRole("button", { name: new RegExp(title) }).click();
   await page
     .getByLabel("Texto da ideia", { exact: true })
@@ -133,7 +134,7 @@ test("admin chooses an isolated workspace, saves private ideas and can switch to
     .getByRole("button", { name: "Administrador", exact: true })
     .click();
   await expect(page).toHaveURL(/\/admin/);
-  await page.getByRole("button", { name: "Ideias", exact: true }).click();
+  await openAdminSection(page, "Ideias");
   await expect(
     page.getByRole("button", { name: new RegExp(title) }),
   ).toHaveCount(2);

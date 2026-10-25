@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -32,7 +33,7 @@ test("admin can export all divisions together or individually using the ranking 
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page.getByRole("button", { name: "Rankings", exact: true }).click();
+  await openAdminSection(page, "Rankings");
   await page
     .getByRole("button", { name: "Exportar ranking para WhatsApp" })
     .click();

@@ -1,6 +1,7 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
-import { addClubDays, clubDay, clubDateTime } from "../lib/calendar";
+import { addClubDays, clubDay, clubDateTime, clubWeek } from "../lib/calendar";
 import type { View } from "../lib/types";
 async function login(page: Page, email: string) {
   await page.goto("/auth");
@@ -34,13 +35,12 @@ test("admin records membership and four separate court shares, with an actionabl
   await expect(
     page.getByRole("heading", { name: "O que precisas de fazer" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Rever inscrições", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Jogadores", exact: true }).click();
+  await page.getByRole("button", { name: /^Pendentes \(/ }).click();
   await expect(
     page.getByRole("button", { name: /^Pendentes \(/ }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Pagamentos", exact: true }).click();
+  await openAdminSection(page, "Pagamentos");
   const membership = page.locator('[data-membership-player="player-7"]');
   await membership
     .getByRole("button", {
@@ -72,11 +72,15 @@ test("admin records membership and four separate court shares, with an actionabl
     minutes: 90,
   });
   await page.reload();
-  await page.getByRole("button", { name: "Pagamentos", exact: true }).click();
+  await openAdminSection(page, "Pagamentos");
   await page
     .getByRole("button", { name: "Campos", exact: true })
     .last()
     .click();
+  if (clubWeek(start).start !== clubWeek().start)
+    await page
+      .getByRole("button", { name: "Semana seguinte", exact: true })
+      .click();
   const game = page.locator(`[data-court-payment-match="${c._id}"]`);
   await expect(game.locator("[data-court-payment-player]")).toHaveCount(4);
   await game
@@ -92,7 +96,7 @@ test("admin records membership and four separate court shares, with an actionabl
       .getByText("Por pagar", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Pagamentos", exact: true }).click();
+  await openAdminSection(page, "Pagamentos");
   await expect(
     page
       .locator('[data-membership-player="player-7"]')
@@ -102,6 +106,10 @@ test("admin records membership and four separate court shares, with an actionabl
     .getByRole("button", { name: "Campos", exact: true })
     .last()
     .click();
+  if (clubWeek(start).start !== clubWeek().start)
+    await page
+      .getByRole("button", { name: "Semana seguinte", exact: true })
+      .click();
   await expect(game).toContainText("1/4 partes pagas");
   await game
     .getByRole("button", {

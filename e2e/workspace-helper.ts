@@ -21,3 +21,19 @@ export async function switchWorkspace(
   expect(response.ok(), await response.text()).toBe(true);
   await page.goto(workspace === "admin" ? "/admin" : "/inicio");
 }
+
+/** Secondary tools are intentionally tucked away until an admin needs them. */
+export async function openAdminSection(page: Page, label: string) {
+  const nav = page.getByRole("navigation", {
+    name: "Secções da administração",
+  });
+  const search = nav.getByRole("searchbox", {
+    name: "Procurar ferramenta de administração",
+  });
+  const toggle = nav.getByRole("button", { name: /^Mais ferramentas/ });
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true")
+    await toggle.click();
+  await search.fill("");
+  await nav.getByRole("button", { name: label, exact: true }).click();
+}

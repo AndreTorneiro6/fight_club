@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { createRequire } from "node:module";
 const ExcelJS = createRequire(import.meta.url)(
@@ -20,9 +21,7 @@ test("admin sees placement games without Excel controls and runs a private chall
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page
-    .getByRole("button", { name: "Eventos de colocação", exact: true })
-    .click();
+  await openAdminSection(page, "Eventos de colocação");
   const area = page.getByRole("region", {
     name: "Eventos de colocação",
     exact: true,
@@ -121,9 +120,7 @@ test("admin sees placement games without Excel controls and runs a private chall
   await expect(
     area.getByRole("button", { name: "Aplicar ranking inicial", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Simulador de desafios", exact: true })
-    .click();
+  await openAdminSection(page, "Simulador de desafios");
   const sim = page.getByRole("region", {
     name: "Simulador privado de desafios",
   });
@@ -180,9 +177,7 @@ test("admin edits individual sets, scores pending games and updates provisional 
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page
-    .getByRole("button", { name: "Eventos de colocação", exact: true })
-    .click();
+  await openAdminSection(page, "Eventos de colocação");
   const area = page.getByRole("region", {
     name: "Eventos de colocação",
     exact: true,

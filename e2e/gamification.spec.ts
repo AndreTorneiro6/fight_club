@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
@@ -46,7 +47,7 @@ test("admin preview saves slogan/signature, renders division cards and exports b
   });
   expect(updated.ok()).toBe(true);
   await page.reload();
-  await page.getByRole("button", { name: "Gamificação", exact: true }).click();
+  await openAdminSection(page, "Gamificação");
   const area = page.getByRole("region", {
     name: "Gamificação em teste privado",
     exact: true,
@@ -164,7 +165,7 @@ test("admin preview saves slogan/signature, renders division cards and exports b
     .getByRole("button", { name: "Cartas e avatares", exact: true })
     .click();
   await page.reload();
-  await page.getByRole("button", { name: "Gamificação", exact: true }).click();
+  await openAdminSection(page, "Gamificação");
   await expect(
     area.getByLabel("Alcunha no verso", { exact: true }),
   ).toHaveValue("Parceiro do clube");

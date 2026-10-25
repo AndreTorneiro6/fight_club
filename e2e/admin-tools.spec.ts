@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -36,7 +37,7 @@ test("admin can drag a whole team and use mobile and keyboard controls to reorde
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page.getByRole("button", { name: "Rankings", exact: true }).click();
+  await openAdminSection(page, "Rankings");
   const rows = page.locator("[data-admin-ranking-entry]");
   const team = page.locator('[data-admin-ranking-entry="player-2:player-3"]');
   await expect(rows).toHaveCount(7);
@@ -148,9 +149,7 @@ test("matchday generator exports a complete PNG, paginates results and respects 
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page
-    .getByRole("button", { name: "Cartazes da jornada", exact: true })
-    .click();
+  await openAdminSection(page, "Cartazes da jornada");
   await page.getByLabel("Tipo de cartaz").selectOption("results");
   await expect(
     page.getByRole("img", { name: /Cartaz de resultados/ }),

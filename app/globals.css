@@ -2848,3 +2848,198 @@ body::before {
     padding-right: 0;
   }
 }
+
+/* Administration: daily operations first, occasional tools on demand. */
+.admin-primary-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-primary-navigation button {
+  min-height: 44px;
+}
+.admin-tools {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.admin-tools-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 12px 16px;
+  min-height: 48px;
+}
+.admin-tools-toggle span {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.admin-tools-toggle small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.admin-tools-content {
+  padding: 0 16px 16px;
+}
+.admin-tool-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.admin-tool-search input {
+  width: 100%;
+}
+.admin-tools-content .admin-navigation-groups {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.admin-overview h2 {
+  margin: 4px 0 8px;
+}
+.admin-task-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+.admin-task {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  width: 100%;
+  padding: 16px;
+  min-height: 76px;
+  background: var(--panel2);
+  border-color: var(--border);
+}
+.admin-task:hover {
+  border-color: var(--gold);
+}
+.admin-task-count {
+  flex-shrink: 0;
+  min-width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold);
+  font-size: 24px;
+  font-weight: 800;
+}
+.admin-task-copy {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  min-width: 0;
+}
+.admin-task-copy small {
+  color: var(--muted);
+  font-weight: 400;
+  line-height: 1.5;
+}
+.admin-all-clear {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 0;
+  color: var(--green);
+}
+.admin-all-clear p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 0;
+}
+.admin-next-actions {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.admin-next-actions h3 {
+  font-size: 13px;
+  color: var(--muted);
+}
+.admin-next-actions a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.admin-next-actions a > span:first-child {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.admin-next-actions .badge {
+  white-space: nowrap;
+}
+.admin-division-status {
+  margin: 20px 0;
+  display: grid;
+  gap: 12px;
+}
+.admin-division-status > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-division-status small {
+  text-align: right;
+  color: var(--muted);
+}
+.admin-week-panel > button {
+  width: 100%;
+  min-height: 44px;
+}
+.admin-scheduling-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 16px 0;
+}
+.admin-overview > .admin-league-stats {
+  grid-column: 1/-1;
+  margin-bottom: 0;
+}
+@media (max-width: 850px) {
+  .admin-overview {
+    grid-template-columns: 1fr;
+  }
+  .admin-tools-content .admin-navigation-groups {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .admin-primary-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-primary-navigation button {
+    padding: 10px 8px;
+  }
+  .admin-next-actions a {
+    flex-wrap: wrap;
+  }
+  .admin-next-actions a > span:first-child {
+    flex-basis: 100%;
+  }
+  .admin-tools-toggle small {
+    display: none;
+  }
+}

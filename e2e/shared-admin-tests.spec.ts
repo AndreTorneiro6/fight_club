@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 async function login(page: Page, email: string) {
@@ -13,9 +14,7 @@ async function login(page: Page, email: string) {
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page
-    .getByRole("button", { name: "Simulador de desafios", exact: true })
-    .click();
+  await openAdminSection(page, "Simulador de desafios");
 }
 test("two different admins exchange test notifications and complete a shared test without league changes", async ({
   page,

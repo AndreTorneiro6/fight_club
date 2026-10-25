@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 
@@ -16,7 +17,7 @@ test("admin manages sponsor publication and prize links while players see publis
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page.getByRole("button", { name: "Patrocínios", exact: true }).click();
+  await openAdminSection(page, "Patrocínios");
   const name = "Parceiro Neiva de teste";
   await page.getByLabel("Nome do patrocinador", { exact: true }).fill(name);
   await page
@@ -78,7 +79,7 @@ test("admin manages sponsor publication and prize links while players see publis
     page.getByText("Os patrocinadores serão anunciados pelo clube."),
   ).toBeVisible();
   await switchWorkspace(page, "admin");
-  await page.getByRole("button", { name: "Patrocínios", exact: true }).click();
+  await openAdminSection(page, "Patrocínios");
   await page
     .getByRole("button", {
       name: `${name} Privado · por publicar`,
@@ -93,7 +94,7 @@ test("admin manages sponsor publication and prize links while players see publis
     page.getByRole("button", { name: `${name} Publicado`, exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Patrocínios", exact: true }).click();
+  await openAdminSection(page, "Patrocínios");
   await expect(
     page.getByRole("button", { name: `${name} Publicado`, exact: true }),
   ).toBeVisible();

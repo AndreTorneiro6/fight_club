@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace, switchWorkspace } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -127,9 +128,7 @@ test("cards export original tier designs, predictions hide unpublished matches a
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" });
   if (await skip.isVisible()) await skip.click();
-  await page
-    .getByRole("button", { name: "Cartões e palpites", exact: true })
-    .click();
+  await openAdminSection(page, "Cartões e palpites");
   const adminData = await (await page.request.get("/api/engagement")).json();
   const otherCard = adminData.cards.find(
     (card: { playerId: string }) => card.playerId !== adminData.currentPlayerId,

@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import {
   test,
@@ -129,9 +130,7 @@ test("private proposal becomes official only after separate admin approval/publi
       .getByRole("dialog")
       .getByRole("button", { name: "Saltar visita" });
     if (await skip.isVisible()) await skip.click();
-    await page
-      .getByRole("button", { name: "Jornadas e emparelhamento", exact: true })
-      .click();
+    await openAdminSection(page, "Jornadas e emparelhamento");
     await expect(
       page.getByRole("heading", { name: "FIGHT CLUB — COMPETIÇÃO E JORNADAS" }),
     ).toBeVisible();

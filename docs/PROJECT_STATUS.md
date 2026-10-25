@@ -3,6 +3,13 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Admin UX/UI first pass prepared locally — 25 October 2026
+
+- User requested admin UX hierarchy improvements. Replaced duplicated dashboard totals/task cards with decision queue (club-confirmed proposals, results, disputes, current selected-week overdue items, registrations), direct challenge review links, weekly division publication/opening status and four always-open league totals. Zero-count task cards omitted; historic expirations no longer flood overview. Scheduling/approval/domain actions unchanged.
+- Daily navigation: Resumo/Jogos/Desafios/Resultados/Papéis semanais/Jogadores. Remaining tools in accessible expandable Mais ferramentas with accent-insensitive search, auto-open on secondary deep links, closure preserves selected tab. Large manual CTA reduced to Ajuda; season/poster/ranking shortcuts grouped with weekly status. All tools and permissions retained.
+- New AdminOverview component and responsive layout tested at390px without horizontal overflow; screenshots /var/tmp/fc-admin-desktop.png and /var/tmp/fc-admin-mobile.png are demo only. Typecheck,361 tests and production build pass. New isolated overview browser test passes; admin payment flow passes (fixed existing Sunday→next-week fixture navigation). Main7-test workspace/coins/gamification/search/sponsor/album group passes with explicit secondary-tools helper. CI includes isolated admin overview check; adapted navigation clicks in existing tests.
+- No live writes, notifications, push or deployment performed for this UI task. Production remains3073e73. Optional user priority question received no answer during implementation; first pass emphasizes daily decisions and competition operations.
+
 ## Notification network and pending UI fixes deployed — 25 October 2026
 
 - Release3073e739f8a06fe940ecf1adf00b0ec5744850da deployed successfully through workflow40200137319. Typecheck,361 tests, build and all browser groups passed, including Bronze/Ouro ranking reach and mandatory challenge detail without response deadline.

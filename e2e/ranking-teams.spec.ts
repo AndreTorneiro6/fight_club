@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -49,7 +50,7 @@ test("ranking groups assigned partners once on desktop and mobile and restores s
     .fill("Luís Costa");
   await expect(playerRows).toHaveCount(1);
   await expect(playerRows).toContainText("Luís Costa");
-  await admin.getByRole("button", { name: "Parceiros", exact: true }).click();
+  await openAdminSection(admin, "Parceiros");
   const partner = admin.getByLabel("Parceiro de Luís Costa", { exact: true });
   const form = admin.locator("form").filter({ has: partner });
   await partner.selectOption("player-6");
@@ -119,7 +120,7 @@ test("ranking groups assigned partners once on desktop and mobile and restores s
     page.locator("[data-ranking-entry]").filter({ hasText: "Luís Costa" }),
   ).toContainText("Bruno Martins");
   await admin.goto("/admin");
-  await admin.getByRole("button", { name: "Parceiros", exact: true }).click();
+  await openAdminSection(admin, "Parceiros");
   await partner.selectOption("");
   await form
     .getByRole("button", { name: "Guardar parceiro", exact: true })

@@ -8,6 +8,7 @@ import {
   challengeTeamName,
 } from "@/lib/team-competition";
 import NotificationEventIcon from "./notification-event-icon";
+import AdminOverview from "./admin-overview";
 import ChallengeOpeningCountdown from "./challenge-opening-countdown";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { initialAgendaWeek } from "@/lib/game-agenda";
@@ -3519,21 +3520,18 @@ function Admin(a: Actions) {
       c.scheduleProposal?.challengerConfirmed &&
       c.scheduleProposal?.defenderConfirmed,
   );
-  const needsAttention = s.challenges.filter(
-    (c) =>
-      ["disputed", "result_pending", "expired"].includes(effectiveStatus(c)) ||
-      clubPending.some((entry) => entry._id === c._id),
-  );
   return (
     <>
       <Heading
         eyebrow="GESTÃO DA LIGA"
         title="Painel do administrador"
-        description="Tu defines as regras. Os jogadores fazem o jogo."
+        description="Confirma jogos, acompanha a jornada e resolve o que está pendente."
+        right={
+          <Link className="button ghost small" href="/ajuda/admin">
+            <BookOpen size={16} /> Ajuda
+          </Link>
+        }
       />
-      <Link className="button" href="/ajuda/admin">
-        <BookOpen size={17} /> Manual do administrador · Guia passo a passo
-      </Link>
       <AdminNavigation
         tab={tab === "approvals" ? "games" : tab}
         onSelect={(value) => {
@@ -3541,142 +3539,15 @@ function Admin(a: Actions) {
           if (value === "players") setPlayersStatus("approved");
         }}
       />
-      <div className="row wrap admin-secondary-links">
-        <Link href="/title-fight">Title Fights ↗</Link>
-        <Link href="/epocas">Épocas ↗</Link>
-      </div>
       {tab === "summary" ? (
-        <>
-          <Section title="O que precisas de fazer">
-            <div className="admin-priority-grid">
-              {[
-                {
-                  label: "Inscrições por aprovar",
-                  count: s.players.filter(
-                    (p) => p.awaitingApproval && !p.registrationRejectedAt,
-                  ).length,
-                  action: "Rever inscrições",
-                  open: () => {
-                    setPlayersStatus("pending");
-                    setTab("players");
-                  },
-                },
-                {
-                  label: "Campos por confirmar",
-                  count: s.challenges.filter(
-                    (c) =>
-                      c.status === "schedule_pending" &&
-                      c.scheduleProposal?.challengerConfirmed &&
-                      c.scheduleProposal?.defenderConfirmed,
-                  ).length,
-                  action: "Rever jogos",
-                  open: () => setTab("approvals"),
-                },
-                {
-                  label: "Resultados pendentes",
-                  count: s.challenges.filter(
-                    (c) => c.status === "result_pending",
-                  ).length,
-                  action: "Rever resultados",
-                  open: () => setTab("results"),
-                },
-                {
-                  label: "Disputas",
-                  count: s.challenges.filter((c) => c.status === "disputed")
-                    .length,
-                  action: "Rever desafios",
-                  open: () => setTab("challenges"),
-                },
-              ].map((task) => (
-                <div className="inset stack" key={task.label}>
-                  <strong>{task.label}</strong>
-                  <span className="admin-priority-count">{task.count}</span>
-                  <button onClick={task.open}>{task.action}</button>
-                </div>
-              ))}
-            </div>
-          </Section>
-          <section className="panel admin-league-stats">
-            <h2>Estado geral da liga</h2>
-            <div className="stats-grid">
-              {[
-                {
-                  label: "JOGADORES ATIVOS",
-                  v: s.players.filter(
-                    (p) =>
-                      p.status === "active" &&
-                      !p.awaitingApproval &&
-                      !p.registrationRejectedAt,
-                  ).length,
-                },
-                {
-                  label: "DESAFIOS ATIVOS",
-                  v: s.challenges.filter(
-                    (c) => !terminal.has(effectiveStatus(c)),
-                  ).length,
-                },
-                {
-                  label: "JOGOS MARCADOS",
-                  v: s.challenges.filter((c) => c.status === "scheduled")
-                    .length,
-                },
-                {
-                  label: "CONFIRMAÇÕES DO CLUBE",
-                  v: s.challenges.filter(
-                    (c) =>
-                      c.status === "schedule_pending" &&
-                      c.scheduleProposal?.challengerConfirmed &&
-                      c.scheduleProposal?.defenderConfirmed,
-                  ).length,
-                },
-                {
-                  label: "RESULTADOS PENDENTES",
-                  v: s.challenges.filter((c) => c.status === "result_pending")
-                    .length,
-                },
-                {
-                  label: "EM DISPUTA",
-                  v: s.challenges.filter((c) => c.status === "disputed").length,
-                },
-                {
-                  label: "EXPIRADOS",
-                  v: s.challenges.filter(
-                    (c) => effectiveStatus(c) === "expired",
-                  ).length,
-                },
-                {
-                  label: "A MARCAR",
-                  v: s.challenges.filter(
-                    (c) => effectiveStatus(c) === "accepted",
-                  ).length,
-                },
-                {
-                  label: "A AGUARDAR RESPOSTA",
-                  v: s.challenges.filter(
-                    (c) => effectiveStatus(c) === "pending",
-                  ).length,
-                },
-              ].map((x) => (
-                <div className="stat-card" key={x.label}>
-                  <div>
-                    <div className="eyebrow muted">{x.label}</div>
-                    <div className="value">{x.v}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <Section title="Requer a tua atenção">
-            <div className="challenge-grid">
-              {needsAttention.map((c) => (
-                <ChallengeCard s={s} c={c} key={c._id} />
-              ))}
-            </div>
-            {!needsAttention.length && (
-              <Empty text="Tudo a correr bem. A liga está nas mãos dos jogadores." />
-            )}
-          </Section>
-        </>
+        <AdminOverview
+          state={s}
+          onSelect={setTab}
+          onRegistrations={() => {
+            setPlayersStatus("pending");
+            setTab("players");
+          }}
+        />
       ) : tab === "approvals" ? (
         <Section title="Campos por confirmar">
           <p>

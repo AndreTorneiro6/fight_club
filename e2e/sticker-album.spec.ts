@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page, admin = true) {
@@ -20,8 +21,7 @@ async function login(page: Page, admin = true) {
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  if (admin)
-    await page.getByRole("button", { name: "Caderneta", exact: true }).click();
+  if (admin) await openAdminSection(page, "Caderneta");
 }
 
 test("private album supports daily packs, concurrent settings and one-time club rewards", async ({
@@ -136,11 +136,9 @@ test("private album supports daily packs, concurrent settings and one-time club 
       exact: true,
     })
     .click();
-  await page
-    .context()
-    .grantPermissions(["accelerometer"], {
-      origin: new URL(page.url()).origin,
-    });
+  await page.context().grantPermissions(["accelerometer"], {
+    origin: new URL(page.url()).origin,
+  });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.getByRole("button", { name: "Ativar shake", exact: true }).click();
   await expect(
