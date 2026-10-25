@@ -23,6 +23,11 @@ const port =
   "3000";
 process.env.APP_URL ??= `http://localhost:${port}`;
 await seed(true);
+if (testing && process.env.DEMO_TEST_ROUND_TRANSITION === "1") {
+  const { seedRoundTransitionTest } =
+    await import("./test-round-transition-fixture");
+  await seedRoundTransitionTest();
+}
 if (testing && process.env.DEMO_TEST_ADMIN_PAIR === "1") {
   const { database } = await import("../lib/db");
   await (

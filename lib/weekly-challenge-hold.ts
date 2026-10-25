@@ -1,3 +1,4 @@
+import { weeklyPublishedAt } from "./weekly-publication";
 import { randomUUID } from "node:crypto";
 import type { State, Actor } from "./types";
 import { ensure } from "./rules";
@@ -72,7 +73,7 @@ export function pauseWeeklyChallenges(
   }
   const r = s.weeklyRounds.find((r) => r.weekStart === input.weekStart);
   ensure(
-    r?.publishedAt,
+    r && input.divisionIds.every((d) => weeklyPublishedAt(r, d)),
     "Os papéis desta jornada ainda não foram publicados.",
     404,
   );
@@ -160,7 +161,10 @@ export function restoreWeeklyChallengePause(
     409,
   );
   const round = s.weeklyRounds.find((r) => r.weekStart === saved.weekStart);
-  ensure(round?.publishedAt, "Jornada publicada não encontrada.");
+  ensure(
+    round && saved.divisionIds.every((d) => weeklyPublishedAt(round, d)),
+    "Jornada publicada não encontrada.",
+  );
   ensure(
     round.version === input.expectedVersion && round.version === saved.version,
     "A jornada foi alterada. Atualiza antes de repor.",

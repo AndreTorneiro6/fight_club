@@ -1,3 +1,4 @@
+import { weeklyPublishedAt } from "./weekly-publication";
 import {
   dynamicWeeklyEnabled,
   dynamicRole,
@@ -36,7 +37,11 @@ export function frozenRanking(s: State, playerId: string, now = Date.now()) {
 }
 /** Publication opens preparation for the immediately following playing week.
  * Older commitments keep their saved week; drafts and distant weeks cannot open challenges. */
-export function weeklyChallengeWeek(s: State, now = Date.now()) {
+export function weeklyChallengeWeek(
+  s: State,
+  now = Date.now(),
+  divisionId?: string,
+) {
   const current = clubWeek(now).start,
     next = addClubDays(current, 7);
   const season =
@@ -45,8 +50,8 @@ export function weeklyChallengeWeek(s: State, now = Date.now()) {
   const selected = s.weeklyRounds.some(
     (r) =>
       r.weekStart === next &&
-      r.publishedAt &&
-      Date.parse(r.publishedAt) <= now &&
+      weeklyPublishedAt(r, divisionId) &&
+      Date.parse(weeklyPublishedAt(r, divisionId)!) <= now &&
       (!r.seasonId || r.seasonId === season?._id),
   )
     ? next
@@ -69,11 +74,18 @@ export function weeklyRole(
   s: State,
   playerId: string,
   now = Date.now(),
-  weekStart = weeklyChallengeWeek(s, now),
+  weekStart = weeklyChallengeWeek(
+    s,
+    now,
+    s.players.find((p) => p._id === playerId)?.divisionId,
+  ),
 ) {
   const round = s.weeklyRounds.find((entry) => entry.weekStart === weekStart);
   if (
-    round?.publishedAt &&
+    weeklyPublishedAt(
+      round,
+      s.players.find((p) => p._id === playerId)?.divisionId,
+    ) &&
     dynamicWeeklyEnabled(
       s,
       s.players.find((p) => p._id === playerId)?.divisionId,
@@ -81,11 +93,14 @@ export function weeklyRole(
   )
     return (
       dynamicRole(s, playerId, weekStart) ??
-      round.dynamicAssignments?.find((e) => e.playerId === playerId)?.role ??
-      round.assignments.find((e) => e.playerId === playerId)?.role
+      round!.dynamicAssignments?.find((e) => e.playerId === playerId)?.role ??
+      round!.assignments.find((e) => e.playerId === playerId)?.role
     );
-  return round?.publishedAt
-    ? (round.dynamicAssignments ?? round.assignments).find(
+  return weeklyPublishedAt(
+    round,
+    s.players.find((p) => p._id === playerId)?.divisionId,
+  )
+    ? (round!.dynamicAssignments ?? round!.assignments).find(
         (entry) => entry.playerId === playerId,
       )?.role
     : undefined;
@@ -108,10 +123,12 @@ export function weeklyReason(
   const week =
     (ignoreId
       ? s.challenges.find((c) => c._id === ignoreId)?.weekStart
-      : undefined) ?? weeklyChallengeWeek(s, now);
+      : undefined) ?? weeklyChallengeWeek(s, now, attacker.divisionId);
   if (
     !s.weeklyRounds.some(
-      (round) => round.weekStart === week && round.publishedAt,
+      (round) =>
+        round.weekStart === week &&
+        weeklyPublishedAt(round, attacker.divisionId),
     )
   )
     return "A aguardar a publicação dos papéis semanais pelo administrador.";
@@ -192,7 +209,11 @@ export function weeklyWindow(
   s: State,
   ids: string[],
   now = Date.now(),
-  weekStart = weeklyChallengeWeek(s, now),
+  weekStart = weeklyChallengeWeek(
+    s,
+    now,
+    s.players.find((p) => p._id === ids[0])?.divisionId,
+  ),
 ) {
   ids = [
     ...new Set(
@@ -266,7 +287,11 @@ export function weeklyPendingReceived(
   s: State,
   defenderId: string,
   now = Date.now(),
-  weekStart = weeklyChallengeWeek(s, now),
+  weekStart = weeklyChallengeWeek(
+    s,
+    now,
+    s.players.find((p) => p._id === defenderId)?.divisionId,
+  ),
 ) {
   const members = teamMembers(s.players, defenderId).map((m) => m._id),
     week = weekStart;
@@ -362,7 +387,11 @@ export function weeklyPriority(
   s: State,
   playerId: string,
   now = Date.now(),
-  weekStart = weeklyChallengeWeek(s, now),
+  weekStart = weeklyChallengeWeek(
+    s,
+    now,
+    s.players.find((p) => p._id === playerId)?.divisionId,
+  ),
 ) {
   const { ordered, reasons } = weeklyQueue(s, now, weekStart);
   const head = ordered.find((c) => !!challengeSide(c, playerId, s.players));
@@ -400,7 +429,11 @@ export function weeklyTeamCommitment(
   now = Date.now(),
 ) {
   if (!s.settings[0].weeklyCompetition) return undefined;
-  const week = weeklyChallengeWeek(s, now);
+  const week = weeklyChallengeWeek(
+    s,
+    now,
+    s.players.find((p) => p._id === playerId)?.divisionId,
+  );
   return s.challenges
     .filter(
       (c) =>

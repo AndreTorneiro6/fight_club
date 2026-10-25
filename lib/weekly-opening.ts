@@ -1,3 +1,5 @@
+import { weeklyPublishedAt } from "./weekly-publication";
+import { divisionRankingPublished } from "./round-transition";
 import { randomUUID } from "node:crypto";
 import type { State, Actor } from "./types";
 import { ensure } from "./rules";
@@ -46,6 +48,18 @@ export function scheduleWeeklyOpening(
         Date.parse(opensAt) >= timestamp),
     "Escolhe uma abertura atual ou futura.",
   );
+  if (opensAt !== null)
+    for (const [d, source] of Object.entries(r.divisionTransitions ?? {})) {
+      if (divisionId && divisionId !== d) continue;
+      ensure(
+        weeklyPublishedAt(r, d),
+        "Publica primeiro os papéis desta divisão.",
+      );
+      ensure(
+        divisionRankingPublished(s, r.seasonId!, d, source.previousWeek),
+        "Publica primeiro o ranking semanal desta divisão.",
+      );
+    }
   const canonical = opensAt === null ? null : new Date(opensAt).toISOString();
   ensure(
     weekStart >= clubWeek(timestamp).start &&
@@ -77,7 +91,7 @@ export function scheduleWeeklyOpening(
     delete r.divisionOpeningDelays[divisionId];
   r.version = (r.version ?? 0) + 1;
   delete r.openingNotifiedAt;
-  if (!r.publishedAt) {
+  if (!weeklyPublishedAt(r, divisionId)) {
     delete r.approvedAt;
     delete r.approvedBy;
     delete r.approvedVersion;
@@ -106,7 +120,7 @@ export function notifyWeeklyOpenings(s: State, timestamp = Date.now()) {
   if (!season || !s.settings[0].weeklyCompetition) return;
   for (const r of s.weeklyRounds) {
     if (
-      !r.publishedAt ||
+      !weeklyPublishedAt(r) ||
       ![current, next].includes(r.weekStart) ||
       (r.seasonId && r.seasonId !== season._id)
     )
@@ -118,6 +132,7 @@ export function notifyWeeklyOpenings(s: State, timestamp = Date.now()) {
         !p.awaitingApproval &&
         !p.registrationRejectedAt,
     )) {
+      if (!weeklyPublishedAt(r, p.divisionId)) continue;
       const opensAt = weeklyOpeningAt(r, p.divisionId);
       if (!opensAt || opensAt > now) continue;
       const dedupe = `weekly-open:${r.weekStart}:${opensAt}:${p._id}`;
@@ -192,7 +207,7 @@ export function configureWeeklyOpeningDelay(
     409,
   );
   ensure(input.reason.trim().length >= 3, "Indica o motivo.");
-  if (r.publishedAt) {
+  if (weeklyPublishedAt(r, input.divisionId)) {
     ensure(input.activate, "Confirma a ativação da contagem.");
     scheduleWeeklyOpening(
       s,
@@ -223,7 +238,9 @@ export function configureWeeklyOpeningDelay(
     createdAt: new Date(timestamp).toISOString(),
     details: JSON.stringify({
       ...input,
-      opensAt: r.publishedAt ? weeklyOpeningAt(r, input.divisionId) : null,
+      opensAt: weeklyPublishedAt(r, input.divisionId)
+        ? weeklyOpeningAt(r, input.divisionId)
+        : null,
     }),
   });
   return { ok: true, version: r.version };

@@ -1,4 +1,7 @@
 "use client";
+import MatchCalendarActions from "./match-calendar-actions";
+import { weeklyPublishedAt } from "@/lib/weekly-publication";
+import AdminRoundTransition from "./admin-round-transition";
 import {
   teamPosition,
   challengeSide,
@@ -474,6 +477,12 @@ export function Application({
       const result = await request("/api/league", cmd);
       await refresh();
       if (message) notify(message);
+      if (result?.roundTransition) {
+        const flow = result.roundTransition;
+        router.push(
+          `/admin?tab=turnover&division=${encodeURIComponent(flow.divisionId)}&week=${encodeURIComponent(flow.weekStart)}&season=${encodeURIComponent(flow.seasonId)}`,
+        );
+      }
       return result;
     } catch (e) {
       notify((e as Error).message, true);
@@ -759,7 +768,9 @@ export function Application({
           {!admin && s.settings[0]?.weeklyCompetition && (
             <ChallengeOpeningCountdown
               round={s.weeklyRounds.find(
-                (r) => r.weekStart === weeklyChallengeWeek(s),
+                (r) =>
+                  r.weekStart ===
+                  weeklyChallengeWeek(s, Date.now(), p.divisionId),
               )}
               divisionId={p.divisionId}
               divisionName={
@@ -1752,41 +1763,45 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
   const when =
     c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
   return (
-    <Link href={"/desafios/" + c._id} className="challenge-card">
-      <div className="row between">
-        <small>
-          #{String(c.number).padStart(3, "0")}{" "}
-          {isTitleMatch(c) ? "· TITLE FIGHT" : ""}
-        </small>
-        <Status c={c} />
-      </div>
-      <div className="row wrap" style={{ marginTop: 12 }}>
-        <span className="badge gold">
-          <Sword size={12} />
-          Ataque · {name(c.challengerId)}
-        </span>
-        <span className="badge">
-          <Shield size={12} />
-          Defesa · {name(c.defenderId)}
-        </span>
-      </div>
-      <h3>
-        {name(c.challengerId)} <span className="gold">vs</span>{" "}
-        {name(c.defenderId)}
-      </h3>
-      <ChallengeOriginLabel s={s} c={c} />
-      <WeeklyQueueNotice s={s} challenge={c} />
-      {c.queueClosureReason && <small>{c.queueClosureReason}</small>}
-      <div className="row between wrap">
-        <DivisionBadge s={s} id={c.divisionId} />
-        <small>
-          <CalendarDays size={11} />{" "}
-          {when
-            ? `${fmtDate(when)} · ${fmtTime(when)}`
-            : `Até ${fmtDate(c.playBy)}`}
-        </small>
-      </div>
-    </Link>
+    <div className="stack">
+      <Link href={"/desafios/" + c._id} className="challenge-card">
+        <div className="row between">
+          <small>
+            #{String(c.number).padStart(3, "0")}{" "}
+            {isTitleMatch(c) ? "· TITLE FIGHT" : ""}
+          </small>
+          <Status c={c} />
+        </div>
+        <div className="row wrap" style={{ marginTop: 12 }}>
+          <span className="badge gold">
+            <Sword size={12} />
+            Ataque · {name(c.challengerId)}
+          </span>
+          <span className="badge">
+            <Shield size={12} />
+            Defesa · {name(c.defenderId)}
+          </span>
+        </div>
+        <h3>
+          {name(c.challengerId)} <span className="gold">vs</span>{" "}
+          {name(c.defenderId)}
+        </h3>
+        <ChallengeOriginLabel s={s} c={c} />
+        <WeeklyQueueNotice s={s} challenge={c} />
+        {c.queueClosureReason && <small>{c.queueClosureReason}</small>}
+        <div className="row between wrap">
+          <DivisionBadge s={s} id={c.divisionId} />
+          <small>
+            <CalendarDays size={11} />{" "}
+            {when
+              ? `${fmtDate(when)} · ${fmtTime(when)}`
+              : `Até ${fmtDate(c.playBy)}`}
+          </small>
+        </div>
+      </Link>
+      <MatchCalendarActions s={s} c={c} />
+      {s.actor.role === "admin" && <MatchCardExport s={s} c={c} />}
+    </div>
   );
 }
 function Challenges(a: Actions) {
@@ -1829,9 +1844,9 @@ function Challenges(a: Actions) {
     }))
     .filter((entry) => entry.target);
   const active = activeChallenges(s, p._id, Date.now());
-  const challengeWeek = weeklyChallengeWeek(s);
+  const challengeWeek = weeklyChallengeWeek(s, Date.now(), p.divisionId);
   const publishedWeek = s.weeklyRounds.find(
-    (r) => r.weekStart === challengeWeek && r.publishedAt,
+    (r) => r.weekStart === challengeWeek && weeklyPublishedAt(r, p.divisionId),
   );
   const opening = publishedWeek
     ? weeklyOpeningAt(publishedWeek, p.divisionId)
@@ -2242,6 +2257,8 @@ function ChallengeDetail(a: Actions & { id: string }) {
         description={`${name(c.challengerId)} vs ${name(c.defenderId)}`}
         right={<Status c={c} />}
       />
+      <MatchCalendarActions s={s} c={c} />
+      {admin && <MatchCardExport s={s} c={c} />}
       <div className="detail-grid">
         <div className="stack">
           <IncomingTimeOffers {...a} c={c} />
@@ -3552,7 +3569,17 @@ function Admin(a: Actions) {
           if (value === "players") setPlayersStatus("approved");
         }}
       />
-      {tab === "summary" ? (
+      {tab === "turnover" ? (
+        <AdminRoundTransition
+          key={`${searchParams.get("division")}:${searchParams.get("week")}`}
+          s={s}
+          run={a.run}
+          busy={a.busy}
+          divisionId={searchParams.get("division") ?? ""}
+          weekStart={searchParams.get("week") ?? ""}
+          seasonId={searchParams.get("season") ?? ""}
+        />
+      ) : tab === "summary" ? (
         <AdminOverview
           state={s}
           onSelect={setTab}
@@ -3607,7 +3634,14 @@ function Admin(a: Actions) {
       ) : tab === "partners" ? (
         <AdminPartners {...a} />
       ) : tab === "weekly" ? (
-        <WeeklyRoles s={s} run={a.run} busy={a.busy} />
+        <WeeklyRoles
+          key={`${searchParams.get("week")}:${searchParams.get("division")}`}
+          s={s}
+          run={a.run}
+          busy={a.busy}
+          initialWeek={searchParams.get("week") ?? undefined}
+          initialDivision={searchParams.get("division") ?? undefined}
+        />
       ) : tab === "registration" ? (
         <AdminRegistration {...a} />
       ) : tab === "players" ? (
@@ -3712,7 +3746,6 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
     : "";
   return (
     <div className="stack space-top">
-      <MatchCardExport s={s} c={c} />
       <CourtPaymentDetails s={s} c={c} run={run} busy={busy} />
       {editable && (
         <button
@@ -4242,57 +4275,194 @@ function AdminChallenges(a: Actions) {
   const { s } = a,
     [division, setDivision] = useState("all"),
     [status, setStatus] = useState("all"),
-    [origin, setOrigin] = useState("all");
-  const list = s.challenges
-    .filter(
-      (c) =>
-        (origin === "all" || challengeOrigin(s, c).kind === origin) &&
-        (division === "all" || c.divisionId === division) &&
-        (status === "all" || effectiveStatus(c) === status),
-    )
+    [origin, setOrigin] = useState("all"),
+    [week, setWeek] = useState("all"),
+    [query, setQuery] = useState("");
+  const matchesStatus = (c: Challenge, value: string) => {
+    const current = effectiveStatus(c);
+    if (value === "all") return true;
+    if (value === "club")
+      return (
+        current === "schedule_pending" &&
+        !!c.scheduleProposal?.challengerConfirmed &&
+        !!c.scheduleProposal?.defenderConfirmed
+      );
+    if (value === "teams")
+      return (
+        current === "schedule_pending" &&
+        !(
+          c.scheduleProposal?.challengerConfirmed &&
+          c.scheduleProposal?.defenderConfirmed
+        )
+      );
+    if (value === "active")
+      return [
+        "pending",
+        "accepted",
+        "schedule_pending",
+        "scheduled",
+        "result_pending",
+        "disputed",
+      ].includes(current);
+    return current === value;
+  };
+  const base = s.challenges.filter(
+    (c) =>
+      (origin === "all" || challengeOrigin(s, c).kind === origin) &&
+      (division === "all" || c.divisionId === division) &&
+      (week === "all" || c.weekStart === week) &&
+      `${c.number} ${challengeTeamName(c, c.challengerId, s.players)} ${challengeTeamName(c, c.defenderId, s.players)}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .includes(
+          query
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim(),
+        ),
+  );
+  const list = base
+    .filter((c) => matchesStatus(c, status))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const groups = [
+    {
+      label: "Acompanhar",
+      items: [
+        ["active", "Todos os desafios em curso"],
+        ["accepted", "Confronto atribuído · por marcar"],
+        ["teams", "Horário por acordar entre duplas"],
+        ["club", "Horário por confirmar pelo clube"],
+        ["pending", "Pendentes / em fila"],
+      ],
+    },
+    {
+      label: "Jogos e resultados",
+      items: [
+        ["scheduled", "Jogo marcado"],
+        ["result_pending", "Resultado por validar"],
+        ["disputed", "Disputa por resolver"],
+        ["completed", "Jogo concluído"],
+      ],
+    },
+    {
+      label: "Arquivo",
+      items: [
+        ["expired", "Prazo ultrapassado"],
+        ["cancelled", "Cancelado"],
+        ["refused", "Recusado · histórico"],
+      ],
+    },
+  ];
   return (
-    <>
-      <div className="toolbar">
-        <div className="row">
-          <select
-            aria-label="Filtrar divisão"
-            value={division}
-            onChange={(e) => setDivision(e.target.value)}
-          >
-            <option value="all">Todas as divisões</option>
-            {s.divisions.map((d) => (
-              <option value={d._id} key={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filtrar estado"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="all">Todos os estados</option>
-            {Object.entries(statusLabels).map(([v, l]) => (
-              <option value={v} key={v}>
-                {l}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filtrar origem do desafio"
-            value={origin}
-            onChange={(e) => setOrigin(e.target.value)}
-          >
-            <option value="all">Todas as origens</option>
-            {Object.entries(challengeOriginLabels).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
+    <section
+      className="stack"
+      aria-label="Filtros dos desafios administrativos"
+    >
+      <div className="panel stack admin-challenge-filters">
+        <div className="form-grid">
+          <label>
+            Divisão
+            <select
+              aria-label="Filtrar divisão"
+              value={division}
+              onChange={(e) => setDivision(e.target.value)}
+            >
+              <option value="all">Todas as divisões</option>
+              {s.divisions.map((d) => (
+                <option value={d._id} key={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Estado do confronto
+            <select
+              aria-label="Filtrar estado"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="all">Todos os desafios ({base.length})</option>
+              {groups.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.items.map(([id, label]) => (
+                    <option value={id} key={id}>
+                      {label} ({base.filter((c) => matchesStatus(c, id)).length}
+                      )
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <label>
+            Semana dos jogos
+            <select
+              aria-label="Filtrar semana dos desafios"
+              value={week}
+              onChange={(e) => setWeek(e.target.value)}
+            >
+              <option value="all">Todas as semanas</option>
+              {[
+                ...new Set(
+                  s.challenges
+                    .map((c) => c.weekStart)
+                    .filter((w): w is string => !!w),
+                ),
+              ]
+                .sort()
+                .reverse()
+                .map((w) => (
+                  <option key={w} value={w}>
+                    Semana de {w}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            Origem
+            <select
+              aria-label="Filtrar origem do desafio"
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+            >
+              <option value="all">Todas as origens</option>
+              {Object.entries(challengeOriginLabels).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Pesquisar dupla ou número
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Nome de um jogador ou nº do desafio"
+            />
+          </label>
         </div>
-        <small>{list.length} desafios</small>
+        <div className="row between wrap">
+          <small role="status">
+            {list.length} de {s.challenges.length} desafios
+          </small>
+          <button
+            className="ghost small"
+            onClick={() => {
+              setDivision("all");
+              setStatus("all");
+              setOrigin("all");
+              setWeek("all");
+              setQuery("");
+            }}
+          >
+            Limpar filtros
+          </button>
+        </div>
       </div>
       <div className="challenge-grid">
         {list.map((c) => (
@@ -4300,9 +4470,10 @@ function AdminChallenges(a: Actions) {
         ))}
       </div>
       {!list.length && <Empty text="Não existem desafios com estes filtros." />}
-    </>
+    </section>
   );
 }
+
 function AdminPlayers(
   a: Actions & { initialRegistrationFilter?: string; initialSearch?: string },
 ) {

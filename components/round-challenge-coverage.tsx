@@ -1,4 +1,5 @@
 "use client";
+import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import type { View } from "@/lib/types";
 import { rankingEntries } from "@/lib/ranking-groups";
 import { clubWeek } from "@/lib/calendar";
@@ -78,7 +79,9 @@ export default function RoundChallengeCoverage({
   const title = r
     ? `Jornada ${r.number}`
     : `${s.divisions.find((d) => d._id === divisionId)?.name ?? "Liga"} — Semana ${weekStart}`;
-  const published = r ? !!r.rolesPublishedAt : !!weekly?.publishedAt;
+  const published = r
+    ? !!r.rolesPublishedAt
+    : !!weeklyPublishedAt(weekly, divisionId);
   const sent = new Set(challenges.map((c) => c.attackerId)),
     received = new Set(challenges.map((c) => c.defenderId));
   const lists = [

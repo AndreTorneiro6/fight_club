@@ -1,6 +1,20 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.2.0";
+export const applicationVersion = "1.3.0";
 export const releaseNotes = [
+  {
+    version: "1.3.0",
+    date: "2026-10-25",
+    title: "Fecho da jornada e preparação da próxima semana",
+    changes: [
+      "O último resultado validado encaminha o administrador para o ranking semanal da divisão correta e prepara a próxima jornada em privado.",
+      "Fluxo guiado: publicar ranking, rever e aprovar papéis, publicar a divisão e ativar a abertura; sem publicação automática.",
+      "Publicação e notificações dos papéis por divisão, preservando as restantes e a compatibilidade com o histórico.",
+      "Uma única configuração de abertura: aguardar, data e hora ou contagem decrescente.",
+      "Filtros administrativos dos desafios por ação necessária, semana, origem, divisão e pesquisa de duplas.",
+      "Cartões de jogo mais visíveis e botões de calendário do telemóvel e Google Calendar nos jogos confirmados dos jogadores.",
+      "Testes de concorrência com MongoDB replica set para desafios simultâneos e proteção de rascunhos privados.",
+    ],
+  },
   {
     version: "1.2.0",
     date: "2026-10-25",

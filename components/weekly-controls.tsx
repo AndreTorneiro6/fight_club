@@ -1,4 +1,5 @@
 "use client";
+import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
@@ -38,7 +39,11 @@ function PreviousWeekRole({
   const previous = s.weeklyRounds.find(
     (round) => round.weekStart === addClubDays(week, -7),
   );
-  if (!previous?.publishedAt || (first && previous.weekStart < first))
+  if (
+    !previous ||
+    !weeklyPublishedAt(previous, team[0]?.divisionId) ||
+    (first && previous.weekStart < first)
+  )
     return null;
   const roleLabel = (role: string | undefined) =>
     role === "attack"
@@ -170,25 +175,40 @@ export function WeeklyRoles({
   run,
   busy,
   onChallenge,
+  initialWeek,
+  initialDivision,
 }: {
   s: View;
   run: (command: unknown, message?: string) => Promise<any>;
   busy: boolean;
   onChallenge?: (player: Player) => void;
+  initialWeek?: string;
+  initialDivision?: string;
 }) {
   const admin = s.actor.role === "admin";
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
-  const [selectedWeek, setWeek] = useState(() => weeklyChallengeWeek(s));
+  const [selectedWeek, setWeek] = useState(
+    () =>
+      initialWeek ??
+      weeklyChallengeWeek(s, Date.now(), admin ? undefined : me.divisionId),
+  );
   const first = firstCompetitionWeek(s);
-  const week = admin ? seasonWeek(s, selectedWeek) : weeklyChallengeWeek(s);
+  const week = admin
+    ? seasonWeek(s, selectedWeek)
+    : weeklyChallengeWeek(s, Date.now(), admin ? undefined : me.divisionId);
   const [exportOpen, setExportOpen] = useState(false);
   const [weekType, setWeekType] = useState<"NORMAL" | "OPEN_ATTACK">("NORMAL");
-  const [division, setDivision] = useState(admin ? "all" : me.divisionId);
+  const [division, setDivision] = useState(
+    admin ? (initialDivision ?? "all") : me.divisionId,
+  );
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(
     round?.assignments.map((entry) => ({
       ...entry,
-      role: round.publishedAt
+      role: weeklyPublishedAt(
+        round,
+        s.players.find((p) => p._id === entry.playerId)?.divisionId,
+      )
         ? (weeklyRole(s, entry.playerId, Date.now(), week) ?? entry.role)
         : entry.role,
     })) ?? [],
@@ -227,23 +247,35 @@ export function WeeklyRoles({
         (weeklyRole(s, me._id) === "attack" &&
           entry.members.some((m) => !challengeReason(s, me, m)))),
   );
-  const published = !!round?.publishedAt;
+  const published = !!weeklyPublishedAt(
+    round,
+    division === "all" ? undefined : division,
+  );
   const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
   const ownTeamCommitment = weeklyTeamCommitment(s, me._id);
   const save = async (publish: boolean) => {
     await run(
       {
-        type: "admin.week.save",
+        type:
+          division === "all"
+            ? "admin.week.save"
+            : publish
+              ? "admin.week.division.publish"
+              : "admin.week.division.save",
+        divisionId: division === "all" ? undefined : division,
         weekStart: week,
         expectedVersion: round?.version ?? 0,
         weekType,
         publish,
         assignments: players
-          .filter((p) => roles[p._id])
+          .filter(
+            (p) =>
+              roles[p._id] && (division === "all" || p.divisionId === division),
+          )
           .map((p) => ({ playerId: p._id, role: roles[p._id] })),
       },
       publish
-        ? "Papéis publicados. Os jogadores já podem desafiar."
+        ? "Papéis publicados. A abertura mantém a configuração definida pelo administrador."
         : "Rascunho semanal guardado.",
     );
   };
@@ -290,7 +322,12 @@ export function WeeklyRoles({
             <strong>
               {published
                 ? "PUBLICADO"
-                : round?.approvedAt && round.approvedVersion === round.version
+                : (
+                      division === "all"
+                        ? round?.approvedAt &&
+                          round.approvedVersion === round.version
+                        : round?.divisionPublications?.[division]?.approvedAt
+                    )
                   ? "APROVADO — aguarda publicação"
                   : "RASCUNHO — aguarda aprovação"}
             </strong>
@@ -308,7 +345,12 @@ export function WeeklyRoles({
             Tipo de semana
             <select
               value={weekType}
-              disabled={busy || published || week < clubWeek().start}
+              disabled={
+                busy ||
+                !!weeklyPublishedAt(round) ||
+                division !== "all" ||
+                week < clubWeek().start
+              }
               onChange={(e) => setWeekType(e.target.value as typeof weekType)}
             >
               <option value="NORMAL">Normal</option>
@@ -329,7 +371,10 @@ export function WeeklyRoles({
                 <div className="inset stack" key={r._id}>
                   <button onClick={() => setWeek(r.weekStart)}>
                     Semana de {r.weekStart} ·{" "}
-                    {r.publishedAt
+                    {weeklyPublishedAt(
+                      r,
+                      division === "all" ? undefined : division,
+                    )
                       ? "Publicado"
                       : r.approvedAt
                         ? "Aprovado"
@@ -777,11 +822,19 @@ export function WeeklyRoles({
               disabled={busy || published || week < clubWeek().start}
               onClick={async () => {
                 const assignments = players
-                  .filter((p) => roles[p._id])
+                  .filter(
+                    (p) =>
+                      roles[p._id] &&
+                      (division === "all" || p.divisionId === division),
+                  )
                   .map((p) => ({ playerId: p._id, role: roles[p._id] }));
                 const saved = await run(
                   {
-                    type: "admin.week.save",
+                    type:
+                      division === "all"
+                        ? "admin.week.save"
+                        : "admin.week.division.save",
+                    divisionId: division === "all" ? undefined : division,
                     weekStart: week,
                     expectedVersion: round?.version ?? 0,
                     weekType,
@@ -793,7 +846,11 @@ export function WeeklyRoles({
                 if (saved)
                   await run(
                     {
-                      type: "admin.week.approve",
+                      type:
+                        division === "all"
+                          ? "admin.week.approve"
+                          : "admin.week.division.approve",
+                      divisionId: division === "all" ? undefined : division,
                       weekStart: week,
                       expectedVersion: (round?.version ?? 0) + 1,
                     },
@@ -815,12 +872,16 @@ export function WeeklyRoles({
                 busy ||
                 published ||
                 week < clubWeek().start ||
-                !round?.approvedAt ||
-                round.approvedVersion !== round.version ||
-                weekType !== (round.weekType ?? "NORMAL") ||
+                (division === "all"
+                  ? !round?.approvedAt ||
+                    round.approvedVersion !== round.version
+                  : !round?.divisionPublications?.[division]?.approvedAt) ||
+                weekType !== (round?.weekType ?? "NORMAL") ||
                 JSON.stringify(Object.entries(roles).sort()) !==
                   JSON.stringify(
-                    round.assignments.map((a) => [a.playerId, a.role]).sort(),
+                    (round?.assignments ?? [])
+                      .map((a) => [a.playerId, a.role])
+                      .sort(),
                   )
               }
               onClick={() => void save(true)}

@@ -1,60 +1,38 @@
-import { challengeSide } from "@/lib/team-competition";
-import { teamName } from "@/lib/ranking-groups";
 import { clubWeek } from "@/lib/calendar";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { view } from "@/lib/db";
 import { failure } from "@/lib/http";
-const escape = (s: string) =>
-  s
-    .replace(/\\/g, "\\\\")
-    .replace(/\n/g, "\\n")
-    .replace(/,/g, "\\,")
-    .replace(/;/g, "\\;");
-const stamp = (s: string) =>
-  new Date(s)
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d{3}/, "");
+import { calendarMatch, matchCalendarFile } from "@/lib/match-calendar";
+import { ensure } from "@/lib/rules";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor(),
-      s = await view(actor);
-    const requestedWeek = new URL(request.url).searchParams.get("week");
-    const week = requestedWeek
-      ? clubWeek(z.iso.date().parse(requestedWeek)).start
-      : clubWeek().start;
-    const lines = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Neiva//Fight Club Padel League//PT",
-      "CALSCALE:GREGORIAN",
-    ];
-    for (const m of s.matches) {
-      const c = s.challenges.find((c) => c._id === m.challengeId);
-      if (
-        !c ||
-        clubWeek(m.start).start !== week ||
-        !challengeSide(c, actor.playerId, s.players) ||
-        ["cancelled", "expired", "refused"].includes(c.status)
-      )
-        continue;
-      lines.push(
-        "BEGIN:VEVENT",
-        `UID:${m._id}@fightclub`,
-        `DTSTAMP:${stamp(new Date().toISOString())}`,
-        `DTSTART:${stamp(m.start)}`,
-        `DTEND:${stamp(m.end)}`,
-        `SUMMARY:${escape((c.challengerTeam?.map((m) => m.name).join(" + ") || teamName(s.players, c.challengerId)) + " vs " + (c.defenderTeam?.map((m) => m.name).join(" + ") || teamName(s.players, c.defenderId)))}`,
-        `LOCATION:${escape("Neiva Padel Club · " + (s.courts.find((x) => x._id === m.courtId)?.name ?? "Campo por definir"))}`,
-        "END:VEVENT",
+      s = await view(actor),
+      params = new URL(request.url).searchParams;
+    const challengeId = params.get("challenge"),
+      requestedWeek = params.get("week"),
+      week = requestedWeek
+        ? clubWeek(z.iso.date().parse(requestedWeek)).start
+        : clubWeek().start;
+    const events = s.challenges.flatMap((c) => {
+      if (challengeId && c._id !== challengeId) return [];
+      const event = calendarMatch(s, c, actor);
+      return event && (challengeId || clubWeek(event.start).start === week)
+        ? [event]
+        : [];
+    });
+    if (challengeId)
+      ensure(
+        events.length === 1,
+        "Jogo não encontrado ou sem horário confirmado.",
+        404,
       );
-    }
-    lines.push("END:VCALENDAR");
-    return new Response(lines.join("\r\n"), {
+    return new Response(matchCalendarFile(events), {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
         "Content-Disposition": 'attachment; filename="fight-club.ics"',
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (e) {

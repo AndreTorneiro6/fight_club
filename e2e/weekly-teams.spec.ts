@@ -94,9 +94,12 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     .getByRole("button", { name: "Publicar papéis da semana", exact: true })
     .click();
   await expect(
-    admin.getByText("Papéis publicados. Os jogadores já podem desafiar.", {
-      exact: true,
-    }),
+    admin.getByText(
+      "Papéis publicados. A abertura mantém a configuração definida pelo administrador.",
+      {
+        exact: true,
+      },
+    ),
   ).toBeVisible();
   const saved: View = await (await admin.request.get("/api/league")).json();
   for (const id of ["player-7", "player-8"])

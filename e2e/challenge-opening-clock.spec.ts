@@ -97,6 +97,9 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
   });
   const published = await round();
   await page.goto("/admin?tab=weekly");
+  await page
+    .getByLabel("Divisão da abertura", { exact: true })
+    .selectOption("bronze");
   await expect(
     page.getByLabel("Abertura dos desafios · Bronze").getByRole("timer"),
   ).toBeVisible();

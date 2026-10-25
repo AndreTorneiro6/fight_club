@@ -1,3 +1,4 @@
+import { weeklyPublishedAt } from "./weekly-publication";
 import { teamPosition } from "./team-competition";
 import { reconcileCoins } from "./coins";
 import { publicActor, workspaceActor } from "./workspace";
@@ -426,7 +427,49 @@ export async function view(actor: Actor): Promise<View> {
               notificationPreferences: undefined,
             },
       );
-    s.weeklyRounds = s.weeklyRounds.filter((round) => round.publishedAt);
+    s.weeklyRounds = s.weeklyRounds
+      .filter((round) => weeklyPublishedAt(round))
+      .map((round) => ({
+        ...round,
+        assignments: round.assignments.filter((a) =>
+          weeklyPublishedAt(
+            round,
+            s.players.find((p) => p._id === a.playerId)?.divisionId ??
+              round.teamSnapshot?.find((t) => t.playerIds.includes(a.playerId))
+                ?.divisionId ??
+              "__unknown_division__",
+          ),
+        ),
+        dynamicAssignments: round.dynamicAssignments?.filter((a) =>
+          weeklyPublishedAt(
+            round,
+            s.players.find((p) => p._id === a.playerId)?.divisionId ??
+              round.teamSnapshot?.find((t) => t.playerIds.includes(a.playerId))
+                ?.divisionId ??
+              "__unknown_division__",
+          ),
+        ),
+        teamSnapshot: round.teamSnapshot?.filter((t) =>
+          weeklyPublishedAt(round, t.divisionId),
+        ),
+        approvedAt: undefined,
+        approvedBy: undefined,
+        approvedVersion: undefined,
+        approvalSnapshot: undefined,
+        warnings: undefined,
+        divisionTransitions: undefined,
+        divisionRoleGeneration: undefined,
+        divisionPublications: round.divisionPublications
+          ? Object.fromEntries(
+              Object.entries(round.divisionPublications)
+                .filter(([, p]) => p.publishedAt)
+                .map(([id, p]) => [
+                  id,
+                  { publishedAt: p.publishedAt, publishedBy: p.publishedBy },
+                ]),
+            )
+          : undefined,
+      }));
     s.availability = s.availability.filter(
       (x) => x.playerId === actor.playerId,
     );

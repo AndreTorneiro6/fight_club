@@ -1,3 +1,4 @@
+import { weeklyPublishedAt } from "./weekly-publication";
 import { challengeMemberIds } from "./team-competition";
 import { challengeDistance } from "./challenge-distance";
 import { seasonWeek } from "./competition-calendar";
@@ -105,7 +106,10 @@ export function synchronizeWeeklyRoles(
   divisionId?: string,
 ) {
   const round = s.weeklyRounds.find((r) => r.weekStart === weekStart);
-  ensure(round?.publishedAt, "Escolhe papéis já publicados.");
+  ensure(
+    round && weeklyPublishedAt(round, divisionId),
+    "Escolhe papéis já publicados.",
+  );
   const before = round.dynamicAssignments ?? round.assignments;
   const after = effectiveWeeklyRoleAssignments(s, round, divisionId);
   if (roleSignature(before) === roleSignature(after)) return { changed: 0 };
@@ -142,7 +146,7 @@ export function weeklyRoleGenerationInput(
   const previous = s.weeklyRounds
     .filter(
       (r) =>
-        r.publishedAt &&
+        weeklyPublishedAt(r, divisionId) &&
         r.weekStart < week &&
         (!season?.firstCompetitionWeek ||
           r.weekStart >= season.firstCompetitionWeek) &&
@@ -179,7 +183,7 @@ export function weeklyRoleGenerationInput(
     ),
   };
 }
-/** Recalculate only tracked, unedited drafts in explicitly enabled dynamic divisions. */
+/** Recalculate tracked, unedited scopes; preserve every already-published division. */
 export function refreshGeneratedWeeklyDrafts(s: State, timestamp: number) {
   if (
     !s.settings[0].weeklyCompetition ||
@@ -187,10 +191,10 @@ export function refreshGeneratedWeeklyDrafts(s: State, timestamp: number) {
   )
     return;
   for (const round of [...s.weeklyRounds]) {
-    if (round.publishedAt || round.weekStart < seasonWeek(s, timestamp))
-      continue;
+    if (round.weekStart < seasonWeek(s, timestamp)) continue;
     for (const d of s.divisions) {
       const current = s.weeklyRounds.find((r) => r._id === round._id)!;
+      if (weeklyPublishedAt(current, d._id)) continue;
       const meta = current.divisionRoleGeneration?.[d._id];
       if (!meta) continue; // Legacy/manual drafts require an explicit admin regeneration once.
       const ids = divisionPlayerIds(s, current, d._id);
@@ -243,7 +247,7 @@ export function generateWeeklyRoles(
   );
   const existing = s.weeklyRounds.find((r) => r.weekStart === weekStart);
   ensure(
-    !existing?.publishedAt,
+    !weeklyPublishedAt(existing, divisionId),
     "Os papéis publicados ficam no histórico e não podem ser regenerados.",
   );
   ensure(

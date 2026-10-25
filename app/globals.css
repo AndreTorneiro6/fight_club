@@ -3043,3 +3043,9 @@ body::before {
     display: none;
   }
 }
+
+@media (max-width: 600px) {
+  .admin-challenge-filters .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

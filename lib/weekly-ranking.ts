@@ -1,3 +1,7 @@
+import {
+  divisionRankingPublished,
+  divisionRoundCompletion,
+} from "./round-transition";
 import { seasonWeek } from "./competition-calendar";
 import { randomUUID } from "node:crypto";
 import type { State } from "./types";
@@ -12,43 +16,82 @@ export function publishWeeklyRanking(
   seasonId: string,
   by: string,
   timestamp: number,
+  divisionId?: string,
+  requestedWeek?: string,
 ) {
   const season = s.seasons.find((season) => season._id === seasonId);
   ensure(
     season?.status === "active",
     "A época precisa de estar ativa para publicar o ranking semanal.",
   );
-  const week = seasonWeek(s, timestamp);
-  if (season.weeklyRankingPublication?.weekStart === week)
+  const week = requestedWeek ?? seasonWeek(s, timestamp);
+  ensure(
+    !requestedWeek || !!divisionId,
+    "Seleciona uma divisão para publicar uma jornada específica.",
+  );
+  ensure(
+    !divisionId || s.divisions.some((d) => d._id === divisionId),
+    "Divisão inválida.",
+  );
+  const completion = divisionId
+    ? divisionRoundCompletion(s, seasonId, divisionId, week)
+    : undefined;
+  if (requestedWeek)
+    ensure(
+      completion?.ready,
+      "Existem jogos desta divisão com resultado por validar.",
+    );
+  if (divisionId && divisionRankingPublished(s, seasonId, divisionId, week))
     return { published: false };
-  const snapshot = s.divisions.map((division) => ({
-    divisionId: division._id,
-    teams: rankingEntries(s.players, division._id).map((team, i) => ({
-      rank: i + 1,
-      id: team.id,
-      players: team.members.map((m) => ({ id: m._id, name: m.name })),
-      wins: Math.max(0, ...team.members.map((p) => p.wins)),
-      losses: Math.max(0, ...team.members.map((p) => p.losses)),
-    })),
-  }));
+  if (!divisionId && season.weeklyRankingPublication?.weekStart === week)
+    return { published: false };
+  const snapshot = s.divisions
+    .filter((d) => !divisionId || d._id === divisionId)
+    .map((division) => ({
+      divisionId: division._id,
+      teams: rankingEntries(s.players, division._id).map((team, i) => ({
+        rank: i + 1,
+        id: team.id,
+        players: team.members.map((m) => ({ id: m._id, name: m.name })),
+        wins: Math.max(0, ...team.members.map((p) => p.wins)),
+        losses: Math.max(0, ...team.members.map((p) => p.losses)),
+      })),
+    }));
   ensure(
     snapshot.some((d) => d.teams.length),
     "Não existem duplas para publicar.",
   );
   const now = new Date(timestamp).toISOString();
-  season.weeklyRankingPublication = {
-    weekStart: week,
-    publishedAt: now,
-    publishedBy: by,
-  };
+  if (divisionId)
+    season.divisionRankingPublications = [
+      ...(season.divisionRankingPublications ?? []).filter(
+        (p) => p.divisionId !== divisionId || p.weekStart !== week,
+      ),
+      {
+        divisionId,
+        weekStart: week,
+        publishedAt: now,
+        publishedBy: by,
+        resultSignature: completion!.resultSignature,
+      },
+    ];
+  else
+    season.weeklyRankingPublication = {
+      weekStart: week,
+      publishedAt: now,
+      publishedBy: by,
+    };
   season.version = (season.version ?? 0) + 1;
   for (const p of s.players.filter(
     (p) =>
-      p.status === "active" && !p.awaitingApproval && !p.registrationRejectedAt,
+      p.status === "active" &&
+      !p.awaitingApproval &&
+      !p.registrationRejectedAt &&
+      (!divisionId || p.divisionId === divisionId),
   )) {
     const division = snapshot.find((d) => d.divisionId === p.divisionId),
       team = division?.teams.find((t) => t.players.some((m) => m.id === p._id));
-    const key = `weekly-ranking:${season._id}:${week}:${p._id}`;
+    const key = `weekly-ranking:${season._id}:${week}:${p._id}${divisionId ? `:${completion!.resultSignature}` : ""}`;
     if (s.notifications.some((n) => n.dedupe === key)) continue;
     s.notifications.push({
       _id: randomUUID(),
@@ -67,7 +110,12 @@ export function publishWeeklyRanking(
     _id: randomUUID(),
     userId: by,
     action: "ranking.weekly.published",
-    details: JSON.stringify({ seasonId, weekStart: week, snapshot }),
+    details: JSON.stringify({
+      seasonId,
+      divisionId,
+      weekStart: week,
+      snapshot,
+    }),
     createdAt: now,
   });
   return { published: true };
@@ -97,7 +145,15 @@ export function autoWeeklyRanking(s: State, timestamp: number) {
           !p.awaitingApproval &&
           !p.registrationRejectedAt,
       )
-    )
+    ) {
+      const week = seasonWeek(s, timestamp);
+      if (
+        s.divisions.some(
+          (d) => divisionRoundCompletion(s, season._id, d._id, week).ready,
+        )
+      )
+        continue;
       publishWeeklyRanking(s, season._id, "system:weekly-ranking", timestamp);
+    }
   }
 }

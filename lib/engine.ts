@@ -1,3 +1,6 @@
+import { weeklyPublishedAt } from "./weekly-publication";
+import { divisionRoundCompletion } from "./round-transition";
+import { publishDivisionPapers } from "./division-weekly-publication";
 import { challengeDistance } from "./challenge-distance";
 import {
   dynamicWeeklyEnabled,
@@ -223,7 +226,33 @@ export const commandSchema = z.discriminatedUnion("type", [
     divisionId: id.optional(),
     reason: text.min(3),
   }),
-  z.object({ type: z.literal("admin.ranking.publishWeekly"), seasonId: id }),
+  z.object({
+    type: z.literal("admin.ranking.publishWeekly"),
+    seasonId: id,
+    divisionId: id.optional(),
+    weekStart: day.optional(),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.save"),
+    divisionId: id,
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+    assignments: z.array(
+      z.object({ playerId: id, role: z.enum(["attack", "defense"]) }),
+    ),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.approve"),
+    divisionId: id,
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.publish"),
+    divisionId: id,
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+  }),
   z.object({
     type: z.literal("admin.week.generate"),
     divisionId: id.optional(),
@@ -1205,6 +1234,7 @@ export function execute(
       c._id,
     );
     log("result.confirmed", { challengeId: c._id, winnerId });
+    refreshGeneratedWeeklyDrafts(s, timestamp);
   };
   const schedule = (
     c: Challenge,
@@ -1597,9 +1627,10 @@ export function execute(
         [cmd.divisionId]: cmd.distance,
       };
       if (dynamicWeeklyEnabled(s, cmd.divisionId)) {
-        const week = weeklyChallengeWeek(s, timestamp),
+        const week = weeklyChallengeWeek(s, timestamp, cmd.divisionId),
           round = s.weeklyRounds.find((r) => r.weekStart === week);
-        if (round?.publishedAt) refreshDynamicRoles(cmd.divisionId, week);
+        if (weeklyPublishedAt(round, cmd.divisionId))
+          refreshDynamicRoles(cmd.divisionId, week);
       }
       refreshGeneratedWeeklyDrafts(s, timestamp);
       log("challenge.distance.changed", {
@@ -1800,8 +1831,95 @@ export function execute(
       return { id: cmd.playerId };
     }
     case "admin.ranking.publishWeekly": {
-      return publishWeeklyRanking(s, cmd.seasonId, actor.userId, timestamp);
+      return publishWeeklyRanking(
+        s,
+        cmd.seasonId,
+        actor.userId,
+        timestamp,
+        cmd.divisionId,
+        cmd.weekStart,
+      );
     }
+    case "admin.week.division.save": {
+      const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      ensure(
+        r && !weeklyPublishedAt(r, cmd.divisionId),
+        "Escolhe papéis por publicar desta divisão.",
+      );
+      ensure(
+        (r.version ?? 0) === cmd.expectedVersion,
+        "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+        409,
+      );
+      ensure(
+        cmd.weekStart >= clubWeek(timestamp).start,
+        "Escolhe uma semana atual ou futura.",
+      );
+      ensure(
+        new Set(cmd.assignments.map((a) => a.playerId)).size ===
+          cmd.assignments.length,
+        "Cada jogador só pode ter um papel.",
+      );
+      for (const a of cmd.assignments) {
+        const p = player(a.playerId);
+        ensure(
+          p.divisionId === cmd.divisionId &&
+            p.status === "active" &&
+            !p.awaitingApproval,
+          "Jogador inválido para esta divisão.",
+        );
+        ensure(
+          !weeklyPositionReason(s.players, p._id, a.role),
+          "Papel inválido para esta posição.",
+        );
+      }
+      for (const t of rankingEntries(s.players, cmd.divisionId)) {
+        const roles = t.members
+          .map((m) => cmd.assignments.find((a) => a.playerId === m._id)?.role)
+          .filter(Boolean);
+        ensure(
+          new Set(roles).size <= 1,
+          "Os parceiros devem ter o mesmo papel.",
+        );
+      }
+      ensure(
+        !s.challenges.some(
+          (c) =>
+            c.weekStart === cmd.weekStart &&
+            c.divisionId === cmd.divisionId &&
+            !["cancelled", "refused"].includes(c.status),
+        ),
+        "Já existem desafios nesta divisão; os papéis estão bloqueados.",
+      );
+      r.assignments = [
+        ...r.assignments.filter(
+          (a) => player(a.playerId).divisionId !== cmd.divisionId,
+        ),
+        ...cmd.assignments,
+      ];
+      if (r.divisionPublications) delete r.divisionPublications[cmd.divisionId];
+      r.version = (r.version ?? 0) + 1;
+      delete r.approvedAt;
+      delete r.approvedVersion;
+      delete r.approvalSnapshot;
+      log("week.division.saved", {
+        divisionId: cmd.divisionId,
+        weekStart: cmd.weekStart,
+        assignments: cmd.assignments,
+      });
+      return { id: r._id };
+    }
+    case "admin.week.division.approve":
+    case "admin.week.division.publish":
+      return publishDivisionPapers(
+        s,
+        cmd.divisionId,
+        cmd.weekStart,
+        cmd.expectedVersion,
+        cmd.type.endsWith("approve"),
+        actor.userId,
+        timestamp,
+      );
     case "admin.week.opening.set":
       return scheduleWeeklyOpening(
         s,
@@ -1831,7 +1949,7 @@ export function execute(
     }
     case "admin.week.approve": {
       const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
-      ensure(r && !r.publishedAt, "Escolhe um rascunho por publicar.");
+      ensure(r && !weeklyPublishedAt(r), "Escolhe um rascunho por publicar.");
       ensure(
         (r.version ?? 0) === cmd.expectedVersion,
         "Outro administrador alterou os papéis. Atualiza antes de continuar.",
@@ -1877,7 +1995,7 @@ export function execute(
         (r) => r.weekStart === cmd.weekStart,
       );
       ensure(
-        !existing?.publishedAt,
+        !weeklyPublishedAt(existing),
         "Os papéis publicados são históricos e não podem ser alterados.",
         409,
       );
@@ -1982,6 +2100,7 @@ export function execute(
         for (const [divisionId, minutes] of Object.entries(
           round.divisionOpeningDelays ?? {},
         )) {
+          if (round.divisionTransitions?.[divisionId]) continue;
           const opensAt = new Date(timestamp + minutes * 60000).toISOString();
           ensure(
             Date.parse(opensAt) <= Date.parse(clubWeek(cmd.weekStart).endsAt),
@@ -4051,6 +4170,63 @@ export function execute(
         score: c.score,
         setScores: c.setScores,
       });
+      if (c.weekStart) {
+        const completion = divisionRoundCompletion(
+          s,
+          c.seasonId,
+          c.divisionId,
+          c.weekStart,
+        );
+        if (completion.ready) {
+          if (
+            completion.hasNextWeek &&
+            completion.nextWeek >= clubWeek(timestamp).start
+          ) {
+            let next = s.weeklyRounds.find(
+              (r) => r.weekStart === completion.nextWeek,
+            );
+            if (!next)
+              next = generateWeeklyRoles(
+                s,
+                completion.nextWeek,
+                actor.userId,
+                timestamp,
+              );
+            if (
+              !weeklyPublishedAt(next, c.divisionId) &&
+              !next.divisionTransitions?.[c.divisionId]
+            ) {
+              next.divisionTransitions = {
+                ...next.divisionTransitions,
+                [c.divisionId]: { previousWeek: c.weekStart, preparedAt: now },
+              };
+              next.divisionChallengeOpenings = {
+                ...next.divisionChallengeOpenings,
+                [c.divisionId]: null,
+              };
+              if (next.divisionOpeningDelays)
+                delete next.divisionOpeningDelays[c.divisionId];
+              delete next.approvedAt;
+              delete next.approvedVersion;
+              delete next.approvalSnapshot;
+              next.version = (next.version ?? 0) + 1;
+              log("week.transition.prepared", {
+                divisionId: c.divisionId,
+                previousWeek: c.weekStart,
+                nextWeek: completion.nextWeek,
+              });
+            }
+          }
+          return {
+            ok: true,
+            roundTransition: {
+              divisionId: c.divisionId,
+              weekStart: c.weekStart,
+              seasonId: c.seasonId,
+            },
+          };
+        }
+      }
       break;
     }
     case "admin.result.correct": {

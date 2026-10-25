@@ -15,6 +15,7 @@ export const adminGroups = [
       ["simulation", "Simulador de desafios"],
       ["matchmaking", "Jornadas e emparelhamento"],
       ["weekly", "Papéis semanais"],
+      ["turnover", "Preparar próxima jornada"],
       ["rankings", "Rankings"],
       ["challenges", "Desafios"],
       ["games", "Jogos"],

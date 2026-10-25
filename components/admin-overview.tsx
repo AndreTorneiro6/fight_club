@@ -1,4 +1,9 @@
 "use client";
+import { weeklyPublishedAt } from "@/lib/weekly-publication";
+import {
+  divisionRoundCompletion,
+  divisionRankingPublished,
+} from "@/lib/round-transition";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock3 } from "lucide-react";
 import { effectiveStatus } from "@/lib/rules";
@@ -149,6 +154,49 @@ export default function AdminOverview({
           </div>
         )}
       </section>
+      <section className="panel stack" aria-label="Fecho das jornadas">
+        <h2>Preparar próxima jornada</h2>
+        <p>
+          Após o último resultado, publica o ranking, revê os papéis e ativa a
+          abertura de cada divisão.
+        </p>
+        {s.seasons
+          .filter((e) => e.status === "active")
+          .flatMap((season) =>
+            s.weeklyRounds.flatMap((r) =>
+              s.divisions.flatMap((d) => {
+                const complete = divisionRoundCompletion(
+                  s,
+                  season._id,
+                  d._id,
+                  r.weekStart,
+                );
+                if (!complete.ready) return [];
+                const next = s.weeklyRounds.find(
+                  (n) => n.weekStart === complete.nextWeek,
+                );
+                if (
+                  divisionRankingPublished(s, season._id, d._id, r.weekStart) &&
+                  (!complete.hasNextWeek ||
+                    (weeklyPublishedAt(next, d._id) &&
+                      next &&
+                      weeklyOpeningAt(next, d._id)))
+                )
+                  return [];
+                return [
+                  <Link
+                    key={`${r.weekStart}:${d._id}`}
+                    className="button"
+                    href={`/admin?tab=turnover&division=${d._id}&week=${r.weekStart}&season=${season._id}`}
+                  >
+                    {d.name} · {r.weekStart} · Continuar publicação{" "}
+                    <ArrowRight size={15} />
+                  </Link>,
+                ];
+              }),
+            ),
+          )}
+      </section>
       <section
         className="panel admin-week-panel"
         aria-labelledby="admin-week-title"
@@ -174,7 +222,7 @@ export default function AdminOverview({
         <div className="admin-division-status">
           {s.divisions.map((d) => {
             const opening = round ? weeklyOpeningAt(round, d._id) : null;
-            const label = !round?.publishedAt
+            const label = !weeklyPublishedAt(round, d._id)
               ? "Papéis por publicar"
               : opening === null
                 ? "Abertura por definir"

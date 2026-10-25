@@ -17,14 +17,16 @@ export default function RankingExport({
   week,
   roles,
   status,
+  initialDivision = "all",
 }: {
   s: View;
   kind?: PosterKind;
   week?: string;
   roles?: Record<string, "attack" | "defense">;
   status?: string;
+  initialDivision?: string;
 }) {
-  const [selection, setSelection] = useState("all"),
+  const [selection, setSelection] = useState(initialDivision),
     [page, setPage] = useState(0);
   const [preview, setPreview] = useState<{
     url: string;

@@ -302,6 +302,13 @@ export interface Champion extends Entity {
 }
 export interface Season extends Entity {
   firstCompetitionWeek?: string;
+  divisionRankingPublications?: {
+    divisionId: string;
+    weekStart: string;
+    publishedAt: string;
+    publishedBy: string;
+    resultSignature: string;
+  }[];
   weeklyRankingPublication?: {
     weekStart: string;
     publishedAt: string;
@@ -329,6 +336,20 @@ export interface RegistrationLink extends Entity {
   createdAt: string;
 }
 export interface WeeklyRound extends Entity {
+  divisionTransitions?: Record<
+    string,
+    { previousWeek: string; preparedAt: string }
+  >;
+  divisionPublications?: Record<
+    string,
+    {
+      approvedAt?: string;
+      approvedBy?: string;
+      approvalSnapshot?: string;
+      publishedAt?: string;
+      publishedBy?: string;
+    }
+  >;
   divisionRoleGeneration?: Record<
     string,
     { input: string; assignments: string }

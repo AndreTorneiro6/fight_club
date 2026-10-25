@@ -1,3 +1,4 @@
+import { weeklyPublishedAt } from "./weekly-publication";
 import { createHash, randomUUID } from "node:crypto";
 import type { Actor, State } from "./types";
 import { ensure } from "./rules";
@@ -26,7 +27,11 @@ export function planFixedWeeklyMatchups(s: State, input: FixedWeeklyInput) {
     "Divisões repetidas.",
   );
   const round = s.weeklyRounds.find((r) => r.weekStart === input.weekStart);
-  ensure(round?.publishedAt, "Papéis ainda não publicados.");
+  ensure(
+    round &&
+      input.fixtures.every((f) => weeklyPublishedAt(round, f.divisionId)),
+    "Papéis ainda não publicados.",
+  );
   const scoped = s.challenges.filter(
     (c) =>
       input.fixtures.some((f) => f.divisionId === c.divisionId) &&

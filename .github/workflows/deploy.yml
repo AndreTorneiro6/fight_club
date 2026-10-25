@@ -56,6 +56,12 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check guided division turnover, private papers and player calendars
+        run: npx playwright test e2e/round-transition.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEMO_TEST_ROUND_TRANSITION: "1"
+
       - name: Check season administration and start announcements
         run: npx playwright test e2e/seasons.spec.ts
         env:

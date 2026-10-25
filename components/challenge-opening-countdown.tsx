@@ -1,4 +1,5 @@
 "use client";
+import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import { useEffect, useRef, useState } from "react";
 import { weeklyOpeningAt } from "@/lib/weekly";
 import type { WeeklyRound } from "@/lib/types";
@@ -34,7 +35,7 @@ export default function ChallengeOpeningCountdown({
     }, 1000);
     return () => clearInterval(timer);
   }, [opening]);
-  if (!round?.publishedAt)
+  if (!weeklyPublishedAt(round, divisionId))
     return showStatus ? (
       <div className="inset">{divisionName}: papéis por publicar.</div>
     ) : null;
