@@ -22,10 +22,10 @@ Ativar a opção não converte desafios pendentes antigos. Um pedido novo não p
 
 O antigo relatório de reconciliação por primeira submissão foi substituído pela lista explícita desta semana. Não executar esse plano antigo nem a sua campanha de avisos.
 
-## Marcação direta pelo administrador — alteração preparada
+## Marcação direta pelo administrador — publicada
 
 Dentro do desafio atribuído, abrir **Intervenção administrativa → Marcar e confirmar jogo**. Definir **Data e hora**, **Campo** e **Duração · minutos**, rever a nota administrativa e clicar em **Confirmar marcação e notificar duplas**. Não são necessárias propostas ou confirmações de horário dos jogadores. A data/hora usa o fuso horário indicado no formulário.
 
 O servidor confirma a reserva e avisa os membros das duas duplas. Conserva as validações de campo ativo, conflitos de reservas/jogadores, ausências, adiamento e prazo da jornada. Não permite marcar um adversário ainda pendente de atribuição, nem contornar o circuito de revisão/publicação das jornadas geridas. A nota e a decisão do admin ficam no histórico; não são inventadas confirmações dos jogadores. Se outro admin alterar o desafio enquanto o formulário está aberto, a confirmação antiga é bloqueada e exige atualização.
 
-Esta extensão de marcação direta foi preparada depois do deploy 91ec8bf; não está publicada enquanto não houver novo deploy.
+Esta extensão foi publicada na versão e5a23ad em 25 de outubro de 2026, após todas as verificações e testes de navegador.

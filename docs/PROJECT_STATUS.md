@@ -3,6 +3,13 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Direct administrator scheduling deployed — 25 October 2026
+
+- User explicitly requested publication. Pushed revision e5a23ad71b03dcfb21c63d2dc5e8591284cef7be to deploy. Release 40186056866 passed typecheck, all 329 tests, production build and every required browser group, including the new isolated direct-administrator-scheduling scenario.
+- Raspberry Pi deployment succeeded. Read-back .deployed-revision matches e5a23ad; app healthy, worker running, zero restarts, both image sha256:770a4c36698ea3ff1cea42d432f77977ee89a1ca8ded7c5ee498c65904c9f86c. Public /api/health returns ok:true.
+- Administrators can now open an assigned challenge → Intervenção administrativa → Marcar e confirmar jogo, enter date/time/court/duration and confirm directly without player proposals. Existing configured scheduling constraints, audit, concurrency protection and notifications remain enforced.
+- This deployment performed no manual competition mutation, created no real game time/reservation and replayed no notification. Only an actual administrator confirmation sends the involved teams their scheduling notice.
+
 ## Direct administrator scheduling prepared — 25 October 2026
 
 - User requested direct confirmation inside each assigned challenge, even without player time proposals, including the game time. Extended existing admin.match.update and its challenge-page form instead of introducing a parallel scheduling path.
