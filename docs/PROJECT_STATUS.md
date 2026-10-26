@@ -1,3 +1,7 @@
+## Version1.5.0 CI clipboard refresh correction — 26 October 2026
+
+- First workflow40305544394 stopped before deployment: weekly paper clipboard success feedback disappeared during a live refresh, while individual template tests passed. RankingExport regenerated identical PNGs whenever live state/roles got new object identities. Key regeneration to serialized poster content/options instead, preserving image/clipboard feedback for unchanged data.390 tests/typecheck/build and isolated image/template browsers pass again. Retry deployment after this fix. Production stays on verified1.4.0 until successful deploy.
+
 ## Version1.5.0 individual exports prepared;1.4.0 verified live — 26 October 2026
 
 - Latest user additionally required every individual ordinary game export to use cartaz da jornada layout with its division, automatically selecting the special division title template for title matches. Removed the old generic square renderer; all exports now reuse renderMatchdayPoster, including per-set result variants. Preview dimensions come from generated canvas. Extended template browser checks both individual normal/title exports for Ouro, Prata, Bronze and actual template requests/dimensions.

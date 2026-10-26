@@ -39,6 +39,10 @@ export default function RankingExport({
     currentPage = Math.min(page, pages - 1);
   const label = kind === "ranking" ? "ranking" : "papéis semanais";
   const division = s.divisions.find((d) => d._id === selection);
+  // Live refreshes recreate arrays/role maps even when the poster content is unchanged.
+  // Keep the same PNG and clipboard feedback until an actual export input changes.
+  const renderKey = JSON.stringify({ players: s.players, divisions: s.divisions,
+    challenges: s.challenges, kind, selection, page: currentPage, week, roles, status });
   useEffect(() => {
     let cancelled = false,
       url = "";
@@ -74,7 +78,7 @@ export default function RankingExport({
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [s, kind, selection, currentPage, week, roles, status, division?.code]);
+  }, [renderKey]);
   async function share() {
     if (!preview) return;
     try {
