@@ -7,7 +7,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { clubWeek } from "@/lib/calendar";
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react";
 import { effectiveStatus } from "@/lib/rules";
 import { rankingEntries } from "@/lib/ranking-groups";
 import { weeklyChallengeWeek, weeklyOpeningAt } from "@/lib/weekly";
@@ -108,266 +108,51 @@ export default function AdminOverview({
         p.status === "active" &&
         !p.awaitingApproval &&
         !p.registrationRejectedAt,
-    ),
-    toSchedule = s.challenges.filter(
-      (c) => effectiveStatus(c) === "accepted" && c.weekStart === week,
-    ).length;
+    );
+  const handoffLinks = s.seasons
+    .filter((e) => e.status === "active")
+    .flatMap((season) =>
+      s.weeklyRounds.flatMap((r) =>
+        s.divisions.flatMap((d) => {
+          const complete = divisionRoundCompletion(
+            s,
+            season._id,
+            d._id,
+            r.weekStart,
+          );
+          if (!complete.ready) return [];
+          const next = s.weeklyRounds.find(
+            (n) => n.weekStart === complete.nextWeek,
+          );
+          if (
+            divisionRankingPublished(s, season._id, d._id, r.weekStart) &&
+            (!complete.hasNextWeek ||
+              (weeklyPublishedAt(next, d._id) &&
+                next &&
+                weeklyOpeningAt(next, d._id)))
+          )
+            return [];
+          return [
+            <Link
+              key={`${r.weekStart}:${d._id}`}
+              className="button"
+              href={`/admin?tab=turnover&division=${d._id}&week=${r.weekStart}&season=${season._id}`}
+            >
+              {d.name} · {r.weekStart} · Continuar publicação{" "}
+              <ArrowRight size={15} />
+            </Link>,
+          ];
+        }),
+      ),
+    );
   return (
     <div className="admin-overview">
-      <section
-        className="panel admin-action-panel"
-        aria-labelledby="admin-actions-title"
-      >
-        <div className="row between wrap">
-          <div>
-            <div className="eyebrow gold">PRIORIDADE</div>
-            <h2 id="admin-actions-title">O que precisas de fazer</h2>
-          </div>
-          <span className="badge">
-            {tasks.reduce((n, t) => n + t.count, 0)} pendentes
-          </span>
-        </div>
-        <p className="muted">Decisões que dependem da organização.</p>
-        {tasks.length ? (
-          <div className="admin-task-list">
-            {tasks.map((task) => (
-              <button
-                className="admin-task"
-                key={task.label}
-                onClick={task.action}
-              >
-                <span className="admin-task-count">{task.count}</span>
-                <span className="admin-task-copy">
-                  <strong>{task.label}</strong>
-                  <small>{task.detail}</small>
-                </span>
-                <ArrowRight size={18} />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="admin-all-clear">
-            <CheckCircle2 size={24} />
-            <div>
-              <strong>Sem decisões pendentes</strong>
-              <p>
-                As confirmações, resultados, disputas e inscrições estão em dia.
-              </p>
-            </div>
-          </div>
-        )}
-        {attention.length > 0 && (
-          <div className="admin-next-actions">
-            <h3>Confrontos a rever</h3>
-            {attention.map((c) => (
-              <Link key={c._id} href={`/desafios/${c._id}`}>
-                <span>
-                  {challengeTeamName(c, c.challengerId, s.players)}{" "}
-                  <span className="muted">×</span>{" "}
-                  {challengeTeamName(c, c.defenderId, s.players)}
-                </span>
-                <span className="badge">
-                  {c.status === "disputed"
-                    ? "Disputa"
-                    : c.status === "result_pending"
-                      ? "Resultado"
-                      : effectiveStatus(c) === "expired"
-                        ? "Prazo ultrapassado"
-                        : "Confirmar jogo"}
-                </span>
-                <ArrowRight size={14} />
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-      <section
-        className="panel stack"
-        aria-labelledby="admin-unscheduled-title"
-      >
-        <div className="row between wrap">
-          <div>
-            <div className="eyebrow gold">MARCAÇÕES</div>
-            <h2 id="admin-unscheduled-title">Jogos por marcar</h2>
-          </div>
-          <span className="badge">{visibleUnscheduled.length}</span>
-        </div>
-        <p>
-          Confrontos atribuídos que ainda não têm dia, hora e campo confirmados.
-          Inclui horários propostos que aguardam confirmação.
-        </p>
-        <label>
-          Divisão dos jogos por marcar
-          <select
-            aria-label="Divisão dos jogos por marcar"
-            value={scheduleDivision}
-            onChange={(e) => {
-              setScheduleDivision(e.target.value);
-              setShowAllUnscheduled(false);
-            }}
-          >
-            <option value="all">
-              Todas as divisões ({unscheduled.length})
-            </option>
-            {s.divisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name} (
-                {unscheduled.filter((c) => c.divisionId === d._id).length})
-              </option>
-            ))}
-          </select>
-        </label>
-        {visibleUnscheduled.length ? (
-          <div className="stack">
-            {visibleUnscheduled
-              .slice(0, showAllUnscheduled ? undefined : 6)
-              .map((c) => (
-                <Link
-                  className="inset stack"
-                  key={c._id}
-                  href={`/desafios/${c._id}`}
-                  aria-label={`Marcar jogo #${c.number}`}
-                >
-                  <small>
-                    {s.divisions.find((d) => d._id === c.divisionId)?.name} ·
-                    Semana de {c.weekStart ?? clubWeek(c.createdAt).start}
-                    {c.deferredUntil ? ` · Adiado até ${c.deferredUntil}` : ""}
-                  </small>
-                  <strong>
-                    {challengeTeamName(c, c.challengerId, s.players)}{" "}
-                    <span className="muted">×</span>{" "}
-                    {challengeTeamName(c, c.defenderId, s.players)}
-                  </strong>
-                  <small>
-                    {c.scheduleProposal
-                      ? `Horário proposto: ${new Date(c.scheduleProposal.start).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} · ${c.scheduleProposal.challengerConfirmed && c.scheduleProposal.defenderConfirmed ? "Aguarda confirmação do clube" : "Aguarda acordo das duplas"}`
-                      : "Sem horário proposto"}
-                  </small>
-                  <span className="row gold">
-                    Marcar e confirmar jogo <ArrowRight size={15} />
-                  </span>
-                </Link>
-              ))}
-          </div>
-        ) : (
-          <p className="muted">Não existem jogos por marcar nesta seleção.</p>
-        )}
-        {visibleUnscheduled.length > 6 && (
-          <button onClick={() => setShowAllUnscheduled((v) => !v)}>
-            {showAllUnscheduled
-              ? "Mostrar menos"
-              : `Ver todos os ${visibleUnscheduled.length} jogos por marcar`}
-          </button>
-        )}
-      </section>
-      <section className="panel stack" aria-label="Fecho das jornadas">
-        <h2>Preparar próxima jornada</h2>
-        <p>
-          Após o último resultado, publica o ranking, revê os papéis e ativa a
-          abertura de cada divisão.
-        </p>
-        {s.seasons
-          .filter((e) => e.status === "active")
-          .flatMap((season) =>
-            s.weeklyRounds.flatMap((r) =>
-              s.divisions.flatMap((d) => {
-                const complete = divisionRoundCompletion(
-                  s,
-                  season._id,
-                  d._id,
-                  r.weekStart,
-                );
-                if (!complete.ready) return [];
-                const next = s.weeklyRounds.find(
-                  (n) => n.weekStart === complete.nextWeek,
-                );
-                if (
-                  divisionRankingPublished(s, season._id, d._id, r.weekStart) &&
-                  (!complete.hasNextWeek ||
-                    (weeklyPublishedAt(next, d._id) &&
-                      next &&
-                      weeklyOpeningAt(next, d._id)))
-                )
-                  return [];
-                return [
-                  <Link
-                    key={`${r.weekStart}:${d._id}`}
-                    className="button"
-                    href={`/admin?tab=turnover&division=${d._id}&week=${r.weekStart}&season=${season._id}`}
-                  >
-                    {d.name} · {r.weekStart} · Continuar publicação{" "}
-                    <ArrowRight size={15} />
-                  </Link>,
-                ];
-              }),
-            ),
-          )}
-      </section>
-      <section
-        className="panel admin-week-panel"
-        aria-labelledby="admin-week-title"
-      >
-        <div className="row between wrap">
-          <div>
-            <div className="eyebrow muted">COMPETIÇÃO</div>
-            <h2 id="admin-week-title">Esta jornada</h2>
-          </div>
-          <CalendarDays size={20} />
-        </div>
-        <p className="muted">
-          Semana de{" "}
-          {new Date(`${week}T12:00:00Z`).toLocaleDateString("pt-PT", {
-            day: "2-digit",
-            month: "2-digit",
-          })}{" "}
-          ·{" "}
-          {round?.weekType === "OPEN_ATTACK"
-            ? "Ataque livre"
-            : "Papéis semanais"}
-        </p>
-        <div className="admin-division-status">
-          {s.divisions.map((d) => {
-            const opening = round ? weeklyOpeningAt(round, d._id) : null;
-            const label = !weeklyPublishedAt(round, d._id)
-              ? "Papéis por publicar"
-              : opening === null
-                ? "Abertura por definir"
-                : opening && Date.parse(opening) > now
-                  ? `Abre ${new Date(opening).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" })}`
-                  : "Desafios abertos";
-            return (
-              <div key={d._id}>
-                <strong>{d.name}</strong>
-                <small>{label}</small>
-              </div>
-            );
-          })}
-        </div>
-        <button onClick={() => onSelect("weekly")}>
-          Gerir papéis e abertura <ArrowRight size={15} />
-        </button>
-        <div className="admin-scheduling-note">
-          <Clock3 size={16} />
-          <span>{toSchedule} confrontos por marcar nesta jornada</span>
-        </div>
-        <div className="row wrap">
-          <Link href="/epocas" className="link">
-            Épocas
-          </Link>
-          <button className="ghost small" onClick={() => onSelect("posters")}>
-            Cartazes
-          </button>
-          <button className="ghost small" onClick={() => onSelect("rankings")}>
-            Rankings
-          </button>
-        </div>
-      </section>
       <section
         className="panel admin-league-stats"
         aria-labelledby="admin-stats-title"
       >
         <h2 id="admin-stats-title">Estado geral da liga</h2>
-        <div className="stats-grid">
+        <div className="admin-overview-metrics">
           {[
             ["JOGADORES ATIVOS", activePlayers.length],
             [
@@ -386,7 +171,7 @@ export default function AdminOverview({
               s.challenges.filter((c) => c.status === "completed").length,
             ],
           ].map(([label, value]) => (
-            <div className="stat-card" key={label}>
+            <div className="admin-overview-metric" key={label}>
               <div>
                 <div className="eyebrow muted">{label}</div>
                 <div className="value">{value}</div>
@@ -395,6 +180,233 @@ export default function AdminOverview({
           ))}
         </div>
       </section>
+      <div className="admin-overview-main">
+        <section
+          className="panel admin-action-panel"
+          aria-labelledby="admin-actions-title"
+        >
+          <div className="row between wrap">
+            <div>
+              <div className="eyebrow gold">PRIORIDADE</div>
+              <h2 id="admin-actions-title">O que precisas de fazer</h2>
+            </div>
+            <span className="badge">
+              {tasks.reduce((n, t) => n + t.count, 0)} pendentes
+            </span>
+          </div>
+          <p className="muted">Decisões que dependem da organização.</p>
+          {tasks.length ? (
+            <div className="admin-task-list">
+              {tasks.map((task) => (
+                <button
+                  className="admin-task"
+                  key={task.label}
+                  onClick={task.action}
+                >
+                  <span className="admin-task-count">{task.count}</span>
+                  <span className="admin-task-copy">
+                    <strong>{task.label}</strong>
+                    <small>{task.detail}</small>
+                  </span>
+                  <ArrowRight size={18} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="admin-all-clear">
+              <CheckCircle2 size={24} />
+              <div>
+                <strong>Sem decisões pendentes</strong>
+                <p>
+                  As confirmações, resultados, disputas e inscrições estão em
+                  dia.
+                </p>
+              </div>
+            </div>
+          )}
+          {attention.length > 0 && (
+            <div className="admin-next-actions">
+              <h3>Confrontos a rever</h3>
+              {attention.map((c) => (
+                <Link key={c._id} href={`/desafios/${c._id}`}>
+                  <span>
+                    {challengeTeamName(c, c.challengerId, s.players)}{" "}
+                    <span className="muted">×</span>{" "}
+                    {challengeTeamName(c, c.defenderId, s.players)}
+                  </span>
+                  <span className="badge">
+                    {c.status === "disputed"
+                      ? "Disputa"
+                      : c.status === "result_pending"
+                        ? "Resultado"
+                        : effectiveStatus(c) === "expired"
+                          ? "Prazo ultrapassado"
+                          : "Confirmar jogo"}
+                  </span>
+                  <ArrowRight size={14} />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+        <section
+          className="panel admin-unscheduled-panel"
+          aria-labelledby="admin-unscheduled-title"
+        >
+          <div className="row between wrap">
+            <div>
+              <div className="eyebrow gold">MARCAÇÕES</div>
+              <h2 id="admin-unscheduled-title">Jogos por marcar</h2>
+            </div>
+            <span className="badge">{visibleUnscheduled.length}</span>
+          </div>
+          <p className="muted">Dia, hora ou campo ainda por confirmar.</p>
+          {unscheduled.length > 0 && (
+            <label className="admin-unscheduled-filter">
+              <span>Divisão</span>
+              <select
+                aria-label="Divisão dos jogos por marcar"
+                value={scheduleDivision}
+                onChange={(e) => {
+                  setScheduleDivision(e.target.value);
+                  setShowAllUnscheduled(false);
+                }}
+              >
+                <option value="all">
+                  Todas as divisões ({unscheduled.length})
+                </option>
+                {s.divisions.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {d.name} (
+                    {unscheduled.filter((c) => c.divisionId === d._id).length})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {visibleUnscheduled.length ? (
+            <div className="admin-unscheduled-list">
+              {visibleUnscheduled
+                .slice(0, showAllUnscheduled ? undefined : 6)
+                .map((c) => (
+                  <Link
+                    className="admin-unscheduled-game"
+                    key={c._id}
+                    href={`/desafios/${c._id}`}
+                    aria-label={`Marcar jogo #${c.number}`}
+                  >
+                    <small className="admin-game-meta">
+                      {s.divisions.find((d) => d._id === c.divisionId)?.name} ·
+                      Semana de {c.weekStart ?? clubWeek(c.createdAt).start}
+                      {c.deferredUntil
+                        ? ` · Adiado até ${c.deferredUntil}`
+                        : ""}
+                    </small>
+                    <strong className="admin-game-teams">
+                      {challengeTeamName(c, c.challengerId, s.players)}{" "}
+                      <span className="muted">×</span>{" "}
+                      {challengeTeamName(c, c.defenderId, s.players)}
+                    </strong>
+                    <small className="admin-game-status">
+                      {c.scheduleProposal
+                        ? `Horário proposto: ${new Date(c.scheduleProposal.start).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} · ${c.scheduleProposal.challengerConfirmed && c.scheduleProposal.defenderConfirmed ? "Aguarda confirmação do clube" : "Aguarda acordo das duplas"}`
+                        : "Sem horário proposto"}
+                    </small>
+                    <ArrowRight
+                      className="admin-game-arrow gold"
+                      size={17}
+                      aria-hidden="true"
+                    />
+                  </Link>
+                ))}
+            </div>
+          ) : (
+            <p className="muted">Não existem jogos por marcar nesta seleção.</p>
+          )}
+          {visibleUnscheduled.length > 6 && (
+            <button onClick={() => setShowAllUnscheduled((v) => !v)}>
+              {showAllUnscheduled
+                ? "Mostrar menos"
+                : `Ver todos os ${visibleUnscheduled.length} jogos por marcar`}
+            </button>
+          )}
+        </section>
+      </div>
+      <aside
+        className="admin-overview-sidebar"
+        aria-label="Jornada e publicações"
+      >
+        <section
+          className="panel admin-week-panel"
+          aria-labelledby="admin-week-title"
+        >
+          <div className="row between wrap">
+            <div>
+              <div className="eyebrow muted">COMPETIÇÃO</div>
+              <h2 id="admin-week-title">Esta jornada</h2>
+            </div>
+            <CalendarDays size={20} />
+          </div>
+          <p className="muted">
+            Semana de{" "}
+            {new Date(`${week}T12:00:00Z`).toLocaleDateString("pt-PT", {
+              day: "2-digit",
+              month: "2-digit",
+            })}{" "}
+            ·{" "}
+            {round?.weekType === "OPEN_ATTACK"
+              ? "Ataque livre"
+              : "Papéis semanais"}
+          </p>
+          <div className="admin-division-status">
+            {s.divisions.map((d) => {
+              const opening = round ? weeklyOpeningAt(round, d._id) : null;
+              const label = !weeklyPublishedAt(round, d._id)
+                ? "Papéis por publicar"
+                : opening === null
+                  ? "Abertura por definir"
+                  : opening && Date.parse(opening) > now
+                    ? `Abre ${new Date(opening).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" })}`
+                    : "Desafios abertos";
+              return (
+                <div key={d._id}>
+                  <strong>{d.name}</strong>
+                  <small>{label}</small>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => onSelect("weekly")}>
+            Gerir papéis e abertura <ArrowRight size={15} />
+          </button>
+          <div className="row wrap">
+            <Link href="/epocas" className="link">
+              Épocas
+            </Link>
+            <button className="ghost small" onClick={() => onSelect("posters")}>
+              Cartazes
+            </button>
+            <button
+              className="ghost small"
+              onClick={() => onSelect("rankings")}
+            >
+              Rankings
+            </button>
+          </div>
+        </section>
+        {handoffLinks.length > 0 && (
+          <section
+            className="panel admin-turnover-panel"
+            aria-label="Fecho das jornadas"
+          >
+            <h2>Preparar próxima jornada</h2>
+            <p className="muted">
+              Publica o ranking, revê os papéis e ativa a abertura.
+            </p>
+            <div className="stack">{handoffLinks}</div>
+          </section>
+        )}
+      </aside>
     </div>
   );
 }

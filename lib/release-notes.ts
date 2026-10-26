@@ -1,8 +1,26 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.1";
+export const applicationVersion = "1.5.2";
 export const releaseNotes = [
-  { version: "1.5.1", date: "2026-10-26", title: "Correção visual dos cartazes",
-    changes: ["Restauro localizado dos campos dos modelos originais, sem retângulos opacos sobre o grafismo.", "Cabeçalhos, molduras, emblemas e slogan originais preservados nas exportações de jornada e jogos individuais."] },
+  {
+    version: "1.5.2",
+    date: "2026-10-26",
+    title: "Resumo de administração mais compacto",
+    changes: [
+      "Indicadores da liga numa faixa compacta e duas colunas independentes para eliminar espaços vazios entre cartões.",
+      "Jogos por marcar em linhas mais curtas, ações e estado da jornada reorganizados; publicações aparecem apenas quando há trabalho por concluir.",
+      "Disposição adaptada ao telemóvel, mantendo os nomes das duplas, filtros e acessos às marcações.",
+      "Limpeza auditada dos jogos cancelados e respetivas referências, protegendo resultados oficiais e ranking.",
+    ],
+  },
+  {
+    version: "1.5.1",
+    date: "2026-10-26",
+    title: "Correção visual dos cartazes",
+    changes: [
+      "Restauro localizado dos campos dos modelos originais, sem retângulos opacos sobre o grafismo.",
+      "Cabeçalhos, molduras, emblemas e slogan originais preservados nas exportações de jornada e jogos individuais.",
+    ],
+  },
   {
     version: "1.5.0",
     date: "2026-10-26",
