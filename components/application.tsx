@@ -65,6 +65,7 @@ import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
+import AdminCoinShortcut from "./admin-coin-shortcut";
 import AdminMatchVoting from "./admin-match-voting";
 import AdminGamification from "./admin-gamification";
 import { AdminSponsors, SponsorPage, PrizeSponsor } from "./sponsors";
@@ -765,6 +766,7 @@ export function Application({
           </div>
         </header>
         <GlobalSearch state={s} />
+        <AdminCoinShortcut state={s} />
         <main className="content">
           <PlayerAppRegistration />
           {!admin && s.settings[0]?.weeklyCompetition && (

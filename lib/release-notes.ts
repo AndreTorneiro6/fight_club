@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.6.1";
+export const applicationVersion = "1.6.2";
 export const releaseNotes = [
+  {
+    version: "1.6.2",
+    date: "2026-10-26",
+    title: "Moeda visível no espaço de administração",
+    changes: [
+      "Atalho visível abaixo da pesquisa com símbolo, nome configurado e saldo da carteira do administrador.",
+      "Acesso direto a Moedas e bar; faixa própria no telemóvel, mantendo espaço nos botões do topo e sem acesso no modo jogador.",
+    ],
+  },
   {
     version: "1.6.1",
     date: "2026-10-26",

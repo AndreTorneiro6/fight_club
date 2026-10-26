@@ -1,3 +1,8 @@
+## Version1.6.2 visible admin coin shortcut prepared — 26 October 2026
+
+- User requested publish1.6.1, then said coin not visible.1.6.1 workflow40414560666 cancelled safely during CI build before Pi deploy to combine changes. Added persistent admin-only coin shortcut below global search: original coin symbol/initials, configured name, personal wallet balance and direct /admin?tab=coins link. Separate responsive band avoids crowding mobile topbar/safe areas. Hidden for player workspace even for admin accounts; no coin activation/balance/rule changes.
+-406 tests/typecheck/build pass, existing coins browser now enters via shortcut and verifies hidden in player mode; custom-name/balance persistence, mobile390px no overflow all pass. Mobile screenshot visually inspected. Version/changelog1.6.2 includes already tested1.6.1 ranking stakes. User optional clarification asks if missing symbol/balance vs management page; no answer yet, assumed visibility/discoverability and addressed both without player release. Deployment next. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.6.1 ranking stakes in private voting prepared — 26 October 2026
 
 - User requested ranking places each game is fighting for and both positions. Central cards/list and detail now reuse challengeTeamRanks (verified historical team snapshots, never account ordinals/current ranking guesses) for ATAQUE/DEFESA place labels. Shows defender place in dispute, title-match badge for champion fights, direct-swap explanation and saved-position caption. Unknown historical positions explicitly unavailable. No ranking/vote/chat/security logic changed; admin-only preview retained.

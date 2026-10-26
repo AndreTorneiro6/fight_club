@@ -17,7 +17,7 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await openAdminSection(page, "Moedas e bar");
+  await page.getByRole("link", { name: /^Abrir moedas e bar:/ }).click();
   await expect(
     page.getByRole("heading", { name: "Neiva Coins", exact: true }),
   ).toBeVisible();
@@ -128,6 +128,9 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
   ).toBeVisible();
   await switchWorkspace(page, "player");
   const state = await (await page.request.get("/api/league")).json();
+  await expect(
+    page.getByRole("link", { name: /^Abrir moedas e bar:/ }),
+  ).toHaveCount(0);
   expect(state.coinSettings).toEqual([]);
   expect(state.coinEntries).toEqual([]);
   expect(state.adminNotes).toEqual([]);
