@@ -1,4 +1,3 @@
-import { clubWeek } from "../lib/calendar";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -537,14 +536,10 @@ test("admin sees weekly calendar on existing challenges and players see why new 
     admin.getByRole("heading", { name: "Jogo confirmado", exact: true }),
   ).toBeVisible();
   await defenderContext.close();
-  if (clubWeek(day).start !== clubWeek().start)
-    await admin
-      .getByRole("button", { name: "Semana seguinte", exact: true })
-      .click();
-  const matchDate = admin.locator(".calendar-day.match");
-  await expect(matchDate).toHaveCount(1);
-  await matchDate.click();
-  await expect(admin.getByText(/Jogo marcado ·/).first()).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Calendário do jogo", exact: true })).toBeVisible();
+  await expect(admin.getByLabel("Horário confirmado do jogo", { exact: true })).toContainText("Campo 2");
+  await expect(admin.getByLabel("Calendário semanal do desafio")).toHaveCount(0);
+  await expect(admin.getByLabel("Dia para consultar", { exact: true })).toHaveCount(0);
   expect(
     await admin.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
