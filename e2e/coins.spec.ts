@@ -18,6 +18,32 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
     .getByRole("button", { name: "Saltar visita" })
     .click();
   await openAdminSection(page, "Moedas e bar");
+  await expect(
+    page.getByRole("heading", { name: "Neiva Coins", exact: true }),
+  ).toBeVisible();
+  const wallets = page.getByRole("region", {
+    name: "Visão geral das Neiva Coins",
+  });
+  await expect(wallets).toBeVisible();
+  await wallets
+    .getByLabel("Filtrar carteiras", { exact: true })
+    .fill("Pedro Costa");
+  await expect(
+    wallets.getByRole("button", { name: /^Gerir carteira de/ }),
+  ).toHaveCount(1);
+  await wallets.getByRole("button", { name: /^Gerir carteira de/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Jogador da carteira", exact: true }),
+  ).toHaveValue("player-2");
+  await page
+    .getByRole("combobox", { name: "Jogador da carteira", exact: true })
+    .selectOption("player-1");
+  await page
+    .getByLabel("Nome das moedas", { exact: true })
+    .fill("Créditos do Clube");
+  await expect(
+    page.getByRole("heading", { name: "Créditos do Clube", exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Ativar moedas em teste privado").check();
   await page.getByLabel("Moedas por jogo marcado", { exact: true }).fill("12");
   await page
@@ -69,7 +95,14 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
   await expect(
     page.getByText("Saldo: 5 moedas", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Créditos do Clube", exact: true }),
+  ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "/var/tmp/neiva-coins-mobile.png",
+    fullPage: true,
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

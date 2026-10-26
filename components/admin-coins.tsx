@@ -104,8 +104,25 @@ export default function AdminCoins({
   return (
     <section className={`stack ${styles.root}`} aria-label="Dinheiro virtual">
       <div className="panel stack">
-        <h2>Moedas e bar do clube</h2>
-        <strong className="badge">Teste privado · só administradores</strong>
+        <header className={styles.coinHeader}>
+          <div className={styles.coin} aria-hidden="true">
+            <span>
+              {(draft.name.trim() || "Moeda")
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((word) => word[0])
+                .join("")
+                .toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <div className="eyebrow gold">MOEDA DO CLUBE</div>
+            <h2>{draft.name.trim() || "Nome da moeda"}</h2>
+            <strong className="badge">
+              Teste privado · só administradores
+            </strong>
+          </div>
+        </header>
         <p>
           Moedas de participação para trocar no clube. Sem compra, transferência
           entre jogadores, apostas ou conversão em dinheiro.
@@ -254,11 +271,97 @@ export default function AdminCoins({
           </p>
         )}
       </div>
-      <div className="panel stack">
+      <section className="panel stack" aria-label="Visão geral das Neiva Coins">
+        <h3>Carteiras da liga</h3>
+        <p className="muted">
+          As moedas pertencem a cada jogador. Não alteram o ranking da dupla, os
+          desafios ou a prioridade da competição.
+        </p>
+        <div className={styles.metrics}>
+          <span>
+            <strong>{eligible.length}</strong> jogadores
+          </span>
+          <span>
+            <strong>
+              {entries
+                .reduce((total, entry) => total + entry.amount, 0)
+                .toLocaleString("pt-PT")}
+            </strong>{" "}
+            moedas em saldo
+          </span>
+          <span>
+            <strong>
+              {entries.filter((entry) => entry.kind === "REDEMPTION").length}
+            </strong>{" "}
+            trocas realizadas
+          </span>
+          <span>
+            <strong>{live.rewards.filter((item) => item.active).length}</strong>{" "}
+            recompensas disponíveis
+          </span>
+        </div>
+        <DataRows
+          data={eligible}
+          label="carteiras"
+          searchText={(player) =>
+            `${player.name} ${state.divisions.find((division) => division._id === player.divisionId)?.name ?? ""}`
+          }
+        >
+          {(rows) => (
+            <div className={`table-scroll ${styles.wallets}`}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Jogador</th>
+                    <th>Divisão</th>
+                    <th>Saldo</th>
+                    <th>Carteira</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((player) => (
+                    <tr key={player._id}>
+                      <td data-label="Jogador">{player.name}</td>
+                      <td data-label="Divisão">
+                        {state.divisions.find(
+                          (division) => division._id === player.divisionId,
+                        )?.name ?? "—"}
+                      </td>
+                      <td data-label="Saldo">
+                        {coinBalance(entries, player._id).toLocaleString(
+                          "pt-PT",
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => {
+                            setPlayerId(player._id);
+                            document
+                              .getElementById("neiva-coin-wallet")
+                              ?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              });
+                          }}
+                        >
+                          Gerir carteira de {player.name}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!rows.length && <p>Não existem jogadores para esta pesquisa.</p>}
+            </div>
+          )}
+        </DataRows>
+      </section>
+      <div className="panel stack" id="neiva-coin-wallet">
         <h3>Carteiras dos jogadores</h3>
-        <label>
+        <label htmlFor="neiva-coin-player">
           Jogador da carteira
           <select
+            id="neiva-coin-player"
             value={playerId}
             onChange={(e) => setPlayerId(e.target.value)}
           >
@@ -373,7 +476,7 @@ export default function AdminCoins({
           searchText={(e) => `${e.reason} ${e.amount} ${e.createdAt}`}
         >
           {(rows) => (
-            <div className="table-scroll">
+            <div className={`table-scroll ${styles.wallets}`}>
               <table>
                 <thead>
                   <tr>

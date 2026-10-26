@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.6";
+export const applicationVersion = "1.5.7";
 export const releaseNotes = [
+  {
+    version: "1.5.7",
+    date: "2026-10-26",
+    title: "Neiva Coins — gestão de carteiras",
+    changes: [
+      "Vista administrativa das carteiras com pesquisa, paginação, saldos e acesso direto à gestão de cada jogador.",
+      "Moeda com nome editável pelo administrador, resumo de saldos/trocas/recompensas e carteiras adaptadas ao telemóvel.",
+      "Teste continua privado para administradores, preservando saldos, regras e nomes já configurados.",
+    ],
+  },
   {
     version: "1.5.6",
     date: "2026-10-26",

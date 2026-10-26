@@ -18,3 +18,117 @@
     width: 100%;
   }
 }
+
+.metrics {
+  gap: 12px 24px;
+}
+.metrics span {
+  font-size: 13px;
+}
+.metrics strong {
+  color: var(--gold);
+}
+
+.coinHeader {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.coinHeader > div {
+  min-width: 0;
+}
+.coinHeader h2 {
+  overflow-wrap: anywhere;
+  margin: 4px 0 8px;
+}
+.coin {
+  flex: 0 0 76px;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid #d6b35c;
+  background: radial-gradient(circle at 30% 25%, #fff0b3, #d5a742 55%, #8a601c);
+  box-shadow:
+    inset 0 0 0 5px #a77826,
+    inset 0 0 0 7px #f3d786;
+  color: #50350e;
+  font-weight: 900;
+  font-size: 25px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.metrics span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.metrics strong {
+  font-size: 22px;
+}
+@media (max-width: 600px) {
+  .coinHeader {
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .coin {
+    flex-basis: 60px;
+    width: 60px;
+    height: 60px;
+    font-size: 20px;
+  }
+  .coinHeader h2 {
+    font-size: 22px;
+  }
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .wallets table,
+  .wallets tbody {
+    display: block;
+    width: 100%;
+  }
+  .wallets thead {
+    display: none;
+  }
+  .wallets tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .wallets td {
+    display: block;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .wallets td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .wallets td:first-child,
+  .wallets td:last-child {
+    grid-column: 1 / -1;
+  }
+  .wallets button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .root input,
+  .root select {
+    max-width: 100%;
+  }
+}

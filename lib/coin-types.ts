@@ -31,7 +31,7 @@ export const defaultCoinSettings: CoinSettings = {
   _id: "coins",
   version: 0,
   enabled: false,
-  name: "Moedas Fight Club",
+  name: "Neiva Coins",
   bookingCoins: 10,
   rewards: [],
 };
