@@ -1,3 +1,8 @@
+## Version1.6.0 deployed and verified — 26 October 2026
+
+- Workflow40410089579 succeeded; live revision c10469e60970054871e9a6cda0ffedf5edf95589/package1.6.0 directly verified. App/worker running zero restarts, image sha256:e437d69c4f53ae19e01d7116ea8d753d7eb74c555e9d44435cd01a0f04de83c6; public health and worker DNS pass. Annotated v1.6.0 tag pushed.406 tests/typecheck/build and all CI browser groups passed, including new private voting/discussion and standard chat mentions regression.
+- Central at Admin -> Configuração -> Central de Apostas (/admin?tab=voting). Effective admin workspace only; votes and discussion/audit hidden in player projection, write commands denied to player workspace including admin accounts. One winner-only vote per account/game, votes change until cutoff; per-game general discussion supports league-wide @mentions. Preview sends no player notifications, no coins or prediction/ranking points affected. Existing player predictions unchanged. No real votes/messages/configuration changed during deploy; new collections initialized via additive indexes only. No remaining work for requested launch; preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.6.0 private match voting/discussion prepared — 26 October 2026
 
 - User requested Central de Apostas: only vote on winning team, chat for all league players per game with @mentions; currently admins only to inspect UI/UX. New dedicated admin voting tab in Configuração, private matchVotes/matchDiscussionMessages collections; one account vote/game, changes before cutoff, counts/percentages, per-game general chat separate from competitive scheduling chat. No set score, coin debit, points or ranking effects. Existing player predictions feature unchanged.
