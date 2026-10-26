@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { View } from "@/lib/types";
+import { challengeTeamRanks } from "@/lib/challenge-team-ranks";
+import { isTitleMatch } from "@/lib/title-matches";
 import { challengeTeamName } from "@/lib/team-competition";
 import { isVotingMatch } from "@/lib/match-voting-targets";
 import { predictionCutoff } from "@/lib/prediction-cutoff";
@@ -114,6 +116,9 @@ export default function AdminMatchVoting({
     const messages = (s.matchDiscussionMessages ?? []).filter(
       (m) => m.challengeId === c._id,
     ).length;
+    const ranks = challengeTeamRanks(s, c);
+    const titleFight = isTitleMatch(c, s);
+    const knownRanks = !!ranks.attacker && !!ranks.defender;
     return (
       <article
         key={c._id}
@@ -133,6 +138,20 @@ export default function AdminMatchVoting({
           {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
           {challengeTeamName(c, c.defenderId, s.players)}
         </h3>
+        <div className={styles.stakes}>
+          <strong>
+            {titleFight
+              ? "Jogo do título · 1.º lugar em disputa"
+              : ranks.defender
+                ? `${ranks.defender}.º lugar em disputa`
+                : "Disputa de ranking"}
+          </strong>
+          <small>
+            {knownRanks
+              ? `Se o ataque vencer, as duplas trocam o ${ranks.attacker}.º e o ${ranks.defender}.º lugares. Se a defesa vencer, mantêm as posições.`
+              : "As posições históricas deste jogo não estão disponíveis."}
+          </small>
+        </div>
         <p className="muted">
           {lockAt
             ? `Votos até ${new Date(lockAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}`
@@ -165,6 +184,16 @@ export default function AdminMatchVoting({
                   )
                 }
               >
+                <small className={styles.position}>
+                  {id === c.challengerId ? "ATAQUE" : "DEFESA"} ·{" "}
+                  {id === c.challengerId
+                    ? ranks.attacker
+                      ? `${ranks.attacker}.º lugar`
+                      : "Posição indisponível"
+                    : ranks.defender
+                      ? `${ranks.defender}.º lugar`
+                      : "Posição indisponível"}
+                </small>
                 <strong>{challengeTeamName(c, id, s.players)}</strong>
                 <span>
                   {mine?.winnerId === id ? "✓ O teu voto · " : ""}
@@ -177,6 +206,9 @@ export default function AdminMatchVoting({
             );
           })}
         </div>
+        <small className="muted">
+          Posições das duplas guardadas para este jogo.
+        </small>
         <div className="row between wrap">
           <small>
             {votes.length} votos · {messages} mensagens

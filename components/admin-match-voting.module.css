@@ -59,3 +59,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+.stakes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-left: 3px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+  border-radius: 6px;
+}
+.stakes small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.position {
+  color: var(--gold);
+  font-size: 11px;
+}

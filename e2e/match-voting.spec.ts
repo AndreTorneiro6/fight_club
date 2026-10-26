@@ -57,6 +57,10 @@ test("private central supports winner-only votes, general discussion mentions an
     exact: true,
   });
   await expect(card).toBeVisible();
+  await expect(card).toContainText("Jogo do título · 1.º lugar em disputa");
+  await expect(card).toContainText("ATAQUE · 2.º lugar");
+  await expect(card).toContainText("DEFESA · 1.º lugar");
+  await expect(card).toContainText("as duplas trocam o 2.º e o 1.º lugares");
   await expect(central.getByLabel(/Sets do jogo/)).toHaveCount(0);
   const choices = card
     .getByRole("group", { name: `Dupla vencedora do jogo ${challenge.number}` })

@@ -1,3 +1,8 @@
+## Version1.6.1 ranking stakes in private voting prepared — 26 October 2026
+
+- User requested ranking places each game is fighting for and both positions. Central cards/list and detail now reuse challengeTeamRanks (verified historical team snapshots, never account ordinals/current ranking guesses) for ATAQUE/DEFESA place labels. Shows defender place in dispute, title-match badge for champion fights, direct-swap explanation and saved-position caption. Unknown historical positions explicitly unavailable. No ranking/vote/chat/security logic changed; admin-only preview retained.
+- Version/changelog1.6.1. Typecheck/build/406 tests pass; existing voting browser extended for attacker/defender positions/title stakes/direct swap; passed including mobile390px privacy check. Mobile screenshot visually inspected. Prepared locally, not deployed; live remains1.6.0. No data/configuration changes. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.6.0 deployed and verified — 26 October 2026
 
 - Workflow40410089579 succeeded; live revision c10469e60970054871e9a6cda0ffedf5edf95589/package1.6.0 directly verified. App/worker running zero restarts, image sha256:e437d69c4f53ae19e01d7116ea8d753d7eb74c555e9d44435cd01a0f04de83c6; public health and worker DNS pass. Annotated v1.6.0 tag pushed.406 tests/typecheck/build and all CI browser groups passed, including new private voting/discussion and standard chat mentions regression.

@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.6.0";
+export const applicationVersion = "1.6.1";
 export const releaseNotes = [
+  {
+    version: "1.6.1",
+    date: "2026-10-26",
+    title: "Posições e lugar em disputa na votação",
+    changes: [
+      "Central de Apostas mostra a posição guardada de cada dupla, o papel de ataque/defesa e o lugar em disputa.",
+      "Jogos do título identificados e explicação da troca direta de posições, sem alterar o ranking.",
+    ],
+  },
   {
     version: "1.6.0",
     date: "2026-10-26",
