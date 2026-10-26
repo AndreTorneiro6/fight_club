@@ -184,6 +184,7 @@ export async function readState(
         !p.registrationRejectedAt,
     )
     .map((p) => ({ playerId: p._id, name: p.name }));
+  state.chatAdministrators = state.adminTestAccounts.map((a) => ({ ...a }));
   if (state.settings[0])
     state.settings = [{ ...defaultSettings, ...state.settings[0] }];
   return state;

@@ -1,3 +1,9 @@
+## Version1.5.0 challenge chat mentions prepared — 26 October 2026
+
+- @ suggestions include captured challenge participants (both partners) and server-derived verified administrators. Selection stores recipient IDs and server name snapshots; no arbitrary player mentions or expanded chat access. Accessible combobox/listbox with keyboard selection and highlighted escaped text.
+- Mentioned participants/admins get a personal push/in-app notice linked to the exact message. Ordinary team/admin delivery is preserved and recipients deduplicated per message; no WhatsApp requirement. Existing no-mention messages remain compatible. No competition rules or operational data modified.
+- Package/lock/changelog1.5.0.390 tests, typecheck and production build pass; new isolated browser verifies actual administrator selection, message submission and stored mention. Existing chat regression running. Deploy1.4.0 workflow40303429656 still in Pi build, then deploy1.5.0 after its checks.
+
 # Fight Club — project handoff
 
 Last updated: 25 October 2026 (Europe/Lisbon).

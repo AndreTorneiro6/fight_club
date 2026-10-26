@@ -1,4 +1,5 @@
 "use client";
+import ChallengeChat from "./challenge-chat";
 import MatchCalendarActions from "./match-calendar-actions";
 import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import AdminRoundTransition from "./admin-round-transition";
@@ -2194,14 +2195,6 @@ function ChallengeDetail(a: Actions & { id: string }) {
   const { s, run, busy, id } = a,
     c = s.challenges.find((c) => c._id === id),
     [refuse, setRefuse] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
-  const lastMessage = s.messages
-    .filter((m) => m.challengeId === id)
-    .at(-1)?._id;
-  useEffect(() => {
-    if (chatRef.current)
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [lastMessage]);
   if (!c) return <Empty text="Desafio não encontrado." />;
   const mine = involves(c, s.actor.playerId),
     admin = s.actor.role === "admin",
@@ -2241,9 +2234,6 @@ function ChallengeDetail(a: Actions & { id: string }) {
     Date.now(),
     Date.parse(c.playBy),
   );
-  const chat = s.messages
-    .filter((x) => x.challengeId === id)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
@@ -2535,81 +2525,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
             </Section>
           )}
           {(mine || admin) && (
-            <Section
-              title="Chat do desafio"
-              right={
-                <span
-                  className={`badge ${a.chatConnection === "live" ? "positive" : "muted"}`}
-                  role="status"
-                >
-                  <span
-                    className="dot"
-                    style={{ background: "currentColor" }}
-                  />
-                  {a.chatConnection === "live"
-                    ? "Em direto"
-                    : a.chatConnection === "reconnecting"
-                      ? "A reconectar…"
-                      : "A ligar…"}
-                </span>
-              }
-            >
-              <div className="stack">
-                <div ref={chatRef} className="chat-box" aria-live="polite">
-                  {chat.length ? (
-                    chat.map((m) => (
-                      <div
-                        className={`message ${m.playerId === s.actor.playerId ? "mine" : ""}`}
-                        key={m._id}
-                      >
-                        <strong>{name(m.playerId)}</strong>
-                        {m.text}
-                        <div>
-                          <small>
-                            {fmtDate(m.createdAt)} · {fmtTime(m.createdAt)}
-                          </small>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p style={{ fontSize: 12 }}>
-                      Combina os detalhes do jogo com o teu adversário.
-                    </p>
-                  )}
-                </div>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const form = e.currentTarget,
-                      text = new FormData(form).get("text");
-                    if (
-                      await run(
-                        { type: "message.send", challengeId: id, text },
-                        "",
-                      )
-                    )
-                      form.reset();
-                  }}
-                >
-                  <div className="row">
-                    <input
-                      name="text"
-                      placeholder="Escreve uma mensagem…"
-                      aria-label="Mensagem"
-                      required
-                      maxLength={2000}
-                    />
-                    <button
-                      disabled={busy}
-                      aria-label="Enviar mensagem"
-                      className="primary"
-                    >
-                      <ArrowRight size={17} />
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </Section>
+            <ChallengeChat
+              s={s}
+              c={c}
+              run={run}
+              busy={busy}
+              connection={a.chatConnection}
+            />
           )}
         </div>
         <div className="stack" style={{ alignContent: "start" }}>
@@ -3105,7 +3027,13 @@ function Notifications({ s, run, busy }: Actions) {
                   {n.challengeId && (
                     <Link
                       className="link"
-                      href={"/desafios/" + n.challengeId}
+                      href={
+                        "/desafios/" +
+                        n.challengeId +
+                        (n.chatMessageId
+                          ? `#mensagem-${encodeURIComponent(n.chatMessageId)}`
+                          : "")
+                      }
                       style={{ marginLeft: 12 }}
                       onClick={() => {
                         void run(

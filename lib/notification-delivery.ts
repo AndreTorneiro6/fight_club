@@ -89,7 +89,7 @@ export function deliveryContent(n: Notification) {
           : n.adminTestId
             ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
             : n.challengeId
-              ? `/desafios/${encodeURIComponent(n.challengeId)}`
+              ? `/desafios/${encodeURIComponent(n.challengeId)}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
               : n.competitionNotice
                 ? n.playerId === "__admins__"
                   ? "/admin?tab=matchmaking"

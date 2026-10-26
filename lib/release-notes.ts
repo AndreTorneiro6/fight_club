@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.4.0";
+export const applicationVersion = "1.5.0";
 export const releaseNotes = [
+  {
+    version: "1.5.0",
+    date: "2026-10-26",
+    title: "Menções no chat dos desafios",
+    changes: [
+      "Escreve @ no chat para mencionar um jogador das duplas ou um administrador verificado.",
+      "Menções destacadas nas mensagens e notificação pessoal com acesso direto à mensagem.",
+      "Validação dos destinatários no servidor e uma única notificação por destinatário e mensagem.",
+    ],
+  },
   {
     version: "1.4.0",
     date: "2026-10-26",

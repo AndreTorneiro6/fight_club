@@ -149,7 +149,7 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
     defender.locator(".panel .status-scheduled").first(),
   ).toBeVisible();
   await defender
-    .getByRole("textbox", { name: "Mensagem", exact: true })
+    .getByRole("combobox", { name: "Mensagem", exact: true })
     .fill("Combinado, até amanhã!");
   await defender.getByRole("button", { name: "Enviar mensagem" }).click();
   await expect(

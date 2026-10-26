@@ -3049,3 +3049,18 @@ body::before {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.chat-mention {
+  background: #e7b85b24;
+  color: var(--gold);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.chat-mention-options {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.chat-mention-options button {
+  white-space: normal;
+  text-align: left;
+}

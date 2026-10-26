@@ -216,6 +216,7 @@ export interface Exception extends Entity {
   note: string;
 }
 export interface Message extends Entity {
+  mentions?: import("./chat-mentions").ChatMention[];
   audienceIds?: string[];
   challengeId: string;
   playerId: string;
@@ -223,6 +224,7 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  chatMessageId?: string;
   weeklyChallengeOpening?: {
     weekStart: string;
     opensAt: string;
@@ -382,6 +384,8 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  /** Verified administrator contacts, derived by the server; never a persisted collection. */
+  chatAdministrators?: { playerId: string; name: string }[];
   /** Server-derived verified admin roster; never persisted as a collection. */
   adminTestAccounts?: AdminTestAccount[];
   adminTestChallenges?: AdminTestChallenge[];

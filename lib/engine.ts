@@ -1,3 +1,4 @@
+import { chatMentionTargets } from "./chat-mentions";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRoundCompletion } from "./round-transition";
 import { publishDivisionPapers } from "./division-weekly-publication";
@@ -417,6 +418,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("message.send"),
     challengeId: id,
     text: text.min(1),
+    mentionIds: z.array(id).max(12).default([]),
   }),
   z.object({
     type: z.literal("profile.save"),
@@ -823,7 +825,10 @@ export function execute(
     body: string,
     cid?: string,
     dedupe?: string,
-    metadata?: Pick<Notification, "seasonId" | "deliveryChannels" | "kind">,
+    metadata?: Pick<
+      Notification,
+      "seasonId" | "deliveryChannels" | "kind" | "chatMessageId"
+    >,
   ) => {
     if (
       dedupe &&
@@ -3232,13 +3237,69 @@ export function execute(
     case "message.send": {
       const c = challenge(cmd.challengeId);
       participant(c);
-      s.messages.push({
+      const targets = chatMentionTargets(s, c),
+        mentionIds = [...new Set(cmd.mentionIds)];
+      const mentions = mentionIds.map((id) => {
+        const target = targets.find((t) => t.playerId === id);
+        ensure(
+          target && cmd.text.includes(`@${target.name}`),
+          "Só podes mencionar membros deste desafio ou administradores, escolhendo o nome na lista.",
+        );
+        return target;
+      });
+      const message = {
         _id: uid(),
         challengeId: c._id,
         playerId: actor.playerId,
         text: cmd.text,
         createdAt: now,
-      });
+        ...(mentions.length ? { mentions } : {}),
+      };
+      s.messages.push(message);
+      if (mentions.length) {
+        const recipients = new Set(
+          admin
+            ? challengeParticipants(c, s.players)
+            : challengeMemberIds(
+                c,
+                challengeSide(c, actor.playerId, s.players) === "attack"
+                  ? "defense"
+                  : "attack",
+                s.players,
+              ),
+        );
+        if (!admin)
+          for (const a of s.chatAdministrators ?? [])
+            recipients.add(a.playerId);
+        for (const mention of mentions) recipients.add(mention.playerId);
+        recipients.delete(actor.playerId);
+        for (const playerId of recipients) {
+          const mentioned = mentionIds.includes(playerId);
+          notify(
+            playerId,
+            mentioned
+              ? "💬 Foste mencionado no desafio"
+              : admin
+                ? "Mensagem do clube no desafio"
+                : "Nova mensagem no desafio",
+            `${player(actor.playerId).name}: ${cmd.text.slice(0, 180)}`,
+            c._id,
+            `chat-message:${message._id}:${playerId}`,
+            {
+              kind: "update",
+              deliveryChannels: ["push"],
+              chatMessageId: message._id,
+            },
+          );
+        }
+        if (!admin && !s.chatAdministrators)
+          notifyAdmins(
+            "Nova mensagem no desafio",
+            cmd.text.slice(0, 120),
+            c._id,
+          );
+        return { id: message._id };
+      }
       if (admin) {
         for (const playerId of challengeParticipants(c, s.players))
           notify(
