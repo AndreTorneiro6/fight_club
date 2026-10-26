@@ -21,9 +21,9 @@ export default function AdminNavigation({
   tab: string;
   onSelect: (tab: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(() => !primaryIds.has(tab));
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
-    if (!primaryIds.has(tab)) setExpanded(true);
+    setExpanded(false);
   }, [tab]);
   const [query, setQuery] = useState("");
   const normalized = (value: string) =>
@@ -32,6 +32,14 @@ export default function AdminNavigation({
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
   const open = expanded;
+  const currentTool = groups
+    .flatMap((group) => [...group.items])
+    .find(([id]) => id === tab && !primaryIds.has(id))?.[1];
+  const select = (value: string) => {
+    setExpanded(false);
+    setQuery("");
+    onSelect(value);
+  };
   return (
     <nav className="admin-navigation" aria-label="Secções da administração">
       <div className="admin-primary-navigation" aria-label="Gestão diária">
@@ -40,7 +48,7 @@ export default function AdminNavigation({
             key={value}
             className={tab === value ? "primary" : ""}
             aria-current={tab === value ? "page" : undefined}
-            onClick={() => onSelect(value)}
+            onClick={() => select(value)}
           >
             {label}
           </button>
@@ -56,7 +64,8 @@ export default function AdminNavigation({
           }}
         >
           <span>
-            Mais ferramentas <small>Configuração, comunicação e extras</small>
+            Mais ferramentas{" "}
+            <small>{currentTool ?? "Configuração, comunicação e extras"}</small>
           </span>
           <ChevronDown
             size={16}
@@ -94,7 +103,7 @@ export default function AdminNavigation({
                           key={value}
                           className={tab === value ? "primary small" : "small"}
                           aria-current={tab === value ? "page" : undefined}
-                          onClick={() => onSelect(value)}
+                          onClick={() => select(value)}
                         >
                           {label}
                         </button>

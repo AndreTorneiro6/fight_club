@@ -3008,3 +3008,33 @@ body::before {
   white-space: normal;
   text-align: left;
 }
+
+/* Keep navigation and long content from enlarging the administration viewport. */
+.app-main, .content, .content > *, .admin-navigation, .admin-tools, .admin-navigation-group { min-width: 0; }
+.topbar .breadcrumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar > .row { flex-shrink: 0; }
+.admin-page-heading .page-heading { margin-bottom: 14px; gap: 10px; }
+.admin-page-heading .page-heading h1 { font-size: 34px; margin: 2px 0 4px; }
+.admin-page-heading .page-heading p { margin: 0; }
+.admin-navigation { margin-top: 12px; gap: 8px; }
+.admin-tools-content { max-height: min(50dvh, 400px); overflow-y: auto; overscroll-behavior: contain; }
+@media (min-width: 761px) and (max-width: 1250px) {
+  .topbar .desktop-meta, .topbar .hide-mobile { display: none; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .topbar .workspace-current { display: none; }
+}
+@media (max-width: 760px) {
+  .admin-page-heading .page-heading { align-items: center; }
+  .admin-page-heading .page-heading > div:first-child { flex: 1 1 200px; }
+  .admin-page-heading .page-heading h1 { font-size: 28px; line-height: 1.15; }
+  .admin-page-heading .page-heading p { display: none; }
+  .admin-page-heading .page-heading > .row { gap: 6px; }
+  .admin-tools-toggle { padding: 8px 12px; }
+  .admin-tools-content { padding: 0 10px 10px; max-height: min(45dvh, 340px); }
+  .admin-navigation-group { padding: 10px; gap: 6px; }
+}
+@media (max-width: 1000px) {
+  .admin-primary-navigation { display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; gap: 6px; padding-bottom: 4px; scrollbar-width: thin; }
+  .admin-primary-navigation button { flex: 0 0 auto; min-height: 44px; padding: 8px 12px; white-space: nowrap; }
+}

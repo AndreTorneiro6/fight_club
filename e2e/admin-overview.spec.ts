@@ -132,6 +132,13 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
   ).toHaveCount(0);
   await openAdminSection(page, "Ideias");
   await expect(page).toHaveURL(/tab=notes/);
+  await expect(
+    page.getByRole("button", { name: /^Mais ferramentas/ }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: /^Mais ferramentas/ }).click();
+  await expect(
+    page.getByRole("button", { name: /^Mais ferramentas/ }),
+  ).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: /^Mais ferramentas/ }).click();
   await expect(page).toHaveURL(/tab=notes/);
   await expect(
@@ -165,6 +172,38 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
   await expect(
     page.getByText(releaseNotes[0].changes[0], { exact: true }),
   ).toBeVisible();
+  for (const width of [320, 390, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/admin?tab=voting");
+    const tools = page.getByRole("button", { name: /^Mais ferramentas/ });
+    await expect(tools).toHaveAttribute("aria-expanded", "false");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const navigation = await page
+      .getByRole("navigation", { name: "Secções da administração" })
+      .boundingBox();
+    expect(navigation!.height, `Navigation height at ${width}px`).toBeLessThan(
+      140,
+    );
+    await tools.click();
+    const panel = page.locator("#admin-tools-panel");
+    expect((await panel.boundingBox())!.height).toBeLessThanOrEqual(400);
+    await tools.click();
+    await page.screenshot({ path: `/var/tmp/admin-compact-${width}.png` });
+  }
+  const timer = page.getByRole("timer").first();
+  await expect(timer).toBeVisible();
+  const initialTimer = await timer.innerText();
+  const initialHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  await expect(timer).not.toHaveText(initialTimer);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(
+    initialHeight,
+  );
   await switchWorkspace(page, "player");
   await page.goto("/admin?tab=changelog");
   await expect(

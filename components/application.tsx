@@ -3486,21 +3486,23 @@ function Admin(a: Actions) {
   );
   return (
     <>
-      <Heading
-        eyebrow="GESTÃO DA LIGA"
-        title="Painel do administrador"
-        description="Confirma jogos, acompanha a jornada e resolve o que está pendente."
-        right={
-          <div className="row wrap">
-            <Link className="badge" href="/admin?tab=changelog">
-              v{applicationVersion}
-            </Link>
-            <Link className="button ghost small" href="/ajuda/admin">
-              <BookOpen size={16} /> Ajuda
-            </Link>
-          </div>
-        }
-      />
+      <div className="admin-page-heading">
+        <Heading
+          eyebrow="GESTÃO DA LIGA"
+          title="Painel do administrador"
+          description="Confirma jogos, acompanha a jornada e resolve o que está pendente."
+          right={
+            <div className="row wrap">
+              <Link className="badge" href="/admin?tab=changelog">
+                v{applicationVersion}
+              </Link>
+              <Link className="button ghost small" href="/ajuda/admin">
+                <BookOpen size={16} /> Ajuda
+              </Link>
+            </div>
+          }
+        />
+      </div>
       <AdminNavigation
         tab={tab === "approvals" ? "games" : tab}
         onSelect={(value) => {

@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.6.2";
+export const applicationVersion = "1.6.3";
 export const releaseNotes = [
+  {
+    version: "1.6.3",
+    date: "2026-10-26",
+    title: "Administração compacta e largura estável",
+    changes: [
+      "Menu Mais ferramentas fechado por defeito e após escolher uma secção, com lista limitada em altura.",
+      "Cabeçalho e atalhos administrativos mais compactos no telemóvel e tablet.",
+      "Ajuste dos controlos do topo em ecrãs intermédios para evitar alargar a página.",
+    ],
+  },
   {
     version: "1.6.2",
     date: "2026-10-26",
