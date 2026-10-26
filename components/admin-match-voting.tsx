@@ -11,6 +11,7 @@ import {
   votingCountdown,
 } from "@/lib/match-voting-targets";
 import ChallengeChat from "./challenge-chat";
+import MatchScorePrediction from "./match-score-prediction";
 import styles from "./admin-match-voting.module.css";
 
 export default function AdminMatchVoting({
@@ -55,10 +56,11 @@ export default function AdminMatchVoting({
           <h2>Central de Apostas</h2>
           <span className="badge">Teste privado · só administradores</span>
         </div>
-        <p>Vota na dupla que vai ganhar e conversa sobre cada jogo.</p>
+        <p>Prevê o resultado de cada set e conversa sobre o jogo.</p>
         <p className="muted">
-          Um voto por pessoa e jogo. Podes mudar até ao fecho. Sem resultados em
-          sets, moedas ou alterações à classificação da liga.
+          Um palpite por pessoa e jogo. O terceiro set só é necessário com um
+          set ganho por cada dupla. As previsões não alteram resultados
+          oficiais, moedas ou o ranking.
         </p>
         <label className={styles.cutoffSetting}>
           Fechar votação antes do jogo
@@ -201,7 +203,7 @@ export default function AdminMatchVoting({
         <div
           className={styles.choices}
           role="group"
-          aria-label={`Dupla vencedora do jogo ${c.number}`}
+          aria-label={`Palpites por dupla do jogo ${c.number}`}
         >
           {[c.challengerId, c.defenderId].map((id) => {
             const count = votes.filter((v) => v.winnerId === id).length;
@@ -209,28 +211,9 @@ export default function AdminMatchVoting({
               ? Math.round((count / votes.length) * 100)
               : 0;
             return (
-              <button
+              <div
                 key={id}
-                type="button"
-                disabled={busy || !open}
-                aria-pressed={mine?.winnerId === id}
-                onClick={() =>
-                  void run(
-                    mine?.winnerId === id
-                      ? {
-                          type: "admin.match-vote.remove",
-                          challengeId: c._id,
-                          expectedWinnerId: mine.winnerId,
-                          expectedUpdatedAt: mine.updatedAt,
-                        }
-                      : {
-                          type: "admin.match-vote.save",
-                          challengeId: c._id,
-                          winnerId: id,
-                        },
-                    mine?.winnerId === id ? "Voto retirado." : "Voto guardado.",
-                  )
-                }
+                className={`${styles.teamSummary} ${mine?.winnerId === id ? styles.selectedTeam : ""}`}
               >
                 <small className={styles.position}>
                   {id === c.challengerId ? "ATAQUE" : "DEFESA"} ·{" "}
@@ -250,16 +233,19 @@ export default function AdminMatchVoting({
                 <span className={styles.track}>
                   <span style={{ width: `${percent}%` }} />
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
-        {open && (
-          <small className="muted">
-            Toca na dupla para votar. Toca novamente na dupla selecionada para
-            retirar o voto.
-          </small>
-        )}
+        <MatchScorePrediction
+          game={c}
+          attacker={challengeTeamName(c, c.challengerId, s.players)}
+          defender={challengeTeamName(c, c.defenderId, s.players)}
+          own={stored}
+          open={open}
+          busy={busy}
+          run={run}
+        />
         <small className="muted">
           Posições das duplas guardadas para este jogo.
         </small>

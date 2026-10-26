@@ -1,3 +1,5 @@
+import { setScoresSchema, type SetScore } from "./set-scores";
+import { matchScorePrediction } from "./match-score-prediction";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, Message, State } from "./types";
@@ -15,6 +17,7 @@ export interface MatchVote {
   userId: string;
   playerId: string;
   winnerId: string;
+  setScores?: SetScore[];
   createdAt: string;
   updatedAt: string;
   lockAt: string;
@@ -24,6 +27,14 @@ export interface MatchDiscussionMessage extends Message {
   requestId: string;
 }
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.match-vote.predict"),
+      challengeId: z.string().min(1).max(100),
+      setScores: setScoresSchema,
+      expectedUpdatedAt: z.string().datetime().nullable().optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.match-vote.settings"),
@@ -115,6 +126,7 @@ export function executeMatchVoting(
   );
   if (
     cmd.type === "admin.match-vote.save" ||
+    cmd.type === "admin.match-vote.predict" ||
     cmd.type === "admin.match-vote.remove"
   ) {
     if (cmd.type === "admin.match-vote.save")
@@ -155,10 +167,33 @@ export function executeMatchVoting(
       });
       return { ok: true };
     }
+    if (
+      cmd.type === "admin.match-vote.predict" &&
+      cmd.expectedUpdatedAt !== undefined
+    )
+      ensure(
+        (existing?.updatedAt ?? null) === cmd.expectedUpdatedAt,
+        "O teu palpite mudou noutra sessão. Atualiza antes de guardar.",
+        409,
+      );
+    const prediction =
+      cmd.type === "admin.match-vote.predict"
+        ? matchScorePrediction(
+            cmd.setScores,
+            challenge.challengerId,
+            challenge.defenderId,
+          )
+        : { winnerId: cmd.winnerId, setScores: undefined };
+    ensure(
+      cmd.type !== "admin.match-vote.save" || !existing?.setScores,
+      "Atualiza a app para editar este palpite por sets.",
+      409,
+    );
     if (existing) delete existing.withdrawnAt;
     if (existing)
       Object.assign(existing, {
-        winnerId: cmd.winnerId,
+        winnerId: prediction.winnerId,
+        setScores: prediction.setScores,
         updatedAt: at,
         lockAt,
       });
@@ -168,7 +203,8 @@ export function executeMatchVoting(
         challengeId: challenge._id,
         userId: actor.userId,
         playerId: actor.playerId,
-        winnerId: cmd.winnerId,
+        winnerId: prediction.winnerId,
+        setScores: prediction.setScores,
         createdAt: at,
         updatedAt: at,
         lockAt,
@@ -180,7 +216,8 @@ export function executeMatchVoting(
       details: JSON.stringify({
         before,
         challengeId: challenge._id,
-        winnerId: cmd.winnerId,
+        winnerId: prediction.winnerId,
+        setScores: prediction.setScores,
       }),
       createdAt: at,
     });

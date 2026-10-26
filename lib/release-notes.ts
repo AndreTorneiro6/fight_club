@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.6.3";
+export const applicationVersion = "1.7.0";
 export const releaseNotes = [
+  {
+    version: "1.7.0",
+    date: "2026-10-26",
+    title: "Palpites por resultado de cada set",
+    changes: [
+      "Central privada permite prever os resultados de cada set, com terceiro set apenas quando os dois primeiros ficam empatados em sets.",
+      "Vencedora do palpite calculada pelos sets, sem alterar resultados, rankings ou estatísticas oficiais.",
+      "Palpite guardado pode ser editado ou retirado antes do fecho. Votos antigos sem sets mantidos sem inventar resultados.",
+    ],
+  },
   {
     version: "1.6.3",
     date: "2026-10-26",

@@ -307,3 +307,185 @@ test("default closure is 30 minutes before kickoff and countdown floors at zero"
     "00h 00m 00s",
   );
 });
+
+test("set prediction derives winner without writing official results/ranking/statistics/coins", () => {
+  const s = fixture(),
+    before = structuredClone(s);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.match-vote.predict",
+      challengeId: "c1",
+      setScores: [
+        { attacker: 6, defender: 4 },
+        { attacker: 7, defender: 6 },
+      ],
+      expectedUpdatedAt: null,
+    },
+    at,
+  );
+  assert.equal(s.matchVotes![0].winnerId, "p3");
+  assert.deepEqual(s.matchVotes![0].setScores, [
+    { attacker: 6, defender: 4 },
+    { attacker: 7, defender: 6 },
+  ]);
+  for (const key of [
+    "challenges",
+    "results",
+    "matches",
+    "players",
+    "history",
+    "coinEntries",
+    "predictions",
+    "notifications",
+  ] as const)
+    assert.deepEqual(s[key], before[key]);
+});
+test("third predicted set required at 1–1, forbidden after 2–0 and ordinary third/super tie-break accepted", () => {
+  const cmd = {
+    type: "admin.match-vote.predict",
+    challengeId: "c1",
+    setScores: [
+      { attacker: 6, defender: 4 },
+      { attacker: 4, defender: 6 },
+    ],
+  };
+  assert.throws(() => execute(fixture(), admin, cmd, at), /dois sets/);
+  assert.throws(
+    () =>
+      execute(
+        fixture(),
+        admin,
+        {
+          ...cmd,
+          setScores: [
+            { attacker: 6, defender: 4 },
+            { attacker: 7, defender: 6 },
+            { attacker: 6, defender: 4 },
+          ],
+        },
+        at,
+      ),
+    /set adicional/,
+  );
+  for (const final of [
+    { attacker: 6, defender: 4 },
+    { attacker: 10, defender: 8 },
+  ]) {
+    const s = fixture();
+    execute(s, admin, { ...cmd, setScores: [...cmd.setScores, final] }, at);
+    assert.equal(s.matchVotes![0].winnerId, "p3");
+  }
+});
+test("invalid scores and client-supplied winner are rejected and score predictions lock/deny players server-side", () => {
+  const s = fixture(),
+    cmd = {
+      type: "admin.match-vote.predict",
+      challengeId: "c1",
+      setScores: [
+        { attacker: 6, defender: 4 },
+        { attacker: 7, defender: 6 },
+      ],
+    };
+  assert.throws(() => execute(s, admin, { ...cmd, winnerId: "p2" }, at));
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          ...cmd,
+          setScores: [
+            { attacker: 6, defender: 5 },
+            { attacker: 6, defender: 4 },
+          ],
+        },
+        at,
+      ),
+    /Pontuação inválida/,
+  );
+  assert.throws(
+    () => execute(s, { ...admin, role: "player" }, cmd, at),
+    /teste privado/,
+  );
+  assert.throws(
+    () => execute(s, admin, cmd, Date.parse("2026-11-03T18:30:00Z")),
+    /encerrada/,
+  );
+  assert.deepEqual(s.matchVotes, []);
+});
+test("score edits protect concurrent sessions, preserve legacy winner-only rows and support withdrawal/recast", () => {
+  const s = fixture();
+  execute(s, admin, vote, at);
+  assert.equal(s.matchVotes![0].setScores, undefined);
+  const cmd = {
+    type: "admin.match-vote.predict",
+    challengeId: "c1",
+    setScores: [
+      { attacker: 4, defender: 6 },
+      { attacker: 6, defender: 7 },
+    ],
+    expectedUpdatedAt: s.matchVotes![0].updatedAt,
+  };
+  execute(s, admin, cmd, at + 1);
+  assert.equal(s.matchVotes![0].winnerId, "p2");
+  assert.throws(() => execute(s, admin, cmd, at + 2), /noutra sessão/);
+  assert.throws(
+    () => execute(s, admin, vote, at + 2),
+    /editar este palpite por sets/,
+  );
+  const own = { ...s.matchVotes![0] };
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.match-vote.remove",
+      challengeId: "c1",
+      expectedWinnerId: own.winnerId,
+      expectedUpdatedAt: own.updatedAt,
+    },
+    at + 3,
+  );
+  assert.equal(s.matchVotes![0].withdrawnAt, new Date(at + 3).toISOString());
+  execute(
+    s,
+    admin,
+    { ...cmd, expectedUpdatedAt: new Date(at + 3).toISOString() },
+    at + 4,
+  );
+  assert.equal(s.matchVotes![0].withdrawnAt, undefined);
+  assert.equal(s.matchVotes!.length, 1);
+});
+test("third-set visibility follows complete first two sets, not incomplete or invalid scores", async () => {
+  const { requiredPredictionSets } =
+    await import("../lib/match-score-prediction");
+  assert.equal(
+    requiredPredictionSets([
+      { attacker: 6, defender: 4 },
+      { attacker: 7, defender: 6 },
+    ]),
+    2,
+  );
+  assert.equal(
+    requiredPredictionSets([
+      { attacker: 6, defender: 4 },
+      { attacker: 4, defender: 6 },
+    ]),
+    3,
+  );
+  assert.equal(
+    requiredPredictionSets([
+      { attacker: 6, defender: 5 },
+      { attacker: 4, defender: 6 },
+    ]),
+    undefined,
+  );
+  assert.equal(
+    requiredPredictionSets([
+      { attacker: 6, defender: -1 },
+      { attacker: 4, defender: 6 },
+    ]),
+    undefined,
+  );
+});

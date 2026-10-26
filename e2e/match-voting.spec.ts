@@ -5,7 +5,7 @@ import {
   switchWorkspace,
 } from "./workspace-helper";
 
-test("private central supports winner-only votes, general discussion mentions and player denial on mobile", async ({
+test("private central supports per-set predictions, conditional third set, withdrawals, mentions and player denial on mobile", async ({
   page,
 }) => {
   await page.goto("/auth");
@@ -72,22 +72,78 @@ test("private central supports winner-only votes, general discussion mentions an
   await expect(card).toContainText("ATAQUE · 2.º lugar");
   await expect(card).toContainText("DEFESA · 1.º lugar");
   await expect(card).toContainText("as duplas trocam o 2.º e o 1.º lugares");
-  await expect(central.getByLabel(/Sets do jogo/)).toHaveCount(0);
-  const choices = card
-    .getByRole("group", { name: `Dupla vencedora do jogo ${challenge.number}` })
-    .getByRole("button");
-  await choices.first().click();
-  await expect(choices.first()).toHaveAttribute("aria-pressed", "true");
-  await expect(choices.first()).toContainText("100%");
-  await choices.last().click();
-  await expect(choices.last()).toHaveAttribute("aria-pressed", "true");
+  await card
+    .getByRole("button", { name: "Prever resultado", exact: true })
+    .click();
+  const editor = page.getByRole("dialog", {
+    name: `O teu palpite · Jogo #${challenge.number}`,
+  });
+  await expect(editor).toContainText("Não altera o resultado oficial do jogo.");
+  const fillSet = async (index: number, attack: string, defense: string) => {
+    await editor
+      .getByLabel(`Ataque · ${index}.º set`, { exact: true })
+      .fill(attack);
+    await editor
+      .getByLabel(`Defesa · ${index}.º set`, { exact: true })
+      .fill(defense);
+  };
+  await fillSet(1, "6", "4");
+  await fillSet(2, "7", "6");
+  await expect(
+    editor.getByLabel("Ataque · 3.º set", { exact: true }),
+  ).toHaveCount(0);
+  await expect(editor).toContainText("não há terceiro set");
+  await editor
+    .getByRole("button", { name: "Guardar palpite", exact: true })
+    .click();
+  await expect(editor).not.toBeVisible();
+  await expect(
+    card.getByRole("button", { name: /O teu palpite: 6-4, 7-6/ }),
+  ).toBeVisible();
   await expect(card).toContainText("1 votos");
-  await choices.last().click();
+  await card
+    .getByRole("button", { name: "Editar palpite", exact: true })
+    .click();
+  await fillSet(2, "4", "6");
+  await expect(
+    editor.getByLabel("Ataque · 3.º set", { exact: true }),
+  ).toBeVisible();
+  await fillSet(3, "6", "4");
+  await fillSet(2, "7", "6");
+  await expect(
+    editor.getByLabel("Ataque · 3.º set", { exact: true }),
+  ).toHaveCount(0);
+  await fillSet(2, "4", "6");
+  await expect(
+    editor.getByLabel("Ataque · 3.º set", { exact: true }),
+  ).toHaveValue("");
+  await fillSet(3, "6", "4");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/var/tmp/score-prediction-mobile.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await editor
+    .getByRole("button", { name: "Guardar palpite", exact: true })
+    .click();
+  const ownPrediction = card.getByRole("button", {
+    name: /O teu palpite: 6-4, 4-6, 6-4/,
+  });
+  await expect(ownPrediction).toBeVisible();
+  await ownPrediction.click();
   await expect(card).toContainText("0 votos");
-  await expect(choices.first()).toHaveAttribute("aria-pressed", "false");
-  await expect(choices.last()).toHaveAttribute("aria-pressed", "false");
-  await choices.last().click();
-  await expect(choices.last()).toHaveAttribute("aria-pressed", "true");
+  await card
+    .getByRole("button", { name: "Prever resultado", exact: true })
+    .click();
+  await fillSet(1, "6", "4");
+  await fillSet(2, "4", "6");
+  await fillSet(3, "6", "4");
+  await editor
+    .getByRole("button", { name: "Guardar palpite", exact: true })
+    .click();
+  await expect(ownPrediction).toBeVisible();
 
   await card.getByRole("button", { name: "Abrir conversa do jogo" }).click();
   const chat = central.getByRole("region", {
@@ -110,6 +166,17 @@ test("private central supports winner-only votes, general discussion mentions an
   expect(
     updated.matchVotes.find((v: any) => v.challengeId === game.id).lockAt,
   ).toBe(new Date(start.getTime() - 60 * 60000).toISOString());
+  expect(
+    updated.matchVotes.find((v: any) => v.challengeId === game.id).setScores,
+  ).toEqual([
+    { attacker: 6, defender: 4 },
+    { attacker: 4, defender: 6 },
+    { attacker: 6, defender: 4 },
+  ]);
+  expect(updated.results).toEqual(state.results);
+  expect(updated.history).toEqual(state.history);
+  expect(updated.players).toEqual(state.players);
+
   expect(
     updated.matchDiscussionMessages.filter(
       (m: any) => m.challengeId === game.id,
@@ -138,7 +205,7 @@ test("private central supports winner-only votes, general discussion mentions an
     central.getByRole("article", {
       name: `Votação do jogo ${challenge.number}`,
     }),
-  ).toContainText("O teu voto");
+  ).toContainText("O teu palpite");
   await switchWorkspace(page, "player");
   const playerState = await (await page.request.get("/api/league")).json();
   expect(playerState.matchVotingSettings).toEqual([]);
