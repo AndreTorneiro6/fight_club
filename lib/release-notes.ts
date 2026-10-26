@@ -6,6 +6,7 @@ export const releaseNotes = [
     date: "2026-10-26",
     title: "Menções no chat dos desafios",
     changes: [
+      "Exportação individual de jogos com o modelo da jornada e a divisão correta; jogos do título usam automaticamente o respetivo modelo especial.",
       "Escreve @ no chat para mencionar um jogador das duplas ou um administrador verificado.",
       "Menções destacadas nas mensagens e notificação pessoal com acesso direto à mensagem.",
       "Validação dos destinatários no servidor e uma única notificação por destinatário e mensagem.",

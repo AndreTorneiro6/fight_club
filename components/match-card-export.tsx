@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { Download, Share2 } from "lucide-react";
 import type { Challenge, View } from "@/lib/types";
-import { renderMatchCardImage } from "@/lib/match-card-image";
-import { isTitleMatch } from "@/lib/title-matches";
+import { renderMatchCardPoster } from "@/lib/match-card-image";
 import CopyImageButton from "./copy-image-button";
 export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
   const [open, setOpen] = useState(false),
     [preview, setPreview] = useState<{
       url: string;
+      width: number;
+      height: number;
       file: File;
       canShare: boolean;
     } | null>(null),
@@ -19,8 +20,8 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
       url = "";
     setPreview(null);
     setError("");
-    void renderMatchCardImage(s, c)
-      .then((blob) => {
+    void renderMatchCardPoster(s, c)
+      .then(({ blob, width, height }) => {
         if (cancelled) return;
         url = URL.createObjectURL(blob);
         const file = new File(
@@ -30,6 +31,8 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
         );
         setPreview({
           url,
+          width,
+          height,
           file,
           canShare: !!navigator.canShare?.({ files: [file] }),
         });
@@ -69,8 +72,8 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
             <img
               src={preview.url}
               alt={`Cartão do jogo #${c.number}`}
-              width={1080}
-              height={isTitleMatch(c) ? 1920 : 1080}
+              width={preview.width}
+              height={preview.height}
               style={{
                 width: "100%",
                 maxWidth: 420,

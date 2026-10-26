@@ -129,6 +129,26 @@ test("club templates generate separate normal and title posters with real teams 
       exact: true,
     }),
   ).toBeVisible();
+  // Individual game exports must reuse the round artwork and automatically choose title art.
+  for (const game of games) {
+    const regular = { ...game, _id: `regular-${game.divisionId}`, number: game.number + 100,
+      challengerPosition: 4, defenderPosition: 3, titleFight: false };
+    state.challenges.push(regular);
+    for (const [c, expectedTemplate] of [[game, `title-${s.divisions.find((d: any) => d._id === game.divisionId).code}`], [regular, "fixtures"]] as const) {
+      const requested: string[] = [];
+      const listener = (request: any) => { if (request.url().includes("/api/poster-templates/")) requested.push(request.url()); };
+      page.on("request", listener);
+      await page.goto(`/desafios/${c._id}`);
+      await page.locator("summary").filter({ hasText: "Exportar cartão do jogo" }).click();
+      const img = page.getByAltText(`Cartão do jogo #${c.number}`);
+      await expect(img).toBeVisible();
+      await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(1080);
+      expect(requested.some(url => url.endsWith(`/api/poster-templates/${expectedTemplate}`))).toBe(true);
+      const height = await img.evaluate((el: HTMLImageElement) => el.naturalHeight);
+      expect(height).toBe(c === game ? 1920 : 1408);
+      page.off("request", listener);
+    }
+  }
   await page.unroute("**/api/league");
   await switchWorkspace(page, "player");
   expect(

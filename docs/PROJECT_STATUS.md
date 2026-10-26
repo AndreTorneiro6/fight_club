@@ -1,3 +1,9 @@
+## Version1.5.0 individual exports prepared;1.4.0 verified live — 26 October 2026
+
+- Latest user additionally required every individual ordinary game export to use cartaz da jornada layout with its division, automatically selecting the special division title template for title matches. Removed the old generic square renderer; all exports now reuse renderMatchdayPoster, including per-set result variants. Preview dimensions come from generated canvas. Extended template browser checks both individual normal/title exports for Ouro, Prata, Bronze and actual template requests/dimensions.
+-390 tests/typecheck/build pass; new chat browser, all6 legacy league desktop/mobile flows (old post-confirmation calendar assertion updated), image clipboard and extended private template browser pass. No operational competition data changed.
+-1.4.0 workflow40303429656 succeeded at05ea01f1bb115852ecf00dc42a8bd98251a42b85; live package1.4.0, app/worker running zero restarts, common image sha256:08e09ab2995007c93652172e586ea258f05244731695953bd701417e286c4fbc. Health/worker DNS pass; annotated v1.4.0 tag pushed.1.5.0 deployment next.
+
 ## Version1.5.0 challenge chat mentions prepared — 26 October 2026
 
 - @ suggestions include captured challenge participants (both partners) and server-derived verified administrators. Selection stores recipient IDs and server name snapshots; no arbitrary player mentions or expanded chat access. Accessible combobox/listbox with keyboard selection and highlighted escaped text.
