@@ -95,6 +95,9 @@ test("matchday generator exports a complete PNG, paginates results and respects 
   const challenges: Challenge[] = Array.from({ length: 4 }, (_, index) => ({
     ...state.challenges[0],
     _id: `poster-${index}`,
+    positionSnapshotModel: "team",
+    challengerPosition:4,
+    defenderPosition:3,
     number: 20 + index,
     status: "completed",
     divisionId: index === 3 ? "prata" : "ouro",

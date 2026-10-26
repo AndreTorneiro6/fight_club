@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.3";
+export const applicationVersion = "1.5.4";
 export const releaseNotes = [
+  {
+    version: "1.5.4",
+    date: "2026-10-26",
+    title: "Posições das duplas nos cartazes e jogos antigos",
+    changes: [
+      "Posições individuais antigas deixam de ser apresentadas como posições de dupla nos cartazes.",
+      "Normalização auditada dos jogos antigos cuja posição pode ser validada, mantendo os rankings, horários, adversários e papéis.",
+      "Title Fights identificam a dupla campeã mesmo quando o desafio foi enviado ao segundo jogador; novos jogos publicados guardam explicitamente o modelo por duplas.",
+    ],
+  },
   {
     version: "1.5.3",
     date: "2026-10-26",

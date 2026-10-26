@@ -2432,6 +2432,7 @@ export function executeCompetition(
             defenderId: d.members[0].playerId,
             challengerTeam: a.members,
             defenderTeam: d.members,
+            positionSnapshotModel: "team",
             challengerPosition: a.rank,
             defenderPosition: d.rank,
             status: p.start ? "scheduled" : "accepted",

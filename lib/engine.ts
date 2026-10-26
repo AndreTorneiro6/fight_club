@@ -1,3 +1,4 @@
+import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRoundCompletion } from "./round-transition";
@@ -373,6 +374,20 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("match.reject_time"),
     challengeId: id,
     proposalId: id,
+    note: text.min(3),
+  }),
+  z.object({
+    type: z.literal("admin.challenges.team_positions.normalize"),
+    snapshots: z
+      .array(
+        z.object({
+          challengeId: id,
+          challengerPosition: z.number().int().positive(),
+          defenderPosition: z.number().int().positive(),
+        }),
+      )
+      .min(1)
+      .max(100),
     note: text.min(3),
   }),
   z.object({
@@ -4051,6 +4066,51 @@ export function execute(
       for (const pid of challengeParticipants(c, s.players))
         notify(pid, "Desafio atualizado pelo administrador", cmd.action, c._id);
       break;
+    }
+    case "admin.challenges.team_positions.normalize": {
+      ensure(
+        new Set(cmd.snapshots.map((x) => x.challengeId)).size ===
+          cmd.snapshots.length,
+        "Jogos duplicados na normalização.",
+      );
+      const changes = cmd.snapshots.map((snapshot) => {
+        const c = challenge(snapshot.challengeId),
+          ranks = challengeTeamRanks(s, c);
+        ensure(
+          c.challengerPosition === snapshot.challengerPosition &&
+            c.defenderPosition === snapshot.defenderPosition,
+          "O jogo mudou: volta a validar as posições.",
+          409,
+        );
+        ensure(
+          ranks.source === "legacy-converted" &&
+            ranks.attacker &&
+            ranks.defender,
+          "Não é possível converter este histórico sem rever as posições originais.",
+        );
+        return { c, ranks, snapshot };
+      });
+      for (const { c, ranks, snapshot } of changes) {
+        c.challengerPosition = ranks.attacker!;
+        c.defenderPosition = ranks.defender!;
+        c.positionSnapshotModel = "team";
+        log("challenge.team_positions.normalized", {
+          challengeId: c._id,
+          number: c.number,
+          note: cmd.note,
+          before: {
+            attacker: snapshot.challengerPosition,
+            defender: snapshot.defenderPosition,
+            model: "individual",
+          },
+          after: {
+            attacker: c.challengerPosition,
+            defender: c.defenderPosition,
+            model: "team",
+          },
+        });
+      }
+      return { normalized: changes.length };
     }
     case "admin.match.delete": {
       const c = challenge(cmd.challengeId);

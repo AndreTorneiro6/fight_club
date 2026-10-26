@@ -47,6 +47,7 @@ test("club templates generate separate normal and title posters with real teams 
       weekStart: week,
       challengerId: left.members[0]._id,
       defenderId: right.members[0]._id,
+      positionSnapshotModel: "team",
       challengerPosition: 2,
       defenderPosition: 1,
       challengerTeam: left.members.map((m) => ({

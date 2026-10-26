@@ -1,3 +1,4 @@
+import { challengeTeamRanks } from "./challenge-team-ranks";
 import { formatSetScores, parseLegacySetScores } from "./set-scores";
 import { isTitleMatch, isOfficialTitleMatch } from "./title-matches";
 import { clubWeek } from "./calendar";
@@ -37,8 +38,8 @@ export function matchdayCards(
         return [];
       if (
         isTitlePoster(mode)
-          ? !isOfficialTitleMatch(challenge)
-          : isTitleMatch(challenge)
+          ? !isOfficialTitleMatch(challenge, state)
+          : isTitleMatch(challenge, state)
       )
         return [];
       if (divisionId !== "all" && challenge.divisionId !== divisionId)
@@ -78,12 +79,13 @@ export function matchdayCards(
       const winnerId = completed
         ? (result?.winnerId ?? challenge.winnerId)
         : undefined;
+      const ranks = challengeTeamRanks(state, challenge);
       return [
         {
           id: challenge._id,
-          titleFight: isTitleMatch(challenge),
-          attackerRank: challenge.challengerPosition,
-          defenderRank: challenge.defenderPosition,
+          titleFight: isTitleMatch(challenge, state),
+          attackerRank: ranks.attacker,
+          defenderRank: ranks.defender,
           number: challenge.number,
           division: division?.name ?? "Liga",
           divisionCode: division?.code ?? "bronze",
