@@ -65,6 +65,7 @@ import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
+import AdminClubPhotos from "./admin-club-photos";
 import AdminCoinShortcut from "./admin-coin-shortcut";
 import AdminMatchVoting from "./admin-match-voting";
 import AdminGamification from "./admin-gamification";
@@ -754,6 +755,7 @@ export function Application({
                 <span className="notification-count">{unread}</span>
               )}
             </Link>
+            <AdminCoinShortcut state={s} />
             <Link href="/perfil" className="row">
               <Avatar p={p} />
               <div className="desktop-meta">
@@ -766,7 +768,6 @@ export function Application({
           </div>
         </header>
         <GlobalSearch state={s} />
-        <AdminCoinShortcut state={s} />
         <main className="content">
           <PlayerAppRegistration />
           {!admin && s.settings[0]?.weeklyCompetition && (
@@ -3559,6 +3560,8 @@ function Admin(a: Actions) {
           busy={a.busy}
           connection={a.chatConnection}
         />
+      ) : tab === "photos" ? (
+        <AdminClubPhotos state={s} run={a.run} busy={a.busy} refresh={a.refresh} />
       ) : tab === "coins" ? (
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (

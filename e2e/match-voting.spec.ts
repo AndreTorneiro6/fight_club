@@ -50,6 +50,12 @@ test("private central supports winner-only votes, general discussion mentions an
     name: "Central de Apostas em teste privado",
     exact: true,
   });
+  await central
+    .getByLabel("Fechar votação antes do jogo", { exact: true })
+    .selectOption("60");
+  await expect(
+    central.getByLabel("Fechar votação antes do jogo", { exact: true }),
+  ).toHaveValue("60");
   const state = await (await page.request.get("/api/league")).json(),
     challenge = state.challenges.find((c: any) => c._id === game.id);
   const card = central.getByRole("article", {
@@ -57,6 +63,11 @@ test("private central supports winner-only votes, general discussion mentions an
     exact: true,
   });
   await expect(card).toBeVisible();
+  const timer = card.getByRole("timer", {
+    name: `Tempo para fechar votação do jogo ${challenge.number}`,
+  });
+  await expect(timer).toContainText(/Fecha em \d+h \d+m \d+s/);
+
   await expect(card).toContainText("Jogo do título · 1.º lugar em disputa");
   await expect(card).toContainText("ATAQUE · 2.º lugar");
   await expect(card).toContainText("DEFESA · 1.º lugar");
@@ -71,6 +82,13 @@ test("private central supports winner-only votes, general discussion mentions an
   await choices.last().click();
   await expect(choices.last()).toHaveAttribute("aria-pressed", "true");
   await expect(card).toContainText("1 votos");
+  await choices.last().click();
+  await expect(card).toContainText("0 votos");
+  await expect(choices.first()).toHaveAttribute("aria-pressed", "false");
+  await expect(choices.last()).toHaveAttribute("aria-pressed", "false");
+  await choices.last().click();
+  await expect(choices.last()).toHaveAttribute("aria-pressed", "true");
+
   await card.getByRole("button", { name: "Abrir conversa do jogo" }).click();
   const chat = central.getByRole("region", {
     name: "Conversa do jogo",
@@ -89,6 +107,9 @@ test("private central supports winner-only votes, general discussion mentions an
   expect(
     updated.matchVotes.filter((v: any) => v.challengeId === game.id),
   ).toHaveLength(1);
+  expect(
+    updated.matchVotes.find((v: any) => v.challengeId === game.id).lockAt,
+  ).toBe(new Date(start.getTime() - 60 * 60000).toISOString());
   expect(
     updated.matchDiscussionMessages.filter(
       (m: any) => m.challengeId === game.id,
@@ -120,6 +141,7 @@ test("private central supports winner-only votes, general discussion mentions an
   ).toContainText("O teu voto");
   await switchWorkspace(page, "player");
   const playerState = await (await page.request.get("/api/league")).json();
+  expect(playerState.matchVotingSettings).toEqual([]);
   expect(playerState.matchVotes).toEqual([]);
   expect(playerState.matchDiscussionMessages).toEqual([]);
   const forbidden = await page.request.post("/api/league", {

@@ -33,6 +33,7 @@ export const adminGroups = [
       ["sponsors", "Patrocínios"],
       ["engagement", "Cartões e palpites"],
       ["album", "Caderneta"],
+      ["photos", "Fotografias para desbloquear"],
       ["rules", "Regras"],
       ["courts", "Campos"],
       ["audit", "Auditoria"],

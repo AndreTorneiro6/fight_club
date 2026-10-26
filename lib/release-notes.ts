@@ -4,10 +4,13 @@ export const releaseNotes = [
   {
     version: "1.6.2",
     date: "2026-10-26",
-    title: "Moeda visível no espaço de administração",
+    title: "Moeda no perfil, votação e fotografias desbloqueáveis",
     changes: [
-      "Atalho visível abaixo da pesquisa com símbolo, nome configurado e saldo da carteira do administrador.",
-      "Acesso direto a Moedas e bar; faixa própria no telemóvel, mantendo espaço nos botões do topo e sem acesso no modo jogador.",
+      "Moeda visível junto ao nome e avatar do administrador, com símbolo, nome configurado e saldo da carteira.",
+      "Acesso direto a Moedas e bar; apresentação compacta no telemóvel e sem acesso no modo jogador.",
+      "Tocar novamente na dupla selecionada retira o voto enquanto a votação está aberta, com atualização das contagens e proteção contra alterações noutra sessão.",
+      "Administrador escolhe fechar os votos 30 minutos ou 1 hora antes do jogo; relógio em contagem decrescente em cada jogo.",
+      "Catálogo privado de fotografias para administradores, com upload, edição, pré-visualização por jogador e regras de desbloqueio por definir, manuais, jogos ou moedas.",
     ],
   },
   {

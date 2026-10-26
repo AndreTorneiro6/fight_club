@@ -2,8 +2,12 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, Message, State } from "./types";
 import { ensure } from "./rules";
-import { predictionCutoff } from "./prediction-cutoff";
-import { discussionTargets, isVotingMatch } from "./match-voting-targets";
+import {
+  discussionTargets,
+  isVotingMatch,
+  matchVotingCutoff,
+  defaultMatchVotingSettings,
+} from "./match-voting-targets";
 
 export interface MatchVote {
   _id: string;
@@ -14,6 +18,7 @@ export interface MatchVote {
   createdAt: string;
   updatedAt: string;
   lockAt: string;
+  withdrawnAt?: string;
 }
 export interface MatchDiscussionMessage extends Message {
   requestId: string;
@@ -21,9 +26,24 @@ export interface MatchDiscussionMessage extends Message {
 const schema = z.discriminatedUnion("type", [
   z
     .object({
+      type: z.literal("admin.match-vote.settings"),
+      expectedVersion: z.number().int().min(0),
+      lockMinutes: z.union([z.literal(30), z.literal(60)]),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal("admin.match-vote.save"),
       challengeId: z.string().min(1).max(100),
       winnerId: z.string().min(1).max(100),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("admin.match-vote.remove"),
+      challengeId: z.string().min(1).max(100),
+      expectedWinnerId: z.string().min(1).max(100),
+      expectedUpdatedAt: z.string().datetime(),
     })
     .strict(),
   z
@@ -62,23 +82,52 @@ export function executeMatchVoting(
     "Perfil indisponível.",
     403,
   );
+  if (cmd.type === "admin.match-vote.settings") {
+    const before = state.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
+    ensure(
+      before.version === cmd.expectedVersion,
+      "As regras mudaram. Atualiza antes de guardar.",
+      409,
+    );
+    state.matchVotingSettings = [
+      {
+        _id: "match-voting",
+        version: before.version + 1,
+        lockMinutes: cmd.lockMinutes,
+        updatedAt: at,
+        updatedBy: actor.userId,
+      },
+    ];
+    state.audit.push({
+      _id: randomUUID(),
+      userId: actor.userId,
+      action: cmd.type,
+      details: JSON.stringify({ before, after: state.matchVotingSettings[0] }),
+      createdAt: at,
+    });
+    return { ok: true };
+  }
   const challenge = state.challenges.find((c) => c._id === cmd.challengeId);
   ensure(
     challenge && isVotingMatch(state, challenge),
     "Este jogo não está oficialmente publicado.",
     404,
   );
-  if (cmd.type === "admin.match-vote.save") {
-    ensure(
-      [challenge.challengerId, challenge.defenderId].includes(cmd.winnerId),
-      "Escolhe uma das duplas deste jogo.",
-    );
+  if (
+    cmd.type === "admin.match-vote.save" ||
+    cmd.type === "admin.match-vote.remove"
+  ) {
+    if (cmd.type === "admin.match-vote.save")
+      ensure(
+        [challenge.challengerId, challenge.defenderId].includes(cmd.winnerId),
+        "Escolhe uma das duplas deste jogo.",
+      );
     ensure(
       ["scheduled", "accepted", "schedule_pending"].includes(challenge.status),
       "A votação deste jogo está encerrada.",
       409,
     );
-    const cutoff = predictionCutoff(state, challenge),
+    const cutoff = matchVotingCutoff(state, challenge),
       existing = state.matchVotes?.find(
         (v) => v.userId === actor.userId && v.challengeId === challenge._id,
       );
@@ -87,6 +136,26 @@ export function executeMatchVoting(
       existing && existing.lockAt < cutoff ? existing.lockAt : cutoff;
     ensure(at < lockAt, "A votação deste jogo está encerrada.", 409);
     const before = existing ? { ...existing } : null;
+    if (cmd.type === "admin.match-vote.remove") {
+      if (!existing || existing.withdrawnAt) return { ok: true };
+      ensure(
+        existing.winnerId === cmd.expectedWinnerId &&
+          existing.updatedAt === cmd.expectedUpdatedAt,
+        "O teu voto mudou noutra sessão. Atualiza antes de o retirar.",
+        409,
+      );
+      existing.withdrawnAt = at;
+      existing.updatedAt = at;
+      state.audit.push({
+        _id: randomUUID(),
+        userId: actor.userId,
+        action: cmd.type,
+        details: JSON.stringify({ before, challengeId: challenge._id }),
+        createdAt: at,
+      });
+      return { ok: true };
+    }
+    if (existing) delete existing.withdrawnAt;
     if (existing)
       Object.assign(existing, {
         winnerId: cmd.winnerId,

@@ -1,3 +1,4 @@
+import { executeClubPhotos } from "./club-photos";
 import { executeMatchVoting } from "./match-voting";
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
@@ -595,6 +596,8 @@ export function execute(
     featureType.startsWith("admin.match-discussion.")
   )
     return executeMatchVoting(s, actor, raw, timestamp);
+  if (featureType.startsWith("admin.photos."))
+    return executeClubPhotos(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.coins."))
     return executeCoins(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.stickers."))
@@ -3635,6 +3638,7 @@ export function execute(
         ) ||
         (s.gamificationProfiles ?? []).some(referencesPlayer) ||
         (s.coinEntries ?? []).some(referencesPlayer) ||
+        (s.clubPhotoUnlocks ?? []).some(referencesPlayer) ||
         (s.matchVotes ?? []).some(referencesPlayer) ||
         (s.matchDiscussionMessages ?? []).some(
           (message) =>

@@ -98,6 +98,40 @@ test("admins configure coins, record and redeem rewards, edit idea markers; play
   await expect(
     page.getByRole("heading", { name: "Créditos do Clube", exact: true }),
   ).toBeVisible();
+  const coinShortcut = page
+    .locator("header.topbar")
+    .getByRole("link", { name: /^Abrir moedas e bar:/ });
+  await expect(coinShortcut).toBeVisible();
+  await expect(coinShortcut).toContainText("5");
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const overflow = await page.evaluate(() =>
+      [...document.querySelectorAll("body *")]
+        .filter(
+          (e) =>
+            e.getBoundingClientRect().right > innerWidth + 1 &&
+            getComputedStyle(e).position !== "fixed",
+        )
+        .map((e) => ({
+          tag: e.tagName,
+          cls: e.className,
+          right: e.getBoundingClientRect().right,
+        }))
+        .slice(0, 20),
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      JSON.stringify(overflow),
+    ).toBe(true);
+    const coinBox = await coinShortcut.boundingBox();
+    expect(coinBox!.width).toBeGreaterThanOrEqual(44);
+    expect(coinBox!.height).toBeGreaterThanOrEqual(44);
+    expect(coinBox!.x + coinBox!.width).toBeLessThanOrEqual(width);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: `/var/tmp/coin-header-${width}.png` });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "/var/tmp/neiva-coins-mobile.png",

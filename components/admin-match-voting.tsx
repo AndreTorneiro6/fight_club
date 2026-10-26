@@ -4,8 +4,12 @@ import type { View } from "@/lib/types";
 import { challengeTeamRanks } from "@/lib/challenge-team-ranks";
 import { isTitleMatch } from "@/lib/title-matches";
 import { challengeTeamName } from "@/lib/team-competition";
-import { isVotingMatch } from "@/lib/match-voting-targets";
-import { predictionCutoff } from "@/lib/prediction-cutoff";
+import {
+  isVotingMatch,
+  matchVotingCutoff,
+  defaultMatchVotingSettings,
+  votingCountdown,
+} from "@/lib/match-voting-targets";
 import ChallengeChat from "./challenge-chat";
 import styles from "./admin-match-voting.module.css";
 
@@ -40,6 +44,7 @@ export default function AdminMatchVoting({
         a.number - b.number,
     );
   const game = games.find((c) => c._id === selected);
+  const settings = s.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
   return (
     <section
       className={`stack ${styles.root}`}
@@ -55,6 +60,27 @@ export default function AdminMatchVoting({
           Um voto por pessoa e jogo. Podes mudar até ao fecho. Sem resultados em
           sets, moedas ou alterações à classificação da liga.
         </p>
+        <label className={styles.cutoffSetting}>
+          Fechar votação antes do jogo
+          <select
+            aria-label="Fechar votação antes do jogo"
+            value={settings.lockMinutes}
+            disabled={busy}
+            onChange={(event) =>
+              void run(
+                {
+                  type: "admin.match-vote.settings",
+                  expectedVersion: settings.version,
+                  lockMinutes: Number(event.target.value),
+                },
+                "Prazo da votação atualizado.",
+              )
+            }
+          >
+            <option value={30}>30 minutos antes</option>
+            <option value={60}>1 hora antes</option>
+          </select>
+        </label>
         <div className="tabs" role="group" aria-label="Divisão da votação">
           {[["all", "Todos"], ...s.divisions.map((d) => [d._id, d.name])].map(
             ([id, label]) => (
@@ -105,10 +131,16 @@ export default function AdminMatchVoting({
     </section>
   );
   function renderGame(c: View["challenges"][number], detail: boolean) {
-    const votes = (s.matchVotes ?? []).filter((v) => v.challengeId === c._id),
-      mine = votes.find((v) => v.userId === s.actor.userId),
-      cutoff = predictionCutoff(s, c),
-      lockAt = mine && cutoff && mine.lockAt < cutoff ? mine.lockAt : cutoff;
+    const stored = (s.matchVotes ?? []).find(
+      (v) => v.challengeId === c._id && v.userId === s.actor.userId,
+    );
+    const votes = (s.matchVotes ?? []).filter(
+        (v) => v.challengeId === c._id && !v.withdrawnAt,
+      ),
+      mine = stored?.withdrawnAt ? undefined : stored,
+      cutoff = matchVotingCutoff(s, c),
+      lockAt =
+        stored && cutoff && stored.lockAt < cutoff ? stored.lockAt : cutoff;
     const open =
       !!lockAt &&
       clock < Date.parse(lockAt) &&
@@ -157,6 +189,15 @@ export default function AdminMatchVoting({
             ? `Votos até ${new Date(lockAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}`
             : "A aguardar horário confirmado"}
         </p>
+        {open && lockAt && (
+          <div
+            className={styles.countdown}
+            role="timer"
+            aria-label={`Tempo para fechar votação do jogo ${c.number}`}
+          >
+            Fecha em <strong>{votingCountdown(lockAt, clock)}</strong>
+          </div>
+        )}
         <div
           className={styles.choices}
           role="group"
@@ -175,12 +216,19 @@ export default function AdminMatchVoting({
                 aria-pressed={mine?.winnerId === id}
                 onClick={() =>
                   void run(
-                    {
-                      type: "admin.match-vote.save",
-                      challengeId: c._id,
-                      winnerId: id,
-                    },
-                    "Voto guardado.",
+                    mine?.winnerId === id
+                      ? {
+                          type: "admin.match-vote.remove",
+                          challengeId: c._id,
+                          expectedWinnerId: mine.winnerId,
+                          expectedUpdatedAt: mine.updatedAt,
+                        }
+                      : {
+                          type: "admin.match-vote.save",
+                          challengeId: c._id,
+                          winnerId: id,
+                        },
+                    mine?.winnerId === id ? "Voto retirado." : "Voto guardado.",
                   )
                 }
               >
@@ -206,6 +254,12 @@ export default function AdminMatchVoting({
             );
           })}
         </div>
+        {open && (
+          <small className="muted">
+            Toca na dupla para votar. Toca novamente na dupla selecionada para
+            retirar o voto.
+          </small>
+        )}
         <small className="muted">
           Posições das duplas guardadas para este jogo.
         </small>

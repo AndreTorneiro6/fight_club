@@ -1,3 +1,4 @@
+import { predictionCutoff } from "./prediction-cutoff";
 import type { State } from "./types";
 import type { ChatMention } from "./chat-mentions";
 export function discussionTargets(state: State): ChatMention[] {
@@ -34,4 +35,33 @@ export function isVotingMatch(
     !!challenge.scheduledAt &&
     state.matches.some((m) => m.challengeId === challenge._id)
   );
+}
+
+export interface MatchVotingSettings {
+  _id: string;
+  version: number;
+  lockMinutes: 30 | 60;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+export const defaultMatchVotingSettings: MatchVotingSettings = {
+  _id: "match-voting",
+  version: 0,
+  lockMinutes: 30,
+};
+export function matchVotingCutoff(
+  state: State,
+  challenge: State["challenges"][number],
+) {
+  return predictionCutoff(
+    state,
+    challenge,
+    state.matchVotingSettings?.[0] ?? defaultMatchVotingSettings,
+  );
+}
+export function votingCountdown(cutoff: string, now: number) {
+  const seconds = Math.max(0, Math.ceil((Date.parse(cutoff) - now) / 1000));
+  const hours = Math.floor(seconds / 3600),
+    minutes = Math.floor((seconds % 3600) / 60);
+  return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`;
 }

@@ -54,6 +54,10 @@ export async function database() {
 }
 async function indexes(db: Db) {
   await db
+    .collection("clubPhotoUnlocks")
+    .createIndex({ photoId: 1, playerId: 1 }, { unique: true });
+  await db.collection("clubPhotoFiles").createIndex({ createdAt: 1 });
+  await db
     .collection("matchVotes")
     .createIndex({ userId: 1, challengeId: 1 }, { unique: true });
   await db

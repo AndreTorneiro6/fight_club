@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { coinBalance, defaultCoinSettings } from "@/lib/coin-types";
 import type { View } from "@/lib/types";
 import styles from "./admin-coin-shortcut.module.css";
@@ -14,6 +13,8 @@ export default function AdminCoinShortcut({ state }: { state: View }) {
     <Link
       href="/admin?tab=coins"
       className={styles.shortcut}
+      data-admin-coin
+      title={`${name}: ${balance.toLocaleString("pt-PT")} · Carteira em teste privado`}
       aria-label={`Abrir moedas e bar: ${name}`}
     >
       <span className={styles.coin} aria-hidden="true">
@@ -24,15 +25,16 @@ export default function AdminCoinShortcut({ state }: { state: View }) {
           .join("")
           .toUpperCase()}
       </span>
-      <span className={styles.identity}>
-        <strong>{name}</strong>
-        <small>Teste privado · gerir moedas e bar</small>
-      </span>
-      <span className={styles.balance}>
-        <strong>{balance.toLocaleString("pt-PT")}</strong>
-        <small>A tua carteira</small>
-      </span>
-      <ArrowRight size={17} aria-hidden="true" />
+      <span className={styles.identity}>{name}</span>
+      <strong
+        className={styles.balance}
+        aria-label={`Saldo: ${balance.toLocaleString("pt-PT")}`}
+      >
+        {new Intl.NumberFormat("pt-PT", {
+          notation: "compact",
+          maximumFractionDigits: 1,
+        }).format(balance)}
+      </strong>
     </Link>
   );
 }

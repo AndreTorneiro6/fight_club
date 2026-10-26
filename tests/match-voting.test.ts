@@ -175,3 +175,135 @@ test("legacy club-confirmed bookings qualify; pending proposals and unpublished 
   c.status = "cancelled";
   assert.equal(isVotingMatch(s, c), false);
 });
+
+test("withdrawal preserves cutoff/history, changes counts once and permits a new vote before closing", () => {
+  const s = fixture();
+  execute(s, admin, vote, at);
+  const original = { ...s.matchVotes![0] };
+  const remove = {
+    type: "admin.match-vote.remove",
+    challengeId: "c1",
+    expectedWinnerId: original.winnerId,
+    expectedUpdatedAt: original.updatedAt,
+  };
+  assert.throws(
+    () => execute(s, admin, { ...remove, expectedWinnerId: "p2" }, at + 1),
+    /noutra sessão/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...admin, role: "player", accountRole: "admin" },
+        remove,
+        at + 1,
+      ),
+    /teste privado/,
+  );
+  execute(s, admin, remove, at + 1);
+  execute(s, admin, remove, at + 2);
+  assert.equal(s.matchVotes!.filter((v) => !v.withdrawnAt).length, 0);
+  assert.equal(s.matchVotes![0].lockAt, original.lockAt);
+  assert.equal(s.audit.filter((a) => a.action === remove.type).length, 1);
+  execute(s, admin, { ...vote, winnerId: "p2" }, at + 3);
+  assert.equal(s.matchVotes!.length, 1);
+  assert.equal(s.matchVotes![0].withdrawnAt, undefined);
+  assert.throws(
+    () => execute(s, admin, remove, Date.parse(original.lockAt)),
+    /encerrada/,
+  );
+});
+test("withdrawn vote cannot reopen when the game is postponed past its original cutoff", () => {
+  const s = fixture();
+  execute(s, admin, vote, at);
+  const own = s.matchVotes![0];
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.match-vote.remove",
+      challengeId: "c1",
+      expectedWinnerId: own.winnerId,
+      expectedUpdatedAt: own.updatedAt,
+    },
+    at + 1,
+  );
+  s.challenges[0].scheduledAt = "2026-11-05T19:00:00Z";
+  assert.throws(
+    () => execute(s, admin, vote, Date.parse("2026-11-04T12:00:00Z")),
+    /encerrada/,
+  );
+});
+
+test("administrator selects 30/60-minute closure independently of predictions with version protection", () => {
+  const s = fixture();
+  execute(
+    s,
+    admin,
+    { type: "admin.match-vote.settings", expectedVersion: 0, lockMinutes: 60 },
+    at,
+  );
+  execute(s, admin, vote, at);
+  assert.equal(s.matchVotes![0].lockAt, "2026-11-03T18:00:00.000Z");
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.match-vote.settings",
+          expectedVersion: 0,
+          lockMinutes: 30,
+        },
+        at,
+      ),
+    /mudaram/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...admin, role: "player" },
+        {
+          type: "admin.match-vote.settings",
+          expectedVersion: 1,
+          lockMinutes: 30,
+        },
+        at,
+      ),
+    /teste privado/,
+  );
+  assert.throws(() =>
+    execute(
+      s,
+      admin,
+      { type: "admin.match-vote.settings", expectedVersion: 1, lockMinutes: 0 },
+      at,
+    ),
+  );
+  execute(
+    s,
+    admin,
+    { type: "admin.match-vote.settings", expectedVersion: 1, lockMinutes: 30 },
+    at,
+  );
+  assert.throws(
+    () => execute(s, admin, vote, Date.parse("2026-11-03T18:01:00Z")),
+    /encerrada/,
+  );
+  assert.deepEqual(s.engagementSettings, []);
+});
+test("default closure is 30 minutes before kickoff and countdown floors at zero", async () => {
+  const { votingCountdown } = await import("../lib/match-voting-targets");
+  const s = fixture();
+  execute(s, admin, vote, at);
+  assert.equal(s.matchVotes![0].lockAt, "2026-11-03T18:30:00.000Z");
+  assert.equal(
+    votingCountdown("2026-11-03T18:30:00Z", Date.parse("2026-11-03T18:00:00Z")),
+    "00h 30m 00s",
+  );
+  assert.equal(
+    votingCountdown("2026-11-03T18:30:00Z", Date.parse("2026-11-03T18:31:00Z")),
+    "00h 00m 00s",
+  );
+});

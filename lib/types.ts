@@ -1,3 +1,5 @@
+import type { ClubPhoto, ClubPhotoUnlock } from "./club-photo-types";
+import type { MatchVotingSettings } from "./match-voting-targets";
 import type { MatchVote, MatchDiscussionMessage } from "./match-voting";
 import type { NotificationEvent } from "./notification-presentation";
 import type { SetScore } from "./set-scores";
@@ -385,6 +387,9 @@ export interface WeeklyRound extends Entity {
   assignments: { playerId: string; role: "attack" | "defense" }[];
 }
 export interface State {
+  clubPhotos?: ClubPhoto[];
+  clubPhotoUnlocks?: ClubPhotoUnlock[];
+  matchVotingSettings?: MatchVotingSettings[];
   matchVotes?: MatchVote[];
   matchDiscussionMessages?: MatchDiscussionMessage[];
   /** Verified administrator contacts, derived by the server; never a persisted collection. */
@@ -431,6 +436,9 @@ export interface State {
   seasons: Season[];
 }
 export const collections = [
+  "clubPhotos",
+  "clubPhotoUnlocks",
+  "matchVotingSettings",
   "matchVotes",
   "matchDiscussionMessages",
   "adminTestChallenges",

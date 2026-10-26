@@ -1,24 +1,24 @@
 .shortcut {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  margin: 0 32px 12px;
-  padding: 12px 16px;
-  min-height: 64px;
+  gap: 7px;
+  padding: 6px 10px;
+  min-height: 44px;
   border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
-  border-radius: 12px;
+  border-radius: 24px;
   background: color-mix(in srgb, var(--gold) 5%, var(--panel));
   color: var(--text);
   text-decoration: none;
+  flex-shrink: 0;
 }
 .shortcut:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 3px;
 }
 .coin {
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -27,67 +27,53 @@
   box-shadow: inset 0 0 0 2px #a77826;
   color: #50350e;
   font-weight: 900;
-  font-size: 13px;
+  font-size: 10px;
 }
 .identity {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-.identity strong {
-  overflow-wrap: anywhere;
-}
-.shortcut small {
-  color: var(--muted);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
 }
 .balance {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-end;
-}
-.balance strong {
   color: var(--gold);
-  font-size: 20px;
+  font-size: 13px;
 }
-.shortcut > svg {
-  flex-shrink: 0;
+@media (max-width: 1200px) {
+  .identity {
+    display: none;
+  }
 }
 @media (max-width: 760px) {
   .shortcut {
-    margin-left: max(12px, var(--safe-left));
-    margin-right: max(12px, var(--safe-right));
-    padding: 10px;
-    gap: 8px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px 4px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
-  .identity strong {
-    font-size: 13px;
+  .coin {
+    flex-basis: 20px;
+    width: 20px;
+    height: 20px;
+    font-size: 8px;
+    border-width: 1px;
   }
-  .identity small {
+  .balance {
     font-size: 10px;
-  }
-  .balance small {
-    font-size: 10px;
+    line-height: 12px;
   }
 }
 @media (max-width: 360px) {
-  .shortcut {
-    flex-wrap: wrap;
+  :global(.topbar:has([data-admin-coin]))::before {
+    content: "FC";
+    font-size: 20px;
+    letter-spacing: 0.03em;
   }
-  .shortcut > svg {
-    display: none;
-  }
-  .identity {
-    flex-basis: calc(100% - 50px);
-  }
-  .balance {
-    flex: 1;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
+  :global(.topbar:has([data-admin-coin]) > .row) {
+    gap: 4px;
   }
 }
