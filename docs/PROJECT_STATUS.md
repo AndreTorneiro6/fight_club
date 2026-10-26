@@ -1,3 +1,9 @@
+## Version1.5.0 deployed and verified — 26 October 2026
+
+- Workflow40306261814 succeeded and deployed e99a402feb327a749ae80481d0fac84c4892a3fe. Live package1.5.0, app/worker running zero restarts, common image sha256:66c7bbab12db0703a543f3ba6156c2be65e2856880173f417001d34c41b31e3c. Public health and worker DNS pass. Annotated v1.5.0 pushed at exact deployed revision.
+- All390 tests/typecheck/build and isolated CI browser groups passed, including chat mentions, actual PNG clipboard, private template access and individual ordinary/title exports in every division. The local first clipboard retry briefly started before production build completed; subsequent isolated browser run passed both image/template specs. No live competition configuration, fixtures, results, openings or notification replay performed.
+- Delivered: @ mention actual challenge members/admins with per-recipient notices/deep links; every individual match export uses club round template with correct division, title matches automatically use division title artwork; previous1.4 confirmed challenge calendar and supplied poster templates remain active. Changelog available in admin. Unrelated deleted fight-club-source.zip and untracked Untitled.jpeg remain untouched.
+
 ## Version1.5.0 CI clipboard refresh correction — 26 October 2026
 
 - First workflow40305544394 stopped before deployment: weekly paper clipboard success feedback disappeared during a live refresh, while individual template tests passed. RankingExport regenerated identical PNGs whenever live state/roles got new object identities. Key regeneration to serialized poster content/options instead, preserving image/clipboard feedback for unchanged data.390 tests/typecheck/build and isolated image/template browsers pass again. Retry deployment after this fix. Production stays on verified1.4.0 until successful deploy.
