@@ -2947,8 +2947,7 @@ body::before {
 .admin-division-status small { text-align: right; color: var(--muted); }
 .admin-week-panel > button { width: 100%; min-height: 44px; }
 .admin-week-panel > .row:last-child { margin-top: 10px; gap: 12px; }
-.admin-unscheduled-filter { display: flex; flex-direction: row; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; }
-.admin-unscheduled-filter select { width: auto; flex: 1; min-width: 0; max-width: 280px; min-height: 44px; }
+.admin-unscheduled-filter { flex-wrap: wrap; margin-bottom: 8px; }
 .admin-unscheduled-list { display: grid; }
 .admin-unscheduled-game {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px;

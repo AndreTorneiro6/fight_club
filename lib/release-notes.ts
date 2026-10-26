@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.5";
+export const applicationVersion = "1.5.6";
 export const releaseNotes = [
+  {
+    version: "1.5.6",
+    date: "2026-10-26",
+    title: "Navegação e filtros do resumo administrativo",
+    changes: [
+      "Voltar ao resumo no detalhe do desafio em modo administrador; jogadores continuam a voltar aos desafios.",
+      "Jogos por marcar com filtros Todos, Ouro, Prata e Bronze e contagem por divisão, no mesmo formato de Jogadores.",
+    ],
+  },
   {
     version: "1.5.5",
     date: "2026-10-26",

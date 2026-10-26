@@ -261,29 +261,31 @@ export default function AdminOverview({
             <span className="badge">{visibleUnscheduled.length}</span>
           </div>
           <p className="muted">Dia, hora ou campo ainda por confirmar.</p>
-          {unscheduled.length > 0 && (
-            <label className="admin-unscheduled-filter">
-              <span>Divisão</span>
-              <select
-                aria-label="Divisão dos jogos por marcar"
-                value={scheduleDivision}
-                onChange={(e) => {
-                  setScheduleDivision(e.target.value);
-                  setShowAllUnscheduled(false);
-                }}
-              >
-                <option value="all">
-                  Todas as divisões ({unscheduled.length})
-                </option>
-                {s.divisions.map((d) => (
-                  <option key={d._id} value={d._id}>
-                    {d.name} (
-                    {unscheduled.filter((c) => c.divisionId === d._id).length})
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <div
+            className="tabs admin-unscheduled-filter"
+            role="group"
+            aria-label="Divisão dos jogos por marcar"
+          >
+            {[["all", "Todos"], ...s.divisions.map((d) => [d._id, d.name])].map(
+              ([value, label]) => (
+                <button
+                  key={value}
+                  className={scheduleDivision === value ? "active" : ""}
+                  aria-pressed={scheduleDivision === value}
+                  onClick={() => {
+                    setScheduleDivision(value);
+                    setShowAllUnscheduled(false);
+                  }}
+                >
+                  {label} (
+                  {value === "all"
+                    ? unscheduled.length
+                    : unscheduled.filter((c) => c.divisionId === value).length}
+                  )
+                </button>
+              ),
+            )}
+          </div>
           {visibleUnscheduled.length ? (
             <div className="admin-unscheduled-list">
               {visibleUnscheduled

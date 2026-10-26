@@ -2237,9 +2237,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
   const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
     <>
-      <Link href="/desafios" className="link row" style={{ marginBottom: 20 }}>
+      <Link
+        href={admin ? "/admin" : "/desafios"}
+        className="link row"
+        style={{ marginBottom: 20 }}
+      >
         <ArrowLeft size={14} />
-        Voltar aos desafios
+        {admin ? "Voltar ao resumo" : "Voltar aos desafios"}
       </Link>
       <Heading
         eyebrow={isTitleMatch(c, s) ? "COMBATE PELO CINTURÃO" : "A TUA ARENA"}

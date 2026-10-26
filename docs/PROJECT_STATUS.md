@@ -1,3 +1,7 @@
+## Version1.5.6 admin summary navigation and division filters prepared — 26 October 2026
+
+- Admin challenge detail back link returns to /admin Resumo and says Voltar ao resumo; player link unchanged. Unscheduled summary uses existing tabs UI (Todos and every division), live counts and pressed states, including zero counts. Existing browser flow updated to exercise filters and actual back link. No competition data modified. Typecheck/build/400 tests and isolated admin-overview browser pass (filter buttons and back navigation). Initial tests hit /tmp quota; rerun with TMPDIR=/var/tmp passed. Deployment pending.
+
 ## Version1.5.5 canonical Bronze poster emblem prepared — 26 October 2026
 
 - User supplied templates/icon_bronze.jpeg and requested its helmet/laurel emblem replace Bronze icons across every poster format. Added canonical native crop renderer through authenticated private template route. Applies ranking/weekly all-division and individual exports, daily/weekly fixtures, individual games/results, and Bronze Title Fights; no old numeral3 or title stars used as Bronze emblem. Original JPEGs untouched. Title belt uses localized imagegen restoration only under the replaced emblem; remaining artwork retained.

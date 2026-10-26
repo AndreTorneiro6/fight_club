@@ -88,18 +88,14 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     }),
   ).toBeVisible();
   await expect(unscheduled).toContainText("Sem horário proposto");
-  await unscheduled
-    .getByLabel("Divisão dos jogos por marcar", { exact: true })
-    .selectOption("prata");
+  await unscheduled.getByRole("button", { name: /^Prata \(/ }).click();
   await expect(
     unscheduled.getByRole("link", {
       name: `Marcar jogo #${game.number}`,
       exact: true,
     }),
   ).toHaveCount(0);
-  await unscheduled
-    .getByLabel("Divisão dos jogos por marcar", { exact: true })
-    .selectOption("all");
+  await unscheduled.getByRole("button", { name: /^Todos \(/ }).click();
   await unscheduled
     .getByRole("link", { name: `Marcar jogo #${game.number}`, exact: true })
     .click();
@@ -115,7 +111,10 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     minutes: 90,
     note: "Confirmar que o resumo retira o jogo já marcado",
   });
-  await page.goto("/admin");
+  await page
+    .getByRole("link", { name: "Voltar ao resumo", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/admin$/);
   await expect(
     page
       .getByRole("region", { name: "Jogos por marcar", exact: true })
