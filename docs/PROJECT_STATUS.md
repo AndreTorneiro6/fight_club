@@ -1,3 +1,9 @@
+## Version1.5.3 deployed and verified — 26 October 2026
+
+- Workflow40319148390 succeeded at281eb825fc4877e262ed85f9f7504f38ea30f5e1. Live package1.5.3; app/worker running zero restarts, common image sha256:7f53e7babb549860885d61c426f0c940ef667df05267aa0f36f30878e60393b8. Public health and worker DNS pass. Annotated v1.5.3 tag pushed. Temporary host cancelled-cleanup script/helper copies removed; private backup retained.
+-393 tests/typecheck/build and every isolated CI browser group passed. Current ordinary fixture/day/individual exports follow user-supplied cartaz_diario_ranking.jpeg, with saved team positions in native lateral boxes. Default ALL selected games in one dynamically taller image, admin can choose custom quantity and pagination. Complete title templates can also be stacked separately from normal games. Visual inspections include single-game and taller3-game same-day PNG; exact header pixels preserved. Latest user explicitly permits taller images and requires admin count control. No further live competition mutations after documented7 cancelled-game cleanup. Compact Resumo remains live from1.5.2.
+- Unrelated local deletion of fight-club-source.zip and untracked Untitled.jpeg remain untouched.
+
 ## Version1.5.3 supplied daily/ranking template and configurable counts prepared — 26 October 2026
 
 - User supplied templates/cartaz_diario_ranking.jpeg (1010x1557), explicitly requested following it and adding ranking positions to round posters. New ranked fixture renderer uses original pixels outside localized sample-data restorations; full native rank boxes, names, date/time/court positions. Gold native row; coherent silver/bronze row variants generated via imagegen. Uses saved attacker/defender ranking snapshots, never current player ordinal. Normal daily/week/individual exports now use this template; title/result artwork retained.
