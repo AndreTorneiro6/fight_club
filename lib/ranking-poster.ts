@@ -1,3 +1,4 @@
+import { posterTemplateUrl } from "./poster-templates";
 import { rankingEntries, teamRecord } from "./ranking-groups";
 import type { View } from "./types";
 
@@ -54,11 +55,7 @@ function loadImage(src: string) {
 }
 export async function renderPublicationPoster(s: View, options: PosterOptions) {
   await document.fonts.ready;
-  const img = await loadImage(
-    options.kind === "ranking"
-      ? "/ranking-template.jpeg"
-      : "/weekly-roles-template.jpeg",
-  );
+  const img = await loadImage(posterTemplateUrl(options.kind));
   const canvas = document.createElement("canvas");
   canvas.width = POSTER_WIDTH;
   canvas.height = POSTER_HEIGHT;

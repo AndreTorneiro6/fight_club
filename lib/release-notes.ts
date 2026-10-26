@@ -1,6 +1,18 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.3.1";
+export const applicationVersion = "1.4.0";
 export const releaseNotes = [
+  {
+    version: "1.4.0",
+    date: "2026-10-26",
+    title: "Cartazes com os modelos do clube e Title Fights separados",
+    changes: [
+      "Modelos do clube para cartazes da jornada, calendário diário, resultados, ranking e papéis semanais.",
+      "Title Fights separados dos jogos normais, com um cartaz próprio por jogo e modelos de Ouro, Prata e Bronze.",
+      "Dados reais das duplas, datas, horários e resultados por set substituem os exemplos impressos nos modelos.",
+      "Exportar, copiar e partilhar os novos cartazes; modelos disponíveis apenas para administradores autenticados.",
+      "Depois da marcação, o calendário do desafio mostra apenas o dia, o campo e as horas confirmadas, sem pesquisa de outras datas.",
+    ],
+  },
   {
     version: "1.3.1",
     date: "2026-10-26",

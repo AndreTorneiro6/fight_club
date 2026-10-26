@@ -3664,7 +3664,18 @@ function Admin(a: Actions) {
       ) : tab === "results" ? (
         <AdminResults {...a} />
       ) : tab === "posters" ? (
-        <MatchdayGenerator s={s} />
+        <MatchdayGenerator
+          key={`${searchParams.get("mode")}:${searchParams.get("division")}`}
+          s={s}
+          initialMode={
+            searchParams.get("mode") === "title_results"
+              ? "title_results"
+              : searchParams.get("mode") === "title"
+                ? "title"
+                : "fixtures"
+          }
+          initialDivision={searchParams.get("division") ?? "all"}
+        />
       ) : tab === "rules" ? (
         <Rules {...a} />
       ) : tab === "courts" ? (
@@ -5796,6 +5807,15 @@ function TitleFights({ s }: Actions) {
         title="Title Fight"
         description="Os confrontos pelo primeiro lugar de cada divisão. A dupla no topo defende o título."
       />
+      {s.actor.role === "admin" && (
+        <Link
+          className="button"
+          href={`/admin?tab=posters&mode=title&division=${division}`}
+        >
+          Gerar cartazes dos jogos pelo título
+        </Link>
+      )}
+
       <div className="toolbar">
         <label>
           Divisão dos jogos do título
@@ -7043,6 +7063,48 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
         ? proposal.challengerConfirmed
         : proposal.defenderConfirmed);
   const name = (id: string) => challengeTeamName(c, id, s.players);
+  if (
+    c.scheduledAt &&
+    ["scheduled", "result_pending", "disputed", "completed"].includes(c.status)
+  ) {
+    const match = s.matches.find((m) => m.challengeId === c._id),
+      start = match?.start ?? c.scheduledAt,
+      end =
+        match?.end ??
+        new Date(Date.parse(start) + c.durationMinutes * 60000).toISOString(),
+      court = s.courts.find((q) => q._id === (match?.courtId ?? c.courtId));
+    return (
+      <Section
+        title="Calendário do jogo"
+        right={<CalendarDays size={20} className="gold" />}
+      >
+        <div className="three-grid" aria-label="Horário confirmado do jogo">
+          <div className="inset stack">
+            <small>Dia</small>
+            <strong>
+              {new Date(start).toLocaleDateString("pt-PT", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                timeZone: "Europe/Lisbon",
+              })}
+            </strong>
+          </div>
+          <div className="inset stack">
+            <small>Campo</small>
+            <strong>{court?.name ?? "Campo por confirmar"}</strong>
+          </div>
+          <div className="inset stack">
+            <small>Hora · Portugal</small>
+            <strong>
+              {fmtTime(start)}–{fmtTime(end)}
+            </strong>
+          </div>
+        </div>
+      </Section>
+    );
+  }
   return (
     <>
       <Section

@@ -1,8 +1,16 @@
+import { formatSetScores, parseLegacySetScores } from "./set-scores";
+import { isTitleMatch, isOfficialTitleMatch } from "./title-matches";
 import { clubWeek } from "./calendar";
 import { teamMembers } from "./ranking-groups";
 import type { State } from "./types";
 
-export type PosterMode = "fixtures" | "results";
+export type PosterMode = "fixtures" | "results" | "title" | "title_results";
+export const isResultPoster = (mode: PosterMode) =>
+  mode === "results" || mode === "title_results";
+export const isTitlePoster = (mode: PosterMode) =>
+  mode === "title" || mode === "title_results";
+export const posterPageSize = (mode: PosterMode) =>
+  isTitlePoster(mode) ? 1 : 3;
 export type MatchdayCard = {
   id: string;
   number: number;
@@ -15,6 +23,9 @@ export type MatchdayCard = {
   score?: string;
   winner?: "left" | "right";
   completed: boolean;
+  titleFight?: boolean;
+  attackerRank?: number;
+  defenderRank?: number;
 };
 export function matchdayCards(
   state: State,
@@ -25,6 +36,12 @@ export function matchdayCards(
   return state.challenges
     .flatMap((challenge) => {
       if (["cancelled", "refused", "expired"].includes(challenge.status))
+        return [];
+      if (
+        isTitlePoster(mode)
+          ? !isOfficialTitleMatch(challenge)
+          : isTitleMatch(challenge)
+      )
         return [];
       if (divisionId !== "all" && challenge.divisionId !== divisionId)
         return [];
@@ -41,7 +58,7 @@ export function matchdayCards(
         (result) => result.challengeId === challenge._id,
       );
       const completed = challenge.status === "completed";
-      if (mode === "results" && !completed) return [];
+      if (isResultPoster(mode) && !completed) return [];
       const division = state.divisions.find(
         (division) => division._id === challenge.divisionId,
       );
@@ -56,12 +73,19 @@ export function matchdayCards(
         snapshot?.length
           ? snapshot.map((member) => member.name)
           : teamMembers(players, id).map((member) => member.name);
+      const sets =
+        result?.setScores ??
+        challenge.setScores ??
+        parseLegacySetScores(result?.score || challenge.score);
       const winnerId = completed
         ? (result?.winnerId ?? challenge.winnerId)
         : undefined;
       return [
         {
           id: challenge._id,
+          titleFight: isTitleMatch(challenge),
+          attackerRank: challenge.challengerPosition,
+          defenderRank: challenge.defenderPosition,
           number: challenge.number,
           division: division?.name ?? "Liga",
           divisionCode: division?.code ?? "bronze",
@@ -72,9 +96,12 @@ export function matchdayCards(
             (court) => court._id === (match?.courtId ?? challenge.courtId),
           )?.name,
           completed,
-          score: completed
-            ? result?.score || challenge.score || undefined
-            : undefined,
+          score:
+            completed && sets?.length
+              ? result?.setScores?.length || challenge.setScores?.length
+                ? formatSetScores(sets)
+                : result?.score || challenge.score
+              : undefined,
           winner:
             winnerId === challenge.challengerId
               ? ("left" as const)

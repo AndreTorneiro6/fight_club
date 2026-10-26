@@ -1,34 +1,169 @@
 import { clubWeek } from "./calendar";
-import type { MatchdayCard, PosterMode } from "./matchday";
-
-const W = 1080,
-  H = 1920;
+import {
+  isResultPoster,
+  isTitlePoster,
+  type MatchdayCard,
+  type PosterMode,
+} from "./matchday";
+import { posterTemplateUrl, type PosterTemplate } from "./poster-templates";
 export const POSTER_PAGE_SIZE = 3;
-const color = (code: string) =>
-  code === "ouro" ? "#f3c75c" : code === "prata" ? "#d1dbe1" : "#d49b71";
-const image = (src: string) =>
+const W = 1080,
+  H = 1920,
+  BW = 941,
+  BH = 1672;
+const accent = (code: string) =>
+  code === "ouro" ? "#f3c75c" : code === "prata" ? "#d1dbe1" : "#e5a16c";
+const load = (key: PosterTemplate) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () =>
-      reject(
-        new Error(
-          "Não foi possível carregar a imagem do cartaz. Tenta novamente.",
-        ),
-      );
-    img.src = src;
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(new Error("Não foi possível carregar o modelo do cartaz."));
+    image.src = posterTemplateUrl(key);
   });
-const dayLabel = (day: string) =>
-  new Date(day.length === 10 ? day + "T12:00:00Z" : day).toLocaleDateString(
-    "pt-PT",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      timeZone: "Europe/Lisbon",
-    },
+const date = (value: string) =>
+  new Date(
+    value.length === 10 ? `${value}T12:00:00Z` : value,
+  ).toLocaleDateString("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Lisbon",
+  });
+const time = (value: string) =>
+  new Date(value).toLocaleTimeString("pt-PT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Lisbon",
+  });
+function drawing(ctx: CanvasRenderingContext2D) {
+  const text = (
+    value: string,
+    x: number,
+    y: number,
+    size: number,
+    width: number,
+    color = "#fff",
+    align: CanvasTextAlign = "center",
+  ) => {
+    const font = () => `800 ${size}px "Bebas Neue", Impact, Arial, sans-serif`;
+    ctx.font = font();
+    while (ctx.measureText(value).width > width && size > 11) {
+      size -= 0.5;
+      ctx.font = font();
+    }
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+    ctx.fillText(value, x, y, width);
+  };
+  const cover = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    fill = "#070707",
+  ) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, w, h);
+  };
+  const names = (
+    values: string[],
+    x: number,
+    y: number,
+    width: number,
+    color = "#fff",
+    size = 32,
+  ) => {
+    const rows = values.length ? values : ["Dupla por identificar"];
+    rows.forEach((value, i) =>
+      text(value.toUpperCase(), x, y + i * 37, size, width, color),
+    );
+  };
+  return { text, cover, names };
+}
+function titleCard(
+  ctx: CanvasRenderingContext2D,
+  card: MatchdayCard,
+  mode: PosterMode,
+) {
+  const { text, cover, names } = drawing(ctx),
+    gold = card.divisionCode === "ouro",
+    bronze = card.divisionCode === "bronze",
+    dateY = gold || bronze ? 1124 : 1100,
+    nameY = gold ? 1304 : bronze ? 1280 : 1270;
+  // Replace all printed example dates, times and player names, retaining the supplied artwork.
+  cover(178, dateY - 35, 282, 70);
+  cover(651, dateY - 35, 222, 70);
+  text(
+    card.start ? date(card.start) : "DATA POR MARCAR",
+    319,
+    dateY,
+    47,
+    270,
+    accent(card.divisionCode),
   );
-
+  text(
+    card.start ? time(card.start) : "A MARCAR",
+    763,
+    dateY,
+    58,
+    210,
+    accent(card.divisionCode),
+  );
+  cover(gold ? 124 : 140, nameY - 35, 286, 116);
+  cover(548, nameY - 35, 300, 116);
+  names(
+    card.left,
+    267,
+    nameY,
+    278,
+    card.winner === "left" ? "#f3c75c" : "#fff",
+    38,
+  );
+  names(
+    card.right,
+    698,
+    nameY,
+    286,
+    card.winner === "right" ? "#f3c75c" : "#fff",
+    38,
+  );
+  if (bronze) text("VS", 478, nameY + 20, 64, 100, "#fff");
+  text(
+    `ATAQUE${card.attackerRank ? ` · #${card.attackerRank}` : ""}`,
+    267,
+    nameY + 92,
+    20,
+    278,
+    accent(card.divisionCode),
+  );
+  text(
+    `DEFESA${card.defenderRank ? ` · #${card.defenderRank}` : ""}`,
+    698,
+    nameY + 92,
+    20,
+    286,
+    accent(card.divisionCode),
+  );
+  cover(125, 1450, 690, isResultPoster(mode) ? 90 : 50, "#050505ed");
+  text(
+    `${card.division.toUpperCase()} · ${card.court ?? "CAMPO POR CONFIRMAR"} · JOGO #${card.number}`,
+    470,
+    1475,
+    23,
+    660,
+  );
+  if (isResultPoster(mode))
+    text(
+      card.score ?? "RESULTADO REGISTADO · SETS NÃO INDICADOS",
+      470,
+      1515,
+      42,
+      650,
+      accent(card.divisionCode),
+    );
+}
 export async function renderMatchdayPoster({
   cards,
   mode,
@@ -48,193 +183,193 @@ export async function renderMatchdayPoster({
   pages: number;
   day?: string;
 }) {
-  const [background, logo] = await Promise.all([
-    image("/matchday-background.png"),
-    image("/neiva-club-wordmark.jpg"),
-  ]);
+  if (!cards.length) throw new Error("Não existem jogos para gerar o cartaz.");
+  const title = isTitlePoster(mode),
+    results = isResultPoster(mode);
+  if (title && cards.length !== 1)
+    throw new Error("Cada cartaz do título apresenta um único jogo.");
+  if (title && cards.some((c) => !c.titleFight))
+    throw new Error(
+      "Este jogo não está identificado como um jogo pelo título.",
+    );
+  const key: PosterTemplate = title
+    ? `title-${cards[0].divisionCode === "ouro" ? "ouro" : cards[0].divisionCode === "prata" ? "prata" : "bronze"}`
+    : results
+      ? "results"
+      : day
+        ? "daily"
+        : "fixtures";
+  const background = await load(key);
   await document.fonts.ready;
+  const bodyTop = results ? 642 : 673,
+    rowH = results ? 187 : 211,
+    gap = results ? 16 : 12,
+    sourceFooterY = results ? 1245 : 1330;
+  const footerY =
+    bodyTop +
+    cards.length * rowH +
+    Math.max(0, cards.length - 1) * gap +
+    (results ? 10 : 0);
   const canvas = document.createElement("canvas");
   canvas.width = W;
-  canvas.height = H;
+  canvas.height = title
+    ? H
+    : Math.ceil(((footerY + BH - sourceFooterY) * H) / BH);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("O navegador não permite gerar o cartaz.");
-  const scale = Math.max(W / background.width, H / background.height);
-  ctx.drawImage(
-    background,
-    (W - background.width * scale) / 2,
-    (H - background.height * scale) / 2,
-    background.width * scale,
-    background.height * scale,
-  );
-  const shade = ctx.createLinearGradient(0, 0, 0, 600);
-  shade.addColorStop(0, "#0005");
-  shade.addColorStop(1, "#0000");
-  ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, W, 650);
-  const text = (
-    value: string,
-    x: number,
-    y: number,
-    size: number,
-    fill = "#fff",
-    maxWidth = 980,
-    align: CanvasTextAlign = "left",
-    display = true,
-  ) => {
-    ctx.font = `${display ? "900" : "700"} ${size}px ${display ? '"Bebas Neue", Impact' : '"Manrope", Arial'}, sans-serif`;
-    while (ctx.measureText(value).width > maxWidth && size > 15) {
-      size -= 1;
-      ctx.font = `900 ${size}px ${display ? '"Bebas Neue", Impact' : '"Manrope", Arial'}, sans-serif`;
+  ctx.scale(W / BW, H / BH);
+  ctx.drawImage(background, 0, 0, BW, BH);
+  if (!title)
+    ctx.drawImage(
+      background,
+      0,
+      sourceFooterY,
+      BW,
+      BH - sourceFooterY,
+      0,
+      footerY,
+      BW,
+      BH - sourceFooterY,
+    );
+  const { text, cover, names } = drawing(ctx);
+  if (title) titleCard(ctx, cards[0], mode);
+  else {
+    if (!results && !day) {
+      cover(94, 366, 755, 110);
+      text("CALENDÁRIO DO", 470, 424, 109, 730);
     }
-    ctx.fillStyle = fill;
-    ctx.textAlign = align;
-    ctx.fillText(value, x, y);
-  };
-  const metal = ctx.createLinearGradient(0, 70, 0, 280);
-  metal.addColorStop(0, "#fff");
-  metal.addColorStop(0.45, "#9ca3a8");
-  metal.addColorStop(0.52, "#fff");
-  metal.addColorStop(1, "#8c8e93");
-  ctx.font = '900 132px "Bebas Neue", Impact, sans-serif';
-  ctx.fillStyle = metal;
-  ctx.shadowColor = "#000";
-  ctx.shadowBlur = 12;
-  ctx.fillText("FIGHT CLUB", 48, 177, 650);
-  ctx.shadowBlur = 0;
-  text("PADEL LEAGUE", 55, 230, 53, "#fff", 610);
-  text("NEIVA PADEL CLUB", 55, 280, 25, "#f3c75c", 580, "left", false);
-  const title = mode === "results" ? "RESULTADOS" : "JORNADA";
-  text(title, W / 2, 455, 133, "#fff", 960, "center");
-  ctx.strokeStyle = "#e3321b";
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.moveTo(100, 477);
-  ctx.lineTo(980, 465);
-  ctx.stroke();
-  text(
-    day ? dayLabel(day) : `${dayLabel(week)} — ${dayLabel(clubWeek(week).end)}`,
-    W / 2,
-    524,
-    37,
-    "#fff",
-    970,
-    "center",
-    false,
-  );
-  text(
-    `${division.toUpperCase()}${round ? ` · JORNADA ${round}` : ""}`,
-    W / 2,
-    575,
-    31,
-    "#f3c75c",
-    970,
-    "center",
-    false,
-  );
-  cards.forEach((card, index) => {
-    const y = 625 + index * 350,
-      accent = color(card.divisionCode);
-    ctx.fillStyle = "#050607e8";
-    ctx.fillRect(40, y, 1000, 325);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(40, y, 1000, 325);
-    ctx.fillStyle = accent + "22";
-    ctx.fillRect(42, y + 2, 152, 321);
-    text("LIGA", 117, y + 97, 38, accent, 140, "center");
-    text(card.division.toUpperCase(), 117, y + 149, 49, accent, 140, "center");
-    text(
-      `#${String(card.number).padStart(3, "0")}`,
-      117,
-      y + 202,
-      32,
-      "#ccc",
-      140,
-      "center",
-      false,
-    );
-    const when = card.start
-      ? `${dayLabel(card.start).slice(0, 5)} · ${new Date(card.start).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" })}${card.court ? ` · ${card.court}` : ""}`
-      : "HORÁRIO POR MARCAR";
-    text(when, 616, y + 39, 23, "#c7c7c7", 770, "center", false);
-    const names = (values: string[], x: number, winner: boolean) => {
-      const rows = values.length ? values : ["Jogador por identificar"];
-      rows.forEach((value, i) =>
-        text(
-          value.toUpperCase(),
-          x,
-          y + 105 + i * 48,
-          35,
-          winner ? "#f3c75c" : "#fff",
-          310,
-          "center",
-        ),
+    if (!results) {
+      cover(175, 600, 600, 63);
+      text(
+        day ? date(day) : `${date(week)} — ${date(clubWeek(week).end)}`,
+        470,
+        631,
+        day ? 48 : 35,
+        590,
       );
-    };
-    names(card.left, 375, card.winner === "left");
-    names(card.right, 850, card.winner === "right");
-    text("VS", 615, y + 140, 70, "#f0462c", 100, "center");
-    ctx.strokeStyle = "#d52e20";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(222, y + 218, 790, 78);
-    const label =
-      mode === "results"
-        ? card.score ||
-          (card.winner
-            ? `VITÓRIA · ${(card.winner === "left" ? card.left : card.right).join(" + ")}`
-            : "RESULTADO SEM VENCEDOR")
-        : card.completed
-          ? "TERMINADO · RESULTADO REGISTADO"
-          : card.start
-            ? "JOGO CONFIRMADO"
-            : "A COMBINAR COM O CLUBE";
+    } else {
+      cover(180, 610, 580, 28);
+      text(`${date(week)} — ${date(clubWeek(week).end)}`, 470, 625, 18, 565);
+    }
+    const bodyBottom = footerY;
+    // Sample games are never left visible, even when the final page contains fewer than three.
+    cover(13, bodyTop - 1, 916, bodyBottom - bodyTop + 2);
+    cards.slice(0, 3).forEach((card, index) => {
+      const y = bodyTop + index * (rowH + gap),
+        sourceY = results
+          ? card.divisionCode === "bronze"
+            ? 1047
+            : 642
+          : card.divisionCode === "bronze"
+            ? 900
+            : 673;
+      ctx.drawImage(background, 16, sourceY, 910, rowH, 16, y, 910, rowH);
+      // League label and dynamic fields cover the populated example text completely.
+      if (results) {
+        cover(151, y + 9, 130, 89);
+        text("LIGA", 216, y + 30, 32, 120, accent(card.divisionCode));
+        text(
+          card.division.toUpperCase(),
+          216,
+          y + 68,
+          35,
+          120,
+          accent(card.divisionCode),
+        );
+        cover(274, y + 9, 194, 82);
+        cover(565, y + 9, 224, 82);
+        names(
+          card.left,
+          366,
+          y + 29,
+          174,
+          card.winner === "left" ? accent(card.divisionCode) : "#fff",
+          30,
+        );
+        names(
+          card.right,
+          676,
+          y + 29,
+          215,
+          card.winner === "right" ? accent(card.divisionCode) : "#fff",
+          30,
+        );
+        cover(281, y + 107, 445, 65);
+        text(
+          card.score ??
+            (card.winner
+              ? `VITÓRIA · ${(card.winner === "left" ? card.left : card.right).join(" + ")}`
+              : "SETS NÃO INDICADOS"),
+          504,
+          y + 141,
+          48,
+          425,
+          accent(card.divisionCode),
+        );
+      } else {
+        cover(165, y + 6, 245, 100);
+        text("LIGA", 223, y + 30, 31, 160, accent(card.divisionCode));
+        text(
+          card.division.toUpperCase(),
+          265,
+          y + 64,
+          39,
+          192,
+          accent(card.divisionCode),
+        );
+        cover(626, y + 9, 249, 72);
+        text(
+          card.start ? time(card.start) : "POR MARCAR",
+          750,
+          y + 46,
+          55,
+          239,
+          accent(card.divisionCode),
+        );
+        cover(218, y + 110, 226, 87);
+        cover(548, y + 110, 244, 87);
+        names(card.left, 328, y + 131, 208, "#fff", 31);
+        names(card.right, 672, y + 131, 232, "#fff", 31);
+        text(
+          `${card.start ? date(card.start).slice(0, 5) : ""}${card.court ? ` · ${card.court}` : ""}`,
+          476,
+          y + 99,
+          17,
+          565,
+          "#ddd",
+        );
+      }
+    });
+    // Source theme badges are replaced with the exact league artwork rather than mismatched sample medals.
+    const leagueArt = await load("ranking");
+    cards.slice(0, 3).forEach((card, index) => {
+      const y = bodyTop + index * (rowH + gap),
+        x =
+          card.divisionCode === "ouro"
+            ? 18
+            : card.divisionCode === "prata"
+              ? 325
+              : 632;
+      cover(18, y + 1, 160, 145);
+      ctx.drawImage(leagueArt, x, 579, 138, 130, 18, y + 1, 160, 145);
+    });
     text(
-      label,
-      616,
-      y + 271,
-      card.score && mode === "results" ? 48 : 29,
-      "#fff",
-      750,
-      "center",
+      `${division.toUpperCase()}${round ? ` · JORNADA ${round}` : ""}${pages > 1 ? ` · ${page + 1}/${pages}` : ""}`,
+      470,
+      footerY + 14,
+      16,
+      830,
+      "#eee",
     );
-  });
-  text(
-    "PLAY. DEFEND. ATTACK. EVOLVE.",
-    W / 2,
-    1768,
-    49,
-    "#f3c75c",
-    980,
-    "center",
-  );
-  ctx.fillStyle = "#ffffffed";
-  ctx.fillRect(385, 1800, 310, 81);
-  const logoScale = Math.min(280 / logo.width, 65 / logo.height);
-  ctx.drawImage(
-    logo,
-    (W - logo.width * logoScale) / 2,
-    1808,
-    logo.width * logoScale,
-    logo.height * logoScale,
-  );
-  text(
-    `fight-club.wbglabs.io${pages > 1 ? ` · ${page + 1}/${pages}` : ""}`,
-    W / 2,
-    1900,
-    19,
-    "#ccc",
-    980,
-    "center",
-    false,
-  );
+  }
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
-      (blob) =>
-        blob
-          ? resolve(blob)
+      (b) =>
+        b
+          ? resolve(b)
           : reject(new Error("Não foi possível exportar o cartaz.")),
       "image/png",
     ),
   );
-  return { blob, width: W, height: H };
+  return { blob, width: W, height: canvas.height };
 }

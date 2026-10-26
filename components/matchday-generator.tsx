@@ -5,14 +5,29 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Download } from "lucide-react";
 import { WeekNavigation } from "./weekly-controls";
 import { clubDay, clubWeek, addClubDays } from "@/lib/calendar";
-import { matchdayCards, matchdayNumber, type PosterMode } from "@/lib/matchday";
-import { renderMatchdayPoster, POSTER_PAGE_SIZE } from "@/lib/matchday-poster";
+import {
+  matchdayCards,
+  matchdayNumber,
+  isResultPoster,
+  isTitlePoster,
+  posterPageSize,
+  type PosterMode,
+} from "@/lib/matchday";
+import { renderMatchdayPoster } from "@/lib/matchday-poster";
 import type { View } from "@/lib/types";
 
-export default function MatchdayGenerator({ s }: { s: View }) {
+export default function MatchdayGenerator({
+  s,
+  initialMode = "fixtures",
+  initialDivision = "all",
+}: {
+  s: View;
+  initialMode?: PosterMode;
+  initialDivision?: string;
+}) {
   const [selectedWeek, setWeek] = useState(() => seasonWeek(s)),
-    [division, setDivision] = useState("all"),
-    [mode, setMode] = useState<PosterMode>("fixtures"),
+    [division, setDivision] = useState(initialDivision),
+    [mode, setMode] = useState<PosterMode>(initialMode),
     [day, setDay] = useState(""),
     [page, setPage] = useState(0);
   const [preview, setPreview] = useState<{ url: string; blob: Blob } | null>(
@@ -24,11 +39,14 @@ export default function MatchdayGenerator({ s }: { s: View }) {
   const allCards = matchdayCards(s, week, division, mode).filter(
     (card) => !day || (card.start && clubDay(card.start) === day),
   );
-  const pages = Math.ceil(allCards.length / POSTER_PAGE_SIZE),
+  const pageSize = posterPageSize(mode),
+    results = isResultPoster(mode),
+    title = isTitlePoster(mode);
+  const pages = Math.ceil(allCards.length / pageSize),
     currentPage = Math.min(page, Math.max(0, pages - 1));
   const cards = allCards.slice(
-    currentPage * POSTER_PAGE_SIZE,
-    (currentPage + 1) * POSTER_PAGE_SIZE,
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize,
   );
   const label =
     division === "all"
@@ -85,7 +103,9 @@ export default function MatchdayGenerator({ s }: { s: View }) {
         <h2>Gerador de cartazes da jornada</h2>
         <p>
           Escolhe a semana e a divisão. A data, as equipas e os resultados
-          registados são preenchidos automaticamente.
+          registados são preenchidos automaticamente. Os jogos do título têm
+          cartazes próprios de Ouro, Prata e Bronze e ficam separados dos jogos
+          normais.
         </p>
       </div>
       <WeekNavigation
@@ -132,8 +152,10 @@ export default function MatchdayGenerator({ s }: { s: View }) {
               setPage(0);
             }}
           >
-            <option value="fixtures">Jornada · jogos e horários</option>
-            <option value="results">Resultados</option>
+            <option value="fixtures">Jornada · jogos normais e horários</option>
+            <option value="results">Resultados · jogos normais</option>
+            <option value="title">Title Fight · jogos pelo título</option>
+            <option value="title_results">Title Fight · resultados</option>
           </select>
         </label>
         <label>
@@ -162,8 +184,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
       </div>
       <div className="row between wrap">
         <p role="status">
-          {allCards.length} {mode === "results" ? "resultados" : "jogos"} ·{" "}
-          {label}
+          {allCards.length} {results ? "resultados" : "jogos"} · {label}
           {round ? ` · Jornada ${round}` : ""}
         </p>
         <button
@@ -172,7 +193,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
             if (!preview) return;
             const link = document.createElement("a");
             link.href = preview.url;
-            link.download = `fight-club-${mode === "results" ? "resultados" : "jornada"}-${division}-${week}-${currentPage + 1}.png`;
+            link.download = `fight-club-${mode.replace("_", "-")}-${division}-${week}-${currentPage + 1}.png`;
             link.click();
           }}
         >
@@ -189,7 +210,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
       {busy && <p> A gerar cartaz…</p>}
       {!allCards.length && (
         <p className="inset">
-          {mode === "results"
+          {results
             ? "Não existem resultados registados para esta seleção."
             : "Não existem jogos ou desafios para esta seleção."}
         </p>
@@ -204,7 +225,8 @@ export default function MatchdayGenerator({ s }: { s: View }) {
             <ArrowLeft size={16} />
           </button>
           <span>
-            Página {currentPage + 1} de {pages} · até 3 jogos por imagem
+            Página {currentPage + 1} de {pages} · até {pageSize}{" "}
+            {pageSize === 1 ? "jogo" : "jogos"} por imagem
           </span>
           <button
             aria-label="Próxima página do cartaz"
@@ -219,7 +241,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
         <img
           className="matchday-preview"
           src={preview.url}
-          alt={`Cartaz ${mode === "results" ? "de resultados" : "da jornada"} · ${label} · ${week} · página ${currentPage + 1}`}
+          alt={`Cartaz ${title ? "do Title Fight" : results ? "de resultados" : "da jornada"} · ${label} · ${week} · página ${currentPage + 1}`}
         />
       )}
       {cards.length > 0 && (
@@ -241,7 +263,7 @@ export default function MatchdayGenerator({ s }: { s: View }) {
                       })
                     : "Horário por marcar"}
                   {card.court ? ` · ${card.court}` : ""}
-                  {mode === "results" && card.completed
+                  {results && card.completed
                     ? ` · ${card.score || "Vencedor registado; sets não indicados"}`
                     : ""}
                 </small>

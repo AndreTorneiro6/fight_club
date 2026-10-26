@@ -93,7 +93,7 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
     .locator("details")
     .filter({ has: page.getByAltText(`Cartão do jogo #${game.number}`) });
   await expect(card.getByRole("img")).toBeVisible();
-  await copy(card, 1080, 1080);
+  await copy(card, 1080, 1920);
   const downloadEvent = page.waitForEvent("download");
   await card
     .getByRole("link", { name: "Descarregar PNG", exact: true })

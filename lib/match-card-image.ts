@@ -1,3 +1,6 @@
+import { matchdayCards } from "./matchday";
+import { renderMatchdayPoster } from "./matchday-poster";
+import { clubWeek } from "./calendar";
 import type { Challenge, View } from "./types";
 import { challengeTeamName, challengeSide } from "./team-competition";
 import { isTitleMatch } from "./title-matches";
@@ -7,6 +10,27 @@ export async function renderMatchCardImage(s: View, c: Challenge) {
     !["scheduled", "result_pending", "disputed", "completed"].includes(c.status)
   )
     throw new Error("Confirma o jogo antes de exportar o cartão.");
+  if (isTitleMatch(c)) {
+    const start =
+      s.matches.find((m) => m.challengeId === c._id)?.start ?? c.scheduledAt;
+    const week = clubWeek(start ?? c.weekStart ?? c.createdAt).start;
+    const mode = c.status === "completed" ? "title_results" : "title";
+    const card = matchdayCards(s, week, c.divisionId, mode).find(
+      (card) => card.id === c._id,
+    );
+    if (!card)
+      throw new Error("Não foi possível identificar o jogo pelo título.");
+    return (
+      await renderMatchdayPoster({
+        cards: [card],
+        mode,
+        week,
+        division: card.division,
+        page: 0,
+        pages: 1,
+      })
+    ).blob;
+  }
   await document.fonts.ready;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = MATCH_CARD_SIZE;

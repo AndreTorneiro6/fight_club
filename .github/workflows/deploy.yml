@@ -52,7 +52,7 @@ jobs:
           TMPDIR: ${{ runner.temp }}
 
       - name: Check match images and clipboard exports
-        run: npx playwright test e2e/image-sharing.spec.ts
+        run: npx playwright test e2e/image-sharing.spec.ts e2e/poster-templates.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 

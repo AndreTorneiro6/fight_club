@@ -36,6 +36,19 @@ test("last result selects its division, guides ranking and private papers, then 
       .click();
     await player.goto(`/desafios/${game._id}`);
     await expect(
+      player.getByRole("heading", { name: "Calendário do jogo", exact: true }),
+    ).toBeVisible();
+    await expect(
+      player.getByLabel("Horário confirmado do jogo", { exact: true }),
+    ).toContainText("Campo 1");
+    await expect(
+      player.getByLabel("Dia para consultar", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      player.getByLabel("Calendário semanal do desafio", { exact: true }),
+    ).toHaveCount(0);
+
+    await expect(
       player.getByRole("link", { name: "Guardar no calendário", exact: true }),
     ).toBeVisible();
     const google = player.getByRole("link", {

@@ -105,3 +105,41 @@ test("cancelled games are omitted and the weekly round number is derived from th
   assert.equal(matchdayCards(s, "2026-10-19", "all", "fixtures").length, 0);
   assert.equal(matchdayNumber(s, "2026-10-19"), 4);
 });
+
+test("title fights stay separate from normal fixtures and results using saved match ranks", () => {
+  const s = state();
+  s.challenges[0].defenderPosition = 1;
+  s.challenges[0].challengerPosition = 3;
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "fixtures").length, 0);
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "title").length, 1);
+  s.challenges[0].status = "completed";
+  s.challenges[0].score = "2-1";
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "results").length, 0);
+  assert.equal(
+    matchdayCards(s, "2026-10-19", "all", "title_results")[0].score,
+    undefined,
+  );
+  s.challenges[0].setScores = [
+    { attacker: 6, defender: 4 },
+    { attacker: 4, defender: 6 },
+    { attacker: 6, defender: 3 },
+  ];
+  assert.equal(
+    matchdayCards(s, "2026-10-19", "all", "title_results")[0].score,
+    "6-4, 4-6, 6-3",
+  );
+  s.players[2].position = 8;
+  assert.equal(
+    matchdayCards(s, "2026-10-19", "all", "title_results").length,
+    1,
+  );
+});
+test("accepted title assignments are not exported as official title posters; explicit historical title flags stay separate", () => {
+  const s = state();
+  s.challenges[0].titleFight = true;
+  s.challenges[0].status = "accepted";
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "fixtures").length, 0);
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "title").length, 0);
+  s.challenges[0].status = "scheduled";
+  assert.equal(matchdayCards(s, "2026-10-19", "all", "title").length, 1);
+});

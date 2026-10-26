@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Download, Share2 } from "lucide-react";
 import type { Challenge, View } from "@/lib/types";
 import { renderMatchCardImage } from "@/lib/match-card-image";
+import { isTitleMatch } from "@/lib/title-matches";
 import CopyImageButton from "./copy-image-button";
 export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
   const [open, setOpen] = useState(false),
@@ -69,7 +70,7 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
               src={preview.url}
               alt={`Cartão do jogo #${c.number}`}
               width={1080}
-              height={1080}
+              height={isTitleMatch(c) ? 1920 : 1080}
               style={{
                 width: "100%",
                 maxWidth: 420,
