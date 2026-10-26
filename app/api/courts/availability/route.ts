@@ -94,7 +94,9 @@ export async function GET(request: Request) {
       try {
         external = await playtomicOccupation(start);
         message =
-          "Ocupação consultada no Playtomic. Para reservar, abre o Playtomic e confirma o campo e o horário. A consulta não cria uma reserva.";
+          actor.role === "admin"
+            ? "Ocupação consultada no Playtomic. Para reservar, abre o Playtomic e confirma o campo e o horário. A consulta não cria uma reserva."
+            : "Ocupação consultada no Playtomic. Consulta os horários disponíveis; a marcação é confirmada pela organização.";
       } catch {
         message =
           "Não foi possível consultar o Playtomic. A disponibilidade externa é desconhecida.";
@@ -127,7 +129,10 @@ export async function GET(request: Request) {
         day,
         checkedAt: external?.checkedAt ?? new Date().toISOString(),
         message,
-        clubUrl: "https://playtomic.com/clubs/neiva-padel-club",
+        canBook: actor.role === "admin",
+        ...(actor.role === "admin"
+          ? { clubUrl: "https://playtomic.com/clubs/neiva-padel-club" }
+          : {}),
         courts: courtStatuses(start, end),
         ...(intervals
           ? {

@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.3.0";
+export const applicationVersion = "1.3.1";
 export const releaseNotes = [
+  {
+    version: "1.3.1",
+    date: "2026-10-26",
+    title: "Resumo das marcações e consulta dos campos",
+    changes: [
+      "O Resumo lista os confrontos ainda sem marcação confirmada, com as duas duplas, divisão, semana e horário proposto.",
+      "Filtro por divisão e acesso direto para marcar e confirmar cada jogo; os jogos já agendados ficam fora desta lista.",
+      "Reservar no Playtomic disponível apenas no espaço de administrador; jogadores consultam horários sem botões de reserva.",
+      "Grelha de disponibilidade mais compacta, com cabeçalho Campos e coluna dos nomes mais estreita.",
+    ],
+  },
   {
     version: "1.3.0",
     date: "2026-10-25",

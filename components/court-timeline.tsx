@@ -31,12 +31,14 @@ export default function CourtTimelineView({
   timeline,
   slots,
   clubUrl,
+  canBook = false,
   minutes,
   day,
 }: {
   timeline: CourtTimeline;
   slots: Slot[];
-  clubUrl: string;
+  clubUrl?: string;
+  canBook?: boolean;
   minutes: string;
   day: string;
 }) {
@@ -103,7 +105,7 @@ export default function CourtTimelineView({
       >
         <div className="court-timeline-grid">
           <div className="court-timeline-row court-timeline-heading">
-            <div className="court-timeline-name">Campos · Portugal</div>
+            <div className="court-timeline-name">Campos</div>
             <div className="court-timeline-axis" aria-hidden="true">
               {hours.map((h, i) => (
                 <span
@@ -189,22 +191,34 @@ export default function CourtTimelineView({
             <>
               <p>
                 Inícios disponíveis para {minutes === "60" ? "1 hora" : "1h30"}.
-                A reserva e a confirmação final são feitas no Playtomic.
+                {canBook
+                  ? "A reserva e a confirmação final são feitas no Playtomic."
+                  : "A marcação final é confirmada pela organização."}
               </p>
               {starts.length ? (
                 <div className="row wrap">
-                  {starts.map((s) => (
-                    <a
-                      key={s.start}
-                      className="button small"
-                      href={clubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Reservar ${court.name} às ${time(s.start)} no Playtomic`}
-                    >
-                      {time(s.start)}–{time(s.end)} ↗
-                    </a>
-                  ))}
+                  {starts.map((s) =>
+                    canBook && clubUrl ? (
+                      <a
+                        key={s.start}
+                        className="button small"
+                        href={clubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Reservar ${court.name} às ${time(s.start)} no Playtomic`}
+                      >
+                        {time(s.start)}–{time(s.end)} ↗
+                      </a>
+                    ) : (
+                      <span
+                        key={s.start}
+                        className="badge"
+                        aria-label={`Horário ${court.name} às ${time(s.start)}`}
+                      >
+                        {time(s.start)}–{time(s.end)}
+                      </span>
+                    ),
+                  )}
                 </div>
               ) : (
                 <p>

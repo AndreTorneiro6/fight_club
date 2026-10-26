@@ -55,6 +55,72 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     await expect(
       page.getByText("Sem decisões pendentes", { exact: true }),
     ).toBeVisible();
+  const post = async (data: unknown) => {
+    const response = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data,
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+  };
+  const assignment = await post({
+    type: "admin.challenge.create",
+    challengerId: "player-2",
+    defenderId: "player-1",
+  });
+  await post({
+    type: "challenge.respond",
+    challengeId: assignment.id,
+    accept: true,
+  });
+  await page.reload();
+  const unscheduled = page.getByRole("region", {
+    name: "Jogos por marcar",
+    exact: true,
+  });
+  await expect(unscheduled).toBeVisible();
+  const current = await (await page.request.get("/api/league")).json(),
+    game = current.challenges.find((c: any) => c._id === assignment.id);
+  await expect(
+    unscheduled.getByRole("link", {
+      name: `Marcar jogo #${game.number}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(unscheduled).toContainText("Sem horário proposto");
+  await unscheduled
+    .getByLabel("Divisão dos jogos por marcar", { exact: true })
+    .selectOption("prata");
+  await expect(
+    unscheduled.getByRole("link", {
+      name: `Marcar jogo #${game.number}`,
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await unscheduled
+    .getByLabel("Divisão dos jogos por marcar", { exact: true })
+    .selectOption("all");
+  await unscheduled
+    .getByRole("link", { name: `Marcar jogo #${game.number}`, exact: true })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/desafios/${assignment.id}`));
+  const matchStart = new Date(Date.now() + 86400000);
+  matchStart.setUTCHours(19, 30, 0, 0);
+  await post({
+    type: "admin.match.update",
+    challengeId: assignment.id,
+    expectedScheduleState: JSON.stringify(["accepted", null, null]),
+    start: matchStart.toISOString(),
+    courtId: "campo-1",
+    minutes: 90,
+    note: "Confirmar que o resumo retira o jogo já marcado",
+  });
+  await page.goto("/admin");
+  await expect(
+    page
+      .getByRole("region", { name: "Jogos por marcar", exact: true })
+      .getByRole("link", { name: `Marcar jogo #${game.number}`, exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: /^Mais ferramentas/ }).click();
   await page
     .getByRole("searchbox", { name: "Procurar ferramenta de administração" })

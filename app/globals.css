@@ -2500,9 +2500,9 @@ html[data-theme="fight-club"] .landing-hero:before {
   background: repeating-linear-gradient(45deg, #8a969e 0 4px, #e8eeef 4px 8px);
 }
 .court-timeline-grid {
-  --court-label: 136px;
+  --court-label: 104px;
   width: 100%;
-  min-width: 896px;
+  min-width: 864px;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: clip;
@@ -2521,7 +2521,7 @@ html[data-theme="fight-club"] .landing-hero:before {
   z-index: 3;
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: 8px;
   font-size: 12px;
   font-weight: 700;
   background: var(--panel);
@@ -2555,7 +2555,7 @@ html[data-theme="fight-club"] .landing-hero:before {
 }
 .court-timeline-track {
   position: relative;
-  height: 56px;
+  height: 48px;
   isolation: isolate;
   background: var(--panel);
 }
@@ -2651,8 +2651,8 @@ button.court-timeline-block:focus-visible {
 }
 @media (max-width: 600px) {
   .court-timeline-grid {
-    --court-label: 116px;
-    min-width: 876px;
+    --court-label: 88px;
+    min-width: 848px;
   }
 }
 

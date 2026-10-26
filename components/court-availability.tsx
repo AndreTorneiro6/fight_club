@@ -15,15 +15,18 @@ type Result = {
   checkedAt: string;
   courts: CourtStatus[];
   slots: { start: string; end: string; courts: CourtStatus[] }[];
-  clubUrl: string;
+  clubUrl?: string;
+  canBook?: boolean;
   timeline: CourtTimeline;
 };
 export default function CourtAvailability({
   c,
   revision,
+  isAdmin = false,
 }: {
   c?: Challenge;
   revision?: string;
+  isAdmin?: boolean;
 }) {
   const [day, setDay] = useState(() => clubDay(Date.now()));
   const [minutes, setMinutes] = useState("90");
@@ -61,7 +64,7 @@ export default function CourtAvailability({
         if (!controller.signal.aborted) setBusy(false);
       });
     return () => controller.abort();
-  }, [day, minutes, c?._id, refresh, revision]);
+  }, [day, minutes, c?._id, refresh, revision, isAdmin]);
   useEffect(() => {
     const update = () => {
       if (document.visibilityState === "visible")
@@ -124,7 +127,7 @@ export default function CourtAvailability({
           <p role="status">{result.message}</p>
           <small>
             Sem ocupação encontrada não garante abertura do clube ou reserva.
-            Confirma a duração total do jogo no Playtomic.
+            Confirma a duração total do jogo com o clube.
           </small>
           <div inert={busy} aria-busy={busy}>
             <CourtTimelineView
@@ -132,6 +135,7 @@ export default function CourtAvailability({
               timeline={result.timeline}
               slots={result.slots}
               clubUrl={result.clubUrl}
+              canBook={isAdmin && result.canBook === true}
               minutes={minutes}
               day={day}
             />
@@ -142,14 +146,16 @@ export default function CourtAvailability({
               timeZone: "Europe/Lisbon",
             })}
           </small>
-          <a
-            className="button"
-            href={result.clubUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Reservar no Playtomic · Neiva Padel Club
-          </a>
+          {isAdmin && result.canBook && result.clubUrl && (
+            <a
+              className="button"
+              href={result.clubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Reservar no Playtomic · Neiva Padel Club
+            </a>
+          )}
         </>
       )}
     </div>

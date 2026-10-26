@@ -5,6 +5,8 @@ import {
   divisionRankingPublished,
 } from "@/lib/round-transition";
 import Link from "next/link";
+import { useState } from "react";
+import { clubWeek } from "@/lib/calendar";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock3 } from "lucide-react";
 import { effectiveStatus } from "@/lib/rules";
 import { rankingEntries } from "@/lib/ranking-groups";
@@ -21,6 +23,31 @@ export default function AdminOverview({
   onSelect: (tab: string) => void;
   onRegistrations: () => void;
 }) {
+  const [scheduleDivision, setScheduleDivision] = useState("all"),
+    [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
+  const unscheduled = s.challenges
+    .filter(
+      (c) =>
+        !c.scheduledAt &&
+        ["accepted", "schedule_pending"].includes(c.status) &&
+        s.seasons.some(
+          (e) =>
+            e._id === c.seasonId &&
+            ["active", "paused"].includes(e.status) &&
+            (!e.firstCompetitionWeek ||
+              (c.weekStart ?? clubWeek(c.createdAt).start) >=
+                e.firstCompetitionWeek),
+        ),
+    )
+    .sort(
+      (a, b) =>
+        (a.weekStart ?? clubWeek(a.createdAt).start).localeCompare(
+          b.weekStart ?? clubWeek(b.createdAt).start,
+        ) || a.createdAt.localeCompare(b.createdAt),
+    );
+  const visibleUnscheduled = unscheduled.filter(
+    (c) => scheduleDivision === "all" || c.divisionId === scheduleDivision,
+  );
   const now = Date.now(),
     week = weeklyChallengeWeek(s),
     round = s.weeklyRounds.find((r) => r.weekStart === week),
@@ -152,6 +179,85 @@ export default function AdminOverview({
               </Link>
             ))}
           </div>
+        )}
+      </section>
+      <section
+        className="panel stack"
+        aria-labelledby="admin-unscheduled-title"
+      >
+        <div className="row between wrap">
+          <div>
+            <div className="eyebrow gold">MARCAÇÕES</div>
+            <h2 id="admin-unscheduled-title">Jogos por marcar</h2>
+          </div>
+          <span className="badge">{visibleUnscheduled.length}</span>
+        </div>
+        <p>
+          Confrontos atribuídos que ainda não têm dia, hora e campo confirmados.
+          Inclui horários propostos que aguardam confirmação.
+        </p>
+        <label>
+          Divisão dos jogos por marcar
+          <select
+            aria-label="Divisão dos jogos por marcar"
+            value={scheduleDivision}
+            onChange={(e) => {
+              setScheduleDivision(e.target.value);
+              setShowAllUnscheduled(false);
+            }}
+          >
+            <option value="all">
+              Todas as divisões ({unscheduled.length})
+            </option>
+            {s.divisions.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name} (
+                {unscheduled.filter((c) => c.divisionId === d._id).length})
+              </option>
+            ))}
+          </select>
+        </label>
+        {visibleUnscheduled.length ? (
+          <div className="stack">
+            {visibleUnscheduled
+              .slice(0, showAllUnscheduled ? undefined : 6)
+              .map((c) => (
+                <Link
+                  className="inset stack"
+                  key={c._id}
+                  href={`/desafios/${c._id}`}
+                  aria-label={`Marcar jogo #${c.number}`}
+                >
+                  <small>
+                    {s.divisions.find((d) => d._id === c.divisionId)?.name} ·
+                    Semana de {c.weekStart ?? clubWeek(c.createdAt).start}
+                    {c.deferredUntil ? ` · Adiado até ${c.deferredUntil}` : ""}
+                  </small>
+                  <strong>
+                    {challengeTeamName(c, c.challengerId, s.players)}{" "}
+                    <span className="muted">×</span>{" "}
+                    {challengeTeamName(c, c.defenderId, s.players)}
+                  </strong>
+                  <small>
+                    {c.scheduleProposal
+                      ? `Horário proposto: ${new Date(c.scheduleProposal.start).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} · ${c.scheduleProposal.challengerConfirmed && c.scheduleProposal.defenderConfirmed ? "Aguarda confirmação do clube" : "Aguarda acordo das duplas"}`
+                      : "Sem horário proposto"}
+                  </small>
+                  <span className="row gold">
+                    Marcar e confirmar jogo <ArrowRight size={15} />
+                  </span>
+                </Link>
+              ))}
+          </div>
+        ) : (
+          <p className="muted">Não existem jogos por marcar nesta seleção.</p>
+        )}
+        {visibleUnscheduled.length > 6 && (
+          <button onClick={() => setShowAllUnscheduled((v) => !v)}>
+            {showAllUnscheduled
+              ? "Mostrar menos"
+              : `Ver todos os ${visibleUnscheduled.length} jogos por marcar`}
+          </button>
         )}
       </section>
       <section className="panel stack" aria-label="Fecho das jornadas">

@@ -2961,7 +2961,10 @@ function Games(a: Actions) {
         }
       />
       <Section title="Disponibilidade dos campos">
-        <CourtAvailability revision={JSON.stringify([s.courts, s.matches])} />
+        <CourtAvailability
+          isAdmin={s.actor.role === "admin"}
+          revision={JSON.stringify([s.courts, s.matches])}
+        />
       </Section>
       <WeekNavigation
         week={week}
@@ -5674,7 +5677,10 @@ function Courts({ s, run, busy }: Actions) {
   return (
     <Section title="Campos e reservas">
       <div className="stack">
-        <CourtAvailability revision={JSON.stringify([s.courts, s.matches])} />
+        <CourtAvailability
+          isAdmin={s.actor.role === "admin"}
+          revision={JSON.stringify([s.courts, s.matches])}
+        />
         <p style={{ fontSize: 12 }}>
           Reservas de desafios impedem sobreposição no mesmo campo. Abre um
           desafio para marcar manualmente.
@@ -7118,6 +7124,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
           )}
           {(mine || admin) && !terminal.has(c.status) && (
             <CourtAvailability
+              isAdmin={s.actor.role === "admin"}
               c={c}
               revision={JSON.stringify([s.courts, s.matches])}
             />

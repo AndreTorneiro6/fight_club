@@ -46,8 +46,8 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
       # A fresh demo database keeps aggregate logins below the production rate limit.
-      - name: Check admin overview priorities and compact navigation
-        run: npx playwright test e2e/admin-overview.spec.ts
+      - name: Check admin overview and read-only player court availability
+        run: npx playwright test e2e/admin-overview.spec.ts e2e/court-availability.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 

@@ -3,6 +3,16 @@
 Last updated: 25 October 2026 (Europe/Lisbon).
 This is a saved snapshot, not a substitute for checking Git and live service state.
 
+## Version1.3.1 admin unscheduled match list prepared — 26 October 2026
+
+- Latest user requested actual unmarked games on Resumo, beyond the existing single counter. Added prominent Jogos por marcar section after priorities: accepted/schedule_pending assignments without confirmed scheduledAt in active/paused seasons, both captured team names, division, playing week, authorized postponement, proposed hour and agreement/club confirmation status. Per-division counts/filter, first6 with expand, direct challenge link for existing admin scheduling action. Scheduled/completed/cancelled/refused games excluded. No competition data/rules/notifications mutation.
+- Package/lock/changelog1.3.1; extended admin overview browser creates an accepted assignment, checks list/filter/detail link, confirms an official time then checks removal. Latest steering included admin-only Playtomic reservation links and a compact Campos header/label column. API exposes canBook and clubUrl only to the verified admin workspace; players get consultation wording and read-only available-time chips. Frontend also checks active workspace and refetches on role changes, preventing stale admin links after switching to player. Timeline label104px desktop/88px mobile, row48px, Portugal clock calculations unchanged. Extended browser checks both roles, same-admin switch to player, retained slot durations/gaps, header, sticky/mobile overflow. Typecheck,383 tests, build and all3 focused overview/court browser scenarios pass. Deployment verification pending. User changed local assets/templates and removed fight-club-source.zip during work; do not stage or revert those unrelated changes.
+
+## Version1.3.0 deployed — 26 October 2026 verification
+
+- Workflow40239784756 succeeded and deployed5bdba949c8b2d89a27e75a1ecf3500eb393736ed; annotated v1.3.0 tag pushed at this exact revision. Package1.3.0 live. App/worker running, zero restarts, same image sha256:cdb375fc50b25bc7c3a22b0fcb1d2d2e3e119ef9ada13dd327ec5eb36f6e5d87. Public health and worker DNS pass.
+- All383 tests/typecheck/build and every isolated CI browser group passed. New full handoff, scoped publication/clock, private paper access, per-game player calendars, actual image clipboard, legacy weekly/team challenge/role scenarios covered. No live competition maintenance or notification replay performed. Earlier prepared/failure notes below are historical. User added unscheduled summary list as follow-up1.3.1 above.
+
 ## Version1.3.0 guided weekly handoff prepared — 25 October 2026
 
 - User requested automatic admin navigation after the last officially validated result in each division: selected division ranking publication → next papers review/approval/publication → explicit challenge opening and notifications. Added completion/result-signature helpers; admin.result.record returns exact division/week/season context and prepares only an unpublished next-week draft with that division held closed. No new week beyond season end; approved later-week postponements excluded, pending/disputed games still block. Existing published weeks/fixtures are preserved. Summary offers resumable handoffs to the second admin; updates stay in existing Mongo transactions/shared lock.
