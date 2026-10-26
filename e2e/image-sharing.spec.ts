@@ -114,6 +114,14 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
   });
   await expect(ranking.getByRole("img")).toBeVisible();
   await copy(ranking, 1882, 3344);
+  const rankingDownload = page.waitForEvent("download");
+  await ranking.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+  await (await rankingDownload).saveAs("/var/tmp/fc-bronze-ranking.png");
+  await ranking.getByRole("radio", {name:"Bronze",exact:true}).check();
+  await expect(ranking.getByRole("img")).toBeVisible();
+  const individualDownload = page.waitForEvent("download");
+  await ranking.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+  await (await individualDownload).saveAs("/var/tmp/fc-bronze-ranking-individual.png");
   const response = await page.request.post("/api/league", {
     headers: { Origin: "http://localhost:3100" },
     data: {
@@ -135,6 +143,9 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
   });
   await expect(weekly.getByRole("img")).toBeVisible();
   await copy(weekly, 1882, 3344);
+  const weeklyDownload = page.waitForEvent("download");
+  await weekly.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+  await (await weeklyDownload).saveAs("/var/tmp/fc-bronze-weekly.png");
   // A denied clipboard permission must offer alternatives without claiming success.
   await page.evaluate(() => {
     Object.defineProperty(navigator.clipboard, "write", {

@@ -1,3 +1,4 @@
+import { drawBronzeEmblem } from "./bronze-emblem";
 import { posterTemplateUrl } from "./poster-templates";
 import { rankingEntries, teamRecord } from "./ranking-groups";
 import type { View } from "./types";
@@ -99,6 +100,8 @@ export async function renderPublicationPoster(s: View, options: PosterOptions) {
       ctx.drawImage(img, sourceX, 575, 294, 210, 323, 575, 294, 210);
     }
   }
+  if (divisions.some((d) => d.code === "bronze"))
+    await drawBronzeEmblem(ctx, individual ? 328 : 637, 576, 132);
   divisions.forEach((d) => {
     const accent =
       d.code === "ouro"

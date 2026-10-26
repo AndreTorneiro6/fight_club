@@ -1,4 +1,6 @@
 export const posterTemplates = {
+  "bronze-emblem": "icon_bronze.jpeg",
+  "title-bronze-emblem-clean": "title-bronze-emblem-clean.png",
   "fixtures-ranked": "cartaz_diario_ranking.jpeg",
   "fixtures-ranked-clean": "fixtures-ranked-clean.png",
   "fixtures-ranked-prata": "fixtures-ranked-prata.png",

@@ -162,13 +162,28 @@ test("club templates generate separate normal and title posters with real teams 
         const ctx = expected.getContext("2d")!; ctx.scale(1080/bw,key === "fixtures-ranked" ? 1080/bw : 1920/bh); ctx.drawImage(base,0,0);
         const actual = document.createElement("canvas"); actual.width = el.naturalWidth; actual.height = el.naturalHeight;
         actual.getContext("2d")!.drawImage(el,0,0);
-        const a = ctx.getImageData(0,0,1080,680).data;
-        const b = actual.getContext("2d")!.getImageData(0,0,1080,680).data;
+        const a = ctx.getImageData(0,0,1080,key === "title-bronze" ? 650 : 680).data;
+        const b = actual.getContext("2d")!.getImageData(0,0,1080,key === "title-bronze" ? 650 : 680).data;
         let different = 0;
         for (let i=0;i<a.length;i+=4) if (Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>3) different++;
         return different;
       }, expectedTemplate);
       expect(changedHeaderPixels).toBe(0);
+      if (c.divisionId === s.divisions.find((d:any)=>d.code === "bronze")._id)
+        expect(requested.some(url=>url.endsWith("/api/poster-templates/bronze-emblem"))).toBe(true);
+      if (c.divisionId === s.divisions.find((d:any)=>d.code === "bronze")._id && c === regular) {
+        const event = page.waitForEvent("download");
+        await page.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+        await (await event).saveAs("/var/tmp/fc-bronze-fixture.png");
+        regular.status="completed";
+        Object.assign(regular,{setScores:[{attacker:6,defender:4},{attacker:6,defender:3}]});
+        await page.reload();
+        await page.locator("summary").filter({hasText:"Exportar cartão do jogo"}).click();
+        await expect(page.getByAltText(`Cartão do jogo #${regular.number}`)).toBeVisible();
+        const resultDownload = page.waitForEvent("download");
+        await page.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+        await (await resultDownload).saveAs("/var/tmp/fc-bronze-result.png");
+      }
       page.off("request", listener);
     }
   }

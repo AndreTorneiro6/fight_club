@@ -1,3 +1,9 @@
+## Version1.5.5 canonical Bronze poster emblem prepared — 26 October 2026
+
+- User supplied templates/icon_bronze.jpeg and requested its helmet/laurel emblem replace Bronze icons across every poster format. Added canonical native crop renderer through authenticated private template route. Applies ranking/weekly all-division and individual exports, daily/weekly fixtures, individual games/results, and Bronze Title Fights; no old numeral3 or title stars used as Bronze emblem. Original JPEGs untouched. Title belt uses localized imagegen restoration only under the replaced emblem; remaining artwork retained.
+- New original asset and title-bronze-emblem-clean.png are private templates; lib/bronze-emblem.ts extracts actual supplied emblem without AI reinterpretation. Shared renderer prevents divergent icons. No competition/ranking/player/configuration data modified and no notices sent.
+- Package/lock/changelog1.5.5;400 tests/typecheck/build pass. Extended existing browser export/clipboard checks pass, including private asset requests for Bronze and saved all/individual ranking, weekly papers, normal fixture/results and title images. All these outputs visually inspected. Exact original header comparison excludes only intentional title emblem zone; remaining header pixels preserved. Deployment pending; unrelated ZIP deletion and Untitled.jpeg untouched.
+
 ## Version1.5.4 deployed; live team snapshots corrected and independently validated — 26 October 2026
 
 - Workflow40341611247 succeeded at0e4b71e4bb6f5f1b8cc53cdbbbc083223306d3f4. Live package1.5.4, app/worker running zero restarts, common image sha256:e98bd142ed428ccf3141033046ca8d6e4ff28d36e04bd7bf16cf016867ddc34a. Health/worker DNS pass; annotated v1.5.4 tag pushed.400 tests/typecheck/build and every isolated CI browser group passed.

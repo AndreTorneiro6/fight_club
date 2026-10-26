@@ -1,3 +1,4 @@
+import { drawBronzeEmblem } from "./bronze-emblem";
 import { clubWeek } from "./calendar";
 import type { MatchdayCard } from "./matchday";
 import { posterTemplateUrl, type PosterTemplate } from "./poster-templates";
@@ -123,6 +124,8 @@ export async function renderRankedFixturesPoster({
       980,
       ROW,
     );
+    if (card.divisionCode === "bronze")
+      await drawBronzeEmblem(ctx, 32, y + 2, 136);
     const accent =
       card.divisionCode === "prata"
         ? "#d1dbe1"

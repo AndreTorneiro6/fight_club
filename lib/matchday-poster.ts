@@ -1,3 +1,4 @@
+import { drawBronzeEmblem } from "./bronze-emblem";
 import { renderRankedFixturesPoster } from "./ranked-fixtures-poster";
 import { clubWeek } from "./calendar";
 import {
@@ -85,6 +86,20 @@ async function load(key: PosterTemplate): Promise<HTMLCanvasElement> {
       w,
       h,
     );
+  if (key === "title-bronze") {
+    const restored = await loadImage("title-bronze-emblem-clean");
+    ctx.drawImage(
+      restored,
+      (330 * restored.width) / BW,
+      (588 * restored.height) / BH,
+      (280 * restored.width) / BW,
+      (95 * restored.height) / BH,
+      330,
+      588,
+      280,
+      95,
+    );
+  }
   return canvas;
 }
 const date = (value: string) =>
@@ -303,8 +318,11 @@ export async function renderMatchdayPoster({
       BH - sourceFooterY,
     );
   const { text, names } = drawing(ctx);
-  if (title) titleCard(ctx, cards[0], mode);
-  else {
+  if (title) {
+    if (cards[0].divisionCode === "bronze")
+      await drawBronzeEmblem(ctx, 419, 588, 112);
+    titleCard(ctx, cards[0], mode);
+  } else {
     if (!results) {
       text(
         day ? date(day) : `${date(week)} — ${date(clubWeek(week).end)}`,
@@ -333,6 +351,8 @@ export async function renderMatchdayPoster({
             ? await load("results-prata")
             : background;
       ctx.drawImage(rowBackground, 16, sourceY, 910, rowH, 16, y, 910, rowH);
+      if (card.divisionCode === "bronze")
+        await drawBronzeEmblem(ctx, 25, y + 3, 126);
       if (results) {
         names(
           card.left,

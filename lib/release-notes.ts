@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.4";
+export const applicationVersion = "1.5.5";
 export const releaseNotes = [
+  {
+    version: "1.5.5",
+    date: "2026-10-26",
+    title: "Emblema único de Bronze nos cartazes",
+    changes: [
+      "Capacete de icon_bronze aplicado aos cartazes de ranking, papéis semanais, jornada, diários, resultados e exportações individuais de Bronze.",
+      "Title Fights de Bronze usam o mesmo emblema, mantendo o restante desenho do cinturão e dos modelos.",
+    ],
+  },
   {
     version: "1.5.4",
     date: "2026-10-26",

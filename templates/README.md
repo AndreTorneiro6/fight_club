@@ -9,3 +9,5 @@ Os modelos continuam disponíveis apenas pela rota autenticada de administrador.
 `fixtures-ouro.png` e `results-prata.png` adaptam apenas a primeira linha à divisão em falta no exemplo original. O gerador utiliza apenas essa linha, mantendo o cabeçalho e rodapé originais.
 
 O modelo `cartaz_diario_ranking.jpeg` define o grafismo atual dos jogos normais, com caixas laterais para as posições guardadas em cada jogo. Os PNG `fixtures-ranked-*` fornecem os campos limpos e as variantes de divisão. A altura é variável: por defeito são incluídos todos os jogos selecionados; o administrador pode escolher a quantidade por imagem. O cabeçalho/rodapé e as linhas mantêm a escala original.
+
+O emblema canónico de Bronze é o capacete com louros de `icon_bronze.jpeg`. `lib/bronze-emblem.ts` extrai esse mesmo emblema para todos os cartazes (incluindo ranking/papéis individuais, jogos e resultados). O Title Fight usa a restauração localizada `title-bronze-emblem-clean.png` para substituir as estrelas pelo emblema sem tapar o desenho do cinturão.
