@@ -159,7 +159,9 @@ test("admin preview saves slogan/signature, renders division cards and exports b
     .getByRole("button", { name: "Bar e prémios", exact: true })
     .click();
   await expect(
-    area.getByRole("heading", { name: "Moedas e bar do clube", exact: true }),
+    area
+      .getByRole("region", { name: "Dinheiro virtual", exact: true })
+      .getByLabel("Nome das moedas", { exact: true }),
   ).toBeVisible();
   await area
     .getByRole("button", { name: "Cartas e avatares", exact: true })

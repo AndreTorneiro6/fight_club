@@ -1,3 +1,7 @@
+## Version1.5.7 admin-only deployment authorized — 26 October 2026
+
+- User explicitly requested publish only for admin. Pushed0b37f04 to deploy; workflow40388033980 correctly stopped at stale gamification browser title assertion (old fixed heading), no production change. Updated assertion to stable coin-name setting inside private coins region because name is configurable. Full7-test workspace/coins/gamification/search/sponsors/album group now passes locally. No app logic changed in follow-up. Retry deployment pending; preserve admin-only server filtering and command authorization.
+
 ## Version1.5.7 private coin management UI prepared — 26 October 2026
 
 - User asked to start Neiva Coins, then clarified name must be admin-defined and UI/mobile placement matters. Existing secure private coins subsystem reused; no new earning rules, player exposure or activation. Name remains editable; new configurations default Neiva Coins but persisted names preserved. Header previews configured name and original CSS coin monogram.
