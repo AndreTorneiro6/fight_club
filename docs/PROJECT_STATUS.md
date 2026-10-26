@@ -1,3 +1,8 @@
+## Version1.5.1 deployed and verified — 26 October 2026
+
+- Workflow40310716604 succeeded at2212901b2f945afcdf3d503dcbb0e6e8c2978f52. Live package1.5.1; app/worker running zero restarts, common image sha256:29066e0e9aa3452c310f7d9eb888e105924842c9a513b21d60ed991e76012e91. Public health and worker DNS pass. Annotated v1.5.1 tag pushed.
+-390 tests/typecheck/build and all CI browser groups passed. Added actual source-header pixel comparison for individual normal/title exports in every division; visually inspected generated normal fixture/results and all title themes. Removed opaque masks/headline replacement/title metadata strips, limited restoration to printed data fields, coherent missing division row variants. Original JPEGs untouched and private assets remain authenticated. No live competition data or notification replay changed. Unrelated ZIP deletion and Untitled.jpeg preserved.
+
 ## Version1.5.1 poster artwork correction prepared — 26 October 2026
 
 - User reported that exports damaged the supplied designs. Confirmed opaque black masks, replaced headline, foreign square badges and added title metadata strips obscured original artwork. Removed these overlays and restored original headline, borders, VS, slogan and title backgrounds. Original JPEG assets are untouched.
