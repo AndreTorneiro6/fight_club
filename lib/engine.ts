@@ -1,3 +1,4 @@
+import { executeMatchVoting } from "./match-voting";
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
 import { weeklyPublishedAt } from "./weekly-publication";
@@ -589,6 +590,11 @@ export function execute(
     return executeGamification(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.sponsors."))
     return executeSponsors(s, actor, raw, timestamp);
+  if (
+    featureType.startsWith("admin.match-vote.") ||
+    featureType.startsWith("admin.match-discussion.")
+  )
+    return executeMatchVoting(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.coins."))
     return executeCoins(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.stickers."))
@@ -3629,6 +3635,12 @@ export function execute(
         ) ||
         (s.gamificationProfiles ?? []).some(referencesPlayer) ||
         (s.coinEntries ?? []).some(referencesPlayer) ||
+        (s.matchVotes ?? []).some(referencesPlayer) ||
+        (s.matchDiscussionMessages ?? []).some(
+          (message) =>
+            referencesPlayer(message) ||
+            message.mentions?.some(referencesPlayer),
+        ) ||
         (s.competitionSchedules ?? []).some((schedule) =>
           schedule.snapshot.some((team) => team.members.some(referencesPlayer)),
         ) ||

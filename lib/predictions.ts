@@ -1,3 +1,5 @@
+import { predictionCutoff } from "./prediction-cutoff";
+export { predictionCutoff } from "./prediction-cutoff";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, Challenge, State } from "./types";
@@ -97,23 +99,6 @@ function winnerSide(challenge: Challenge, winnerId: string): string | null {
   )
     return challenge.defenderId;
   return null;
-}
-export function predictionCutoff(
-  state: State,
-  challenge: Challenge,
-  settings = engagementSettings(state),
-): string | null {
-  const match = state.matches.find((m) => m.challengeId === challenge._id);
-  const scheduled = match?.start ?? challenge.scheduledAt;
-  const start =
-    challenge.predictionCutoffAt &&
-    (!scheduled || challenge.predictionCutoffAt < scheduled)
-      ? challenge.predictionCutoffAt
-      : scheduled;
-  if (!start || !Number.isFinite(Date.parse(start))) return null;
-  return new Date(
-    Date.parse(start) - settings.lockMinutes * 60000,
-  ).toISOString();
 }
 /** Explicit set totals, or valid completed padel sets. Ambiguous legacy text earns no exact-score bonus. */
 export function officialSetScore(score: string): "2-0" | "2-1" | null {

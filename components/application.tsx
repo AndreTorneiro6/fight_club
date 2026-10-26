@@ -65,6 +65,7 @@ import { SeasonOverview, SeasonEditor } from "./season-overview";
 import AdminNavigation from "./admin-navigation";
 import AdminNotes from "./admin-notes";
 import AdminCoins from "./admin-coins";
+import AdminMatchVoting from "./admin-match-voting";
 import AdminGamification from "./admin-gamification";
 import { AdminSponsors, SponsorPage, PrizeSponsor } from "./sponsors";
 import { AdminPlayerCards } from "./player-attributes";
@@ -3548,6 +3549,13 @@ function Admin(a: Actions) {
           run={a.run}
           busy={a.busy}
           onOpenAlbum={() => setTab("album")}
+        />
+      ) : tab === "voting" ? (
+        <AdminMatchVoting
+          state={s}
+          run={a.run}
+          busy={a.busy}
+          connection={a.chatConnection}
         />
       ) : tab === "coins" ? (
         <AdminCoins state={s} run={a.run} busy={a.busy} />

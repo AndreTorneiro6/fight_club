@@ -1,0 +1,61 @@
+.root,
+.game {
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.game h3,
+.choices strong {
+  overflow-wrap: anywhere;
+}
+.choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.choices button {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 10px;
+  min-height: 100px;
+  white-space: normal;
+  min-width: 0;
+}
+.choices button[aria-pressed="true"] {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.track {
+  display: block;
+  width: 100%;
+  height: 5px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.track > span {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+}
+.back {
+  justify-self: start;
+  min-height: 44px;
+}
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .choices button {
+    padding: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+}

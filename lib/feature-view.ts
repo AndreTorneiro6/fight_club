@@ -22,6 +22,8 @@ export function filterFeatureView(state: State, actor: Actor) {
     state.placementEvents = [];
     state.gamificationSettings = [];
     state.gamificationProfiles = [];
+    state.matchVotes = [];
+    state.matchDiscussionMessages = [];
     state.coinSettings = [];
     state.coinEntries = [];
     state.stickerSettings = [];
@@ -52,6 +54,8 @@ export function filterFeatureView(state: State, actor: Actor) {
     (entry) =>
       !entry.action.startsWith("admin.notes.") &&
       !entry.action.startsWith("admin.coins.") &&
+      !entry.action.startsWith("admin.match-vote.") &&
+      !entry.action.startsWith("admin.match-discussion.") &&
       !entry.action.startsWith("admin.sponsors.") &&
       !entry.action.startsWith("admin.gamification.") &&
       !entry.action.startsWith("admin.placement.") &&

@@ -28,6 +28,7 @@ export const adminGroups = [
     items: [
       ["notes", "Ideias"],
       ["coins", "Moedas e bar"],
+      ["voting", "Central de Apostas"],
       ["gamification", "Gamificação"],
       ["sponsors", "Patrocínios"],
       ["engagement", "Cartões e palpites"],

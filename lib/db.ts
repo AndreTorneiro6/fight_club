@@ -54,6 +54,15 @@ export async function database() {
 }
 async function indexes(db: Db) {
   await db
+    .collection("matchVotes")
+    .createIndex({ userId: 1, challengeId: 1 }, { unique: true });
+  await db
+    .collection("matchDiscussionMessages")
+    .createIndex({ requestId: 1 }, { unique: true });
+  await db
+    .collection("matchDiscussionMessages")
+    .createIndex({ challengeId: 1, createdAt: 1 });
+  await db
     .collection("adminTestChallenges")
     .createIndex({ attackerId: 1, requestId: 1 }, { unique: true });
   await db

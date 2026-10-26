@@ -62,6 +62,11 @@ jobs:
           TMPDIR: ${{ runner.temp }}
           DEMO_TEST_ROUND_TRANSITION: "1"
 
+      - name: Check private match voting and discussion
+        run: npx playwright test e2e/match-voting.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check challenge chat mentions
         run: npx playwright test e2e/chat-mentions.spec.ts
         env:

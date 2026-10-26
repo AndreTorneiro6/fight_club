@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, AtSign } from "lucide-react";
+import { discussionTargets } from "@/lib/match-voting-targets";
 import type { View, Challenge } from "@/lib/types";
 import {
   chatMentionTargets,
@@ -15,7 +16,9 @@ export default function ChallengeChat({
   run,
   busy,
   connection,
+  community = false,
 }: {
+  community?: boolean;
   s: View;
   c: Challenge;
   run: (cmd: unknown, message?: string) => Promise<unknown>;
@@ -30,14 +33,15 @@ export default function ChallengeChat({
       value: string;
     } | null>(null),
     [active, setActive] = useState(0);
+  const requestId = useRef<string | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null),
     box = useRef<HTMLDivElement>(null);
-  const chat = s.messages
+  const chat = (community ? (s.matchDiscussionMessages ?? []) : s.messages)
     .filter((m) => m.challengeId === c._id)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const targets = chatMentionTargets(s, c).filter(
-      (t) => t.playerId !== s.actor.playerId,
-    ),
+  const targets = (
+      community ? discussionTargets(s) : chatMentionTargets(s, c)
+    ).filter((t) => t.playerId !== s.actor.playerId),
     matches = query
       ? targets
           .filter((t) =>
@@ -90,7 +94,9 @@ export default function ChallengeChat({
       aria-labelledby={`challenge-chat-${c._id}`}
     >
       <div className="row between wrap">
-        <h2 id={`challenge-chat-${c._id}`}>Chat do desafio</h2>
+        <h2 id={`challenge-chat-${c._id}`}>
+          {community ? "Conversa do jogo" : "Chat do desafio"}
+        </h2>
         <span
           className={`badge ${connection === "live" ? "positive" : "muted"}`}
           role="status"
@@ -140,7 +146,11 @@ export default function ChallengeChat({
             </div>
           ))
         ) : (
-          <p>Combina os detalhes do jogo com o teu adversário.</p>
+          <p>
+            {community
+              ? "Quem vai ganhar? Abre a conversa sobre este jogo."
+              : "Combina os detalhes do jogo com o teu adversário."}
+          </p>
         )}
       </div>
       <form
@@ -153,10 +163,21 @@ export default function ChallengeChat({
           });
           if (
             await run(
-              { type: "message.send", challengeId: c._id, text, mentionIds },
+              {
+                type: community
+                  ? "admin.match-discussion.send"
+                  : "message.send",
+                challengeId: c._id,
+                text,
+                mentionIds,
+                ...(community
+                  ? { requestId: (requestId.current ??= crypto.randomUUID()) }
+                  : {}),
+              },
               "",
             )
           ) {
+            requestId.current = undefined;
             setText("");
             setSelected([]);
             setQuery(null);
@@ -165,8 +186,9 @@ export default function ChallengeChat({
         }}
       >
         <small>
-          Escreve @ e escolhe um jogador ou administrador para o mencionar e
-          notificar.
+          {community
+            ? "Teste privado: escreve @ para identificar alguém. Não são enviadas notificações aos jogadores."
+            : "Escreve @ e escolhe um jogador ou administrador para o mencionar e notificar."}
         </small>
         {matches.length > 0 && (
           <div
@@ -190,7 +212,9 @@ export default function ChallengeChat({
                 <small>
                   {target.kind === "admin"
                     ? "Administrador"
-                    : "Jogador do desafio"}
+                    : community
+                      ? "Jogador da liga"
+                      : "Jogador do desafio"}
                 </small>
               </button>
             ))}

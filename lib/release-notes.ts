@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.7";
+export const applicationVersion = "1.6.0";
 export const releaseNotes = [
+  {
+    version: "1.6.0",
+    date: "2026-10-26",
+    title: "Central de Apostas — teste privado",
+    changes: [
+      "Central apenas para administradores, com um voto na dupla vencedora por pessoa e jogo e distribuição dos votos.",
+      "Conversa geral por jogo com menções @ a jogadores e administradores; mensagens de teste sem notificações para jogadores.",
+      "Votos fecham antes do início; sem previsão de sets, ligação às moedas ou alterações ao ranking. Interface adaptada ao telemóvel.",
+    ],
+  },
   {
     version: "1.5.7",
     date: "2026-10-26",
