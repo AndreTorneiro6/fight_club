@@ -1,3 +1,8 @@
+## Version1.5.6 validated and publication running;1.5.5 verified live — 26 October 2026
+
+- Latest request implemented: admin challenge back link returns to Resumo, player remains Desafios. Jogos por marcar uses Todos/Ouro/Prata/Bronze buttons with actual counts, active state, zero counts and existing Jogadores tab appearance.400 tests/typecheck/build and isolated admin overview browser passed. Commit cbb162ede056ea00443847ac6a3d69bbb6658088 pushed to deploy; workflow40357192385 running, not yet verified live. No data/rules/notifications changed.
+- Preceding workflow40355471038 succeeded: live1.5.5 revision83493bbabbeada3493f0ce66726d2fc448f26a30; app/worker zero restarts, image sha256:527fb0bbe694fc5ce1fbebd3036fd15d0379f126ce6ca1505b9b3020290371c6; health200 and worker DNS pass. v1.5.5 annotated tag pushed. Next: verify1.5.6 workflow/live version and tag exact deployed commit. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.5.6 admin summary navigation and division filters prepared — 26 October 2026
 
 - Admin challenge detail back link returns to /admin Resumo and says Voltar ao resumo; player link unchanged. Unscheduled summary uses existing tabs UI (Todos and every division), live counts and pressed states, including zero counts. Existing browser flow updated to exercise filters and actual back link. No competition data modified. Typecheck/build/400 tests and isolated admin-overview browser pass (filter buttons and back navigation). Initial tests hit /tmp quota; rerun with TMPDIR=/var/tmp passed. Deployment pending.
