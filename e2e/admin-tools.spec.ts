@@ -100,8 +100,8 @@ test("matchday generator exports a complete PNG, paginates results and respects 
     divisionId: index === 3 ? "prata" : "ouro",
     challengerId: index === 3 ? "player-15" : "player-2",
     defenderId: index === 3 ? "player-12" : "player-4",
-    scheduledAt: clubDateTime(addClubDays(week, index), "19:30"),
-    completedAt: clubDateTime(addClubDays(week, index), "21:00"),
+    scheduledAt: clubDateTime(addClubDays(week, index < 3 ? 0 : index), "19:30"),
+    completedAt: clubDateTime(addClubDays(week, index < 3 ? 0 : index), "21:00"),
     winnerId: index === 3 ? "player-15" : "player-2",
     challengerTeam: (index === 3
       ? ["player-15", "player-16"]
@@ -150,10 +150,23 @@ test("matchday generator exports a complete PNG, paginates results and respects 
     .getByRole("button", { name: "Saltar visita" })
     .click();
   await openAdminSection(page, "Cartazes da jornada");
+  await expect(page.getByLabel("Jogos por imagem", {exact:true})).toHaveValue("all");
+  await page.getByLabel("Dia do cartaz").selectOption(week);
+  await expect(page.getByText("3 jogos · Todas as divisões",{exact:false})).toBeVisible();
+  await expect(page.locator(".matchday-generator details .inset")).toHaveCount(3);
+  await expect(page.getByRole("button", {name:"Próxima página do cartaz"})).toHaveCount(0);
+  await expect.poll(()=>page.getByRole("img",{name:/Cartaz da jornada/}).evaluate((el:HTMLImageElement)=>el.naturalHeight)).toBeGreaterThan(1900);
+  const dayDownload = page.waitForEvent("download");
+  await page.getByRole("button",{name:"Descarregar PNG",exact:true}).click();
+  await (await dayDownload).saveAs("/var/tmp/fc-ranked-day-all.png");
+  await page.getByLabel("Dia do cartaz").selectOption("");
   await page.getByLabel("Tipo de cartaz").selectOption("results");
   await expect(
     page.getByRole("img", { name: /Cartaz de resultados/ }),
   ).toBeVisible();
+  await expect(page.getByLabel("Jogos por imagem", {exact:true})).toHaveValue("all");
+  await page.getByLabel("Jogos por imagem", {exact:true}).selectOption("custom");
+  await page.getByLabel("Número de jogos por imagem", {exact:true}).fill("3");
   await expect(
     page.getByText("Página 1 de 2 · até 3 jogos por imagem"),
   ).toBeVisible();
@@ -187,7 +200,7 @@ test("matchday generator exports a complete PNG, paginates results and respects 
   ).toHaveCount(0);
   await page.getByLabel("Dia do cartaz").selectOption(week);
   await expect(
-    page.getByText("1 resultados · Ouro", { exact: false }),
+    page.getByText("3 resultados · Ouro", { exact: false }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(

@@ -10,7 +10,6 @@ import {
   matchdayNumber,
   isResultPoster,
   isTitlePoster,
-  posterPageSize,
   type PosterMode,
 } from "@/lib/matchday";
 import { renderMatchdayPoster } from "@/lib/matchday-poster";
@@ -29,7 +28,9 @@ export default function MatchdayGenerator({
     [division, setDivision] = useState(initialDivision),
     [mode, setMode] = useState<PosterMode>(initialMode),
     [day, setDay] = useState(""),
-    [page, setPage] = useState(0);
+    [page, setPage] = useState(0),
+    [split, setSplit] = useState("all"),
+    [gamesPerImage, setGamesPerImage] = useState(3);
   const [preview, setPreview] = useState<{ url: string; blob: Blob } | null>(
       null,
     ),
@@ -39,7 +40,8 @@ export default function MatchdayGenerator({
   const allCards = matchdayCards(s, week, division, mode).filter(
     (card) => !day || (card.start && clubDay(card.start) === day),
   );
-  const pageSize = posterPageSize(mode),
+  const pageSize =
+      split === "all" ? Math.max(1, allCards.length) : gamesPerImage,
     results = isResultPoster(mode),
     title = isTitlePoster(mode);
   const pages = Math.ceil(allCards.length / pageSize),
@@ -181,7 +183,50 @@ export default function MatchdayGenerator({
             ))}
           </select>
         </label>
+        {
+          <>
+            <label>
+              Jogos por imagem
+              <select
+                aria-label="Jogos por imagem"
+                value={split}
+                onChange={(e) => {
+                  setSplit(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="all">Todos os jogos selecionados</option>
+                <option value="custom">Definir quantidade</option>
+              </select>
+            </label>
+            {split === "custom" && (
+              <label>
+                Número de jogos por imagem
+                <input
+                  type="number"
+                  aria-label="Número de jogos por imagem"
+                  min={1}
+                  max={50}
+                  value={gamesPerImage}
+                  onChange={(e) => {
+                    setGamesPerImage(
+                      Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                    );
+                    setPage(0);
+                  }}
+                />
+              </label>
+            )}
+          </>
+        }
       </div>
+      {
+        <small className="muted">
+          {split === "all"
+            ? "O cartaz inclui todos os jogos da seleção. A altura ajusta-se automaticamente."
+            : `Até ${gamesPerImage} jogos por imagem. Os restantes ficam nas páginas seguintes.`}
+        </small>
+      }
       <div className="row between wrap">
         <p role="status">
           {allCards.length} {results ? "resultados" : "jogos"} · {label}

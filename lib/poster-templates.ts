@@ -1,4 +1,8 @@
 export const posterTemplates = {
+  "fixtures-ranked": "cartaz_diario_ranking.jpeg",
+  "fixtures-ranked-clean": "fixtures-ranked-clean.png",
+  "fixtures-ranked-prata": "fixtures-ranked-prata.png",
+  "fixtures-ranked-bronze": "fixtures-ranked-bronze.png",
   "fixtures-ouro": "fixtures-ouro.png",
   "results-prata": "results-prata.png",
   "fixtures-clean": "fixtures-clean.png",

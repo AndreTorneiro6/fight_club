@@ -1,3 +1,4 @@
+import { renderRankedFixturesPoster } from "./ranked-fixtures-poster";
 import { clubWeek } from "./calendar";
 import {
   isResultPoster,
@@ -6,7 +7,6 @@ import {
   type PosterMode,
 } from "./matchday";
 import { posterTemplateUrl, type PosterTemplate } from "./poster-templates";
-export const POSTER_PAGE_SIZE = 3;
 const W = 1080,
   H = 1920,
   BW = 941,
@@ -215,12 +215,48 @@ export async function renderMatchdayPoster({
   page: number;
   pages: number;
   day?: string;
-}) {
+}): Promise<{ blob: Blob; width: number; height: number }> {
   if (!cards.length) throw new Error("Não existem jogos para gerar o cartaz.");
+  if (mode === "fixtures")
+    return renderRankedFixturesPoster({ cards, week, day });
   const title = isTitlePoster(mode),
     results = isResultPoster(mode);
-  if (title && cards.length !== 1)
-    throw new Error("Cada cartaz do título apresenta um único jogo.");
+  if (title && cards.length > 1) {
+    const parts = await Promise.all(
+      cards.map((card) =>
+        renderMatchdayPoster({
+          cards: [card],
+          mode,
+          week,
+          division,
+          page,
+          pages,
+          day,
+        }),
+      ),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H * parts.length;
+    const ctx = canvas.getContext("2d")!;
+    for (const [i, part] of parts.entries()) {
+      const bitmap = await createImageBitmap(part.blob);
+      ctx.drawImage(bitmap, 0, i * H);
+      bitmap.close();
+    }
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) =>
+          b
+            ? resolve(b)
+            : reject(
+                new Error("Não foi possível exportar os jogos do título."),
+              ),
+        "image/png",
+      ),
+    );
+    return { blob, width: W, height: canvas.height };
+  }
   if (title && cards.some((c) => !c.titleFight))
     throw new Error(
       "Este jogo não está identificado como um jogo pelo título.",
@@ -251,6 +287,8 @@ export async function renderMatchdayPoster({
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("O navegador não permite gerar o cartaz.");
   ctx.scale(W / BW, H / BH);
+  ctx.fillStyle = "#080807";
+  ctx.fillRect(0, 0, BW, (canvas.height * BH) / H);
   ctx.drawImage(background, 0, 0, BW, BH);
   if (!title)
     ctx.drawImage(
@@ -279,7 +317,7 @@ export async function renderMatchdayPoster({
       text(`${date(week)} — ${date(clubWeek(week).end)}`, 470, 625, 18, 565);
     }
 
-    for (const [index, card] of cards.slice(0, 3).entries()) {
+    for (const [index, card] of cards.entries()) {
       const y = bodyTop + index * (rowH + gap),
         sourceY = results
           ? card.divisionCode === "bronze"
@@ -288,10 +326,12 @@ export async function renderMatchdayPoster({
           : card.divisionCode === "bronze"
             ? 900
             : 673;
-      const rowBackground = !results && card.divisionCode === "ouro"
-        ? await load("fixtures-ouro")
-        : results && card.divisionCode === "prata"
-          ? await load("results-prata") : background;
+      const rowBackground =
+        !results && card.divisionCode === "ouro"
+          ? await load("fixtures-ouro")
+          : results && card.divisionCode === "prata"
+            ? await load("results-prata")
+            : background;
       ctx.drawImage(rowBackground, 16, sourceY, 910, rowH, 16, y, 910, rowH);
       if (results) {
         names(

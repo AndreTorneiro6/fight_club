@@ -1,3 +1,13 @@
+## Version1.5.3 supplied daily/ranking template and configurable counts prepared — 26 October 2026
+
+- User supplied templates/cartaz_diario_ranking.jpeg (1010x1557), explicitly requested following it and adding ranking positions to round posters. New ranked fixture renderer uses original pixels outside localized sample-data restorations; full native rank boxes, names, date/time/court positions. Gold native row; coherent silver/bronze row variants generated via imagegen. Uses saved attacker/defender ranking snapshots, never current player ordinal. Normal daily/week/individual exports now use this template; title/result artwork retained.
+- Latest steering: include ALL selected day games by default; let admin set quantity; taller image allowed. Removed fixed page caps. Admin Jogos por imagem offers all/default or custom1–50; all included with native-scale rows and dynamically taller canvas. Same controls work for results/title-only modes. Multiple title matches stack complete original themed posters without mixing ordinary games. Preview uses natural height. No database/competition change.
+-393 tests/typecheck/build pass; isolated image/template/admin-tools browsers pass, including 3 games on one day with default all, custom pagination and title aggregation, exact original header pixels and all3 division individual exports. Final393 tests/typecheck/build and focused browsers pass. Visually inspected exported daily/weekly single game and taller three-game same-day PNG with rank boxes; source header exact pixels pass. Deployment pending.
+
+## Version1.5.2 deployed and verified — 26 October 2026
+
+- Workflow40314953797 succeeded atcae5c92dd31435124463ffdd4cdf49017b7d3ba7. Live package1.5.2, app/worker running zero restarts, common image sha256:3a60e4d5e19fa5c43fa34dbdf2991070ca61a0a0a436b164393b11983ef36e4f. Health/worker DNS pass, annotated v1.5.2 tag pushed. Compact Resumo active. Earlier audited cleanup7 cancelled games and56 deliveries verified0 remaining; protected live rankings/results/roles/active games unchanged. User added the new daily-ranking template request while deploy was finishing; next1.5.3 above.
+
 ## Version1.5.2 compact Resumo and cancelled cleanup — 26 October 2026
 
 - Admin Resumo now uses compact top metrics and independent main/sidebar stacks, avoiding grid row gaps. Main: priorities then compact unscheduled-game rows; sidebar: current division status then only actionable round-publication handoffs. Reduced panel/task/list spacing; no division filter when entire unscheduled list empty. Mobile stacks naturally, complete team names remain readable, touch controls preserved. No operational logic changed for scheduling/publication.

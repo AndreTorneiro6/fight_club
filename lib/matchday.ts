@@ -9,8 +9,6 @@ export const isResultPoster = (mode: PosterMode) =>
   mode === "results" || mode === "title_results";
 export const isTitlePoster = (mode: PosterMode) =>
   mode === "title" || mode === "title_results";
-export const posterPageSize = (mode: PosterMode) =>
-  isTitlePoster(mode) ? 1 : 3;
 export type MatchdayCard = {
   id: string;
   number: number;

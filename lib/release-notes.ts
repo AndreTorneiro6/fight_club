@@ -1,6 +1,18 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.2";
+export const applicationVersion = "1.5.3";
 export const releaseNotes = [
+  {
+    version: "1.5.3",
+    date: "2026-10-26",
+    title: "Cartaz diário e da jornada com ranking",
+    changes: [
+      "Novo modelo cartaz_diario_ranking aplicado aos cartazes da jornada, diários e jogos individuais, com quantidade de jogos configurável.",
+      "Por defeito inclui todos os jogos do dia selecionado; o administrador pode definir quantos jogos apresentar por imagem.",
+      "A imagem cresce em altura conforme o número de jogos, mantendo a escala das linhas e sem cortar confrontos.",
+      "Posições das duplas nas caixas laterais do modelo, com os valores guardados no jogo e variantes de Ouro, Prata e Bronze.",
+      "Grafismo original preservado, incluindo cabeçalho, molduras e rodapé; Title Fights continuam com os modelos próprios.",
+    ],
+  },
   {
     version: "1.5.2",
     date: "2026-10-26",
