@@ -13,7 +13,7 @@ const W = 1080,
   BH = 1672;
 const accent = (code: string) =>
   code === "ouro" ? "#f3c75c" : code === "prata" ? "#d1dbe1" : "#e5a16c";
-const load = (key: PosterTemplate) =>
+const loadImage = (key: PosterTemplate) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
@@ -21,6 +21,72 @@ const load = (key: PosterTemplate) =>
       reject(new Error("Não foi possível carregar o modelo do cartaz."));
     image.src = posterTemplateUrl(key);
   });
+// Restore only printed data fields. All artwork outside these rectangles comes from
+// the untouched original JPEG, never from the generated restoration.
+async function load(key: PosterTemplate): Promise<HTMLCanvasElement> {
+  const original = await loadImage(key);
+  const canvas = document.createElement("canvas");
+  canvas.width = BW;
+  canvas.height = BH;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(original, 0, 0, BW, BH);
+  const cleanKey = key === "daily" ? "fixtures-clean" : `${key}-clean`;
+  if (
+    !(
+      cleanKey in
+      {
+        "fixtures-clean": 1,
+        "results-clean": 1,
+        "title-ouro-clean": 1,
+        "title-prata-clean": 1,
+        "title-bronze-clean": 1,
+      }
+    )
+  )
+    return canvas;
+  const clean = await loadImage(cleanKey as PosterTemplate);
+  const rects: number[][] = [];
+  if (key === "fixtures" || key === "daily") {
+    rects.push([230, 600, 470, 63]);
+    for (const y of [673, 900, 1120])
+      rects.push(
+        [626, y + 9, 249, 72],
+        [218, y + 110, 226, 87],
+        [548, y + 110, 244, 87],
+      );
+  } else if (key === "results") {
+    for (const y of [642, 845, 1047])
+      rects.push(
+        [274, y + 9, 194, 82],
+        [565, y + 9, 224, 82],
+        [281, y + 107, 445, 65],
+      );
+  } else {
+    const gold = key === "title-ouro",
+      bronze = key === "title-bronze";
+    const dy = gold || bronze ? 1124 : 1100,
+      ny = gold ? 1304 : 1270;
+    rects.push([178, dy - 35, 282, 70], [651, dy - 35, 222, 70]);
+    if (!bronze)
+      rects.push(
+        [gold ? 124 : 140, ny - 35, 286, 116],
+        [548, ny - 35, 300, 116],
+      );
+  }
+  for (const [x, y, w, h] of rects)
+    ctx.drawImage(
+      clean,
+      (x * clean.width) / BW,
+      (y * clean.height) / BH,
+      (w * clean.width) / BW,
+      (h * clean.height) / BH,
+      x,
+      y,
+      w,
+      h,
+    );
+  return canvas;
+}
 const date = (value: string) =>
   new Date(
     value.length === 10 ? `${value}T12:00:00Z` : value,
@@ -53,19 +119,12 @@ function drawing(ctx: CanvasRenderingContext2D) {
       ctx.font = font();
     }
     ctx.fillStyle = color;
+    ctx.shadowColor = "#000";
+    ctx.shadowBlur = 4;
     ctx.textAlign = align;
     ctx.textBaseline = "middle";
     ctx.fillText(value, x, y, width);
-  };
-  const cover = (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    fill = "#070707",
-  ) => {
-    ctx.fillStyle = fill;
-    ctx.fillRect(x, y, w, h);
+    ctx.shadowBlur = 0;
   };
   const names = (
     values: string[],
@@ -80,21 +139,20 @@ function drawing(ctx: CanvasRenderingContext2D) {
       text(value.toUpperCase(), x, y + i * 37, size, width, color),
     );
   };
-  return { text, cover, names };
+  return { text, names };
 }
 function titleCard(
   ctx: CanvasRenderingContext2D,
   card: MatchdayCard,
   mode: PosterMode,
 ) {
-  const { text, cover, names } = drawing(ctx),
+  const { text, names } = drawing(ctx),
     gold = card.divisionCode === "ouro",
     bronze = card.divisionCode === "bronze",
     dateY = gold || bronze ? 1124 : 1100,
     nameY = gold ? 1304 : bronze ? 1280 : 1270;
   // Replace all printed example dates, times and player names, retaining the supplied artwork.
-  cover(178, dateY - 35, 282, 70);
-  cover(651, dateY - 35, 222, 70);
+
   text(
     card.start ? date(card.start) : "DATA POR MARCAR",
     319,
@@ -111,8 +169,7 @@ function titleCard(
     210,
     accent(card.divisionCode),
   );
-  cover(gold ? 124 : 140, nameY - 35, 286, 116);
-  cover(548, nameY - 35, 300, 116);
+
   names(
     card.left,
     267,
@@ -130,37 +187,13 @@ function titleCard(
     38,
   );
   if (bronze) text("VS", 478, nameY + 20, 64, 100, "#fff");
-  text(
-    `ATAQUE${card.attackerRank ? ` · #${card.attackerRank}` : ""}`,
-    267,
-    nameY + 92,
-    20,
-    278,
-    accent(card.divisionCode),
-  );
-  text(
-    `DEFESA${card.defenderRank ? ` · #${card.defenderRank}` : ""}`,
-    698,
-    nameY + 92,
-    20,
-    286,
-    accent(card.divisionCode),
-  );
-  cover(125, 1450, 690, isResultPoster(mode) ? 90 : 50, "#050505ed");
-  text(
-    `${card.division.toUpperCase()} · ${card.court ?? "CAMPO POR CONFIRMAR"} · JOGO #${card.number}`,
-    470,
-    1475,
-    23,
-    660,
-  );
   if (isResultPoster(mode))
     text(
-      card.score ?? "RESULTADO REGISTADO · SETS NÃO INDICADOS",
+      card.score ?? "SETS NÃO INDICADOS",
       470,
-      1515,
-      42,
-      650,
+      1440,
+      36,
+      520,
       accent(card.divisionCode),
     );
 }
@@ -231,15 +264,10 @@ export async function renderMatchdayPoster({
       BW,
       BH - sourceFooterY,
     );
-  const { text, cover, names } = drawing(ctx);
+  const { text, names } = drawing(ctx);
   if (title) titleCard(ctx, cards[0], mode);
   else {
-    if (!results && !day) {
-      cover(94, 366, 755, 110);
-      text("CALENDÁRIO DO", 470, 424, 109, 730);
-    }
     if (!results) {
-      cover(175, 600, 600, 63);
       text(
         day ? date(day) : `${date(week)} — ${date(clubWeek(week).end)}`,
         470,
@@ -248,13 +276,10 @@ export async function renderMatchdayPoster({
         590,
       );
     } else {
-      cover(180, 610, 580, 28);
       text(`${date(week)} — ${date(clubWeek(week).end)}`, 470, 625, 18, 565);
     }
-    const bodyBottom = footerY;
-    // Sample games are never left visible, even when the final page contains fewer than three.
-    cover(13, bodyTop - 1, 916, bodyBottom - bodyTop + 2);
-    cards.slice(0, 3).forEach((card, index) => {
+
+    for (const [index, card] of cards.slice(0, 3).entries()) {
       const y = bodyTop + index * (rowH + gap),
         sourceY = results
           ? card.divisionCode === "bronze"
@@ -263,21 +288,12 @@ export async function renderMatchdayPoster({
           : card.divisionCode === "bronze"
             ? 900
             : 673;
-      ctx.drawImage(background, 16, sourceY, 910, rowH, 16, y, 910, rowH);
-      // League label and dynamic fields cover the populated example text completely.
+      const rowBackground = !results && card.divisionCode === "ouro"
+        ? await load("fixtures-ouro")
+        : results && card.divisionCode === "prata"
+          ? await load("results-prata") : background;
+      ctx.drawImage(rowBackground, 16, sourceY, 910, rowH, 16, y, 910, rowH);
       if (results) {
-        cover(151, y + 9, 130, 89);
-        text("LIGA", 216, y + 30, 32, 120, accent(card.divisionCode));
-        text(
-          card.division.toUpperCase(),
-          216,
-          y + 68,
-          35,
-          120,
-          accent(card.divisionCode),
-        );
-        cover(274, y + 9, 194, 82);
-        cover(565, y + 9, 224, 82);
         names(
           card.left,
           366,
@@ -294,7 +310,7 @@ export async function renderMatchdayPoster({
           card.winner === "right" ? accent(card.divisionCode) : "#fff",
           30,
         );
-        cover(281, y + 107, 445, 65);
+
         text(
           card.score ??
             (card.winner
@@ -307,17 +323,6 @@ export async function renderMatchdayPoster({
           accent(card.divisionCode),
         );
       } else {
-        cover(165, y + 6, 245, 100);
-        text("LIGA", 223, y + 30, 31, 160, accent(card.divisionCode));
-        text(
-          card.division.toUpperCase(),
-          265,
-          y + 64,
-          39,
-          192,
-          accent(card.divisionCode),
-        );
-        cover(626, y + 9, 249, 72);
         text(
           card.start ? time(card.start) : "POR MARCAR",
           750,
@@ -326,8 +331,7 @@ export async function renderMatchdayPoster({
           239,
           accent(card.divisionCode),
         );
-        cover(218, y + 110, 226, 87);
-        cover(548, y + 110, 244, 87);
+
         names(card.left, 328, y + 131, 208, "#fff", 31);
         names(card.right, 672, y + 131, 232, "#fff", 31);
         text(
@@ -339,28 +343,8 @@ export async function renderMatchdayPoster({
           "#ddd",
         );
       }
-    });
-    // Source theme badges are replaced with the exact league artwork rather than mismatched sample medals.
-    const leagueArt = await load("ranking");
-    cards.slice(0, 3).forEach((card, index) => {
-      const y = bodyTop + index * (rowH + gap),
-        x =
-          card.divisionCode === "ouro"
-            ? 18
-            : card.divisionCode === "prata"
-              ? 325
-              : 632;
-      cover(18, y + 1, 160, 145);
-      ctx.drawImage(leagueArt, x, 579, 138, 130, 18, y + 1, 160, 145);
-    });
-    text(
-      `${division.toUpperCase()}${round ? ` · JORNADA ${round}` : ""}${pages > 1 ? ` · ${page + 1}/${pages}` : ""}`,
-      470,
-      footerY + 14,
-      16,
-      830,
-      "#eee",
-    );
+    }
+    // League badge and label stay together with the matching original row artwork.
   }
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(

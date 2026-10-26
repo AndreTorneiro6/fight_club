@@ -25,7 +25,7 @@ test("club templates generate separate normal and title posters with real teams 
       `/api/poster-templates/${template}`,
     );
     expect(response.ok(), template).toBeTruthy();
-    expect(response.headers()["content-type"]).toContain("image/jpeg");
+    expect(response.headers()["content-type"]).toContain(posterTemplates[template as keyof typeof posterTemplates].endsWith(".png") ? "image/png" : "image/jpeg");
   }
   expect(
     (await page.request.get("/api/poster-templates/unknown")).status(),
@@ -146,6 +146,24 @@ test("club templates generate separate normal and title posters with real teams 
       expect(requested.some(url => url.endsWith(`/api/poster-templates/${expectedTemplate}`))).toBe(true);
       const height = await img.evaluate((el: HTMLImageElement) => el.naturalHeight);
       expect(height).toBe(c === game ? 1920 : 1408);
+      // The original artwork above the date/rows must survive export pixel-for-pixel.
+      const changedHeaderPixels = await img.evaluate(async (el: HTMLImageElement, key: string) => {
+        const original = new Image();
+        original.src = `/api/poster-templates/${key}`;
+        await original.decode();
+        const base = document.createElement("canvas"); base.width = 941; base.height = 1672;
+        base.getContext("2d")!.drawImage(original, 0, 0, 941, 1672);
+        const expected = document.createElement("canvas"); expected.width = 1080; expected.height = 1920;
+        const ctx = expected.getContext("2d")!; ctx.scale(1080/941,1920/1672); ctx.drawImage(base,0,0);
+        const actual = document.createElement("canvas"); actual.width = el.naturalWidth; actual.height = el.naturalHeight;
+        actual.getContext("2d")!.drawImage(el,0,0);
+        const a = ctx.getImageData(0,0,1080,680).data;
+        const b = actual.getContext("2d")!.getImageData(0,0,1080,680).data;
+        let different = 0;
+        for (let i=0;i<a.length;i+=4) if (Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>3) different++;
+        return different;
+      }, expectedTemplate);
+      expect(changedHeaderPixels).toBe(0);
       page.off("request", listener);
     }
   }

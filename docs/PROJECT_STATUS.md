@@ -1,3 +1,9 @@
+## Version1.5.1 poster artwork correction prepared — 26 October 2026
+
+- User reported that exports damaged the supplied designs. Confirmed opaque black masks, replaced headline, foreign square badges and added title metadata strips obscured original artwork. Removed these overlays and restored original headline, borders, VS, slogan and title backgrounds. Original JPEG assets are untouched.
+- Applied imagegen skill to prepare five restored PNG siblings with printed sample fields removed. Runtime composites only localized data-field rectangles from these onto original JPEGs, retaining original pixels everywhere else. Private allowlist route supports PNG MIME. League badge/label kept together from native matching template artwork; corrected source-label remnants. Dynamic row counts remain compact without stretching artwork.
+- Package/lock/changelog1.5.1.390 tests/typecheck/build pass. Image clipboard, all3 division individual/title exports, template access, pagination and filter browser checks pass, now including exact header pixel comparison to original artwork. Final generated fixture/results and all title themes visually inspected. Added coherent gold-fixture and silver-result row variants to avoid pasted emblem rectangles; use only row artwork from variants, leaving original header/footer untouched. Deployment pending. No live competition state changed; preserve unrelated deleted ZIP and Untitled.jpeg.
+
 ## Version1.5.0 deployed and verified — 26 October 2026
 
 - Workflow40306261814 succeeded and deployed e99a402feb327a749ae80481d0fac84c4892a3fe. Live package1.5.0, app/worker running zero restarts, common image sha256:66c7bbab12db0703a543f3ba6156c2be65e2856880173f417001d34c41b31e3c. Public health and worker DNS pass. Annotated v1.5.0 pushed at exact deployed revision.

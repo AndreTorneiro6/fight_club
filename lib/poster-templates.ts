@@ -1,4 +1,11 @@
 export const posterTemplates = {
+  "fixtures-ouro": "fixtures-ouro.png",
+  "results-prata": "results-prata.png",
+  "fixtures-clean": "fixtures-clean.png",
+  "results-clean": "results-clean.png",
+  "title-ouro-clean": "title-ouro-clean.png",
+  "title-prata-clean": "title-prata-clean.png",
+  "title-bronze-clean": "title-bronze-clean.png",
   ranking: "ranking_semanal.jpeg",
   weekly: "papeis_semanais.jpeg",
   fixtures: "cartaz_calendário.jpeg",

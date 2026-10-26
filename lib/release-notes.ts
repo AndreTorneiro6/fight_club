@@ -1,6 +1,8 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.5.0";
+export const applicationVersion = "1.5.1";
 export const releaseNotes = [
+  { version: "1.5.1", date: "2026-10-26", title: "Correção visual dos cartazes",
+    changes: ["Restauro localizado dos campos dos modelos originais, sem retângulos opacos sobre o grafismo.", "Cabeçalhos, molduras, emblemas e slogan originais preservados nas exportações de jornada e jogos individuais."] },
   {
     version: "1.5.0",
     date: "2026-10-26",

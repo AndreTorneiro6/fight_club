@@ -31,7 +31,11 @@ export async function GET(
     );
     return new Response(new Uint8Array(bytes), {
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": posterTemplates[template as PosterTemplate].endsWith(
+          ".png",
+        )
+          ? "image/png"
+          : "image/jpeg",
         "Cache-Control": "private, no-store",
       },
     });
