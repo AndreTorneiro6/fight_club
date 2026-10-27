@@ -1,3 +1,4 @@
+import { anonymousMatchVotes } from "./anonymous-match-votes";
 import {
   competitionPriorities,
   challengeContext,
@@ -8,6 +9,18 @@ import type { Actor, State } from "./types";
 
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
+  state.matchVoteSummaries =
+    actor.role === "admin" ? anonymousMatchVotes(state) : [];
+  state.matchVotes = (state.matchVotes ?? []).filter(
+    (vote) => actor.role === "admin" && vote.userId === actor.userId,
+  );
+  // Keep the full audit in storage, but don't disclose another bettor through the shared audit UI/API.
+  state.audit = state.audit.filter(
+    (entry) =>
+      !entry.action.startsWith("admin.match-vote.") ||
+      entry.action === "admin.match-vote.settings",
+  );
+
   state.stickerPacks = (state.stickerPacks ?? []).filter(
     (pack) => actor.role === "admin" && pack.userId === actor.userId,
   );

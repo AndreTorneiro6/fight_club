@@ -200,3 +200,38 @@
     font-size: 20px;
   }
 }
+
+.anonymousResults {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.anonymousResults h4 {
+  font-size: 13px;
+  margin: 0;
+}
+.anonymousResults ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 190px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.anonymousResults li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.anonymousResults li strong {
+  overflow-wrap: anywhere;
+}
+.anonymousResults li span {
+  color: var(--muted);
+  white-space: nowrap;
+}

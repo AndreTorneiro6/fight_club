@@ -1,3 +1,9 @@
+## Version1.7.1 prepared locally — 27 October 2026
+
+- Latest request: predictions cannot be edited after saving, only deleted before existing30/60-minute cutoff. UI removes edit action, keeps own chip withdrawal; server rejects both scored and legacy endpoint overwrites409, preserving history/CAS/earliest cutoff. Deleting allows fresh submission before close, as explained to user. No real competition/statistics/coins changes.
+- Other participants' predictions are shared only as score/winner-team/count aggregates. Admin API returns only actor's own raw vote; bet mutation audit remains stored but hidden from shared projection to avoid author disclosure. Chat retains normal authors. Admin-only preview retained; player sees no prediction data. Anonymous summaries derived, never persisted.
+-421 tests/typecheck/build pass; isolated mobile voting browser passes conditional sets/save/delete/recast, grouped results and absence of Edit, official-state isolation/player denial. Direct API edit returns409 in the passing browser check. Final typecheck/build/all421 tests passed. Initial default/tmp run failed due local Mongo/temp filesystem, clean TMPDIR=/var/tmp run passed all421. Not deployed; production remains1.7.0/ec475563. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.7.0 deployed; score predictions never modify official results — 27 October 2026
 
 - Workflow40421890252 succeeded at ec4755639f87098c00829f9a02be1cefd4740f14. Live package1.7.0 and revision directly verified; app/worker running zero restarts with image sha256:2eab34796661763b091e94d07ed074635bb66e89647484df78e4030f5db0811f. Health and worker DNS pass. Annotated v1.7.0 tag pushed.420 tests/typecheck/build and all CI browser groups passed. Prepared26Oct, deployed after midnight27Oct.

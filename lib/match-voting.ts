@@ -167,6 +167,11 @@ export function executeMatchVoting(
       });
       return { ok: true };
     }
+    ensure(
+      !existing || !!existing.withdrawnAt,
+      "O palpite já foi guardado. Só podes eliminá-lo antes do fecho; não pode ser editado.",
+      409,
+    );
     if (
       cmd.type === "admin.match-vote.predict" &&
       cmd.expectedUpdatedAt !== undefined
@@ -184,11 +189,6 @@ export function executeMatchVoting(
             challenge.defenderId,
           )
         : { winnerId: cmd.winnerId, setScores: undefined };
-    ensure(
-      cmd.type !== "admin.match-vote.save" || !existing?.setScores,
-      "Atualiza a app para editar este palpite por sets.",
-      409,
-    );
     if (existing) delete existing.withdrawnAt;
     if (existing)
       Object.assign(existing, {

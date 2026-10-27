@@ -93,17 +93,6 @@ test("private central supports per-set predictions, conditional third set, withd
     editor.getByLabel("Ataque · 3.º set", { exact: true }),
   ).toHaveCount(0);
   await expect(editor).toContainText("não há terceiro set");
-  await editor
-    .getByRole("button", { name: "Guardar palpite", exact: true })
-    .click();
-  await expect(editor).not.toBeVisible();
-  await expect(
-    card.getByRole("button", { name: /O teu palpite: 6-4, 7-6/ }),
-  ).toBeVisible();
-  await expect(card).toContainText("1 votos");
-  await card
-    .getByRole("button", { name: "Editar palpite", exact: true })
-    .click();
   await fillSet(2, "4", "6");
   await expect(
     editor.getByLabel("Ataque · 3.º set", { exact: true }),
@@ -132,6 +121,12 @@ test("private central supports per-set predictions, conditional third set, withd
     name: /O teu palpite: 6-4, 4-6, 6-4/,
   });
   await expect(ownPrediction).toBeVisible();
+  await expect(
+    card.getByRole("button", { name: "Editar palpite", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    card.getByRole("region", { name: /Palpites por resultado/ }),
+  ).toContainText("6-4, 4-6, 6-4");
   await ownPrediction.click();
   await expect(card).toContainText("0 votos");
   await card
@@ -173,6 +168,19 @@ test("private central supports per-set predictions, conditional third set, withd
     { attacker: 4, defender: 6 },
     { attacker: 6, defender: 4 },
   ]);
+  const blockedEdit = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.match-vote.predict",
+      challengeId: game.id,
+      setScores: [
+        { attacker: 4, defender: 6 },
+        { attacker: 6, defender: 7 },
+      ],
+    },
+  });
+  expect(blockedEdit.status()).toBe(409);
+  expect(await blockedEdit.text()).toContain("não pode ser editado");
   expect(updated.results).toEqual(state.results);
   expect(updated.history).toEqual(state.history);
   expect(updated.players).toEqual(state.players);

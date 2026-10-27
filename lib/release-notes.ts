@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.7.0";
+export const applicationVersion = "1.7.1";
 export const releaseNotes = [
+  {
+    version: "1.7.1",
+    date: "2026-10-27",
+    title: "Palpites anónimos e sem edição",
+    changes: [
+      "Resultados previstos visíveis de forma agregada, sem identificar os autores. Cada pessoa vê o seu próprio palpite.",
+      "Depois de guardar, o palpite só pode ser eliminado antes do fecho; edição bloqueada também no servidor.",
+      "Após eliminar, é possível submeter novo palpite enquanto a votação estiver aberta. Central mantém-se privada para administradores.",
+    ],
+  },
   {
     version: "1.7.0",
     date: "2026-10-26",

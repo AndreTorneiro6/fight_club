@@ -114,7 +114,7 @@ test("administrator projection preserves private proposals for review", () => {
   const state = fixture(),
     before = structuredClone(state);
   filterFeatureView(state, { ...actor, role: "admin" });
-  assert.deepEqual(state, before);
+  assert.deepEqual(state, { ...before, matchVoteSummaries: [] });
 });
 
 test("an approved schedule without publication cannot become public by setting its status alone", () => {

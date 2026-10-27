@@ -40,21 +40,17 @@ export default function MatchScorePrediction({
   const firstTwo = draft
     .slice(0, 2)
     .every((s) => s.attacker !== "" && s.defender !== "")
-    ? draft
-        .slice(0, 2)
-        .map((s) => ({
-          attacker: Number(s.attacker),
-          defender: Number(s.defender),
-        }))
+    ? draft.slice(0, 2).map((s) => ({
+        attacker: Number(s.attacker),
+        defender: Number(s.defender),
+      }))
     : [];
   const needed = requiredPredictionSets(firstTwo),
     count = needed === 3 ? 3 : 2;
-  const sets: SetScore[] = draft
-    .slice(0, count)
-    .map((s) => ({
-      attacker: Number(s.attacker),
-      defender: Number(s.defender),
-    }));
+  const sets: SetScore[] = draft.slice(0, count).map((s) => ({
+    attacker: Number(s.attacker),
+    defender: Number(s.defender),
+  }));
   let preview: ReturnType<typeof matchScorePrediction> | undefined;
   if (
     draft.slice(0, count).every((s) => s.attacker !== "" && s.defender !== "")
@@ -91,12 +87,10 @@ export default function MatchScorePrediction({
       const scores = next
         .slice(0, 2)
         .every((s) => s.attacker !== "" && s.defender !== "")
-        ? next
-            .slice(0, 2)
-            .map((s) => ({
-              attacker: Number(s.attacker),
-              defender: Number(s.defender),
-            }))
+        ? next.slice(0, 2).map((s) => ({
+            attacker: Number(s.attacker),
+            defender: Number(s.defender),
+          }))
         : [];
       if (index < 2 && requiredPredictionSets(scores) !== 3)
         next[2] = emptySet();
@@ -131,9 +125,16 @@ export default function MatchScorePrediction({
           </small>
         </button>
       )}
-      <button disabled={!open || busy} onClick={edit}>
-        {mine ? "Editar palpite" : "Prever resultado"}
-      </button>
+      {!mine && (
+        <button disabled={!open || busy} onClick={edit}>
+          Prever resultado
+        </button>
+      )}
+      {mine && (
+        <small className="muted">
+          O palpite não pode ser editado. Podes eliminá-lo antes do fecho.
+        </small>
+      )}
       <dialog
         ref={dialog}
         className={styles.scoreDialog}
@@ -186,6 +187,7 @@ export default function MatchScorePrediction({
           </div>
           <p className={styles.predictionNotice}>
             É apenas uma previsão. Não altera o resultado oficial do jogo.
+            Depois de guardar, só podes eliminar o palpite antes do fecho.
           </p>
           <div className={styles.setTeams}>
             <strong>

@@ -1,3 +1,4 @@
+import type { MatchVoteSummary } from "./anonymous-match-votes";
 import type { ClubPhoto, ClubPhotoUnlock } from "./club-photo-types";
 import type { MatchVotingSettings } from "./match-voting-targets";
 import type { MatchVote, MatchDiscussionMessage } from "./match-voting";
@@ -390,6 +391,8 @@ export interface State {
   clubPhotos?: ClubPhoto[];
   clubPhotoUnlocks?: ClubPhotoUnlock[];
   matchVotingSettings?: MatchVotingSettings[];
+  /** Server-derived anonymous aggregates; never persisted. */
+  matchVoteSummaries?: MatchVoteSummary[];
   matchVotes?: MatchVote[];
   matchDiscussionMessages?: MatchDiscussionMessage[];
   /** Verified administrator contacts, derived by the server; never a persisted collection. */

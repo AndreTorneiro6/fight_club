@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { formatSetScores } from "@/lib/set-scores";
 import type { View } from "@/lib/types";
 import { challengeTeamRanks } from "@/lib/challenge-team-ranks";
 import { isTitleMatch } from "@/lib/title-matches";
@@ -136,10 +137,11 @@ export default function AdminMatchVoting({
     const stored = (s.matchVotes ?? []).find(
       (v) => v.challengeId === c._id && v.userId === s.actor.userId,
     );
-    const votes = (s.matchVotes ?? []).filter(
-        (v) => v.challengeId === c._id && !v.withdrawnAt,
-      ),
-      mine = stored?.withdrawnAt ? undefined : stored,
+    const summary = s.matchVoteSummaries?.find(
+      (item) => item.challengeId === c._id,
+    );
+    const total = summary?.total ?? 0;
+    const mine = stored?.withdrawnAt ? undefined : stored,
       cutoff = matchVotingCutoff(s, c),
       lockAt =
         stored && cutoff && stored.lockAt < cutoff ? stored.lockAt : cutoff;
@@ -206,10 +208,10 @@ export default function AdminMatchVoting({
           aria-label={`Palpites por dupla do jogo ${c.number}`}
         >
           {[c.challengerId, c.defenderId].map((id) => {
-            const count = votes.filter((v) => v.winnerId === id).length;
-            const percent = votes.length
-              ? Math.round((count / votes.length) * 100)
-              : 0;
+            const count = (summary?.outcomes ?? [])
+              .filter((outcome) => outcome.winnerId === id)
+              .reduce((sum, outcome) => sum + outcome.count, 0);
+            const percent = total ? Math.round((count / total) * 100) : 0;
             return (
               <div
                 key={id}
@@ -237,6 +239,37 @@ export default function AdminMatchVoting({
             );
           })}
         </div>
+        <section
+          className={styles.anonymousResults}
+          aria-label={`Palpites por resultado do jogo ${c.number}`}
+        >
+          <div className="row between wrap">
+            <h4>Palpites por resultado</h4>
+            <span className="badge">Anónimos</span>
+          </div>
+          <small className="muted">
+            Sets na ordem ATAQUE / DEFESA. Os autores não são apresentados.
+          </small>
+          {summary?.outcomes.length ? (
+            <ul>
+              {summary.outcomes.map((outcome) => (
+                <li key={JSON.stringify([outcome.winnerId, outcome.setScores])}>
+                  <strong>
+                    {outcome.setScores
+                      ? formatSetScores(outcome.setScores)
+                      : `Vitória de ${challengeTeamName(c, outcome.winnerId, s.players)} · sem sets`}
+                  </strong>
+                  <span>
+                    {outcome.count}{" "}
+                    {outcome.count === 1 ? "palpite" : "palpites"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">Ainda não existem palpites.</p>
+          )}
+        </section>
         <MatchScorePrediction
           game={c}
           attacker={challengeTeamName(c, c.challengerId, s.players)}
@@ -251,7 +284,7 @@ export default function AdminMatchVoting({
         </small>
         <div className="row between wrap">
           <small>
-            {votes.length} votos · {messages} mensagens
+            {total} votos · {messages} mensagens
           </small>
           {!detail && (
             <button onClick={() => setSelected(c._id)}>

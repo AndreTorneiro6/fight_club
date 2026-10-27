@@ -46,13 +46,16 @@ const vote = {
   challengeId: "c1",
   winnerId: "p3",
 };
-test("private vote saves one per account, supports changing sides and leaves competitive/coin/prediction state unchanged", () => {
+test("private vote saves one per account, blocks editing and leaves competitive/coin/prediction state unchanged", () => {
   const s = fixture(),
     before = structuredClone(s);
   execute(s, admin, vote, at);
-  execute(s, admin, { ...vote, winnerId: "p2" }, at + 1);
+  assert.throws(
+    () => execute(s, admin, { ...vote, winnerId: "p2" }, at + 1),
+    /não pode ser editado/,
+  );
   assert.equal(s.matchVotes!.length, 1);
-  assert.equal(s.matchVotes![0].winnerId, "p2");
+  assert.equal(s.matchVotes![0].winnerId, "p3");
   for (const key of [
     "players",
     "challenges",
@@ -64,7 +67,7 @@ test("private vote saves one per account, supports changing sides and leaves com
     "messages",
   ] as const)
     assert.deepEqual(s[key], before[key]);
-  assert.equal(s.audit.length, 2);
+  assert.equal(s.audit.length, 1);
 });
 test("player workspace cannot vote/send, even for an admin account; invalid/unpublished games are rejected", () => {
   const s = fixture(),
@@ -415,27 +418,43 @@ test("invalid scores and client-supplied winner are rejected and score predictio
   );
   assert.deepEqual(s.matchVotes, []);
 });
-test("score edits protect concurrent sessions, preserve legacy winner-only rows and support withdrawal/recast", () => {
+test("saved predictions cannot be edited by either endpoint; deletion and fresh submission remain available", () => {
   const s = fixture();
-  execute(s, admin, vote, at);
-  assert.equal(s.matchVotes![0].setScores, undefined);
   const cmd = {
     type: "admin.match-vote.predict",
     challengeId: "c1",
     setScores: [
-      { attacker: 4, defender: 6 },
-      { attacker: 6, defender: 7 },
+      { attacker: 6, defender: 4 },
+      { attacker: 7, defender: 6 },
     ],
-    expectedUpdatedAt: s.matchVotes![0].updatedAt,
+    expectedUpdatedAt: null,
   };
-  execute(s, admin, cmd, at + 1);
-  assert.equal(s.matchVotes![0].winnerId, "p2");
-  assert.throws(() => execute(s, admin, cmd, at + 2), /noutra sessão/);
+  execute(s, admin, cmd, at);
+  const own = structuredClone(s.matchVotes![0]);
+  const auditCount = s.audit.length;
   assert.throws(
-    () => execute(s, admin, vote, at + 2),
-    /editar este palpite por sets/,
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          ...cmd,
+          expectedUpdatedAt: own.updatedAt,
+          setScores: [
+            { attacker: 4, defender: 6 },
+            { attacker: 6, defender: 7 },
+          ],
+        },
+        at + 1,
+      ),
+    /não pode ser editado/,
   );
-  const own = { ...s.matchVotes![0] };
+  assert.throws(
+    () => execute(s, admin, { ...vote, winnerId: "p2" }, at + 1),
+    /não pode ser editado/,
+  );
+  assert.deepEqual(s.matchVotes![0], own);
+  assert.equal(s.audit.length, auditCount);
   execute(
     s,
     admin,
@@ -445,17 +464,17 @@ test("score edits protect concurrent sessions, preserve legacy winner-only rows 
       expectedWinnerId: own.winnerId,
       expectedUpdatedAt: own.updatedAt,
     },
-    at + 3,
+    at + 2,
   );
-  assert.equal(s.matchVotes![0].withdrawnAt, new Date(at + 3).toISOString());
   execute(
     s,
     admin,
-    { ...cmd, expectedUpdatedAt: new Date(at + 3).toISOString() },
-    at + 4,
+    { ...cmd, expectedUpdatedAt: new Date(at + 2).toISOString() },
+    at + 3,
   );
-  assert.equal(s.matchVotes![0].withdrawnAt, undefined);
   assert.equal(s.matchVotes!.length, 1);
+  assert.equal(s.matchVotes![0].withdrawnAt, undefined);
+  assert.equal(s.matchVotes![0].lockAt, own.lockAt);
 });
 test("third-set visibility follows complete first two sets, not incomplete or invalid scores", async () => {
   const { requiredPredictionSets } =
@@ -488,4 +507,57 @@ test("third-set visibility follows complete first two sets, not incomplete or in
     ]),
     undefined,
   );
+});
+
+test("shared predictions expose grouped results without authors, only the actor's own raw vote", () => {
+  const s = fixture();
+  const cmd = {
+    type: "admin.match-vote.predict",
+    challengeId: "c1",
+    setScores: [
+      { attacker: 6, defender: 4 },
+      { attacker: 7, defender: 6 },
+    ],
+  };
+  execute(s, admin, cmd, at);
+  execute(s, { userId: "u4", playerId: "p4", role: "admin" }, cmd, at + 1);
+  const view = structuredClone(s);
+  filterFeatureView(view, admin);
+  assert.equal(view.matchVotes!.length, 1);
+  assert.equal(view.matchVotes![0].userId, admin.userId);
+  assert.deepEqual(view.matchVoteSummaries, [
+    {
+      challengeId: "c1",
+      total: 2,
+      outcomes: [{ winnerId: "p3", setScores: cmd.setScores, count: 2 }],
+    },
+  ]);
+  assert.equal(
+    view.audit.some((e) => e.action === cmd.type),
+    false,
+  );
+  assert.equal(s.audit.filter((e) => e.action === cmd.type).length, 2);
+  assert.equal(JSON.stringify(view.matchVoteSummaries).includes("u4"), false);
+  const own = s.matchVotes![1];
+  execute(
+    s,
+    { userId: "u4", playerId: "p4", role: "admin" },
+    {
+      type: "admin.match-vote.remove",
+      challengeId: "c1",
+      expectedWinnerId: own.winnerId,
+      expectedUpdatedAt: own.updatedAt,
+    },
+    at + 2,
+  );
+  const after = structuredClone(s);
+  filterFeatureView(after, admin);
+  assert.equal(after.matchVoteSummaries![0].total, 1);
+  const playerView = structuredClone(s);
+  filterFeatureView(playerView, { ...admin, role: "player" });
+  assert.deepEqual(playerView.matchVoteSummaries, []);
+  assert.deepEqual(playerView.matchVotes, []);
+  s.challenges[0].status = "cancelled";
+  filterFeatureView(s, admin);
+  assert.deepEqual(s.matchVoteSummaries, []);
 });
