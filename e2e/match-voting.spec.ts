@@ -5,7 +5,7 @@ import {
   switchWorkspace,
 } from "./workspace-helper";
 
-test("private central supports per-set predictions, conditional third set, withdrawals, mentions and player denial on mobile", async ({
+test("central shares one prediction across workspaces and keeps configuration admin-only on mobile", async ({
   page,
   browser,
 }) => {
@@ -48,7 +48,7 @@ test("private central supports per-set predictions, conditional third set, withd
   await page.reload();
   await openAdminSection(page, "Central de Apostas");
   const central = page.getByRole("region", {
-    name: "Central de Apostas em teste privado",
+    name: "Central de Apostas",
     exact: true,
   });
   await central
@@ -344,16 +344,38 @@ test("private central supports per-set predictions, conditional third set, withd
     chat.getByText("Resposta pelo telemóvel", { exact: true }),
   ).toBeVisible();
   await switchWorkspace(page, "player");
+  await page
+    .getByRole("button", { name: "Saltar visita", exact: true })
+    .click();
   const playerState = await (await page.request.get("/api/league")).json();
-  expect(playerState.matchVotingSettings).toEqual([]);
-  expect(playerState.matchVotes).toEqual([]);
-  expect(playerState.matchDiscussionMessages).toEqual([]);
+  expect(playerState.matchVotingSettings[0].lockMinutes).toBe(60);
+  expect(playerState.matchVotes).toHaveLength(1);
+  expect(playerState.matchDiscussionMessages.length).toBeGreaterThan(0);
+  await page.goto("/apostas");
+  await expect(central).toBeVisible();
+  await expect(
+    central.getByLabel("Fechar votação antes do jogo", { exact: true }),
+  ).toHaveCount(0);
+  await mineGroup.click();
+  await expect(card).toContainText("O teu palpite");
+  const duplicateVote = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "match-vote.predict",
+      challengeId: game.id,
+      setScores: [
+        { attacker: 6, defender: 4 },
+        { attacker: 6, defender: 4 },
+      ],
+    },
+  });
+  expect(duplicateVote.status()).toBe(409);
   const forbidden = await page.request.post("/api/league", {
     headers: { Origin: new URL(page.url()).origin },
     data: {
-      type: "admin.match-vote.save",
-      challengeId: game.id,
-      winnerId: "player-2",
+      type: "admin.match-vote.settings",
+      expectedVersion: 1,
+      lockMinutes: 30,
     },
   });
   expect(forbidden.status()).toBe(403);

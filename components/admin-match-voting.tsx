@@ -31,10 +31,13 @@ export default function AdminMatchVoting({
     [selected, setSelected] = useState<string>(),
     [clock, setClock] = useState(Date.now());
   useEffect(() => {
+    setSelected(
+      new URLSearchParams(window.location.search).get("jogo") ?? undefined,
+    );
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  if (s.actor.role !== "admin") return null;
+
   const games = s.challenges
     .filter(
       (c) =>
@@ -72,14 +75,11 @@ export default function AdminMatchVoting({
   };
   const settings = s.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
   return (
-    <section
-      className={`stack ${styles.root}`}
-      aria-label="Central de Apostas em teste privado"
-    >
+    <section className={`stack ${styles.root}`} aria-label="Central de Apostas">
       <header className="panel stack">
         <div className="row between wrap">
           <h2>Central de Apostas</h2>
-          <span className="badge">Teste privado · só administradores</span>
+          <span className="badge">Um palpite por pessoa</span>
         </div>
         <div
           className={`tabs ${styles.groups}`}
@@ -112,27 +112,29 @@ export default function AdminMatchVoting({
           set ganho por cada dupla. As previsões não alteram resultados
           oficiais, moedas ou o ranking.
         </p>
-        <label className={styles.cutoffSetting}>
-          Fechar votação antes do jogo
-          <select
-            aria-label="Fechar votação antes do jogo"
-            value={settings.lockMinutes}
-            disabled={busy}
-            onChange={(event) =>
-              void run(
-                {
-                  type: "admin.match-vote.settings",
-                  expectedVersion: settings.version,
-                  lockMinutes: Number(event.target.value),
-                },
-                "Prazo da votação atualizado.",
-              )
-            }
-          >
-            <option value={30}>30 minutos antes</option>
-            <option value={60}>1 hora antes</option>
-          </select>
-        </label>
+        {s.actor.role === "admin" && (
+          <label className={styles.cutoffSetting}>
+            Fechar votação antes do jogo
+            <select
+              aria-label="Fechar votação antes do jogo"
+              value={settings.lockMinutes}
+              disabled={busy}
+              onChange={(event) =>
+                void run(
+                  {
+                    type: "admin.match-vote.settings",
+                    expectedVersion: settings.version,
+                    lockMinutes: Number(event.target.value),
+                  },
+                  "Prazo da votação atualizado.",
+                )
+              }
+            >
+              <option value={30}>30 minutos antes</option>
+              <option value={60}>1 hora antes</option>
+            </select>
+          </label>
+        )}
         <div className="tabs" role="group" aria-label="Divisão da votação">
           {[["all", "Todos"], ...s.divisions.map((d) => [d._id, d.name])].map(
             ([id, label]) => (

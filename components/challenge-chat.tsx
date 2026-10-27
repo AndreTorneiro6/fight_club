@@ -174,9 +174,7 @@ export default function ChallengeChat({
           try {
             const result = await run(
               {
-                type: community
-                  ? "admin.match-discussion.send"
-                  : "message.send",
+                type: community ? "match-discussion.send" : "message.send",
                 challengeId: c._id,
                 text,
                 mentionIds,
@@ -211,7 +209,7 @@ export default function ChallengeChat({
         )}
         <small>
           {community
-            ? "Teste privado: escreve @ para identificar alguém. Não são enviadas notificações aos jogadores."
+            ? "Os jogadores do jogo, quem já participou na conversa e as pessoas mencionadas recebem notificações. Escreve @ para mencionar."
             : "Escreve @ e escolhe um jogador ou administrador para o mencionar e notificar."}
         </small>
         {matches.length > 0 && (

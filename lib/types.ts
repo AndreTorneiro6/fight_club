@@ -228,6 +228,7 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  bettingNotice?: boolean;
   chatMessageId?: string;
   weeklyChallengeOpening?: {
     weekStart: string;

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { processMatchVotingAnnouncement } from "../lib/match-voting";
 import { execute } from "../lib/engine";
 import { filterFeatureView } from "../lib/feature-view";
 import {
@@ -22,6 +23,9 @@ function fixture() {
     userId: `u${i}`,
     name: `Pessoa ${i}`,
     status: "active",
+    partner: "",
+    divisionId: "d1",
+    position: i,
   })) as Player[];
   s.challenges = [
     {
@@ -46,7 +50,7 @@ const vote = {
   challengeId: "c1",
   winnerId: "p3",
 };
-test("private vote saves one per account, blocks editing and leaves competitive/coin/prediction state unchanged", () => {
+test("account vote saves one per account, blocks editing and leaves competitive/coin/prediction state unchanged", () => {
   const s = fixture(),
     before = structuredClone(s);
   execute(s, admin, vote, at);
@@ -69,25 +73,32 @@ test("private vote saves one per account, blocks editing and leaves competitive/
     assert.deepEqual(s[key], before[key]);
   assert.equal(s.audit.length, 1);
 });
-test("player workspace cannot vote/send, even for an admin account; invalid/unpublished games are rejected", () => {
+test("player workspace can predict and chat, but cannot configure even for an admin account", () => {
   const s = fixture(),
-    cmd = {
-      type: "admin.match-discussion.send",
+    player = {
+      ...admin,
+      role: "player" as const,
+      accountRole: "admin" as const,
+    };
+  execute(s, player, vote, at);
+  execute(
+    s,
+    player,
+    {
+      type: "match-discussion.send",
       challengeId: "c1",
       text: "Olá",
       requestId: randomUUID(),
-    };
-  for (const command of [vote, cmd])
-    assert.throws(
-      () =>
-        execute(
-          s,
-          { ...admin, role: "player", accountRole: "admin" },
-          command,
-          at,
-        ),
-      /teste privado/,
-    );
+    },
+    at,
+  );
+  assert.throws(() => execute(s, admin, vote, at), /não pode ser editado/);
+  for (const command of [
+    { type: "admin.match-vote.settings", expectedVersion: 0, lockMinutes: 60 },
+    { type: "admin.match-vote.reset", confirmation: "RESET" },
+    { type: "admin.match-vote.announce", sendAt: "2026-11-04T14:00:00Z" },
+  ])
+    assert.throws(() => execute(s, player, command, at), /administradores/);
   assert.throws(
     () => execute(s, admin, { ...vote, winnerId: "p4" }, at),
     /duplas/,
@@ -108,7 +119,7 @@ test("votes lock at the configured cutoff and postponement does not reopen an ex
     /encerrada/,
   );
 });
-test("general room is independent of participants, validates mentions, retries idempotently and never notifies players", () => {
+test("general room is independent of participants, validates mentions, retries idempotently and notifies eligible players", () => {
   const s = fixture(),
     cmd = {
       type: "admin.match-discussion.send",
@@ -122,7 +133,11 @@ test("general room is independent of participants, validates mentions, retries i
   assert.equal(s.matchDiscussionMessages!.length, 1);
   assert.equal(s.matchDiscussionMessages![0].mentions![0].playerId, "p4");
   assert.deepEqual(s.messages, []);
-  assert.deepEqual(s.notifications, []);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), [
+    "p2",
+    "p3",
+    "p4",
+  ]);
   assert.throws(
     () => execute(s, admin, { ...cmd, text: "outro texto" }, at),
     /outros valores/,
@@ -138,7 +153,7 @@ test("general room is independent of participants, validates mentions, retries i
     /menções/,
   );
 });
-test("player projection removes private votes, discussions and audit entries", () => {
+test("player projection keeps own prediction and public discussion but hides audit", () => {
   const s = fixture();
   execute(s, admin, vote, at);
   execute(
@@ -153,8 +168,8 @@ test("player projection removes private votes, discussions and audit entries", (
     at,
   );
   filterFeatureView(s, { ...admin, role: "player" });
-  assert.deepEqual(s.matchVotes, []);
-  assert.deepEqual(s.matchDiscussionMessages, []);
+  assert.equal(s.matchVotes!.length, 1);
+  assert.equal(s.matchDiscussionMessages!.length, 1);
   assert.deepEqual(s.audit, []);
 });
 test("legacy club-confirmed bookings qualify; pending proposals and unpublished optimizer rounds do not", () => {
@@ -193,15 +208,11 @@ test("withdrawal preserves cutoff/history, changes counts once and permits a new
     () => execute(s, admin, { ...remove, expectedWinnerId: "p2" }, at + 1),
     /noutra sessão/,
   );
-  assert.throws(
-    () =>
-      execute(
-        s,
-        { ...admin, role: "player", accountRole: "admin" },
-        remove,
-        at + 1,
-      ),
-    /teste privado/,
+  execute(
+    s,
+    { ...admin, role: "player", accountRole: "admin" },
+    remove,
+    at + 1,
   );
   execute(s, admin, remove, at + 1);
   execute(s, admin, remove, at + 2);
@@ -274,7 +285,7 @@ test("administrator selects 30/60-minute closure independently of predictions wi
         },
         at,
       ),
-    /teste privado/,
+    /administradores/,
   );
   assert.throws(() =>
     execute(
@@ -341,7 +352,6 @@ test("set prediction derives winner without writing official results/ranking/sta
     "history",
     "coinEntries",
     "predictions",
-    "notifications",
   ] as const)
     assert.deepEqual(s[key], before[key]);
 });
@@ -381,7 +391,7 @@ test("third predicted set required at 1–1, forbidden after 2–0 and ordinary 
     assert.equal(s.matchVotes![0].winnerId, "p3");
   }
 });
-test("invalid scores and client-supplied winner are rejected and score predictions lock/deny players server-side", () => {
+test("invalid scores and client-supplied winner are rejected and score predictions lock/validate actors server-side", () => {
   const s = fixture(),
     cmd = {
       type: "admin.match-vote.predict",
@@ -409,8 +419,9 @@ test("invalid scores and client-supplied winner are rejected and score predictio
     /Pontuação inválida/,
   );
   assert.throws(
-    () => execute(s, { ...admin, role: "player" }, cmd, at),
-    /teste privado/,
+    () =>
+      execute(s, { ...admin, playerId: "missing", role: "player" }, cmd, at),
+    /Perfil indisponível/,
   );
   assert.throws(
     () => execute(s, admin, cmd, Date.parse("2026-11-03T18:30:00Z")),
@@ -555,9 +566,148 @@ test("shared predictions expose grouped results without authors, only the actor'
   assert.equal(after.matchVoteSummaries![0].total, 1);
   const playerView = structuredClone(s);
   filterFeatureView(playerView, { ...admin, role: "player" });
-  assert.deepEqual(playerView.matchVoteSummaries, []);
-  assert.deepEqual(playerView.matchVotes, []);
+  assert.equal(playerView.matchVoteSummaries![0].total, 1);
+  assert.equal(playerView.matchVotes!.length, 1);
   s.challenges[0].status = "cancelled";
   filterFeatureView(s, admin);
   assert.deepEqual(s.matchVoteSummaries, []);
+});
+
+test("bets notify only saved match teammates anonymously, excluding sender, and recasts don't spam", () => {
+  const s = fixture();
+  s.challenges[0].challengerTeam = [
+    { playerId: "p3", name: "Pessoa 3" },
+    { playerId: "p4", name: "Pessoa 4" },
+  ];
+  execute(s, admin, vote, at);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), [
+    "p2",
+    "p3",
+    "p4",
+  ]);
+  assert.equal(
+    s.notifications.every(
+      (n) => n.bettingNotice && !n.body.includes("Pessoa 1"),
+    ),
+    true,
+  );
+  const own = s.matchVotes![0];
+  execute(
+    s,
+    { ...admin, role: "player" },
+    {
+      type: "match-vote.remove",
+      challengeId: "c1",
+      expectedWinnerId: own.winnerId,
+      expectedUpdatedAt: own.updatedAt,
+    },
+    at + 1,
+  );
+  execute(s, { ...admin, role: "player" }, vote, at + 2);
+  assert.equal(s.notifications.length, 3);
+});
+
+test("chat notifies participants, previous authors and mentions once; viewers and the sender are excluded", () => {
+  const s = fixture();
+  const chat = (user: number, text: string, mentionIds: string[] = []) => ({
+    actor: {
+      userId: `u${user}`,
+      playerId: `p${user}`,
+      role: "player" as const,
+    },
+    command: {
+      type: "match-discussion.send",
+      challengeId: "c1",
+      text,
+      mentionIds,
+      requestId: randomUUID(),
+    },
+  });
+  const first = chat(4, "Comecei a conversa");
+  execute(s, first.actor, first.command, at);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), ["p2", "p3"]);
+  s.notifications = [];
+  const second = chat(3, "@Pessoa 1 @Pessoa 4 olá", ["p1", "p4"]);
+  execute(s, second.actor, second.command, at + 1);
+  execute(s, second.actor, second.command, at + 2);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), [
+    "p1",
+    "p2",
+    "p4",
+  ]);
+  assert.equal(s.notifications.filter((n) => n.playerId === "p4").length, 1);
+  assert.equal(
+    s.notifications.every(
+      (n) => n.chatMessageId === s.matchDiscussionMessages!.at(-1)!._id,
+    ),
+    true,
+  );
+  s.notifications = [];
+  const third = chat(2, "Sem menções");
+  execute(s, third.actor, third.command, at + 3);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), ["p3", "p4"]);
+});
+
+test("launch announcement waits until its scheduled instant, reaches eligible players once, and keeps configuration private", () => {
+  const s = fixture();
+  s.players[3].status = "suspended";
+  const sendAt = "2026-11-02T14:00:00.000Z";
+  execute(s, admin, { type: "admin.match-vote.announce", sendAt }, at);
+  processMatchVotingAnnouncement(s, Date.parse(sendAt) - 1);
+  assert.equal(s.notifications.length, 0);
+  const playerView = structuredClone(s);
+  filterFeatureView(playerView, { ...admin, role: "player" });
+  assert.equal(playerView.matchVotingSettings![0].announcement, undefined);
+  processMatchVotingAnnouncement(s, Date.parse(sendAt));
+  processMatchVotingAnnouncement(s, Date.parse(sendAt) + 1);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), [
+    "p1",
+    "p2",
+    "p3",
+  ]);
+  assert.equal(
+    s.notifications.every(
+      (n) =>
+        n.bettingNotice &&
+        !n.challengeId &&
+        n.deliveryChannels?.join() === "push",
+    ),
+    true,
+  );
+  assert.equal(s.matchVotingSettings![0].announcement!.sentAt, sendAt);
+});
+
+test("release reset clears betting activity and its notices, retains audit and official state, and is idempotent", () => {
+  const s = fixture();
+  execute(s, admin, vote, at);
+  execute(
+    s,
+    admin,
+    {
+      type: "match-discussion.send",
+      challengeId: "c1",
+      text: "Teste",
+      requestId: randomUUID(),
+    },
+    at,
+  );
+  const before = structuredClone(s);
+  const reset = { type: "admin.match-vote.reset", confirmation: "RESET" };
+  execute(s, admin, reset, at + 1);
+  assert.equal(s.matchVotes!.length, 0);
+  assert.equal(s.matchDiscussionMessages!.length, 0);
+  assert.equal(s.notifications.length, 0);
+  assert.equal(s.audit.length, before.audit.length + 1);
+  for (const key of [
+    "players",
+    "challenges",
+    "results",
+    "history",
+    "coinEntries",
+    "messages",
+  ] as const)
+    assert.deepEqual(s[key], before[key]);
+  execute(s, admin, vote, at + 2);
+  execute(s, admin, reset, at + 3);
+  assert.equal(s.matchVotes!.length, 1);
 });

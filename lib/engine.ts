@@ -1,5 +1,8 @@
 import { executeClubPhotos } from "./club-photos";
-import { executeMatchVoting } from "./match-voting";
+import {
+  executeMatchVoting,
+  processMatchVotingAnnouncement,
+} from "./match-voting";
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
 import { weeklyPublishedAt } from "./weekly-publication";
@@ -592,6 +595,8 @@ export function execute(
   if (featureType.startsWith("admin.sponsors."))
     return executeSponsors(s, actor, raw, timestamp);
   if (
+    featureType.startsWith("match-vote.") ||
+    featureType.startsWith("match-discussion.") ||
     featureType.startsWith("admin.match-vote.") ||
     featureType.startsWith("admin.match-discussion.")
   )
@@ -4805,6 +4810,7 @@ export function processDeadlines(
   timestamp = Date.now(),
   generateRoles = true,
 ) {
+  processMatchVotingAnnouncement(s, timestamp);
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);
     autoWeeklyRanking(s, timestamp);

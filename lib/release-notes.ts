@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.7.3";
+export const applicationVersion = "1.8.0";
 export const releaseNotes = [
+  {
+    version: "1.8.0",
+    date: "2026-10-27",
+    title: "Central de Apostas para todos os jogadores",
+    changes: [
+      "Jogadores aprovados podem prever os sets e conversar em cada jogo, com Abertas, Os meus palpites e Encerradas e destaque no telemóvel.",
+      "Um palpite por conta e jogo, partilhado entre os espaços de jogador e administrador. Só os administradores configuram o fecho.",
+      "Jogadores do encontro recebem avisos de novos palpites, sem identificar os autores. Conversas notificam os jogadores do encontro, quem já participou e pessoas mencionadas, sem duplicados nem aviso ao próprio autor.",
+      "Anúncio de lançamento agendado; tocar na notificação abre diretamente a Central de Apostas, sem ligação adicional.",
+    ],
+  },
   {
     version: "1.7.3",
     date: "2026-10-27",

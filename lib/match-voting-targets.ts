@@ -21,7 +21,7 @@ export function discussionTargets(state: State): ChatMention[] {
 
 /** Legacy club-confirmed bookings are official too; unpublished optimizer drafts never qualify. */
 export function isVotingMatch(
-  state: State,
+  state: Pick<State, "matches">,
   challenge: State["challenges"][number],
 ) {
   if (["cancelled", "refused", "expired"].includes(challenge.status))
@@ -43,6 +43,12 @@ export interface MatchVotingSettings {
   lockMinutes: 30 | 60;
   updatedAt?: string;
   updatedBy?: string;
+  announcement?: {
+    sendAt: string;
+    createdAt: string;
+    createdBy: string;
+    sentAt?: string;
+  };
 }
 export const defaultMatchVotingSettings: MatchVotingSettings = {
   _id: "match-voting",

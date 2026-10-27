@@ -1,3 +1,4 @@
+import { isVotingMatch } from "./match-voting-targets";
 import { anonymousMatchVotes } from "./anonymous-match-votes";
 import {
   competitionPriorities,
@@ -9,10 +10,9 @@ import type { Actor, State } from "./types";
 
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
-  state.matchVoteSummaries =
-    actor.role === "admin" ? anonymousMatchVotes(state) : [];
+  state.matchVoteSummaries = anonymousMatchVotes(state);
   state.matchVotes = (state.matchVotes ?? []).filter(
-    (vote) => actor.role === "admin" && vote.userId === actor.userId,
+    (vote) => vote.userId === actor.userId,
   );
   // Keep the full audit in storage, but don't disclose another bettor through the shared audit UI/API.
   state.audit = state.audit.filter(
@@ -21,6 +21,12 @@ export function filterFeatureView(state: State, actor: Actor) {
       entry.action === "admin.match-vote.settings",
   );
 
+  const published = new Set(
+    state.challenges.filter((c) => isVotingMatch(state, c)).map((c) => c._id),
+  );
+  state.matchDiscussionMessages = (state.matchDiscussionMessages ?? []).filter(
+    (m) => published.has(m.challengeId),
+  );
   state.stickerPacks = (state.stickerPacks ?? []).filter(
     (pack) => actor.role === "admin" && pack.userId === actor.userId,
   );
@@ -35,9 +41,9 @@ export function filterFeatureView(state: State, actor: Actor) {
     state.placementEvents = [];
     state.gamificationSettings = [];
     state.gamificationProfiles = [];
-    state.matchVotingSettings = [];
-    state.matchVotes = [];
-    state.matchDiscussionMessages = [];
+    state.matchVotingSettings = (state.matchVotingSettings ?? []).map(
+      ({ _id, version, lockMinutes }) => ({ _id, version, lockMinutes }),
+    );
     state.clubPhotos = [];
     state.clubPhotoUnlocks = [];
     state.coinSettings = [];

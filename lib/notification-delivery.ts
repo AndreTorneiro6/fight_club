@@ -1,3 +1,4 @@
+import { isVotingMatch } from "./match-voting-targets";
 import { responseNoticeIsCurrent } from "./challenge-response-notices";
 import type { CompetitionChallenge } from "./competition-types";
 import {
@@ -80,21 +81,23 @@ export function deliveryContent(n: Notification) {
       n.responseDeadline?.status === "pending"
         ? new Date(n.responseDeadline.respondBy)
         : undefined,
-    path: n.weeklyChallengeOpening
-      ? "/desafios"
-      : n.rankingNotice
-        ? "/ranking"
-        : n.seasonId
-          ? "/epocas"
-          : n.adminTestId
-            ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
-            : n.challengeId
-              ? `/desafios/${encodeURIComponent(n.challengeId)}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
-              : n.competitionNotice
-                ? n.playerId === "__admins__"
-                  ? "/admin?tab=matchmaking"
-                  : "/jornadas"
-                : "/notificacoes",
+    path: n.bettingNotice
+      ? `/apostas${n.challengeId ? `?jogo=${encodeURIComponent(n.challengeId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
+      : n.weeklyChallengeOpening
+        ? "/desafios"
+        : n.rankingNotice
+          ? "/ranking"
+          : n.seasonId
+            ? "/epocas"
+            : n.adminTestId
+              ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
+              : n.challengeId
+                ? `/desafios/${encodeURIComponent(n.challengeId)}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
+                : n.competitionNotice
+                  ? n.playerId === "__admins__"
+                    ? "/admin?tab=matchmaking"
+                    : "/jornadas"
+                  : "/notificacoes",
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */
@@ -337,16 +340,35 @@ export async function dispatchNotifications(
             .collection<Challenge>("challenges")
             .findOne({ _id: notification.challengeId })
         : null;
+      const bettingAccess =
+        notification?.bettingNotice && challenge
+          ? isVotingMatch(
+              {
+                matches: challenge.officialPublication
+                  ? []
+                  : ((await db
+                      .collection("matches")
+                      .find({ challengeId: challenge._id })
+                      .toArray()) as unknown as State["matches"]),
+              },
+              challenge,
+            ) &&
+            player?.status === "active" &&
+            !player.awaitingApproval &&
+            !player.registrationRejectedAt
+          : false;
       const challengeAccess =
         !notification?.challengeId ||
-        (challenge &&
-          (user?.role === "admin" ||
-            [
-              challenge.challengerId,
-              challenge.defenderId,
-              ...(challenge.challengerTeam ?? []).map((m) => m.playerId),
-              ...(challenge.defenderTeam ?? []).map((m) => m.playerId),
-            ].includes(player?._id ?? "")));
+        (notification?.bettingNotice
+          ? bettingAccess
+          : challenge &&
+            (user?.role === "admin" ||
+              [
+                challenge.challengerId,
+                challenge.defenderId,
+                ...(challenge.challengerTeam ?? []).map((m) => m.playerId),
+                ...(challenge.defenderTeam ?? []).map((m) => m.playerId),
+              ].includes(player?._id ?? "")));
       const responseSource = notification?.responseDeadline
         ? notification.responseDeadline.managed
           ? await db
@@ -395,6 +417,10 @@ export async function dispatchNotifications(
               player?.divisionId) &&
           Date.parse(effectiveOpening) <= Date.now());
       const allowed =
+        (!notification?.bettingNotice ||
+          (player?.status === "active" &&
+            !player.awaitingApproval &&
+            !player.registrationRejectedAt)) &&
         openingCurrent &&
         responseCurrent &&
         testAccess &&

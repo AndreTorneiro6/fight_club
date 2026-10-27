@@ -27,6 +27,7 @@ const routes = new Set([
   "jornadas",
   "cartoes",
   "palpites",
+  "apostas",
 ]);
 export default async function Page({
   params,
@@ -66,7 +67,8 @@ export default async function Page({
             fotografias e classificações da liga; o email, telefone e
             disponibilidades privadas não são apresentados aos outros jogadores.
             O chat de cada desafio é acessível aos participantes e ao
-            administrador.
+            administrador. As conversas da Central de Apostas são visíveis aos
+            jogadores aprovados da liga.
           </p>
           <p>
             A inscrição exige confirmação de email e aprovação pelo clube. Os

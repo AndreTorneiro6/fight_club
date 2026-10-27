@@ -479,6 +479,45 @@ test("outbox commits with events, fans out admins, respects consent, leases work
       new Date(queuedReminders[0].expiresAt!).toISOString(),
       reminderEnd,
     );
+
+    // A public betting-chat participant need not be one of the four match players.
+    await transaction((s) => {
+      s.challenges.push({
+        ...s.challenges.find((c) => c._id === "team-notification-game")!,
+        _id: "public-betting-game",
+        status: "scheduled",
+        challengerId: "player-8",
+        defenderId: "player-5",
+        defenderTeam: [{ playerId: "player-5", name: "Defender" }],
+        officialPublication: {
+          roundId: "r",
+          scheduleId: "s",
+          version: 1,
+          publishedAt: new Date().toISOString(),
+        },
+      });
+      s.notifications.push({
+        _id: "betting-outsider-notice",
+        playerId: actor.playerId,
+        title: "Nova mensagem na conversa do jogo",
+        body: "Recebe a resposta",
+        bettingNotice: true,
+        challengeId: "public-betting-game",
+        chatMessageId: "chat-123",
+        read: false,
+        createdAt: new Date().toISOString(),
+        deliveryChannels: ["push"],
+      });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    const bettingDelivery = await queue.findOne({
+      notificationId: "betting-outsider-notice",
+    });
+    assert.equal(bettingDelivery?.status, "sent");
+    assert.equal(
+      bettingDelivery?.path,
+      "/apostas?jogo=public-betting-game#mensagem-chat-123",
+    );
   } finally {
     await clientToClose?.close();
     process.env = previous;

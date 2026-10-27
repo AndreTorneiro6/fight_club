@@ -404,6 +404,7 @@ const nav = [
   { path: "ranking", label: "Ranking", icon: Medal },
   { path: "desafios", label: "Desafios", icon: Swords },
   { path: "jogos", label: "Jogos", icon: CalendarDays },
+  { path: "apostas", label: "Apostas", icon: Target },
   { path: "perfil", label: "Perfil", icon: UserRound },
 ];
 type Actions = {
@@ -445,7 +446,15 @@ export function Application({
     } catch (e) {
       if (sequence !== refreshSequence.current) return;
       if ((e as { status: number }).status === 401) {
-        router.replace("/auth");
+        const path =
+          window.location.pathname +
+          window.location.search +
+          window.location.hash;
+        router.replace(
+          window.location.pathname === "/apostas"
+            ? `/auth?next=${encodeURIComponent(path)}`
+            : "/auth",
+        );
         return;
       }
       setError((e as Error).message);
@@ -608,6 +617,7 @@ export function Application({
       jornadas: "Jornadas oficiais",
       cartoes: "Cartões de jogador",
       palpites: "Palpites",
+      apostas: "Central de Apostas",
     }[route] ??
     "Desafio";
   return (
@@ -813,6 +823,13 @@ export function Application({
             <PlayerCards revision={s} />
           ) : route === "jornadas" ? (
             <PlayerCompetition s={s} run={safeRun} busy={busy} />
+          ) : route === "apostas" ? (
+            <AdminMatchVoting
+              state={s}
+              run={safeRun}
+              busy={busy}
+              connection={chatConnection}
+            />
           ) : route === "palpites" ? (
             <PredictionCenter revision={s} />
           ) : route === "notificacoes" ? (
@@ -858,6 +875,13 @@ export function Application({
               <Shield size={19} />
               Administração
             </Link>
+            <Link
+              href="/apostas"
+              className={`betting-nav ${route === "apostas" ? "active" : ""}`}
+            >
+              <Target size={19} />
+              Apostas
+            </Link>
             <Link href="/notificacoes">
               <Bell size={19} />
               Notificações
@@ -872,7 +896,7 @@ export function Application({
             <Link
               key={n.path}
               href={"/" + n.path}
-              className={route.startsWith(n.path) ? "active" : ""}
+              className={`${route.startsWith(n.path) ? "active" : ""} ${n.path === "apostas" ? "betting-nav" : ""}`}
             >
               <n.icon size={19} />
               {n.label}
@@ -1048,7 +1072,12 @@ function Auth({
       if (mode === "forgot" || res.pending) {
         setMessage(res.message);
         if (res.pending) setMode("login");
-      } else router.replace("/inicio");
+      } else {
+        const next = new URLSearchParams(window.location.search).get("next");
+        router.replace(
+          next && /^\/apostas(?:[?#]|$)/.test(next) ? next : "/inicio",
+        );
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1296,6 +1325,18 @@ function Dashboard(a: Actions) {
           </span>
         }
       />
+      <Link href="/apostas" className="panel betting-highlight">
+        <Target size={28} aria-hidden="true" />
+        <div>
+          <span className="badge">NOVO</span>
+          <h2>Central de Apostas</h2>
+          <p>
+            Prevê os sets, acompanha os teus palpites e entra na conversa de
+            cada jogo.
+          </p>
+        </div>
+        <ChevronRight aria-hidden="true" />
+      </Link>
       <div className="stats-grid">
         {[
           {
@@ -2967,109 +3008,142 @@ function Notifications({ s, run, busy }: Actions) {
           s.notifications
             .slice()
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-            .map((n) => (
-              <div
-                className={`notification ${!n.read ? "unread" : ""}`}
-                key={n._id}
-              >
-                <NotificationEventIcon notice={n} />
-                <div className="flex-1">
-                  <strong>{n.title}</strong>
-                  <p>{n.body}</p>
-                  <small>
-                    {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
-                  </small>
-                  {n.weeklyChallengeOpening && (
-                    <Link className="link" href="/desafios">
-                      Ver desafios →
-                    </Link>
-                  )}
-                  {n.rankingNotice && (
-                    <Link className="link" href="/ranking">
-                      Ver ranking →
-                    </Link>
-                  )}
-                  {n.seasonId && (
-                    <Link
-                      className="link"
-                      href="/epocas"
-                      style={{ marginLeft: 12 }}
+            .map((n) =>
+              n.bettingNotice ? (
+                <Link
+                  key={n._id}
+                  className={`notification betting-notification ${!n.read ? "unread" : ""}`}
+                  href={`/apostas${n.challengeId ? `?jogo=${encodeURIComponent(n.challengeId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`}
+                  onClick={() => {
+                    void run(
+                      { type: "notifications.read", notificationId: n._id },
+                      "",
+                    );
+                  }}
+                >
+                  <NotificationEventIcon notice={n} />
+                  <div className="flex-1">
+                    <strong>{n.title}</strong>
+                    <p>{n.body}</p>
+                    <small>
+                      {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
+                    </small>
+                  </div>
+                </Link>
+              ) : (
+                <div
+                  className={`notification ${!n.read ? "unread" : ""}`}
+                  key={n._id}
+                >
+                  <NotificationEventIcon notice={n} />
+                  <div className="flex-1">
+                    <strong>{n.title}</strong>
+                    <p>{n.body}</p>
+                    <small>
+                      {fmtDate(n.createdAt)} · {fmtTime(n.createdAt)}
+                    </small>
+                    {n.weeklyChallengeOpening && (
+                      <Link className="link" href="/desafios">
+                        Ver desafios →
+                      </Link>
+                    )}
+                    {n.rankingNotice && (
+                      <Link className="link" href="/ranking">
+                        Ver ranking →
+                      </Link>
+                    )}
+                    {n.seasonId && (
+                      <Link
+                        className="link"
+                        href="/epocas"
+                        style={{ marginLeft: 12 }}
+                        onClick={() =>
+                          void run(
+                            {
+                              type: "notifications.read",
+                              notificationId: n._id,
+                            },
+                            "",
+                          )
+                        }
+                      >
+                        Ver época →
+                      </Link>
+                    )}
+                    {n.adminTestId && (
+                      <Link
+                        className="link"
+                        href={`/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`}
+                        style={{ marginLeft: 12 }}
+                      >
+                        Abrir teste
+                      </Link>
+                    )}
+                    {n.competitionNotice && !n.challengeId && (
+                      <Link
+                        className="link"
+                        href={
+                          s.actor.role === "admin" &&
+                          n.playerId === "__admins__"
+                            ? "/admin?tab=matchmaking"
+                            : "/jornadas"
+                        }
+                        style={{ marginLeft: 12 }}
+                        onClick={() => {
+                          void run(
+                            {
+                              type: "notifications.read",
+                              notificationId: n._id,
+                            },
+                            "",
+                          );
+                        }}
+                      >
+                        Abrir jornada →
+                      </Link>
+                    )}
+                    {n.challengeId && (
+                      <Link
+                        className="link"
+                        href={
+                          "/desafios/" +
+                          n.challengeId +
+                          (n.chatMessageId
+                            ? `#mensagem-${encodeURIComponent(n.chatMessageId)}`
+                            : "")
+                        }
+                        style={{ marginLeft: 12 }}
+                        onClick={() => {
+                          void run(
+                            {
+                              type: "notifications.read",
+                              notificationId: n._id,
+                            },
+                            "",
+                          );
+                        }}
+                      >
+                        Ver desafio →
+                      </Link>
+                    )}
+                  </div>
+                  {!n.read && (
+                    <button
+                      className="icon-button"
+                      aria-label="Marcar como lida"
                       onClick={() =>
-                        void run(
+                        run(
                           { type: "notifications.read", notificationId: n._id },
                           "",
                         )
                       }
                     >
-                      Ver época →
-                    </Link>
-                  )}
-                  {n.adminTestId && (
-                    <Link
-                      className="link"
-                      href={`/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`}
-                      style={{ marginLeft: 12 }}
-                    >
-                      Abrir teste
-                    </Link>
-                  )}
-                  {n.competitionNotice && !n.challengeId && (
-                    <Link
-                      className="link"
-                      href={
-                        s.actor.role === "admin" && n.playerId === "__admins__"
-                          ? "/admin?tab=matchmaking"
-                          : "/jornadas"
-                      }
-                      style={{ marginLeft: 12 }}
-                      onClick={() => {
-                        void run(
-                          { type: "notifications.read", notificationId: n._id },
-                          "",
-                        );
-                      }}
-                    >
-                      Abrir jornada →
-                    </Link>
-                  )}
-                  {n.challengeId && (
-                    <Link
-                      className="link"
-                      href={
-                        "/desafios/" +
-                        n.challengeId +
-                        (n.chatMessageId
-                          ? `#mensagem-${encodeURIComponent(n.chatMessageId)}`
-                          : "")
-                      }
-                      style={{ marginLeft: 12 }}
-                      onClick={() => {
-                        void run(
-                          { type: "notifications.read", notificationId: n._id },
-                          "",
-                        );
-                      }}
-                    >
-                      Ver desafio →
-                    </Link>
+                      <Check size={14} />
+                    </button>
                   )}
                 </div>
-                {!n.read && (
-                  <button
-                    className="icon-button"
-                    aria-label="Marcar como lida"
-                    onClick={() =>
-                      run(
-                        { type: "notifications.read", notificationId: n._id },
-                        "",
-                      )
-                    }
-                  >
-                    <Check size={14} />
-                  </button>
-                )}
-              </div>
-            ))
+              ),
+            )
         ) : (
           <Empty text="Estás a par de tudo." />
         )}
@@ -3563,7 +3637,12 @@ function Admin(a: Actions) {
           connection={a.chatConnection}
         />
       ) : tab === "photos" ? (
-        <AdminClubPhotos state={s} run={a.run} busy={a.busy} refresh={a.refresh} />
+        <AdminClubPhotos
+          state={s}
+          run={a.run}
+          busy={a.busy}
+          refresh={a.refresh}
+        />
       ) : tab === "coins" ? (
         <AdminCoins state={s} run={a.run} busy={a.busy} />
       ) : tab === "notes" ? (
@@ -5726,7 +5805,8 @@ function Courts({ s, run, busy }: Actions) {
 function TitleFights({ s }: Actions) {
   const [division, setDivision] = useState("all");
   const pool = s.challenges.filter(
-    (c) => (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
+    (c) =>
+      (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
   );
   const upcoming = pool
     .filter((c) => isOfficialTitleMatch(c, s) && c.status !== "completed")

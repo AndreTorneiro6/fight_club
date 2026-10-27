@@ -72,6 +72,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check player betting release and notification navigation
+        run: npx playwright test e2e/player-betting.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check challenge chat mentions
         run: npx playwright test e2e/chat-mentions.spec.ts
         env:

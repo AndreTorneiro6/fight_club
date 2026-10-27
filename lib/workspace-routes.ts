@@ -11,6 +11,7 @@ export const leagueInformationLinks = [
 ] as const;
 export const managementLinks = [
   ["admin", "Administração"],
+  ["apostas", "Central de Apostas"],
   ...leagueInformationLinks,
   ["ajuda/admin", "Manual do administrador"],
 ] as const;
@@ -25,7 +26,9 @@ export function isManagementRoute(route: string) {
   return (
     adminOnlyRoutes.has(route) ||
     leagueInformationLinks.some(([path]) => path === route) ||
-    ["perfil", "notificacoes", "desafios", "jogos"].includes(route) ||
+    ["perfil", "notificacoes", "desafios", "jogos", "apostas"].includes(
+      route,
+    ) ||
     route.startsWith("desafios/")
   );
 }

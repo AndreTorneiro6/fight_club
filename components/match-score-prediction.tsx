@@ -105,7 +105,7 @@ export default function MatchScorePrediction({
           onClick={() =>
             void run(
               {
-                type: "admin.match-vote.remove",
+                type: "match-vote.remove",
                 challengeId: game._id,
                 expectedWinnerId: mine.winnerId,
                 expectedUpdatedAt: mine.updatedAt,
@@ -154,7 +154,7 @@ export default function MatchScorePrediction({
               if (
                 await run(
                   {
-                    type: "admin.match-vote.predict",
+                    type: "match-vote.predict",
                     challengeId: game._id,
                     setScores: value.setScores,
                     expectedUpdatedAt: expected,

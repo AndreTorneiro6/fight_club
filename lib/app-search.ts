@@ -51,6 +51,7 @@ export function searchEntries(state: View): SearchEntry[] {
         ["ranking", "Ranking"],
         ["desafios", "Desafios"],
         ["jogos", "Jogos"],
+        ["apostas", "Central de Apostas"],
         ["perfil", "Perfil"],
         ...playerLinks,
       ] as const);

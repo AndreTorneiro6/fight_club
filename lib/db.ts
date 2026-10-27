@@ -370,7 +370,11 @@ export async function mutate(actor: Actor, command: unknown) {
         409,
       );
     }
-    if ("deleted" in result && result.deleted && "notificationIds" in result) {
+    if (
+      (("deleted" in result && result.deleted) ||
+        ("reset" in result && result.reset)) &&
+      "notificationIds" in result
+    ) {
       await db
         .collection("notification_deliveries")
         .deleteMany(

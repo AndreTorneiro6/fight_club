@@ -1,5 +1,6 @@
 import { setScoresSchema, type SetScore } from "./set-scores";
 import { matchScorePrediction } from "./match-score-prediction";
+import { challengeParticipants } from "./team-competition";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, Message, State } from "./types";
@@ -22,11 +23,25 @@ export interface MatchVote {
   updatedAt: string;
   lockAt: string;
   withdrawnAt?: string;
+  notifiedAt?: string;
 }
 export interface MatchDiscussionMessage extends Message {
   requestId: string;
 }
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.match-vote.reset"),
+      confirmation: z.literal("RESET"),
+      releaseId: z.literal("players-1.8.0").default("players-1.8.0"),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("admin.match-vote.announce"),
+      sendAt: z.string().datetime(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.match-vote.predict"),
@@ -67,20 +82,32 @@ const schema = z.discriminatedUnion("type", [
     })
     .strict(),
 ]);
-/** Private preview. Every mutation uses the existing domain transaction/serialization. */
+/** Account-level predictions shared by both workspaces; all writes are transactional. */
 export function executeMatchVoting(
   state: State,
   actor: Actor,
   raw: unknown,
   timestamp = Date.now(),
 ) {
-  ensure(
-    actor.role === "admin",
-    "A Central de Apostas está em teste privado para administradores.",
-    403,
-  );
-  const cmd = schema.parse(raw),
+  const normalized =
+    raw &&
+    typeof raw === "object" &&
+    "type" in raw &&
+    /^(match-vote|match-discussion)\./.test(String(raw.type))
+      ? { ...raw, type: `admin.${raw.type}` }
+      : raw;
+  const cmd = schema.parse(normalized),
     at = new Date(timestamp).toISOString();
+  if (
+    cmd.type === "admin.match-vote.reset" ||
+    cmd.type === "admin.match-vote.settings" ||
+    cmd.type === "admin.match-vote.announce"
+  )
+    ensure(
+      actor.role === "admin",
+      "Só os administradores podem configurar as apostas.",
+      403,
+    );
   ensure(
     state.players.some(
       (p) =>
@@ -93,6 +120,82 @@ export function executeMatchVoting(
     "Perfil indisponível.",
     403,
   );
+  if (cmd.type === "admin.match-vote.reset") {
+    if (
+      state.audit.some(
+        (e) =>
+          e.action === cmd.type &&
+          JSON.parse(e.details).releaseId === cmd.releaseId,
+      )
+    )
+      return {
+        reset: false,
+        votes: 0,
+        messages: 0,
+        notificationIds: [] as string[],
+      };
+    const votes = state.matchVotes ?? [],
+      messages = state.matchDiscussionMessages ?? [];
+    const notificationIds = state.notifications
+      .filter((n) => n.bettingNotice)
+      .map((n) => n._id);
+    state.matchVotes = [];
+    state.matchDiscussionMessages = [];
+    state.notifications = state.notifications.filter((n) => !n.bettingNotice);
+    state.audit.push({
+      _id: randomUUID(),
+      userId: actor.userId,
+      action: cmd.type,
+      details: JSON.stringify({
+        releaseId: cmd.releaseId,
+        voteIds: votes.map((v) => v._id),
+        messageIds: messages.map((m) => m._id),
+        notificationIds,
+      }),
+      createdAt: at,
+    });
+    return {
+      reset: true,
+      votes: votes.length,
+      messages: messages.length,
+      notificationIds,
+    };
+  }
+  if (cmd.type === "admin.match-vote.announce") {
+    const previous =
+      state.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
+    if (previous.announcement) {
+      ensure(
+        previous.announcement.sendAt === cmd.sendAt,
+        "O anúncio já está agendado.",
+        409,
+      );
+      return { ok: true, sendAt: cmd.sendAt };
+    }
+    ensure(
+      Date.parse(cmd.sendAt) > timestamp,
+      "Escolhe uma hora futura para o anúncio.",
+    );
+    state.matchVotingSettings = [
+      {
+        ...previous,
+        version: previous.version + 1,
+        announcement: {
+          sendAt: cmd.sendAt,
+          createdBy: actor.userId,
+          createdAt: at,
+        },
+      },
+    ];
+    state.audit.push({
+      _id: randomUUID(),
+      userId: actor.userId,
+      action: cmd.type,
+      details: JSON.stringify({ sendAt: cmd.sendAt }),
+      createdAt: at,
+    });
+    return { ok: true, sendAt: cmd.sendAt };
+  }
   if (cmd.type === "admin.match-vote.settings") {
     const before = state.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
     ensure(
@@ -102,6 +205,7 @@ export function executeMatchVoting(
     );
     state.matchVotingSettings = [
       {
+        ...before,
         _id: "match-voting",
         version: before.version + 1,
         lockMinutes: cmd.lockMinutes,
@@ -221,6 +325,23 @@ export function executeMatchVoting(
       }),
       createdAt: at,
     });
+    const saved = state.matchVotes!.find(
+      (v) => v.userId === actor.userId && v.challengeId === challenge._id,
+    )!;
+    if (!saved.notifiedAt) {
+      for (const playerId of challengeParticipants(challenge, state.players))
+        bettingNotice(
+          state,
+          actor.playerId,
+          playerId,
+          "Novo palpite no teu jogo",
+          `Alguém guardou um palpite para o resultado do teu jogo #${challenge.number}. Vê os palpites na Central de Apostas.`,
+          `bet:${challenge._id}:${randomUUID()}`,
+          at,
+          challenge._id,
+        );
+      saved.notifiedAt = at;
+    }
     return { ok: true };
   }
   const duplicate = state.matchDiscussionMessages?.find(
@@ -268,6 +389,97 @@ export function executeMatchVoting(
     }),
     createdAt: at,
   });
-  // Preview messages/mentions must never notify players or leak into competitive challenge chat.
+  const recipients = new Set([
+    ...challengeParticipants(challenge, state.players),
+    ...(state.matchDiscussionMessages ?? [])
+      .filter((m) => m.challengeId === challenge._id)
+      .map((m) => m.playerId),
+    ...mentions.map((m) => m.playerId),
+  ]);
+  for (const playerId of recipients)
+    bettingNotice(
+      state,
+      actor.playerId,
+      playerId,
+      mentions.some((m) => m.playerId === playerId)
+        ? "Mencionaram-te na conversa do jogo"
+        : "Nova mensagem na conversa do jogo",
+      `${state.players.find((p) => p._id === actor.playerId)?.name ?? "Jogador"}: ${cmd.text}`,
+      `bet-chat:${message._id}:${playerId}`,
+      at,
+      challenge._id,
+      message._id,
+    );
   return { id: message._id };
+}
+
+function bettingNotice(
+  state: State,
+  sender: string | undefined,
+  playerId: string,
+  title: string,
+  body: string,
+  dedupe: string,
+  at: string,
+  challengeId?: string,
+  chatMessageId?: string,
+) {
+  const player = state.players.find((p) => p._id === playerId);
+  if (
+    !player ||
+    playerId === sender ||
+    player.status !== "active" ||
+    player.awaitingApproval ||
+    player.registrationRejectedAt ||
+    state.notifications.some((n) => n.dedupe === dedupe)
+  )
+    return;
+  state.notifications.push({
+    _id: randomUUID(),
+    playerId,
+    title,
+    body,
+    dedupe,
+    read: false,
+    createdAt: at,
+    kind: "general",
+    bettingNotice: true,
+    challengeId,
+    chatMessageId,
+  });
+}
+export function processMatchVotingAnnouncement(
+  state: State,
+  timestamp: number,
+) {
+  const announcement = state.matchVotingSettings?.[0]?.announcement;
+  if (
+    !announcement ||
+    announcement.sentAt ||
+    timestamp < Date.parse(announcement.sendAt)
+  )
+    return;
+  const at = new Date(timestamp).toISOString();
+  for (const player of state.players)
+    bettingNotice(
+      state,
+      undefined,
+      player._id,
+      "A Central de Apostas já está disponível! 🎾",
+      "Prevê os resultados dos sets, acompanha os teus palpites e conversa sobre cada jogo. Um palpite por pessoa, partilhado entre os teus espaços. Toca nesta notificação para entrar.",
+      `betting-launch:${announcement.sendAt}:${player._id}`,
+      at,
+    );
+  for (const n of state.notifications.filter((n) =>
+    n.dedupe?.startsWith(`betting-launch:${announcement.sendAt}:`),
+  ))
+    n.deliveryChannels = ["push"];
+  announcement.sentAt = at;
+  state.audit.push({
+    _id: randomUUID(),
+    userId: "system",
+    action: "match-vote.announced",
+    details: JSON.stringify({ sendAt: announcement.sendAt }),
+    createdAt: at,
+  });
 }
