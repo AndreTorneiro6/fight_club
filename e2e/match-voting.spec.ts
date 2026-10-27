@@ -7,6 +7,7 @@ import {
 
 test("private central supports per-set predictions, conditional third set, withdrawals, mentions and player denial on mobile", async ({
   page,
+  browser,
 }) => {
   await page.goto("/auth");
   await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
@@ -154,6 +155,103 @@ test("private central supports per-set predictions, conditional third set, withd
     .getByRole("button", { name: "Enviar mensagem", exact: true })
     .click();
   await expect(chat.locator("mark.chat-mention")).toHaveText("@Carlos Pereira");
+  await expect(input).toHaveValue("");
+  const observerContext = await browser.newContext({
+    storageState: await page.context().storageState(),
+    viewport: { width: 390, height: 844 },
+  });
+  try {
+    const observer = await observerContext.newPage();
+    await observer.goto("/admin?tab=voting");
+    await observer
+      .getByRole("article", {
+        name: `Votação do jogo ${challenge.number}`,
+        exact: true,
+      })
+      .getByRole("button", { name: "Abrir conversa do jogo" })
+      .click();
+    const observerChat = observer.getByRole("region", {
+      name: "Conversa do jogo",
+      exact: true,
+    });
+    await expect(observerChat.locator("mark.chat-mention")).toHaveText(
+      "@Carlos Pereira",
+    );
+    await input.fill("Segunda mensagem da conversa");
+    await input.press("Enter");
+    await expect(input).toHaveValue("");
+    await expect(
+      observerChat.getByText("Segunda mensagem da conversa", { exact: true }),
+    ).toBeVisible({ timeout: 15000 });
+    const observerInput = observerChat.getByRole("combobox", {
+      name: "Mensagem",
+      exact: true,
+    });
+    await observerInput.fill("Resposta pelo telemóvel");
+    await observerChat
+      .getByRole("button", { name: "Enviar mensagem", exact: true })
+      .click();
+    await expect(
+      chat.getByText("Resposta pelo telemóvel", { exact: true }),
+    ).toBeVisible({ timeout: 15000 });
+    await observer.reload();
+    await observer
+      .getByRole("article", {
+        name: `Votação do jogo ${challenge.number}`,
+        exact: true,
+      })
+      .getByRole("button", { name: "Abrir conversa do jogo" })
+      .click();
+    await expect(
+      observerChat.getByText("Resposta pelo telemóvel", { exact: true }),
+    ).toBeVisible();
+  } finally {
+    await observerContext.close();
+  }
+  // The server commits, but the sender loses the response. An edited retry
+  // must get a fresh id; an unchanged retry must remain idempotent.
+  await page.route("**/api/league", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fetch();
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Resposta interrompida no teste" }),
+    });
+  });
+  await input.fill("Mensagem com resposta interrompida");
+  await chat
+    .getByRole("button", { name: "Enviar mensagem", exact: true })
+    .click();
+  await expect(chat.getByRole("alert")).toContainText("A mensagem foi mantida");
+  await expect(input).toHaveValue("Mensagem com resposta interrompida");
+  await page.unroute("**/api/league");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  await expect(
+    chat.getByText("Mensagem com resposta interrompida", { exact: true }),
+  ).toHaveCount(1);
+  // Reproduce the same lost response, then change the message before retrying.
+  await page.route("**/api/league", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fetch();
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Resposta interrompida no teste" }),
+    });
+  });
+  await input.fill("Mensagem antes de corrigir");
+  await input.press("Enter");
+  await expect(chat.getByRole("alert")).toBeVisible();
+  await page.unroute("**/api/league");
+  await input.fill("Mensagem corrigida após falha");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  await expect(chat.getByRole("alert")).toHaveCount(0);
+  await expect(
+    chat.getByText("Mensagem corrigida após falha", { exact: true }),
+  ).toBeVisible();
   const updated = await (await page.request.get("/api/league")).json();
   expect(
     updated.matchVotes.filter((v: any) => v.challengeId === game.id),
@@ -189,7 +287,7 @@ test("private central supports per-set predictions, conditional third set, withd
     updated.matchDiscussionMessages.filter(
       (m: any) => m.challengeId === game.id,
     ),
-  ).toHaveLength(1);
+  ).toHaveLength(6);
   expect(
     updated.messages.filter((m: any) => m.text.includes("quem vai ganhar?")),
   ).toHaveLength(0);

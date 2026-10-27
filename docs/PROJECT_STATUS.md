@@ -1,3 +1,8 @@
+## Version1.7.2 chat retry fix prepared — 27 October 2026
+
+- User reports betting chat not working; exact symptom not supplied. Expanded isolated browser verifies repeated sends, Enter/button, second-session live replies, mobile and persistence/reopening. Standard path passes; production app logs showed no recent server error. Found concrete recovery bug: changed text after a failed/lost response reused the old request UUID and could receive409 indefinitely. Request UUID is now bound to challenge/text/mentions, unchanged retries remain idempotent, edited retries get a new UUID. Added synchronous in-flight guard and local send failure alert retaining draft.
+- Expanded browser passes deliberate lost response after server commit, unchanged retry with no duplicate, edited retry and cleared error, plus privacy/official-state isolation.421 tests/typecheck/build pass with1.7.2 metadata; expanded betting browser and normal challenge mentions browser (with DEMO_TEST_ROUND_TRANSITION=1 fixture) pass. Deployment next. No production chat messages or league data created. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.7.1 deployed and verified — 27 October 2026
 
 - Continuation completed: workflow40484338750 passed every CI/browser group and deployed commit4f9fa9342c0e036928f5d47c098dbd98316d5099. Direct host verification reports package1.7.1 and the exact revision; app/worker running with zero restarts, image sha256:8d5d7e981995e012d054c48a9a5c802dc939b5b88889dfd604f58c2d48c98dea. Public health and worker DNS pass. Local typecheck/build/all421 tests and isolated mobile voting browser rechecked successfully. No remaining implementation work for this request; unrelated ZIP deletion/Untitled.jpeg preserved.

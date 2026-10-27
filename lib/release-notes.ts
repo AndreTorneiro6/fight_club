@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.7.1";
+export const applicationVersion = "1.7.2";
 export const releaseNotes = [
+  {
+    version: "1.7.2",
+    date: "2026-10-27",
+    title: "Recuperação do envio de mensagens",
+    changes: [
+      "Conversa dos jogos permite corrigir e reenviar uma mensagem após falha sem reutilizar o identificador do texto anterior.",
+      "Falhas de envio mantêm o texto e mostram um aviso junto à mensagem. Repetir o mesmo envio continua a evitar duplicados.",
+    ],
+  },
   {
     version: "1.7.1",
     date: "2026-10-27",

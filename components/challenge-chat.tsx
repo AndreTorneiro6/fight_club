@@ -33,7 +33,11 @@ export default function ChallengeChat({
       value: string;
     } | null>(null),
     [active, setActive] = useState(0);
-  const requestId = useRef<string | undefined>(undefined);
+  const requestId = useRef<{ payload: string; id: string } | undefined>(
+    undefined,
+  );
+  const sending = useRef(false);
+  const [sendError, setSendError] = useState("");
   const input = useRef<HTMLInputElement>(null),
     box = useRef<HTMLDivElement>(null);
   const chat = (community ? (s.matchDiscussionMessages ?? []) : s.messages)
@@ -157,12 +161,18 @@ export default function ChallengeChat({
         className="stack"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (busy || sending.current || !text.trim()) return;
           const mentionIds = selected.filter((id) => {
             const target = targets.find((t) => t.playerId === id);
             return target && text.includes(`@${target.name}`);
           });
-          if (
-            await run(
+          const payload = JSON.stringify([c._id, text, mentionIds]);
+          if (community && requestId.current?.payload !== payload)
+            requestId.current = { payload, id: crypto.randomUUID() };
+          sending.current = true;
+          setSendError("");
+          try {
+            const result = await run(
               {
                 type: community
                   ? "admin.match-discussion.send"
@@ -170,21 +180,35 @@ export default function ChallengeChat({
                 challengeId: c._id,
                 text,
                 mentionIds,
-                ...(community
-                  ? { requestId: (requestId.current ??= crypto.randomUUID()) }
-                  : {}),
+                ...(community ? { requestId: requestId.current!.id } : {}),
               },
               "",
-            )
-          ) {
+            );
+            if (!result) {
+              setSendError(
+                "Não foi possível enviar. A mensagem foi mantida; tenta novamente.",
+              );
+              return;
+            }
             requestId.current = undefined;
             setText("");
             setSelected([]);
             setQuery(null);
             input.current?.focus();
+          } catch {
+            setSendError(
+              "Não foi possível enviar. A mensagem foi mantida; tenta novamente.",
+            );
+          } finally {
+            sending.current = false;
           }
         }}
       >
+        {sendError && (
+          <p className="error" role="alert">
+            {sendError}
+          </p>
+        )}
         <small>
           {community
             ? "Teste privado: escreve @ para identificar alguém. Não são enviadas notificações aos jogadores."
