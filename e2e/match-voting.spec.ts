@@ -64,6 +64,19 @@ test("private central supports per-set predictions, conditional third set, withd
     exact: true,
   });
   await expect(card).toBeVisible();
+  const groups = central.getByRole("group", {
+    name: "Estado das apostas",
+    exact: true,
+  });
+  const mineGroup = groups.getByRole("button", { name: /^Os meus palpites/ });
+  const openGroup = groups.getByRole("button", { name: /^Abertas/ });
+  await expect(openGroup).toHaveAttribute("aria-pressed", "true");
+  await mineGroup.click();
+  await expect(central).toContainText("Ainda não tens palpites guardados");
+  await expect(card).toHaveCount(0);
+  await groups.getByRole("button", { name: /^Encerradas/ }).click();
+  await expect(card).toHaveCount(0);
+  await openGroup.click();
   const timer = card.getByRole("timer", {
     name: `Tempo para fechar votação do jogo ${challenge.number}`,
   });
@@ -122,6 +135,9 @@ test("private central supports per-set predictions, conditional third set, withd
     name: /O teu palpite: 6-4, 4-6, 6-4/,
   });
   await expect(ownPrediction).toBeVisible();
+  await expect(mineGroup).toContainText("1");
+  await mineGroup.click();
+  await expect(ownPrediction).toBeVisible();
   await expect(
     card.getByRole("button", { name: "Editar palpite", exact: true }),
   ).toHaveCount(0);
@@ -129,6 +145,10 @@ test("private central supports per-set predictions, conditional third set, withd
     card.getByRole("region", { name: /Palpites por resultado/ }),
   ).toContainText("6-4, 4-6, 6-4");
   await ownPrediction.click();
+  await expect(mineGroup).toContainText("0");
+  await expect(card).toHaveCount(0);
+  await expect(central).toContainText("Ainda não tens palpites guardados");
+  await openGroup.click();
   await expect(card).toContainText("0 votos");
   await card
     .getByRole("button", { name: "Prever resultado", exact: true })
@@ -312,6 +332,17 @@ test("private central supports per-set predictions, conditional third set, withd
       name: `Votação do jogo ${challenge.number}`,
     }),
   ).toContainText("O teu palpite");
+  await page.clock.install({ time: new Date(start.getTime() + 86400000) });
+  await page.clock.runFor(1100);
+  await expect(card).toHaveCount(0);
+  await mineGroup.click();
+  await expect(card).toContainText("Votação fechada");
+  await groups.getByRole("button", { name: /^Encerradas/ }).click();
+  await expect(card).toContainText("O teu palpite");
+  await card.getByRole("button", { name: "Abrir conversa do jogo" }).click();
+  await expect(
+    chat.getByText("Resposta pelo telemóvel", { exact: true }),
+  ).toBeVisible();
   await switchWorkspace(page, "player");
   const playerState = await (await page.request.get("/api/league")).json();
   expect(playerState.matchVotingSettings).toEqual([]);

@@ -1,3 +1,8 @@
+## Version1.7.3 betting views prepared — 27 October 2026
+
+- User wants Central split into open bets and their own. Added Abertas (default), Os meus palpites and Encerradas with counts respecting division selection. Own list uses only actor's active saved predictions, includes closed games, excludes withdrawn records. Open/closed lists and card status reuse the same existing earliest-lock/status calculation. Switching group returns to list; game chat remains available from each group. No writes or permissions changes; admin-only preview retained.
+-421 tests/typecheck/build and expanded mobile browser pass: empty own/closed view, default open, save to own, deletion removes own, recast, simulated clock closure moves game out of open into closed while retaining own/chat access. Existing chat retry/privacy/official-state checks pass.390px screenshot visually inspected; no horizontal overflow. Final release-metadata checks/deployment pending. Preserve unrelated ZIP deletion/Untitled.jpeg.
+
 ## Version1.7.2 chat retry fix deployed and verified — 27 October 2026
 
 - User reports betting chat not working; exact symptom not supplied. Expanded isolated browser verifies repeated sends, Enter/button, second-session live replies, mobile and persistence/reopening. Standard path passes; production app logs showed no recent server error. Found concrete recovery bug: changed text after a failed/lost response reused the old request UUID and could receive409 indefinitely. Request UUID is now bound to challenge/text/mentions, unchanged retries remain idempotent, edited retries get a new UUID. Added synchronous in-flight guard and local send failure alert retaining draft.

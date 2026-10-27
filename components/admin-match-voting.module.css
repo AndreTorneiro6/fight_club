@@ -2,6 +2,15 @@
 .game {
   min-width: 0;
 }
+.groups {
+  flex-wrap: wrap;
+}
+.groups button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

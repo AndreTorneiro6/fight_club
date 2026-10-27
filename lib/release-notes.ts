@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.7.2";
+export const applicationVersion = "1.7.3";
 export const releaseNotes = [
+  {
+    version: "1.7.3",
+    date: "2026-10-27",
+    title: "Apostas abertas e os teus palpites",
+    changes: [
+      "Central de Apostas organizada em Abertas, Os meus palpites e Encerradas, com contagens por divisão.",
+      "Os teus palpites continuam disponíveis depois do fecho. Eliminar um palpite retira-o da tua lista; a conversa de cada jogo mantém-se acessível.",
+    ],
+  },
   {
     version: "1.7.2",
     date: "2026-10-27",

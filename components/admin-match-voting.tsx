@@ -27,6 +27,7 @@ export default function AdminMatchVoting({
   connection?: "connecting" | "live" | "reconnecting";
 }) {
   const [division, setDivision] = useState("all"),
+    [group, setGroup] = useState<"open" | "mine" | "closed">("open"),
     [selected, setSelected] = useState<string>(),
     [clock, setClock] = useState(Date.now());
   useEffect(() => {
@@ -46,6 +47,29 @@ export default function AdminMatchVoting({
         a.number - b.number,
     );
   const game = games.find((c) => c._id === selected);
+  function votingState(c: View["challenges"][number]) {
+    const stored = (s.matchVotes ?? []).find(
+      (v) => v.challengeId === c._id && v.userId === s.actor.userId,
+    );
+    const cutoff = matchVotingCutoff(s, c);
+    const lockAt =
+      stored && cutoff && stored.lockAt < cutoff ? stored.lockAt : cutoff;
+    const open =
+      !!lockAt &&
+      clock < Date.parse(lockAt) &&
+      ["scheduled", "accepted", "schedule_pending"].includes(c.status);
+    return {
+      stored,
+      mine: stored?.withdrawnAt ? undefined : stored,
+      lockAt,
+      open,
+    };
+  }
+  const grouped = {
+    open: games.filter((c) => votingState(c).open),
+    mine: games.filter((c) => votingState(c).mine),
+    closed: games.filter((c) => !votingState(c).open),
+  };
   const settings = s.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
   return (
     <section
@@ -56,6 +80,31 @@ export default function AdminMatchVoting({
         <div className="row between wrap">
           <h2>Central de Apostas</h2>
           <span className="badge">Teste privado · só administradores</span>
+        </div>
+        <div
+          className={`tabs ${styles.groups}`}
+          role="group"
+          aria-label="Estado das apostas"
+        >
+          {(
+            [
+              ["open", "Abertas"],
+              ["mine", "Os meus palpites"],
+              ["closed", "Encerradas"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              aria-pressed={group === id}
+              className={group === id ? "active" : ""}
+              onClick={() => {
+                setGroup(id);
+                setSelected(undefined);
+              }}
+            >
+              {label} <span className="badge">{grouped[id].length}</span>
+            </button>
+          ))}
         </div>
         <p>Prevê o resultado de cada set e conversa sobre o jogo.</p>
         <p className="muted">
@@ -123,10 +172,14 @@ export default function AdminMatchVoting({
         </>
       ) : (
         <div className={styles.grid}>
-          {games.map((c) => renderGame(c, false))}
-          {!games.length && (
+          {grouped[group].map((c) => renderGame(c, false))}
+          {!grouped[group].length && (
             <p className="panel">
-              Ainda não existem jogos publicados nesta divisão.
+              {group === "mine"
+                ? "Ainda não tens palpites guardados nesta divisão. Escolhe um jogo em Abertas para participar."
+                : group === "open"
+                  ? "Não existem apostas abertas nesta divisão."
+                  : "Não existem apostas encerradas nesta divisão."}
             </p>
           )}
         </div>
@@ -134,21 +187,11 @@ export default function AdminMatchVoting({
     </section>
   );
   function renderGame(c: View["challenges"][number], detail: boolean) {
-    const stored = (s.matchVotes ?? []).find(
-      (v) => v.challengeId === c._id && v.userId === s.actor.userId,
-    );
+    const { stored, mine, lockAt, open } = votingState(c);
     const summary = s.matchVoteSummaries?.find(
       (item) => item.challengeId === c._id,
     );
     const total = summary?.total ?? 0;
-    const mine = stored?.withdrawnAt ? undefined : stored,
-      cutoff = matchVotingCutoff(s, c),
-      lockAt =
-        stored && cutoff && stored.lockAt < cutoff ? stored.lockAt : cutoff;
-    const open =
-      !!lockAt &&
-      clock < Date.parse(lockAt) &&
-      ["scheduled", "accepted", "schedule_pending"].includes(c.status);
     const messages = (s.matchDiscussionMessages ?? []).filter(
       (m) => m.challengeId === c._id,
     ).length;
