@@ -15,7 +15,9 @@
     "format": "prettier --write app components lib scripts tests e2e next.config.ts playwright.config.ts",
     "recovery": "tsx --env-file=.env.local scripts/recovery.ts",
     "notifications:work": "tsx --env-file=.env.local scripts/notifications.ts",
-    "notifications:work:container": "tsx scripts/notifications.ts"
+    "notifications:work:container": "tsx scripts/notifications.ts",
+    "email:verify": "tsx --env-file=.env.resend.local scripts/check-email.ts --verify",
+    "email:test": "tsx --env-file=.env.resend.local scripts/check-email.ts --send-test"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

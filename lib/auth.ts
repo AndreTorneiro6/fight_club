@@ -6,7 +6,7 @@ import { z } from "zod";
 import { database, transaction } from "./db";
 import { ensure } from "./rules";
 import type { Actor, Player, Session, User } from "./types";
-import nodemailer from "nodemailer";
+import { sendEmail } from "./mail";
 import {
   emailSchema,
   emailLookup,
@@ -68,17 +68,15 @@ export async function selectWorkspace(raw: unknown) {
       "Sem permissão.",
       403,
     );
-    const changed = await db
-      .collection<Session>("sessions")
-      .updateOne(
-        {
-          _id: activeSession._id,
-          userId: user._id,
-          expiresAt: { $gt: new Date() },
-        },
-        { $set: { workspace } },
-        { session },
-      );
+    const changed = await db.collection<Session>("sessions").updateOne(
+      {
+        _id: activeSession._id,
+        userId: user._id,
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { workspace } },
+      { session },
+    );
     ensure(changed.matchedCount === 1, "Sessão expirada.", 401);
     state.audit.push({
       _id: random(),
@@ -339,8 +337,7 @@ export async function accountLink(
   });
   const link = `${process.env.APP_URL ?? "http://localhost:3000"}/auth?token=${token}&purpose=${purpose}`;
   if (process.env.SMTP_URL)
-    await nodemailer.createTransport(process.env.SMTP_URL).sendMail({
-      from: process.env.EMAIL_FROM ?? "Fight Club <noreply@localhost>",
+    await sendEmail({
       to: email,
       subject:
         purpose === "invite"

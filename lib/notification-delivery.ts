@@ -9,9 +9,8 @@ import type { NotificationEvent } from "./notification-presentation";
 import type { AdminTestChallenge } from "./admin-test-types";
 import { randomUUID } from "node:crypto";
 import type { ClientSession, Db } from "mongodb";
-import nodemailer from "nodemailer";
+import { emailConfigured, EmailDeliveryError, sendEmail } from "./mail";
 import webpush from "web-push";
-import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import type { Challenge, Notification, Player, State, User } from "./types";
 
 export type Channel = "email" | "whatsapp" | "push";
@@ -183,7 +182,7 @@ export async function enqueueNotifications(
 }
 export function providerStatus() {
   return {
-    email: !!(process.env.SMTP_URL && process.env.EMAIL_FROM),
+    email: emailConfigured(),
     whatsapp: !!(
       process.env.TWILIO_ACCOUNT_SID &&
       process.env.TWILIO_AUTH_TOKEN &&
@@ -207,25 +206,15 @@ export async function sendDelivery(job: Delivery, to: string) {
   if (!base || !/^https?:\/\//.test(base)) throw new ProviderError(false);
   const url = new URL(job.path, base).toString();
   if (job.channel === "email") {
-    const transport = nodemailer.createTransport({
-      url: process.env.SMTP_URL!,
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    } as SMTPTransport.Options);
     try {
-      const info = await transport.sendMail({
-        from: process.env.EMAIL_FROM,
+      return await sendEmail({
         to,
         subject: `Fight Club · ${job.title.replace(/[\r\n]/g, " ")}`,
         text: `${job.title}\n\n${job.body}\n\nAbrir na aplicação: ${url}\n\nGere os teus alertas no Perfil da aplicação.`,
       });
-      return String(info.messageId);
-    } catch (e) {
-      const code = (e as { responseCode?: number }).responseCode;
-      throw new ProviderError(!code || code < 500);
-    } finally {
-      transport.close();
+    } catch (error) {
+      if (error instanceof EmailDeliveryError) throw error;
+      throw new ProviderError(true);
     }
   }
   const sid = process.env.TWILIO_ACCOUNT_SID!;
@@ -512,12 +501,17 @@ export async function dispatchNotifications(
       }
       const attempts = job.attempts + 1;
       const retry =
-        attempts < 5 && (!(e instanceof ProviderError) || e.retryable);
+        attempts < 5 &&
+        (!(e instanceof ProviderError || e instanceof EmailDeliveryError) ||
+          e.retryable);
       await queue.updateOne(filter, {
         $set: {
           status: retry ? "retry" : "failed",
           attempts,
-          error: "Falha no envio. Verifica a configuração e o fornecedor.",
+          error:
+            e instanceof EmailDeliveryError
+              ? e.message
+              : "Falha no envio. Verifica a configuração e o fornecedor.",
           availableAt: new Date(
             Date.now() + Math.min(3600000, 30000 * 2 ** attempts),
           ),
