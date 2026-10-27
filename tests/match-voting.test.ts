@@ -711,3 +711,76 @@ test("release reset clears betting activity and its notices, retains audit and o
   execute(s, admin, reset, at + 3);
   assert.equal(s.matchVotes!.length, 1);
 });
+
+test("match-discussion: authors edit/delete with concurrency protection; others cannot mutate", () => {
+  const s = fixture();
+  const owner = admin;
+  execute(
+    s,
+    owner,
+    {
+      type: "match-discussion.send",
+      challengeId: "c1",
+      text: "Original",
+      requestId: "11111111-1111-4111-8111-111111111111",
+    },
+    at,
+  );
+  const message = s.matchDiscussionMessages![0];
+  const edit = {
+    type: "match-discussion.edit",
+    challengeId: "c1",
+    messageId: message._id,
+    expectedUpdatedAt: message.createdAt,
+    text: "Corrigida",
+  };
+  const before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { userId: "u3", playerId: "p3", role: "player" },
+        edit,
+        at + 1,
+      ),
+    /tuas mensagens/,
+  );
+  assert.deepEqual(s, before);
+  execute(s, owner, edit, at + 2);
+  assert.equal(message.text, "Corrigida");
+  assert.ok(message.updatedAt);
+  assert.throws(() => execute(s, owner, edit, at + 3), /mensagem mudou/);
+  assert.throws(() =>
+    execute(
+      s,
+      owner,
+      { ...edit, expectedUpdatedAt: message.updatedAt, text: "   " },
+      at + 3,
+    ),
+  );
+  assert.throws(() =>
+    execute(
+      s,
+      owner,
+      { ...edit, expectedUpdatedAt: message.updatedAt, challengeId: "missing" },
+      at + 3,
+    ),
+  );
+  const notices = s.notifications.length;
+  const audit = s.audit.length;
+  execute(
+    s,
+    owner,
+    {
+      type: "match-discussion.delete",
+      challengeId: "c1",
+      messageId: message._id,
+      expectedUpdatedAt: message.updatedAt,
+    },
+    at + 4,
+  );
+  assert.equal(s.matchDiscussionMessages!.length, 0);
+  assert.equal(s.notifications.length, notices);
+  assert.equal(s.audit.length, audit + 1);
+  assert.equal(JSON.parse(s.audit.at(-1)!.details).before.text, "Corrigida");
+});

@@ -220,6 +220,7 @@ export interface Exception extends Entity {
   note: string;
 }
 export interface Message extends Entity {
+  updatedAt?: string;
   mentions?: import("./chat-mentions").ChatMention[];
   audienceIds?: string[];
   challengeId: string;

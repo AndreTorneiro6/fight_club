@@ -224,3 +224,76 @@ test("stored mention names survive renames and split safely without interpreting
   );
   assert.equal(parts.map((p) => p.text).join(""), message.text);
 });
+
+test("message: authors edit/delete with concurrency protection; others cannot mutate", () => {
+  const s = fixture();
+  const owner = actor;
+  execute(
+    s,
+    owner,
+    {
+      type: "message.send",
+      challengeId: "chat",
+      text: "Original",
+      requestId: "11111111-1111-4111-8111-111111111111",
+    },
+    now,
+  );
+  const message = s.messages![0];
+  const edit = {
+    type: "message.edit",
+    challengeId: "chat",
+    messageId: message._id,
+    expectedUpdatedAt: message.createdAt,
+    text: "Corrigida",
+  };
+  const before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { userId: "u3", playerId: "p3", role: "player" },
+        edit,
+        now + 1,
+      ),
+    /tuas mensagens/,
+  );
+  assert.deepEqual(s, before);
+  execute(s, owner, edit, now + 2);
+  assert.equal(message.text, "Corrigida");
+  assert.ok(message.updatedAt);
+  assert.throws(() => execute(s, owner, edit, now + 3), /mensagem mudou/);
+  assert.throws(() =>
+    execute(
+      s,
+      owner,
+      { ...edit, expectedUpdatedAt: message.updatedAt, text: "   " },
+      now + 3,
+    ),
+  );
+  assert.throws(() =>
+    execute(
+      s,
+      owner,
+      { ...edit, expectedUpdatedAt: message.updatedAt, challengeId: "missing" },
+      now + 3,
+    ),
+  );
+  const notices = s.notifications.length;
+  const audit = s.audit.length;
+  execute(
+    s,
+    owner,
+    {
+      type: "message.delete",
+      challengeId: "chat",
+      messageId: message._id,
+      expectedUpdatedAt: message.updatedAt,
+    },
+    now + 4,
+  );
+  assert.equal(s.messages!.length, 0);
+  assert.equal(s.notifications.length, notices);
+  assert.equal(s.audit.length, audit + 1);
+  assert.equal(JSON.parse(s.audit.at(-1)!.details).before.text, "Corrigida");
+});

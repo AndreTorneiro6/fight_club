@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, AtSign } from "lucide-react";
+import ChatMessageActions from "./chat-message-actions";
 import { discussionTargets } from "@/lib/match-voting-targets";
 import type { View, Challenge } from "@/lib/types";
 import {
@@ -146,7 +147,16 @@ export default function ChallengeChat({
                 {new Date(m.createdAt).toLocaleString("pt-PT", {
                   timeZone: "Europe/Lisbon",
                 })}
+                {m.updatedAt ? " · editada" : ""}
               </small>
+              {m.playerId === s.actor.playerId && (
+                <ChatMessageActions
+                  message={m}
+                  community={community}
+                  busy={busy}
+                  run={run}
+                />
+              )}
             </div>
           ))
         ) : (

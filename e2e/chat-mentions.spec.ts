@@ -1,13 +1,23 @@
 import { test, expect } from "@playwright/test";
-test("challenge participants can mention a verified administrator", async ({ page }) => {
+test("challenge participants can mention a verified administrator", async ({
+  page,
+}) => {
   await page.goto("/auth");
-  await page.getByLabel("Email", { exact: true }).fill("jogador@fightclub.local");
-  await page.getByLabel("Palavra-passe", { exact: true }).fill("FightClub2026!");
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill("jogador@fightclub.local");
+  await page
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
   await page.getByRole("button", { name: "Entrar na arena" }).click();
   await expect(page).toHaveURL(/\/inicio/);
-  await page.getByRole("button", { name: "Saltar visita", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Saltar visita", exact: true })
+    .click();
   const state = await (await page.request.get("/api/league")).json();
-  const admin = state.chatAdministrators.find((p: any) => p.playerId !== state.actor.playerId);
+  const admin = state.chatAdministrators.find(
+    (p: any) => p.playerId !== state.actor.playerId,
+  );
   expect(admin).toBeTruthy();
   await page.goto("/desafios/test-transition-game");
   const chat = page.getByRole("region", { name: "Chat do desafio" });
@@ -16,10 +26,37 @@ test("challenge participants can mention a verified administrator", async ({ pag
   await chat.getByRole("option", { name: new RegExp(admin.name) }).click();
   await input.press("End");
   await input.pressSequentially("podes verificar o horário?");
-  await chat.getByRole("button", { name: "Enviar mensagem", exact: true }).click();
+  await chat
+    .getByRole("button", { name: "Enviar mensagem", exact: true })
+    .click();
   await expect(chat.locator("mark.chat-mention")).toHaveText(`@${admin.name}`);
   const updated = await (await page.request.get("/api/league")).json();
-  const message = updated.messages.find((m: any) => m.text.includes("podes verificar o horário?"));
-  expect(message.mentions).toEqual([{ playerId: admin.playerId, name: admin.name, kind: "admin" }]);
+  const message = updated.messages.find((m: any) =>
+    m.text.includes("podes verificar o horário?"),
+  );
+  expect(message.mentions).toEqual([
+    { playerId: admin.playerId, name: admin.name, kind: "admin" },
+  ]);
   await expect(input).toHaveValue("");
+  const own = chat
+    .locator(".message")
+    .filter({ hasText: "podes verificar o horário?" });
+  await own.getByRole("button", { name: "Editar", exact: true }).click();
+  await own
+    .getByLabel("Editar mensagem", { exact: true })
+    .fill("Horário confirmado");
+  await own.getByRole("button", { name: "Guardar alteração" }).click();
+  const edited = chat
+    .locator(".message")
+    .filter({ hasText: "Horário confirmado" });
+  await expect(
+    edited.getByText("Horário confirmado", { exact: true }),
+  ).toBeVisible();
+  await expect(edited.getByText(/editada/)).toBeVisible();
+  await edited.getByRole("button", { name: "Apagar", exact: true }).click();
+  await edited.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(edited).toBeVisible();
+  await edited.getByRole("button", { name: "Apagar", exact: true }).click();
+  await edited.getByRole("button", { name: "Confirmar apagar" }).click();
+  await expect(edited).toHaveCount(0);
 });

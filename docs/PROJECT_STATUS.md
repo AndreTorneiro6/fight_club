@@ -1,3 +1,15 @@
+## Version1.8.1 own-message editing/deletion ready for release — 27 October 2026
+
+- User explicitly requests edit/delete own Apostas chat messages and also challenges chat. Added common inline editor, cancel/save, delete confirmation, edited marker and own-message-only controls. New strict engine commands message.edit/delete and match-discussion.edit/delete enforce conversation access, authorship (including admins), current version, nonempty/max2000 text. Shared mutation helper records before/after in audit; edits retain valid existing mentions and do not generate new notifications. Deletes remove only the chosen message, preserving bets/results/league state.
+- Version/package/lock/release notes1.8.1. Local typecheck,432 tests and build pass. Expanded isolated browser tests pass individually with CI demo flags: challenge-chat edit/cancel/delete and mobile betting chat edit/delete plus existing prediction/notification flow. Initial local test lacked DEMO_TEST_ROUND_TRANSITION, corrected; explicit textarea accessible name also fixed after browser check.
+- Releasing through deploy branch/CI. Preserve unrelated CROMOS plan, reference ZIP deletion, Untitled.jpeg and newly present untracked templates/cromo_ouro.jpeg and cromo_prata_bronze.jpeg. Production email already Resend and must remain so; no additional real emails or chat/bet writes as part of release.
+
+## Resend active in production; authenticated app and worker — 27 October 2026
+
+- User confirmed Gmail original SPF PASS, DKIM PASS wbglabs.io, DMARC PASS and inbox delivery. Released scoped email integration commit6eac22129b602baba950b07aac09f22ca68f1c96 to deploy branch. GitHub run40540384864 succeeded including430 tests/typecheck/build/all browser groups and Pi deployment. Live exact revision confirmed healthy.
+- Activated only SMTP_URL/SMTP_USER/SMTP_PASSWORD/EMAIL_FROM from private staged config, under production deploy lock with private timestamped .env.before-resend rollback backup. Recreated app/worker; health passed; verifyEmailTransport executed successfully inside BOTH containers with smtp.resend.com:465 TLS/authenticated and no-reply@wbglabs.io. No additional real test sent. Restricted sending key remains private; staged remote env removed. Production now uses Resend for shared account/queued email delivery. Existing preferences/league records unaffected.
+- Reclaimed2.169GB unused Docker build cache older1h before release, no images/volumes removed. Postbuild root5.9GB free/90%. Unrelated CROMOS plan, ZIP deletion and image preserved. User's later question about deleting Apostas chat was a capability question, NOT authorization to delete; no messages or bets deleted.
+
 ## Gmail authentication confirmed; Resend release in progress — 27 October 2026
 
 - User supplied original-message summary for authorized test: SPF PASS, DKIM PASS with wbglabs.io, DMARC PASS; recipient already confirmed inbox placement. All migration validation prerequisites met. Proceeding with production activation under original migration request.

@@ -3,6 +3,7 @@ import { matchScorePrediction } from "./match-score-prediction";
 import { challengeParticipants } from "./team-competition";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { editChatMessage } from "./edit-chat-message";
 import type { Actor, Message, State } from "./types";
 import { ensure } from "./rules";
 import {
@@ -29,6 +30,23 @@ export interface MatchDiscussionMessage extends Message {
   requestId: string;
 }
 const schema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("admin.match-discussion.edit"),
+      challengeId: z.string().min(1).max(100),
+      messageId: z.string().min(1).max(100),
+      expectedUpdatedAt: z.string().datetime(),
+      text: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("admin.match-discussion.delete"),
+      challengeId: z.string().min(1).max(100),
+      messageId: z.string().min(1).max(100),
+      expectedUpdatedAt: z.string().datetime(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("admin.match-vote.reset"),
@@ -344,6 +362,17 @@ export function executeMatchVoting(
     }
     return { ok: true };
   }
+  if (
+    cmd.type === "admin.match-discussion.edit" ||
+    cmd.type === "admin.match-discussion.delete"
+  )
+    return editChatMessage(
+      state,
+      actor,
+      state.matchDiscussionMessages ?? [],
+      cmd,
+      at,
+    );
   const duplicate = state.matchDiscussionMessages?.find(
     (m) => m.requestId === cmd.requestId,
   );

@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.8.0";
+export const applicationVersion = "1.8.1";
 export const releaseNotes = [
+  {
+    version: "1.8.1",
+    date: "2026-10-27",
+    title: "Editar e apagar mensagens",
+    changes: [
+      "Podes editar e apagar as tuas mensagens nas conversas de Apostas e dos desafios.",
+      "Mensagens alteradas mostram editada; apagar pede confirmação. As mensagens de outras pessoas mantêm-se protegidas.",
+    ],
+  },
   {
     version: "1.8.0",
     date: "2026-10-27",

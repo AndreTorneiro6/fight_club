@@ -5,6 +5,7 @@ import {
 } from "./match-voting";
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
+import { editChatMessage } from "./edit-chat-message";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRoundCompletion } from "./round-transition";
 import { publishDivisionPapers } from "./division-weekly-publication";
@@ -434,6 +435,23 @@ export const commandSchema = z.discriminatedUnion("type", [
     challengeId: id,
     note: text.min(3),
   }),
+  z
+    .object({
+      type: z.literal("message.edit"),
+      challengeId: id,
+      messageId: id,
+      expectedUpdatedAt: z.string().datetime(),
+      text: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("message.delete"),
+      challengeId: id,
+      messageId: id,
+      expectedUpdatedAt: z.string().datetime(),
+    })
+    .strict(),
   z.object({
     type: z.literal("message.send"),
     challengeId: id,
@@ -3262,6 +3280,12 @@ export function execute(
       notify(c.reportedBy!, "Resultado contestado", cmd.note, c._id);
       log("result.disputed", { challengeId: c._id, note: cmd.note });
       break;
+    }
+    case "message.edit":
+    case "message.delete": {
+      const c = challenge(cmd.challengeId);
+      participant(c);
+      return editChatMessage(s, actor, s.messages, cmd, now);
     }
     case "message.send": {
       const c = challenge(cmd.challengeId);

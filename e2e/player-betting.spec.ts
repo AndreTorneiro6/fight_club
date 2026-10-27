@@ -116,6 +116,42 @@ test("players predict and chat, receive targeted notices, and tap the launch ann
     await expect(
       chat.getByText("Conversa pública do jogo", { exact: true }),
     ).toBeVisible();
+    const own = chat
+      .locator(".message")
+      .filter({ hasText: "Conversa pública do jogo" });
+    await own.getByRole("button", { name: "Editar", exact: true }).click();
+    await own
+      .getByLabel("Editar mensagem", { exact: true })
+      .fill("Texto corrigido");
+    await own.getByRole("button", { name: "Guardar alteração" }).click();
+    const edited = chat
+      .locator(".message")
+      .filter({ hasText: "Texto corrigido" });
+    await expect(
+      edited.getByText("Texto corrigido", { exact: true }),
+    ).toBeVisible();
+    await edited.getByRole("button", { name: "Editar", exact: true }).click();
+    await edited
+      .getByLabel("Editar mensagem", { exact: true })
+      .fill("Conversa pública do jogo");
+    await edited.getByRole("button", { name: "Guardar alteração" }).click();
+    await expect(
+      own.getByText("Conversa pública do jogo", { exact: true }),
+    ).toBeVisible();
+    await chat
+      .getByRole("combobox", { name: "Mensagem", exact: true })
+      .fill("Mensagem para apagar");
+    await chat
+      .getByRole("button", { name: "Enviar mensagem", exact: true })
+      .click();
+    const removable = chat
+      .locator(".message")
+      .filter({ hasText: "Mensagem para apagar" });
+    await removable
+      .getByRole("button", { name: "Apagar", exact: true })
+      .click();
+    await removable.getByRole("button", { name: "Confirmar apagar" }).click();
+    await expect(removable).toHaveCount(0);
     await page.goto(`/apostas?jogo=${encodeURIComponent(game.id)}`);
     const adminChat = page.getByRole("region", {
       name: "Conversa do jogo",
