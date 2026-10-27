@@ -125,6 +125,11 @@ export async function enqueueNotifications(
       const player = after.players.find((p) => p.userId === user._id);
       if (!player) continue;
       for (const channel of ["email", "whatsapp"] as const) {
+        if (
+          channel === "email" &&
+          after.settings[0]?.leagueEmailsEnabled !== true
+        )
+          continue;
         if (n.deliveryChannels && !n.deliveryChannels.includes(channel))
           continue;
         if (n.adminTestId && !n.testChannels?.includes(channel)) continue;
@@ -312,6 +317,20 @@ export async function dispatchNotifications(
     );
     if (!job) break;
     const filter = { _id: job._id, leaseId };
+    if (
+      job.channel === "email" &&
+      (await db.collection("settings").findOne({ _id: "league" as never }))
+        ?.leagueEmailsEnabled !== true
+    ) {
+      await queue.updateOne(filter, {
+        $set: {
+          status: "skipped",
+          error:
+            "Email reservado a questões de conta. Notificações da liga por email desativadas.",
+        },
+      });
+      continue;
+    }
     let pushSubscription: PushSubscriptionRecord | null = null;
     try {
       const user = await db

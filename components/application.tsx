@@ -1,4 +1,5 @@
 "use client";
+import { canRecordOfficialResult } from "@/lib/result-readiness";
 import ChallengeChat from "./challenge-chat";
 import MatchCalendarActions from "./match-calendar-actions";
 import { weeklyPublishedAt } from "@/lib/weekly-publication";
@@ -3279,6 +3280,7 @@ function Profile(a: Actions) {
             <NotificationSettings
               key={JSON.stringify([p.phone, p.notificationPreferences])}
               player={p}
+              leagueEmailsEnabled={s.settings[0].leagueEmailsEnabled === true}
               busy={busy}
               save={(input) => run(input, "Preferências de alertas guardadas.")}
             />
@@ -3981,10 +3983,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
   const rankingReview = s.results.find(
     (r) => r.challengeId === c._id,
   )?.rankingReviewRequired;
-  const ready =
-    ["scheduled", "result_pending", "disputed"].includes(c.status) &&
-    !!c.scheduledAt &&
-    Date.parse(c.scheduledAt) + c.durationMinutes * 60000 <= Date.now();
+  const ready = canRecordOfficialResult(c);
   return (
     <div className="stack space-top">
       {rankingReview && (
@@ -4239,10 +4238,7 @@ function AdminResults(a: Actions) {
   const { s } = a;
   const [filter, setFilter] = useState("pending"),
     [division, setDivision] = useState("all");
-  const ready = (c: Challenge) =>
-    ["scheduled", "result_pending", "disputed"].includes(c.status) &&
-    !!c.scheduledAt &&
-    Date.parse(c.scheduledAt) + c.durationMinutes * 60000 <= Date.now();
+  const ready = canRecordOfficialResult;
   const games = s.challenges
     .filter(
       (c) =>
@@ -5452,6 +5448,8 @@ const settingLabels: Record<
   >,
   string
 > = {
+  leagueEmailsEnabled:
+    "Permitir notificações da liga por email · desativado: apenas questões de conta",
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
   weeklyDynamicRoles:
     "Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade",
@@ -6798,7 +6796,7 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Resultados",
-      "Só o administrador regista resultados. Os sets são opcionais e não atribuem pontos. Ao guardar o vencedor, o sistema atualiza automaticamente vitórias, derrotas e ranking segundo o modelo configurado.",
+      "Só o administrador regista resultados. Indica o vencedor e os jogos de cada set na ordem ataque / defesa. Ao guardar, o sistema atualiza automaticamente vitórias, derrotas e ranking segundo o modelo configurado.",
     ],
     [
       "Title Fight",

@@ -81,14 +81,12 @@ test("admin records sets; waiting bets show official outcome and correction noti
     await central.getByRole("button", { name: /^A aguardar/ }).click();
     await expect(card).toContainText("A aguardar confirmação do resultado");
     await page.goto(`/desafios/${id}`);
-    const intervention = page
-      .locator("section.panel")
-      .filter({
-        has: page.getByRole("heading", {
-          name: "Intervenção administrativa",
-          exact: true,
-        }),
-      });
+    const intervention = page.locator("section.panel").filter({
+      has: page.getByRole("heading", {
+        name: "Intervenção administrativa",
+        exact: true,
+      }),
+    });
     await intervention
       .getByLabel("Declarar vencedor", { exact: true })
       .selectOption("player-1");
@@ -121,6 +119,12 @@ test("admin records sets; waiting bets show official outcome and correction noti
         (n: any) => n.bettingResult?.version === 1 && n.challengeId === id,
       ),
     ).toHaveLength(1);
+    expect(mine.settings[0].leagueEmailsEnabled).toBe(false);
+    expect(
+      mine.notifications.find(
+        (n: any) => n.bettingResult?.version === 1 && n.challengeId === id,
+      ).deliveryChannels,
+    ).toEqual(["push"]);
     await player.screenshot({
       path: "/var/tmp/fc-official-result-mobile.png",
       fullPage: true,

@@ -89,6 +89,7 @@ export interface Division extends Entity {
   capacity: number;
 }
 export interface Settings extends Entity {
+  leagueEmailsEnabled?: boolean;
   weeklyCompetition: boolean;
   weeklyMandatoryChallenges?: boolean;
   weeklyDynamicRoles?: boolean;
@@ -529,6 +530,7 @@ export interface View extends State {
 }
 
 export const defaultSettings: Settings = {
+  leagueEmailsEnabled: false,
   weeklyCompetition: false,
   weeklyMandatoryChallenges: false,
   weeklyDynamicRoles: false,

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { processMatchVotingAnnouncement } from "../lib/match-voting";
-import { execute } from "../lib/engine";
+import { execute, processDeadlines } from "../lib/engine";
 import { filterFeatureView } from "../lib/feature-view";
 import {
   collections,
@@ -815,7 +815,7 @@ test("official result settles only active bettors, distinguishes exact/winner/mi
   }));
   assert.equal(votingPhase(s, c, at), "open");
   assert.equal(votingPhase(s, c, Date.parse(c.scheduledAt!)), "waiting");
-  settleMatchVotes(s, at);
+  settleMatchVotes(s, at, c._id);
   assert.equal(s.notifications.length, 0);
   c.status = "completed";
   c.winnerId = c.defenderId;
@@ -841,22 +841,102 @@ test("official result settles only active bettors, distinguishes exact/winner/mi
   assert.equal(matchVoteOutcome(s.matchVotes[1], c.defenderId, sets), "winner");
   assert.equal(matchVoteOutcome(s.matchVotes[2], c.defenderId, sets), "miss");
   assert.match(officialResultNews(s, c)!, /mantêm o 7/);
-  settleMatchVotes(s, at);
+  settleMatchVotes(s, at, c._id);
   assert.equal(s.notifications.length, 3);
-  settleMatchVotes(s, at + 1);
+  settleMatchVotes(s, at + 1, c._id);
   assert.equal(s.notifications.length, 3);
   assert(
     s.notifications.every(
       (n) => n.bettingNotice && n.bettingResult?.version === 1,
     ),
   );
+  assert(
+    s.notifications.every(
+      (n) => JSON.stringify(n.deliveryChannels) === JSON.stringify(["push"]),
+    ),
+  );
   s.results[0].setScores = [
     { attacker: 2, defender: 6 },
     { attacker: 4, defender: 6 },
   ];
-  settleMatchVotes(s, at + 2);
+  settleMatchVotes(s, at + 2, c._id);
   assert.equal(s.notifications.length, 6);
-  settleMatchVotes(s, at + 3);
+  settleMatchVotes(s, at + 3, c._id);
   assert.equal(s.notifications.length, 6);
   assert(s.notifications.slice(3).every((n) => n.title.includes("atualizado")));
+});
+
+test("closing bets and worker ticks never publish retrospective result notices", () => {
+  const s = fixture(),
+    c = s.challenges[0];
+  c.status = "completed";
+  c.winnerId = c.defenderId;
+  s.results = [
+    {
+      _id: "old",
+      challengeId: c._id,
+      winnerId: c.defenderId,
+      loserId: c.challengerId,
+      score: "1-6, 4-6",
+      setScores: [
+        { attacker: 1, defender: 6 },
+        { attacker: 4, defender: 6 },
+      ],
+      confirmedAt: new Date(at).toISOString(),
+      seasonId: "season",
+    },
+  ];
+  s.matchVotes = [
+    {
+      _id: "old-vote",
+      challengeId: c._id,
+      userId: "u1",
+      playerId: "p1",
+      winnerId: c.defenderId,
+      createdAt: new Date(at - 1000).toISOString(),
+      updatedAt: new Date(at - 1000).toISOString(),
+      lockAt: new Date(at - 500).toISOString(),
+    },
+  ];
+  processDeadlines(s, at + 1000, false);
+  assert.equal(s.notifications.filter((n) => n.bettingResult).length, 0);
+  assert.equal(s.matchVotes[0].settledFingerprint, undefined);
+});
+
+test("submitting one game's result never backfills another game's bettors", async () => {
+  const { settleMatchVotes } = await import("../lib/match-voting");
+  const s = fixture(),
+    first = s.challenges[0];
+  first.status = "completed";
+  const second = { ...first, _id: "old-game" };
+  s.challenges.push(second);
+  const sets = [
+    { attacker: 4, defender: 6 },
+    { attacker: 3, defender: 6 },
+  ];
+  s.results = [first, second].map((c) => ({
+    _id: `r-${c._id}`,
+    challengeId: c._id,
+    winnerId: c.defenderId,
+    loserId: c.challengerId,
+    score: "4-6, 3-6",
+    setScores: sets,
+    confirmedAt: new Date(at).toISOString(),
+    seasonId: "season",
+  }));
+  s.matchVotes = [first, second].map((c) => ({
+    _id: `v-${c._id}`,
+    challengeId: c._id,
+    userId: "u1",
+    playerId: "p1",
+    winnerId: c.defenderId,
+    setScores: sets,
+    createdAt: new Date(at - 1000).toISOString(),
+    updatedAt: new Date(at - 1000).toISOString(),
+    lockAt: new Date(at - 500).toISOString(),
+  }));
+  settleMatchVotes(s, at, first._id);
+  assert.equal(s.notifications.filter((n) => n.bettingResult).length, 1);
+  assert.equal(s.notifications[0].challengeId, first._id);
+  assert.equal(s.matchVotes[1].settledFingerprint, undefined);
 });

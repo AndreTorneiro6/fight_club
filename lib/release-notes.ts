@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.9.0";
+export const applicationVersion = "1.9.1";
 export const releaseNotes = [
+  {
+    version: "1.9.1",
+    date: "2026-10-27",
+    title: "Resultados pendentes e emails apenas de conta",
+    changes: [
+      "Jogos terminados sem resultado confirmado aparecem em O que precisas de fazer, mesmo enquanto o estado continua Marcado.",
+      "O atalho Resultados por registar abre os jogos prontos para introduzir os sets; a pendência desaparece após a confirmação.",
+      "Email reservado a convites, verificação de endereço e recuperação de palavra-passe; notificações da liga mantêm-se na aplicação e por push.",
+      "Avisos de apuramento só após submissão de sets oficiais; fechar apostas ou reiniciar a aplicação não envia avisos retroativos.",
+    ],
+  },
   {
     version: "1.9.0",
     date: "2026-10-27",

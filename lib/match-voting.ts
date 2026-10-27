@@ -489,11 +489,17 @@ function bettingNotice(
   return notice;
 }
 /** Official result changes notify active bettors once per version, including corrections. */
-export function settleMatchVotes(state: State, timestamp: number) {
+export function settleMatchVotes(
+  state: State,
+  timestamp: number,
+  challengeId: string,
+) {
   const at = new Date(timestamp).toISOString();
-  for (const c of state.challenges.filter((c) => isVotingMatch(state, c))) {
+  for (const c of state.challenges.filter(
+    (c) => c._id === challengeId && isVotingMatch(state, c),
+  )) {
     const official = officialVotingResult(state, c);
-    if (!official) continue;
+    if (!official?.sets) continue;
     const fingerprint = createHash("sha256")
       .update(JSON.stringify([official.result.winnerId, official.sets ?? null]))
       .digest("hex");
@@ -528,6 +534,7 @@ export function settleMatchVotes(state: State, timestamp: number) {
         at,
         c._id,
       );
+      if (notice) notice.deliveryChannels = ["push"];
       if (notice)
         notice.bettingResult = {
           userId: vote.userId,

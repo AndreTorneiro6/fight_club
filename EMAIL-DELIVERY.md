@@ -1,3 +1,11 @@
+## Política atual — email apenas para conta (27 outubro 2026)
+
+Por instrução explícita do administrador, convites, verificação de endereço e recuperação de palavra-passe continuam por email. Notificações da liga, apostas, resultados, chat e avisos gerais usam a aplicação/push. A política leagueEmailsEnabled é false por defeito e pode ser configurada por administrador; preferências individuais são preservadas. A fila não deve enviar emails antigos enquanto a política estiver desativada. Não reenviar falhas antigas automaticamente.
+
+Avisos de apuramento só após submissão/correção efetiva de sets oficiais para o jogo em causa. Não fazer apuramento retroativo ao arrancar/deploy ou fechar apostas. A publicação1.9.1 aplica esta política; confirmar estado live no handoff.
+
+A consulta de uso do Resend de27 outubro indicou200/100 envios diários e200/3000 mensais, renovação às00:00UTC de28 outubro. Foram observadas recusas550; a quota pode afetar também emails de conta até renovar. Não foi comprado plano pago.
+
 # Email da aplicação — migração para Resend
 
 ## Verificação concluída — 27 outubro 2026

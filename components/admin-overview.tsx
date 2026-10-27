@@ -5,7 +5,8 @@ import {
   divisionRankingPublished,
 } from "@/lib/round-transition";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { canRecordOfficialResult } from "@/lib/result-readiness";
 import { clubWeek } from "@/lib/calendar";
 import { ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react";
 import { effectiveStatus } from "@/lib/rules";
@@ -23,6 +24,11 @@ export default function AdminOverview({
   onSelect: (tab: string) => void;
   onRegistrations: () => void;
 }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const [scheduleDivision, setScheduleDivision] = useState("all"),
     [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
   const unscheduled = s.challenges
@@ -48,8 +54,7 @@ export default function AdminOverview({
   const visibleUnscheduled = unscheduled.filter(
     (c) => scheduleDivision === "all" || c.divisionId === scheduleDivision,
   );
-  const now = Date.now(),
-    week = weeklyChallengeWeek(s),
+  const week = weeklyChallengeWeek(s),
     round = s.weeklyRounds.find((r) => r.weekStart === week),
     pending = s.players.filter(
       (p) => p.awaitingApproval && !p.registrationRejectedAt,
@@ -60,7 +65,9 @@ export default function AdminOverview({
         c.scheduleProposal?.challengerConfirmed &&
         c.scheduleProposal?.defenderConfirmed,
     ),
-    results = s.challenges.filter((c) => c.status === "result_pending"),
+    results = s.challenges.filter(
+      (c) => c.status !== "disputed" && canRecordOfficialResult(c, now),
+    ),
     disputes = s.challenges.filter((c) => c.status === "disputed"),
     overdue = s.challenges.filter(
       (c) =>
@@ -77,9 +84,10 @@ export default function AdminOverview({
         action: () => onSelect("approvals"),
       },
       {
-        label: "Resultados por validar",
+        label: "Resultados por registar",
         count: results.length,
-        detail: "Confirma os resultados para atualizar a classificação.",
+        detail:
+          "Há jogos terminados sem resultado confirmado. Regista os sets para atualizar o ranking e apurar os palpites.",
         action: () => onSelect("results"),
       },
       {
@@ -237,8 +245,8 @@ export default function AdminOverview({
                   <span className="badge">
                     {c.status === "disputed"
                       ? "Disputa"
-                      : c.status === "result_pending"
-                        ? "Resultado"
+                      : canRecordOfficialResult(c, now)
+                        ? "Resultado por registar"
                         : effectiveStatus(c) === "expired"
                           ? "Prazo ultrapassado"
                           : "Confirmar jogo"}

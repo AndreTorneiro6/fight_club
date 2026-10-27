@@ -1,3 +1,4 @@
+import { canRecordOfficialResult } from "../lib/result-readiness";
 import { applicationVersion, releaseNotes } from "../lib/release-notes";
 import { weeklyChallengeWeek } from "../lib/weekly";
 import { effectiveStatus } from "../lib/rules";
@@ -41,7 +42,8 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     ).length +
     state.challenges.filter(
       (c: any) =>
-        ["result_pending", "disputed"].includes(c.status) ||
+        c.status === "disputed" ||
+        canRecordOfficialResult(c) ||
         (c.weekStart === weeklyChallengeWeek(state) &&
           effectiveStatus(c) === "expired") ||
         (c.status === "schedule_pending" &&

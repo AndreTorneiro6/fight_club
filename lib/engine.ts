@@ -150,6 +150,7 @@ const playerFields = {
   partner: short,
 };
 export const settingsSchema = z.object({
+  leagueEmailsEnabled: z.boolean().default(false),
   weeklyCompetition: z.boolean().default(false),
   weeklyMandatoryChallenges: z.boolean().optional(),
   weeklyDynamicRoles: z.boolean().optional(),
@@ -533,6 +534,12 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("admin.settings.save"),
     settings: settingsSchema,
   }),
+  z
+    .object({
+      type: z.literal("admin.notifications.email-policy"),
+      enabled: z.boolean(),
+    })
+    .strict(),
   z.object({
     type: z.literal("admin.division.save"),
     divisionId: id,
@@ -1280,7 +1287,7 @@ export function execute(
         timestamp,
       );
     s.results.at(-1)!.rankingOutcome!.after = resultTeamRanks(s, c);
-    settleMatchVotes(s, timestamp);
+    settleMatchVotes(s, timestamp, c._id);
     notifyTeam(
       w._id,
       "Vitória confirmada 🏆",
@@ -4043,6 +4050,11 @@ export function execute(
       log("settings.updated", cmd.settings);
       break;
     }
+    case "admin.notifications.email-policy": {
+      s.settings[0].leagueEmailsEnabled = cmd.enabled;
+      log("notifications.email-policy", { enabled: cmd.enabled });
+      break;
+    }
     case "admin.division.save": {
       const d = s.divisions.find((x) => x._id === cmd.divisionId);
       ensure(d, "Divisão inexistente.");
@@ -4508,7 +4520,11 @@ export function execute(
           `${cmd.note} · Vitória: ${player(cmd.winnerId).name}`,
           c._id,
         );
-      settleMatchVotes(s, timestamp);
+      if (
+        before.winnerId !== result.winnerId ||
+        JSON.stringify(before.setScores) !== JSON.stringify(result.setScores)
+      )
+        settleMatchVotes(s, timestamp, c._id);
       break;
     }
     case "admin.champions.clear": {
@@ -4871,7 +4887,6 @@ export function processDeadlines(
   generateRoles = true,
 ) {
   processMatchVotingAnnouncement(s, timestamp);
-  settleMatchVotes(s, timestamp);
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);
     autoWeeklyRanking(s, timestamp);

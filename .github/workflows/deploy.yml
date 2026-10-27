@@ -51,6 +51,12 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check admin pending official results
+        run: npx playwright test e2e/admin-pending-results.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEMO_TEST_ROUND_TRANSITION: "1"
+
       - name: Check match images and clipboard exports
         run: npx playwright test e2e/image-sharing.spec.ts e2e/poster-templates.spec.ts
         env:

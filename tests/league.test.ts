@@ -3373,3 +3373,25 @@ test("accepting a weekly challenge closes only incompatible pending requests, no
     2,
   );
 });
+
+test("only admins can configure the league email policy; account mail is separate", () => {
+  const s = fixture();
+  assert.throws(
+    () =>
+      execute(
+        s,
+        actor(8),
+        { type: "admin.notifications.email-policy", enabled: true },
+        time,
+      ),
+    /administradores/,
+  );
+  execute(
+    s,
+    actor(1, "admin"),
+    { type: "admin.notifications.email-policy", enabled: false },
+    time,
+  );
+  assert.equal(s.settings[0].leagueEmailsEnabled, false);
+  assert.equal(s.audit.at(-1)?.action, "notifications.email-policy");
+});

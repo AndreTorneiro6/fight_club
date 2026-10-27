@@ -236,7 +236,11 @@ export default function SharedAdminTests(props: Props) {
           {(["push", "email", "whatsapp"] as const).map((channel) => (
             <label className="row" key={channel}>
               <input
-                disabled={busy}
+                disabled={
+                  busy ||
+                  (channel === "email" &&
+                    state.settings[0].leagueEmailsEnabled !== true)
+                }
                 type="checkbox"
                 checked={channels.includes(channel)}
                 onChange={(e) =>
@@ -250,7 +254,9 @@ export default function SharedAdminTests(props: Props) {
               {channel === "push"
                 ? "Push neste dispositivo"
                 : channel === "email"
-                  ? "Email"
+                  ? state.settings[0].leagueEmailsEnabled === true
+                    ? "Email"
+                    : "Email · reservado a questões de conta"
                   : "WhatsApp"}
             </label>
           ))}

@@ -166,6 +166,8 @@ test("outbox commits with events, fans out admins, respects consent, leases work
     };
     // Provision a test account email, never a real external address.
     await transaction(async (s, db, session) => {
+      // Explicit opt-in fixture covers the optional league email mode.
+      s.settings[0].leagueEmailsEnabled = true;
       for (const p of s.players.filter((p) => p.userId)) {
         p.email = `${p._id}@example.test`;
         await db
@@ -554,6 +556,43 @@ test("outbox commits with events, fans out admins, respects consent, leases work
     assert.equal(
       (await queue.findOne({ notificationId: "latest-result" }))?.status,
       "sent",
+    );
+    await transaction((s) => {
+      s.settings[0].leagueEmailsEnabled = false;
+      s.notifications.push({
+        _id: "account-only-policy",
+        playerId: actor.playerId,
+        title: "Resultado disponível",
+        body: "Aviso na aplicação",
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    });
+    assert.equal(
+      await queue.countDocuments({
+        notificationId: "account-only-policy",
+        channel: "email",
+      }),
+      0,
+    );
+    await queue.insertOne({
+      _id: "old-pending-email",
+      notificationId: "account-only-policy",
+      userId: actor.userId,
+      playerId: actor.playerId,
+      channel: "email",
+      title: "Antigo",
+      body: "Não enviar",
+      path: "/notificacoes",
+      status: "pending",
+      attempts: 0,
+      createdAt: new Date(),
+      availableAt: new Date(),
+    });
+    await dispatchNotifications(db, 20, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ _id: "old-pending-email" }))?.status,
+      "skipped",
     );
   } finally {
     await clientToClose?.close();

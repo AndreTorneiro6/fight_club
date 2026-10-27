@@ -166,7 +166,9 @@ export function NotificationSettings({
   player,
   busy,
   save,
+  leagueEmailsEnabled = false,
 }: {
+  leagueEmailsEnabled?: boolean;
   player: Player;
   busy: boolean;
   save: (input: {
@@ -183,7 +185,9 @@ export function NotificationSettings({
         const f = new FormData(e.currentTarget);
         await save({
           type: "notifications.preferences",
-          email: f.get("email") === "on",
+          email: leagueEmailsEnabled
+            ? f.get("email") === "on"
+            : player.notificationPreferences?.email !== false,
           whatsapp: f.get("whatsapp") === "on",
           phone: String(f.get("phone") ?? ""),
         });
@@ -193,14 +197,21 @@ export function NotificationSettings({
         Escolhe como receber desafios, horários, resultados e lembretes. Os
         alertas dentro da aplicação mantêm-se sempre disponíveis.
       </p>
-      <label className="row">
-        <input
-          type="checkbox"
-          name="email"
-          defaultChecked={player.notificationPreferences?.email !== false}
-        />
-        Receber alertas por email
-      </label>
+      {leagueEmailsEnabled ? (
+        <label className="row">
+          <input
+            type="checkbox"
+            name="email"
+            defaultChecked={player.notificationPreferences?.email !== false}
+          />
+          Receber alertas por email
+        </label>
+      ) : (
+        <p className="muted">
+          Email reservado a convites, verificação de endereço e recuperação de
+          palavra-passe. Os avisos da liga chegam pela aplicação e por push.
+        </p>
+      )}
       <label>
         Número WhatsApp com indicativo
         <input
