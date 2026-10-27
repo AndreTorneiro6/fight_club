@@ -1,8 +1,10 @@
-## Version1.7.1 prepared locally — 27 October 2026
+## Version1.7.1 deployed and verified — 27 October 2026
+
+- Continuation completed: workflow40484338750 passed every CI/browser group and deployed commit4f9fa9342c0e036928f5d47c098dbd98316d5099. Direct host verification reports package1.7.1 and the exact revision; app/worker running with zero restarts, image sha256:8d5d7e981995e012d054c48a9a5c802dc939b5b88889dfd604f58c2d48c98dea. Public health and worker DNS pass. Local typecheck/build/all421 tests and isolated mobile voting browser rechecked successfully. No remaining implementation work for this request; unrelated ZIP deletion/Untitled.jpeg preserved.
 
 - Latest request: predictions cannot be edited after saving, only deleted before existing30/60-minute cutoff. UI removes edit action, keeps own chip withdrawal; server rejects both scored and legacy endpoint overwrites409, preserving history/CAS/earliest cutoff. Deleting allows fresh submission before close, as explained to user. No real competition/statistics/coins changes.
 - Other participants' predictions are shared only as score/winner-team/count aggregates. Admin API returns only actor's own raw vote; bet mutation audit remains stored but hidden from shared projection to avoid author disclosure. Chat retains normal authors. Admin-only preview retained; player sees no prediction data. Anonymous summaries derived, never persisted.
--421 tests/typecheck/build pass; isolated mobile voting browser passes conditional sets/save/delete/recast, grouped results and absence of Edit, official-state isolation/player denial. Direct API edit returns409 in the passing browser check. Final typecheck/build/all421 tests passed. Initial default/tmp run failed due local Mongo/temp filesystem, clean TMPDIR=/var/tmp run passed all421. Not deployed; production remains1.7.0/ec475563. Preserve unrelated ZIP deletion/Untitled.jpeg.
+-421 tests/typecheck/build pass; isolated mobile voting browser passes conditional sets/save/delete/recast, grouped results and absence of Edit, official-state isolation/player denial. Direct API edit returns409 in the passing browser check. Final typecheck/build/all421 tests passed. Initial default/tmp run failed due local Mongo/temp filesystem, clean TMPDIR=/var/tmp run passed all421. At preparation, production remained1.7.0/ec475563; deployment is now verified above. Preserve unrelated ZIP deletion/Untitled.jpeg.
 
 ## Version1.7.0 deployed; score predictions never modify official results — 27 October 2026
 
