@@ -34,6 +34,7 @@ The runner is named `fight-club-rpi` with label `fight-club-production`, scoped 
 - Deployments are serialized in GitHub and with a host lock. MongoDB is backed up before replacing app/worker. MongoDB, backup and Traefik containers are left running. The retired Ollama service has been removed.
 - New app health and worker state/restart count must pass. Failures or interrupted updates restore the previous image, environment and deployment markers. Database recovery is deliberately operator-controlled; deployment never rewrites league data.
 - Success updates only `FIGHT_CLUB_APP_IMAGE` in the existing `.env.production`, preserving every other setting. `.deployed-revision` and `.deployed-image` record the live release. The local image tag is `fightclub:git-<validated SHA>`.
+- After a healthy release, retention preserves images used by any container and the previous Fight Club deployment, removes older Fight Club image tags, and prunes unused build cache older than one hour. It preserves volumes and other applications' images. Cleanup failures report a warning without rolling back a healthy release.
 
 View runs under Actions → **Validate and deploy Fight Club**. A queued deploy job means the `fight-club-production` runner is not yet registered/online. Register it once; ordinary deploy-branch pushes need no further setup or approval.
 

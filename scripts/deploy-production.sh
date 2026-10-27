@@ -84,3 +84,5 @@ Path('.deployed-image').write_text(sys.argv[1] + '\n')
 PY
 trap - ERR HUP INT TERM
 printf 'Deployed validated revision %s directly on the Pi\n' "$revision"
+# Retention is best-effort after health passes; it must never roll back a healthy release.
+python3 "$source_dir/scripts/cleanup-deployment-images.py" || echo 'Image retention needs operator review.' >&2
