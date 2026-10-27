@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.8.1";
+export const applicationVersion = "1.9.0";
 export const releaseNotes = [
+  {
+    version: "1.9.0",
+    date: "2026-10-27",
+    title: "Resultados oficiais e apuramento dos palpites",
+    changes: [
+      "Registo administrativo com resultado por sets também na intervenção do desafio, com identificação das duplas de ataque e defesa.",
+      "Correções de vencedor reconciliam trocas de ranking quando o histórico permite fazê-lo em segurança; movimentos posteriores ficam preservados para revisão.",
+      "Central de Apostas distingue Abertas, A aguardar e Resultados, mostra o resultado oficial e resume a manutenção ou subida de posição.",
+      "Cada apostador vê o acerto do seu palpite e recebe um aviso quando o resultado é publicado ou corrigido, respeitando os seus canais de notificação.",
+    ],
+  },
   {
     version: "1.8.1",
     date: "2026-10-27",

@@ -237,3 +237,90 @@ test("swapping a pair with a single preserves each intermediate team position", 
   assert.equal(teamPosition(s.players, "p3"), 2);
   assert.equal(teamPosition(s.players, "p1"), 3);
 });
+
+test("correcting attacker to defender restores the original whole-team ranking, including a legacy incorrect swap", () => {
+  for (const legacy of [false, true]) {
+    const s = fixture(),
+      c = match(s);
+    const baseline = s.players.map((p) => p.position);
+    result(s, c);
+    if (legacy) {
+      delete s.results[0].rankingEffect;
+      // Simulates the old correction: official winner/stats already fixed but ranking untouched.
+      s.results[0].winnerId = c.defenderId;
+      s.results[0].loserId = c.challengerId;
+      c.winnerId = c.defenderId;
+    }
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.result.correct",
+        challengeId: c._id,
+        winnerId: c.defenderId,
+        setScores: [
+          { attacker: 1, defender: 6 },
+          { attacker: 4, defender: 6 },
+        ],
+        note: "Reconciliação validada",
+      },
+      now + 1000,
+    );
+    assert.deepEqual(
+      s.players.map((p) => p.position),
+      baseline,
+    );
+    assert.equal(s.results[0].rankingReviewRequired, false);
+    const history = s.history.length;
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.result.correct",
+        challengeId: c._id,
+        winnerId: c.defenderId,
+        setScores: [
+          { attacker: 1, defender: 6 },
+          { attacker: 4, defender: 6 },
+        ],
+        note: "Repetição segura",
+      },
+      now + 2000,
+    );
+    assert.equal(s.history.length, history);
+  }
+});
+test("later movement or protected players prevents automatic ranking reversal", () => {
+  const s = fixture(),
+    c = match(s);
+  result(s, c);
+  execute(
+    s,
+    admin,
+    { type: "admin.ranking.move", playerId: "p5", targetPlayerId: "p3" },
+    now + 1000,
+  );
+  const before = s.players.map((p) => p.position),
+    history = structuredClone(s.history);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.result.correct",
+      challengeId: c._id,
+      winnerId: c.defenderId,
+      setScores: [
+        { attacker: 1, defender: 6 },
+        { attacker: 4, defender: 6 },
+      ],
+      note: "Não apagar movimentos posteriores",
+    },
+    now + 2000,
+  );
+  assert.deepEqual(
+    s.players.map((p) => p.position),
+    before,
+  );
+  assert.deepEqual(s.history, history);
+  assert.equal(s.results[0].rankingReviewRequired, true);
+});

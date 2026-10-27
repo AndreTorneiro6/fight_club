@@ -406,6 +406,14 @@ export async function dispatchNotifications(
               player?.divisionId) &&
           Date.parse(effectiveOpening) <= Date.now());
       const allowed =
+        (!notification?.bettingResult ||
+          (await db.collection("matchVotes").findOne({
+            userId: notification.bettingResult.userId,
+            challengeId: notification.challengeId,
+            settlementVersion: notification.bettingResult.version,
+            settledFingerprint: notification.bettingResult.fingerprint,
+            withdrawnAt: null,
+          }))) &&
         (!notification?.bettingNotice ||
           (player?.status === "active" &&
             !player.awaitingApproval &&

@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { formatSetScores } from "@/lib/set-scores";
+import {
+  officialVotingResult,
+  officialResultNews,
+  matchVoteOutcome,
+  voteOutcomeLabel,
+} from "@/lib/match-vote-outcome";
 import type { View } from "@/lib/types";
 import { challengeTeamRanks } from "@/lib/challenge-team-ranks";
 import { isTitleMatch } from "@/lib/title-matches";
@@ -27,7 +33,9 @@ export default function AdminMatchVoting({
   connection?: "connecting" | "live" | "reconnecting";
 }) {
   const [division, setDivision] = useState("all"),
-    [group, setGroup] = useState<"open" | "mine" | "closed">("open"),
+    [group, setGroup] = useState<"open" | "mine" | "waiting" | "result">(
+      "open",
+    ),
     [selected, setSelected] = useState<string>(),
     [clock, setClock] = useState(Date.now());
   useEffect(() => {
@@ -71,7 +79,10 @@ export default function AdminMatchVoting({
   const grouped = {
     open: games.filter((c) => votingState(c).open),
     mine: games.filter((c) => votingState(c).mine),
-    closed: games.filter((c) => !votingState(c).open),
+    waiting: games.filter(
+      (c) => !votingState(c).open && !officialVotingResult(s, c),
+    ),
+    result: games.filter((c) => !!officialVotingResult(s, c)),
   };
   const settings = s.matchVotingSettings?.[0] ?? defaultMatchVotingSettings;
   return (
@@ -90,7 +101,8 @@ export default function AdminMatchVoting({
             [
               ["open", "Abertas"],
               ["mine", "Os meus palpites"],
-              ["closed", "Encerradas"],
+              ["waiting", "A aguardar"],
+              ["result", "Resultados"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -181,7 +193,9 @@ export default function AdminMatchVoting({
                 ? "Ainda não tens palpites guardados nesta divisão. Escolhe um jogo em Abertas para participar."
                 : group === "open"
                   ? "Não existem apostas abertas nesta divisão."
-                  : "Não existem apostas encerradas nesta divisão."}
+                  : group === "waiting"
+                    ? "Não existem jogos a aguardar resultado nesta divisão."
+                    : "Não existem resultados oficiais nesta divisão."}
             </p>
           )}
         </div>
@@ -190,6 +204,7 @@ export default function AdminMatchVoting({
   );
   function renderGame(c: View["challenges"][number], detail: boolean) {
     const { stored, mine, lockAt, open } = votingState(c);
+    const official = officialVotingResult(s, c);
     const summary = s.matchVoteSummaries?.find(
       (item) => item.challengeId === c._id,
     );
@@ -212,27 +227,69 @@ export default function AdminMatchVoting({
             {c.number}
           </span>
           <span className="badge">
-            {open ? "Votação aberta" : "Votação fechada"}
+            {official
+              ? "Resultado oficial"
+              : open
+                ? "Votação aberta"
+                : "A aguardar resultado"}
           </span>
         </div>
         <h3>
           {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
           {challengeTeamName(c, c.defenderId, s.players)}
         </h3>
-        <div className={styles.stakes}>
-          <strong>
-            {titleFight
-              ? "Jogo do título · 1.º lugar em disputa"
-              : ranks.defender
-                ? `${ranks.defender}.º lugar em disputa`
-                : "Disputa de ranking"}
-          </strong>
-          <small>
-            {knownRanks
-              ? `Se o ataque vencer, as duplas trocam o ${ranks.attacker}.º e o ${ranks.defender}.º lugares. Se a defesa vencer, mantêm as posições.`
-              : "As posições históricas deste jogo não estão disponíveis."}
-          </small>
-        </div>
+        {official && (
+          <section
+            className="inset stack"
+            aria-label={`Resultado oficial do jogo ${c.number}`}
+          >
+            <h4>Resultado oficial</h4>
+            <strong>
+              {official.sets
+                ? formatSetScores(official.sets)
+                : official.result.score || "Sets não indicados"}
+            </strong>
+            <small>Sets na ordem ATAQUE / DEFESA.</small>
+            <p>{officialResultNews(s, c)}</p>
+            {mine && (
+              <p role="status">
+                <strong>
+                  {
+                    voteOutcomeLabel[
+                      matchVoteOutcome(
+                        mine,
+                        official.result.winnerId,
+                        official.sets,
+                      )
+                    ]
+                  }
+                </strong>
+              </p>
+            )}
+          </section>
+        )}
+        {!official && (
+          <div className={styles.stakes}>
+            <strong>
+              {titleFight
+                ? "Jogo do título · 1.º lugar em disputa"
+                : ranks.defender
+                  ? `${ranks.defender}.º lugar em disputa`
+                  : "Disputa de ranking"}
+            </strong>
+            <small>
+              {knownRanks
+                ? `Se o ataque vencer, as duplas trocam o ${ranks.attacker}.º e o ${ranks.defender}.º lugares. Se a defesa vencer, mantêm as posições.`
+                : "As posições históricas deste jogo não estão disponíveis."}
+            </small>
+          </div>
+        )}
+        {!open && !official && (
+          <p role="status">
+            A votação fechou. A aguardar confirmação do resultado pelo
+            administrador.
+          </p>
+        )}
         <p className="muted">
           {lockAt
             ? `Votos até ${new Date(lockAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })}`

@@ -77,6 +77,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check official results and betting settlement
+        run: npx playwright test e2e/official-betting-results.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check challenge chat mentions
         run: npx playwright test e2e/chat-mentions.spec.ts
         env:

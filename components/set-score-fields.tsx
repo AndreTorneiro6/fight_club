@@ -29,6 +29,13 @@ export function SetScoreFields({ challenge: c }: { challenge: Challenge }) {
         Preenche os jogos de cada dupla na ordem ATAQUE / DEFESA. O 3.º set só é
         necessário em caso de 1–1; aceita super tie-break.
       </p>
+      <p>
+        <strong>ATAQUE:</strong>{" "}
+        {c.challengerTeam?.map((p) => p.name).join(" + ") ?? "Dupla atacante"}
+        <br />
+        <strong>DEFESA:</strong>{" "}
+        {c.defenderTeam?.map((p) => p.name).join(" + ") ?? "Dupla defensora"}
+      </p>
       {[0, 1, 2].map((i) => (
         <div className="form-grid" key={i}>
           <label>

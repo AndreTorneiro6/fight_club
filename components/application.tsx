@@ -2606,7 +2606,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
                 "Atacante e defensor aceitam o horário",
                 "Clube confirma o campo",
                 "Joga e comunica o resultado ao clube",
-                "O administrador regista o vencedor",
+                "O administrador regista o resultado por sets",
                 "O ranking atualiza automaticamente",
               ].map((t, i) => (
                 <div className="row" key={t}>
@@ -2754,7 +2754,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                     ...Object.fromEntries(new FormData(e.currentTarget)),
                     setScores: setScoresFromForm(e.currentTarget),
                   },
-                  "Resultado corrigido. Revê o ranking e o cinturão, se necessário.",
+                  "Resultado corrigido. O ranking é reconciliado quando não existem alterações posteriores. Revê os avisos de classificação.",
                 );
               }}
             >
@@ -2774,52 +2774,61 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                 <textarea name="note" required minLength={3} />
               </label>
               <p style={{ fontSize: 11 }}>
-                As estatísticas serão corrigidas. Para preservar as alterações
-                de jogos posteriores, revê a posição em Jogadores e o campeão em
-                Title Fight.
+                As estatísticas e a troca de posições são corrigidas quando é
+                seguro. Se existirem alterações posteriores, o ranking fica
+                assinalado para revisão administrativa.
               </p>
               <button disabled={busy}>Guardar correção</button>
             </form>
           )}
           {c.status !== "completed" && (
             <>
-              <label>
-                Declarar vencedor
-                <select id={"winner-" + c._id}>
-                  <option value="">Escolher jogador</option>
-                  {[c.challengerId, c.defenderId].map((pid) => (
-                    <option value={pid} key={pid}>
-                      {challengeTeamName(c, pid, s.players)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                disabled={busy || terminal.has(c.status)}
-                className="primary"
-                onClick={() => {
-                  const winnerId = (
-                    document.getElementById(
-                      "winner-" + c._id,
-                    ) as HTMLSelectElement
-                  ).value;
-                  if (
-                    winnerId &&
-                    confirm("Confirmar vencedor e atualizar ranking?")
-                  )
-                    void run(
-                      {
-                        type: "admin.resolve",
-                        challengeId: c._id,
-                        action: "winner",
-                        winnerId,
-                      },
-                      "Resultado resolvido.",
-                    );
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await run(
+                    {
+                      type: "admin.resolve",
+                      challengeId: c._id,
+                      action: "winner",
+                      ...Object.fromEntries(new FormData(e.currentTarget)),
+                      setScores: setScoresFromForm(e.currentTarget),
+                    },
+                    "Resultado resolvido.",
+                  );
                 }}
               >
-                Confirmar vencedor
-              </button>
+                <label>
+                  Declarar vencedor
+                  <select
+                    id={"winner-" + c._id}
+                    aria-label="Declarar vencedor"
+                    name="winnerId"
+                    required
+                    defaultValue=""
+                  >
+                    <option value="" disabled>
+                      Escolher vencedor
+                    </option>
+                    {[c.challengerId, c.defenderId].map((pid) => (
+                      <option value={pid} key={pid}>
+                        {challengeTeamName(c, pid, s.players)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SetScoreFields challenge={c} />
+                <p>
+                  O vencedor tem de corresponder aos sets. Uma vitória da defesa
+                  mantém as posições.
+                </p>
+                <button
+                  disabled={busy || terminal.has(c.status)}
+                  className="primary"
+                >
+                  Confirmar vencedor
+                </button>
+              </form>
               <div className="row wrap">
                 {[
                   ["extend", "Prolongar prazo"],
@@ -3969,12 +3978,22 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
   const [open, setOpen] = useState(false);
   if (s.actor.role !== "admin") return null;
   const completed = c.status === "completed";
+  const rankingReview = s.results.find(
+    (r) => r.challengeId === c._id,
+  )?.rankingReviewRequired;
   const ready =
     ["scheduled", "result_pending", "disputed"].includes(c.status) &&
     !!c.scheduledAt &&
     Date.parse(c.scheduledAt) + c.durationMinutes * 60000 <= Date.now();
   return (
     <div className="stack space-top">
+      {rankingReview && (
+        <p className="error" role="alert">
+          O resultado foi corrigido. O ranking precisa de revisão administrativa
+          porque existem alterações posteriores ou não é possível reconstruir a
+          troca em segurança.
+        </p>
+      )}
       <button
         className="primary"
         disabled={busy || (!completed && !ready)}
@@ -4012,7 +4031,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                     setScores: setScoresFromForm(e.currentTarget),
                   },
                   completed
-                    ? "Resultado corrigido. Revê o ranking e o cinturão, se necessário."
+                    ? "Resultado corrigido. O ranking é reconciliado quando não existem alterações posteriores. Revê os avisos de classificação."
                     : "Resultado registado. Estatísticas e ranking atualizados.",
                 )
               )
@@ -4053,9 +4072,9 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
                   />
                 </label>
                 <p>
-                  As estatísticas são corrigidas automaticamente. Revê as
-                  posições e o campeão: alterações de jogos posteriores são
-                  preservadas.
+                  As estatísticas e a troca de posições são corrigidas quando é
+                  seguro. Alterações posteriores são preservadas e ficam
+                  assinaladas para revisão.
                 </p>
               </>
             ) : (

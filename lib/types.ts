@@ -229,6 +229,7 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  bettingResult?: { userId: string; version: number; fingerprint: string };
   bettingNotice?: boolean;
   chatMessageId?: string;
   weeklyChallengeOpening?: {
@@ -287,6 +288,17 @@ export interface Match extends Entity {
   seasonId: string;
 }
 export interface Result extends Entity {
+  rankingEffect?: {
+    model: "swap" | "leapfrog";
+    before: { playerId: string; position: number }[];
+    after: { playerId: string; position: number }[];
+  };
+  rankingOutcome?: {
+    before: { attacker: number; defender: number };
+    after: { attacker: number; defender: number };
+  };
+  rankingReconciledAt?: string;
+  rankingReviewRequired?: boolean;
   approvedBy?: string;
   championsBefore?: Champion[];
   championsAfter?: Champion[];

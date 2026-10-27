@@ -518,6 +518,43 @@ test("outbox commits with events, fans out admins, respects consent, leases work
       bettingDelivery?.path,
       "/apostas?jogo=public-betting-game#mensagem-chat-123",
     );
+    // A delayed old outcome must not be sent after an official correction.
+    await transaction((s) => {
+      s.matchVotes ??= [];
+      s.matchVotes.push({
+        _id: "settled-vote",
+        challengeId: "public-betting-game",
+        userId: actor.userId,
+        playerId: actor.playerId,
+        winnerId: "player-5",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lockAt: new Date().toISOString(),
+        settlementVersion: 2,
+        settledFingerprint: "latest",
+      });
+      const base = s.notifications.find(
+        (n) => n._id === "betting-outsider-notice",
+      )!;
+      for (const [id, version, fingerprint] of [
+        ["old-result", 1, "old"],
+        ["latest-result", 2, "latest"],
+      ] as const)
+        s.notifications.push({
+          ...base,
+          _id: id,
+          bettingResult: { userId: actor.userId, version, fingerprint },
+        });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "old-result" }))?.status,
+      "skipped",
+    );
+    assert.equal(
+      (await queue.findOne({ notificationId: "latest-result" }))?.status,
+      "sent",
+    );
   } finally {
     await clientToClose?.close();
     process.env = previous;

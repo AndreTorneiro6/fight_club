@@ -3,6 +3,13 @@ import { matchScorePrediction } from "./match-score-prediction";
 import { challengeParticipants } from "./team-competition";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+import {
+  officialVotingResult,
+  matchVoteOutcome,
+  voteOutcomeLabel,
+} from "./match-vote-outcome";
+import { formatSetScores } from "./set-scores";
 import { editChatMessage } from "./edit-chat-message";
 import type { Actor, Message, State } from "./types";
 import { ensure } from "./rules";
@@ -14,6 +21,8 @@ import {
 } from "./match-voting-targets";
 
 export interface MatchVote {
+  settledFingerprint?: string;
+  settlementVersion?: number;
   _id: string;
   challengeId: string;
   userId: string;
@@ -463,7 +472,7 @@ function bettingNotice(
     state.notifications.some((n) => n.dedupe === dedupe)
   )
     return;
-  state.notifications.push({
+  const notice: State["notifications"][number] = {
     _id: randomUUID(),
     playerId,
     title,
@@ -471,11 +480,63 @@ function bettingNotice(
     dedupe,
     read: false,
     createdAt: at,
-    kind: "general",
+    kind: "general" as const,
     bettingNotice: true,
     challengeId,
     chatMessageId,
-  });
+  };
+  state.notifications.push(notice);
+  return notice;
+}
+/** Official result changes notify active bettors once per version, including corrections. */
+export function settleMatchVotes(state: State, timestamp: number) {
+  const at = new Date(timestamp).toISOString();
+  for (const c of state.challenges.filter((c) => isVotingMatch(state, c))) {
+    const official = officialVotingResult(state, c);
+    if (!official) continue;
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify([official.result.winnerId, official.sets ?? null]))
+      .digest("hex");
+    for (const vote of state.matchVotes ?? []) {
+      if (
+        vote.challengeId !== c._id ||
+        vote.withdrawnAt ||
+        vote.settledFingerprint === fingerprint
+      )
+        continue;
+      const player = state.players.find(
+        (p) => p._id === vote.playerId && p.userId === vote.userId,
+      );
+      if (
+        !player ||
+        player.status !== "active" ||
+        player.awaitingApproval ||
+        player.registrationRejectedAt
+      )
+        continue;
+      const corrected = !!vote.settledFingerprint;
+      vote.settlementVersion = (vote.settlementVersion ?? 0) + 1;
+      const notice = bettingNotice(
+        state,
+        undefined,
+        player._id,
+        corrected
+          ? "Resultado do teu palpite atualizado"
+          : "O resultado do teu palpite já está disponível",
+        `Jogo #${c.number}: ${voteOutcomeLabel[matchVoteOutcome(vote, official.result.winnerId, official.sets)]}${official.sets ? ` Resultado oficial (ataque / defesa): ${formatSetScores(official.sets)}.` : ""}`,
+        `bet-result:${c._id}:${vote.userId}:${vote.settlementVersion}`,
+        at,
+        c._id,
+      );
+      if (notice)
+        notice.bettingResult = {
+          userId: vote.userId,
+          version: vote.settlementVersion,
+          fingerprint,
+        };
+      vote.settledFingerprint = fingerprint;
+    }
+  }
 }
 export function processMatchVotingAnnouncement(
   state: State,

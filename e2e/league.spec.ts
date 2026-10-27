@@ -174,10 +174,13 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   expect(denied.status()).toBe(403);
   await login(admin, "admin@fightclub.local");
   await admin.goto(challengePath);
-  admin.once("dialog", (dialog) => dialog.accept());
   await admin
     .locator("#winner-" + challengePath.split("/").pop())
     .selectOption("player-7");
+  for (const i of [1, 2]) {
+    await admin.getByLabel(`${i}.º set ATAQUE`, { exact: true }).fill("6");
+    await admin.getByLabel(`${i}.º set DEFESA`, { exact: true }).fill("4");
+  }
   await admin
     .getByRole("button", { name: "Confirmar vencedor", exact: true })
     .click();
@@ -379,6 +382,10 @@ test("themes, rule/prize publication and administrative attack/defense assignmen
   await page
     .getByRole("combobox", { name: "Jogador em ataque" })
     .selectOption("player-7");
+  for (const i of [1, 2]) {
+    await admin.getByLabel(`${i}.º set ATAQUE`, { exact: true }).fill("6");
+    await admin.getByLabel(`${i}.º set DEFESA`, { exact: true }).fill("4");
+  }
   await page
     .getByRole("combobox", { name: "Jogador em defesa" })
     .selectOption("player-5");
@@ -536,10 +543,18 @@ test("admin sees weekly calendar on existing challenges and players see why new 
     admin.getByRole("heading", { name: "Jogo confirmado", exact: true }),
   ).toBeVisible();
   await defenderContext.close();
-  await expect(admin.getByRole("heading", { name: "Calendário do jogo", exact: true })).toBeVisible();
-  await expect(admin.getByLabel("Horário confirmado do jogo", { exact: true })).toContainText("Campo 2");
-  await expect(admin.getByLabel("Calendário semanal do desafio")).toHaveCount(0);
-  await expect(admin.getByLabel("Dia para consultar", { exact: true })).toHaveCount(0);
+  await expect(
+    admin.getByRole("heading", { name: "Calendário do jogo", exact: true }),
+  ).toBeVisible();
+  await expect(
+    admin.getByLabel("Horário confirmado do jogo", { exact: true }),
+  ).toContainText("Campo 2");
+  await expect(admin.getByLabel("Calendário semanal do desafio")).toHaveCount(
+    0,
+  );
+  await expect(
+    admin.getByLabel("Dia para consultar", { exact: true }),
+  ).toHaveCount(0);
   expect(
     await admin.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,

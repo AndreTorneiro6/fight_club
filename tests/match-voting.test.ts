@@ -784,3 +784,79 @@ test("match-discussion: authors edit/delete with concurrency protection; others 
   assert.equal(s.audit.length, audit + 1);
   assert.equal(JSON.parse(s.audit.at(-1)!.details).before.text, "Corrigida");
 });
+
+test("official result settles only active bettors, distinguishes exact/winner/miss, and deduplicates corrections", async () => {
+  const { settleMatchVotes } = await import("../lib/match-voting");
+  const { matchVoteOutcome, officialResultNews, votingPhase } =
+    await import("../lib/match-vote-outcome");
+  const s = fixture(),
+    c = s.challenges[0];
+  const sets = [
+    { attacker: 1, defender: 6 },
+    { attacker: 4, defender: 6 },
+  ];
+  s.matchVotes = [1, 2, 3, 4].map((i) => ({
+    _id: `v${i}`,
+    challengeId: c._id,
+    userId: `u${i}`,
+    playerId: `p${i}`,
+    winnerId: i === 3 ? c.challengerId : c.defenderId,
+    setScores:
+      i === 2
+        ? [
+            { attacker: 2, defender: 6 },
+            { attacker: 4, defender: 6 },
+          ]
+        : sets,
+    createdAt: new Date(at).toISOString(),
+    updatedAt: new Date(at).toISOString(),
+    lockAt: new Date(at + 1000).toISOString(),
+    ...(i === 4 ? { withdrawnAt: new Date(at + 500).toISOString() } : {}),
+  }));
+  assert.equal(votingPhase(s, c, at), "open");
+  assert.equal(votingPhase(s, c, Date.parse(c.scheduledAt!)), "waiting");
+  settleMatchVotes(s, at);
+  assert.equal(s.notifications.length, 0);
+  c.status = "completed";
+  c.winnerId = c.defenderId;
+  c.setScores = sets;
+  s.results = [
+    {
+      _id: "r",
+      challengeId: c._id,
+      winnerId: c.defenderId,
+      loserId: c.challengerId,
+      score: "1-6, 4-6",
+      setScores: sets,
+      confirmedAt: new Date(at).toISOString(),
+      seasonId: "season",
+      rankingOutcome: {
+        before: { attacker: 8, defender: 7 },
+        after: { attacker: 8, defender: 7 },
+      },
+    },
+  ];
+  assert.equal(votingPhase(s, c, at), "result");
+  assert.equal(matchVoteOutcome(s.matchVotes[0], c.defenderId, sets), "exact");
+  assert.equal(matchVoteOutcome(s.matchVotes[1], c.defenderId, sets), "winner");
+  assert.equal(matchVoteOutcome(s.matchVotes[2], c.defenderId, sets), "miss");
+  assert.match(officialResultNews(s, c)!, /mantêm o 7/);
+  settleMatchVotes(s, at);
+  assert.equal(s.notifications.length, 3);
+  settleMatchVotes(s, at + 1);
+  assert.equal(s.notifications.length, 3);
+  assert(
+    s.notifications.every(
+      (n) => n.bettingNotice && n.bettingResult?.version === 1,
+    ),
+  );
+  s.results[0].setScores = [
+    { attacker: 2, defender: 6 },
+    { attacker: 4, defender: 6 },
+  ];
+  settleMatchVotes(s, at + 2);
+  assert.equal(s.notifications.length, 6);
+  settleMatchVotes(s, at + 3);
+  assert.equal(s.notifications.length, 6);
+  assert(s.notifications.slice(3).every((n) => n.title.includes("atualizado")));
+});

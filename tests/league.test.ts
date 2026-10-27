@@ -392,6 +392,10 @@ test("disputes notify admins and administrative resolution applies exactly once"
           challengeId: c._id,
           action: "winner",
           winnerId: "p6",
+          setScores: [
+            { attacker: 4, defender: 6 },
+            { attacker: 3, defender: 6 },
+          ],
         },
         later,
       ),
@@ -405,6 +409,10 @@ test("disputes notify admins and administrative resolution applies exactly once"
       challengeId: c._id,
       action: "winner",
       winnerId: "p6",
+      setScores: [
+        { attacker: 4, defender: 6 },
+        { attacker: 3, defender: 6 },
+      ],
     },
     later,
   );
@@ -598,6 +606,10 @@ test("champion changes after confirmed title fight and former reign is archived"
       challengeId: c._id,
       action: "winner",
       winnerId: "p2",
+      setScores: [
+        { attacker: 6, defender: 4 },
+        { attacker: 6, defender: 3 },
+      ],
     },
     time + 86400000,
   );
@@ -647,7 +659,7 @@ test("paused season prevents new challenges", () => {
   s.seasons[0].status = "paused";
   assert.throws(() => create(s), /época ativa/);
 });
-test("correcting a confirmed result updates statistics without erasing later ranking history", () => {
+test("correcting an untouched confirmed result reconciles ranking and preserves its original history", () => {
   const s = fixture(),
     c = schedule(s),
     later = time + 2 * 86400000;
@@ -679,7 +691,9 @@ test("correcting a confirmed result updates statistics without erasing later ran
   assert.equal(s.players[7].wins, 0);
   assert.equal(s.players[7].losses, 1);
   assert.equal(s.players[5].wins, 1);
-  assert.deepEqual(s.history, oldHistory);
+  assert.deepEqual(s.history.slice(0, oldHistory.length), oldHistory);
+  assert.equal(s.players[5].position, 6);
+  assert.equal(s.players[7].position, 8);
   assert.equal(s.results.length, 1);
   assert.equal(s.results[0].winnerId, "p6");
   assert(s.audit.some((a) => a.action === "result.corrected"));

@@ -2,7 +2,13 @@ import { executeClubPhotos } from "./club-photos";
 import {
   executeMatchVoting,
   processMatchVotingAnnouncement,
+  settleMatchVotes,
 } from "./match-voting";
+import {
+  resultPositions,
+  resultTeamRanks,
+  reconcileResultRanking,
+} from "./result-ranking";
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
 import { editChatMessage } from "./edit-chat-message";
@@ -544,6 +550,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     challengeId: id,
     action: z.enum(["winner", "void", "replay", "extend"]),
     winnerId: id.optional(),
+    setScores: setScoresSchema.optional(),
     score: short.optional(),
   }),
   z.object({
@@ -1113,6 +1120,8 @@ export function execute(
       s.players,
     ).map(player);
     const defenderRankBefore = teamPosition(s.players, c.defenderId);
+    const rankingBefore = resultPositions(s, c);
+    const ranksBefore = resultTeamRanks(s, c);
 
     ensure(
       w.divisionId === c.divisionId && l.divisionId === c.divisionId,
@@ -1248,6 +1257,12 @@ export function execute(
       confirmedAt: now,
       approvedBy: actor.userId,
       seasonId: c.seasonId,
+      rankingEffect: {
+        model: rules.rankingModel,
+        before: rankingBefore,
+        after: resultPositions(s, c),
+      },
+      rankingOutcome: { before: ranksBefore, after: resultTeamRanks(s, c) },
       ...(titleChange
         ? {
             championsBefore,
@@ -1264,6 +1279,8 @@ export function execute(
         actor.userId,
         timestamp,
       );
+    s.results.at(-1)!.rankingOutcome!.after = resultTeamRanks(s, c);
+    settleMatchVotes(s, timestamp);
     notifyTeam(
       w._id,
       "Vitória confirmada 🏆",
@@ -4062,7 +4079,11 @@ export function execute(
       if (cmd.action === "winner") {
         ensure(!terminal.has(c.status), "Jogo já encerrado.");
         ensure(cmd.winnerId, "Escolhe o vencedor.");
-        applyResult(c, cmd.winnerId, cmd.score ?? c.score ?? "");
+        ensure(
+          cmd.setScores,
+          "Indica o resultado por sets para confirmar o vencedor.",
+        );
+        applyResult(c, cmd.winnerId, cmd.score ?? c.score ?? "", cmd.setScores);
       }
       if (cmd.action === "void") {
         ensure(
@@ -4416,6 +4437,17 @@ export function execute(
         : undefined;
       const score = sets ? formatSetScores(sets) : cmd.score;
       const before = structuredClone(result);
+      const rankingAction = c.competitionRoundId
+        ? "managed"
+        : reconcileResultRanking(
+            s,
+            c,
+            result,
+            cmd.winnerId,
+            now,
+            (id) => !frozenRanking(s, id, timestamp),
+          );
+      result.rankingReviewRequired = rankingAction === "manual_review";
       if (result.winnerId !== cmd.winnerId) {
         const oldWinner = player(result.winnerId),
           oldLoser = player(result.loserId);
@@ -4452,19 +4484,22 @@ export function execute(
       c.setScores = sets;
       c.winnerId = cmd.winnerId;
       c.score = score;
-      if (c.competitionRoundId)
+      if (c.competitionRoundId) {
         updateCompetitionRanking(
           s,
           c.competitionRoundId,
           actor.userId,
           timestamp,
         );
-      // Legacy corrections still require explicit review of subsequent ranking changes.
+        if (result.rankingOutcome)
+          result.rankingOutcome.after = resultTeamRanks(s, c);
+      }
+      // Unsafe legacy corrections remain explicitly flagged for manual review.
       log("result.corrected", {
         before,
         after: result,
         note: cmd.note,
-        rankingAction: "manual_review",
+        rankingAction,
       });
       for (const pid of challengeParticipants(c, s.players))
         notify(
@@ -4473,6 +4508,7 @@ export function execute(
           `${cmd.note} · Vitória: ${player(cmd.winnerId).name}`,
           c._id,
         );
+      settleMatchVotes(s, timestamp);
       break;
     }
     case "admin.champions.clear": {
@@ -4835,6 +4871,7 @@ export function processDeadlines(
   generateRoles = true,
 ) {
   processMatchVotingAnnouncement(s, timestamp);
+  settleMatchVotes(s, timestamp);
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);
     autoWeeklyRanking(s, timestamp);

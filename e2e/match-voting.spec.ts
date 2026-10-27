@@ -74,7 +74,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
   await mineGroup.click();
   await expect(central).toContainText("Ainda não tens palpites guardados");
   await expect(card).toHaveCount(0);
-  await groups.getByRole("button", { name: /^Encerradas/ }).click();
+  await groups.getByRole("button", { name: /^A aguardar/ }).click();
   await expect(card).toHaveCount(0);
   await openGroup.click();
   const timer = card.getByRole("timer", {
@@ -336,8 +336,8 @@ test("central shares one prediction across workspaces and keeps configuration ad
   await page.clock.runFor(1100);
   await expect(card).toHaveCount(0);
   await mineGroup.click();
-  await expect(card).toContainText("Votação fechada");
-  await groups.getByRole("button", { name: /^Encerradas/ }).click();
+  await expect(card).toContainText("A aguardar resultado");
+  await groups.getByRole("button", { name: /^A aguardar/ }).click();
   await expect(card).toContainText("O teu palpite");
   await card.getByRole("button", { name: "Abrir conversa do jogo" }).click();
   await expect(
