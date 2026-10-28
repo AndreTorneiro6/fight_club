@@ -79,7 +79,9 @@ test("both admins preview spectator; only admin assignment enables spectators, w
     .click();
   await expect(page).toHaveURL(/\/admin/);
   const tour = page.getByRole("button", { name: "Saltar visita", exact: true });
-  if (await tour.isVisible()) await tour.click();
+  await expect(tour).toBeVisible();
+  await tour.click();
+  await expect(page.locator(".walkthrough-dialog")).not.toBeVisible();
   const adminState = await state(page);
   const target = adminState.players.find(
     (p: any) => p.email === "jogador@fightclub.local",
