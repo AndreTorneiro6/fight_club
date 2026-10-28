@@ -18,7 +18,6 @@ export const managementLinks = [
 export const playerLinks = [
   ["jornadas", "Jornadas oficiais"],
   ["cartoes", "Cartões de jogador"],
-  ["palpites", "Palpites dos jogos"],
   ...leagueInformationLinks,
   ["ajuda", "Como usar a app"],
 ] as const;

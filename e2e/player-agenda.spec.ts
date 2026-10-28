@@ -14,6 +14,9 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
   await page
     .getByRole("button", { name: "Saltar visita", exact: true })
     .click();
+  await expect(
+    page.getByRole("link", { name: "Palpites dos jogos", exact: true }),
+  ).toHaveCount(0);
   const state = await (await page.request.get("/api/league")).json();
   const game = state.challenges.find(
     (c: { status: string; scheduledAt?: string }) =>
@@ -23,6 +26,24 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
   expect([game.challengerId, game.defenderId]).not.toContain(
     state.actor.playerId,
   );
+  const myDivision = state.players.find(
+    (p: any) => p._id === state.actor.playerId,
+  ).divisionId;
+  expect(game.divisionId).not.toBe(myDivision);
+  const otherDivision = game.divisionId;
+  await page.route("**/api/league", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const data = await response.json();
+    data.challenges.push({
+      ...game,
+      _id: "agenda-my-division",
+      divisionId: myDivision,
+      number: 988,
+    });
+    await route.fulfill({ response, json: data });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/jogos");
   await expect(page.getByLabel("Dia para consultar")).toHaveCount(0);
   await expect(
@@ -30,6 +51,29 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
   ).toHaveClass("active");
   const link = page.locator(`a.challenge-card[href="/desafios/${game._id}"]`);
   await expect(link).toBeVisible();
+  const other = page.locator(
+    'a.challenge-card[href="/desafios/agenda-my-division"]',
+  );
+  await expect(other).toBeVisible();
+  await page.getByRole("button", { name: "Minha liga", exact: true }).click();
+  await expect(page.getByLabel("Liga dos jogos", { exact: true })).toHaveValue(
+    myDivision,
+  );
+  await expect(link).toHaveCount(0);
+  await expect(other).toBeVisible();
+  await page
+    .getByLabel("Liga dos jogos", { exact: true })
+    .selectOption(otherDivision);
+  await expect(link).toBeVisible();
+  await expect(other).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Chat do desafio", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Jogos da liga", exact: true })
+    .click();
+  await expect(link).toBeVisible();
+  await expect(other).toBeVisible();
   await page.getByRole("button", { name: "Meus jogos", exact: true }).click();
   await expect(link).not.toBeVisible();
   await expect(
@@ -41,6 +85,21 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
     .getByRole("button", { name: "Jogos da liga", exact: true })
     .click();
   await expect(link).toBeVisible();
+  await page.goto(`/desafios/${game._id}`);
+  await expect(
+    page.getByRole("heading", { name: "Chat do desafio", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: "/var/tmp/fc-player-game-filter-mobile.png",
+    fullPage: true,
+  });
+  await page.goto("/palpites");
+  await expect(
+    page.getByRole("heading", { name: "Central de Apostas", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Palpites Fight Club", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("admin and player competition calendars share the configured first week and cannot navigate into preparation", async ({

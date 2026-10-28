@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.5";
+export const applicationVersion = "1.11.6";
 export const releaseNotes = [
+  {
+    version: "1.11.6",
+    date: "2026-10-28",
+    title: "Filtrar Jogos pela tua liga",
+    changes: [
+      "Atalho Minha liga e filtro Ouro/Prata/Bronze na agenda, disponíveis também no telemóvel.",
+      "Meus jogos continua a mostrar só a tua dupla; Jogos da liga permite voltar a todos os confrontos.",
+      "Chat privado mantém-se dentro do jogo para participantes e admins; chat público apenas nas Apostas.",
+      "Palpites dos jogos removido do menu de jogador; o acesso antigo abre a Central de Apostas e o selo Novo expira três dias após o lançamento.",
+    ],
+  },
   {
     version: "1.11.5",
     date: "2026-10-28",

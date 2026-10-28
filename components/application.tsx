@@ -79,7 +79,7 @@ import { AdminSponsors, SponsorPage, PrizeSponsor } from "./sponsors";
 import { AdminPlayerCards } from "./player-attributes";
 import WorkspaceChoice, { WorkspaceSwitcher } from "./workspace-choice";
 import { PlayerCards } from "./player-cards";
-import { EngagementAdmin, PredictionCenter } from "./prediction-center";
+import { EngagementAdmin } from "./prediction-center";
 import {
   CompetitionMatchmaking,
   PlayerCompetition,
@@ -696,11 +696,9 @@ export function Application({
                 icon:
                   path === "cartoes"
                     ? UserRound
-                    : path === "palpites"
-                      ? Target
-                      : path === "ajuda"
-                        ? BookOpen
-                        : CalendarDays,
+                    : path === "ajuda"
+                      ? BookOpen
+                      : CalendarDays,
               }))
               .map((n) => (
                 <Link
@@ -861,15 +859,13 @@ export function Application({
             <PlayerCards revision={s} />
           ) : route === "jornadas" ? (
             <PlayerCompetition s={s} run={safeRun} busy={busy} />
-          ) : route === "apostas" ? (
+          ) : ["apostas", "palpites"].includes(route) ? (
             <AdminMatchVoting
               state={s}
               run={safeRun}
               busy={busy}
               connection={chatConnection}
             />
-          ) : route === "palpites" ? (
-            <PredictionCenter revision={s} />
           ) : route === "notificacoes" ? (
             <Notifications {...actions} />
           ) : route === "ajuda" ? (
@@ -1371,7 +1367,10 @@ function Dashboard(a: Actions) {
       <Link href="/apostas" className="panel betting-highlight">
         <Target size={28} aria-hidden="true" />
         <div>
-          <span className="badge">NOVO</span>
+          {Date.now() >= Date.parse("2026-10-27T00:00:00+00:00") &&
+            Date.now() < Date.parse("2026-10-30T00:00:00+00:00") && (
+              <span className="badge">NOVO</span>
+            )}
           <h2>Central de Apostas</h2>
           <p>
             Prevê os sets, acompanha os teus palpites e entra na conversa de
@@ -2293,7 +2292,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
     c = s.challenges.find((c) => c._id === id),
     [refuse, setRefuse] = useState(false);
   if (!c) return <Empty text="Desafio não encontrado." />;
-  const mine = involves(c, s.actor.playerId),
+  const mine = involves(c, s.actor.playerId, s.players),
     admin = s.actor.role === "admin",
     status = effectiveStatus(c),
     opponentId =
@@ -2962,6 +2961,10 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
 function Games(a: Actions) {
   const { s } = a;
   const [all, setAll] = useState(true);
+  const [division, setDivision] = useState("all");
+  const myDivision = s.players.find(
+    (p) => p._id === s.actor.playerId,
+  )?.divisionId;
   const [selectedWeek, setWeek] = useState(() =>
     initialAgendaWeek(s.challenges),
   );
@@ -2972,6 +2975,7 @@ function Games(a: Actions) {
         (c.scheduledAt || c.scheduleProposal) &&
         clubWeek(matchStart(c) ?? c.createdAt).start === week &&
         (all || involves(c, s.actor.playerId, s.players)) &&
+        (division === "all" || c.divisionId === division) &&
         !["cancelled", "refused", "expired"].includes(c.status),
     )
     .sort(matchOrder());
@@ -3006,15 +3010,53 @@ function Games(a: Actions) {
           {s.actor.role !== "spectator" && (
             <button
               className={!all ? "active" : ""}
-              onClick={() => setAll(false)}
+              onClick={() => {
+                setAll(false);
+                setDivision("all");
+              }}
             >
               Meus jogos
             </button>
           )}
-          <button className={all ? "active" : ""} onClick={() => setAll(true)}>
+          <button
+            className={all && division === "all" ? "active" : ""}
+            onClick={() => {
+              setAll(true);
+              setDivision("all");
+            }}
+          >
             Jogos da liga
           </button>
+          {myDivision && s.actor.role !== "spectator" && (
+            <button
+              className={all && division === myDivision ? "active" : ""}
+              onClick={() => {
+                setAll(true);
+                setDivision(myDivision);
+              }}
+            >
+              Minha liga
+            </button>
+          )}
         </div>
+        <label>
+          Liga dos jogos
+          <select
+            aria-label="Liga dos jogos"
+            value={division}
+            onChange={(e) => {
+              setDivision(e.target.value);
+              setAll(true);
+            }}
+          >
+            <option value="all">Todas as ligas</option>
+            {s.divisions.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {games.length ? (
         <div className="challenge-grid">
@@ -3031,7 +3073,9 @@ function Games(a: Actions) {
           <Empty
             text={
               all
-                ? "Não existem jogos marcados para esta semana. Consulta as outras semanas na agenda."
+                ? division !== "all"
+                  ? "Não existem jogos desta liga marcados para esta semana. Consulta outra liga ou semana."
+                  : "Não existem jogos marcados para esta semana. Consulta as outras semanas na agenda."
                 : "A tua dupla não tem jogos marcados nesta semana. Consulta Jogos da liga para ver os outros confrontos."
             }
           />
