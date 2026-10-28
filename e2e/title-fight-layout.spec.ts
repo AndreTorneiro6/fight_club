@@ -97,13 +97,11 @@ test("title fight template uses live teams, division filters, collapsible result
   await expect(
     page.getByRole("link", { name: "Gerar cartazes dos jogos pelo título" }),
   ).toBeVisible();
-  const history = page
-    .locator("details")
-    .filter({
-      has: page.locator("summary", {
-        hasText: "Histórico dos jogos pelo título",
-      }),
-    });
+  const history = page.locator("details").filter({
+    has: page.locator("summary", {
+      hasText: "Histórico dos jogos pelo título",
+    }),
+  });
   await expect(history).not.toHaveAttribute("open", "");
   await page.getByLabel("Divisão dos jogos do título").selectOption("bronze");
   await expect(upcoming.locator("[data-title-match]")).toHaveCount(1);
@@ -167,11 +165,21 @@ test("title fight template uses live teams, division filters, collapsible result
   await page.setViewportSize({ width: 320, height: 720 });
   await page.reload();
   await expect(upcoming).toContainText("Rodrigues de Albuquerque");
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.evaluate(() =>
+    document.documentElement.setAttribute("data-theme", "fight-club"),
+  );
+  await expect(upcoming.locator("a.challenge-card").first()).toHaveCSS(
+    "background-image",
+    /title-fight-arena\.png/,
+  );
   await page.screenshot({
     path: "test-results/title-fight-mobile-long-names.png",
     fullPage: true,

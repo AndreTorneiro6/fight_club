@@ -1,3 +1,13 @@
+## Title Fight final theme isolation verified before publication — 28 October 2026
+
+- Found a global themed challenge-card background rule overriding the arena image when data-theme=fight-club. Confirmed via browser (background-image became none), fixed specificity inside the scoped page styles, added explicit theme regression assertion and bounded long team-name width. Browser geometry assertion waits for web fonts after reload; repeated stable320px long-name render passes. Required typecheck,450 tests/build and dedicated layout browser pass on final source.
+- Initial UI run40676740967 passed ALL hosted checks but was intentionally cancelled during image build before any live replacement, after verifying marker1189614/1.10.1. This prevents publishing the discovered theme issue. The app/worker stayed on the already-verified1.10.1. Follow-up commit retains version1.11.0 because no UI release was deployed. New complete pipeline still required before marking UI live.
+
+## Version1.10.1 season-summary fix live while1.11.0 proceeds — 28 October 2026
+
+- Run40674534156 succeeded at1189614ee3915af7d394af3928ede925dc47da23; exact Pi marker/package1.10.1, healthy app and running worker verified. Read-only live season summary:3 divisions only (Ouro23, Prata24, Bronze19),66 competitive players and1 spectator excluded. Current Bronze champion remains Hélder Mota + Mário Simões. Effective leagueEmailsEnabled=false. No additional production mutations during verification.
+- Title Fight UI release7ca82898fdc1d15e251f6d8c722959e89816fd52 / run40676740967 now in hosted checks after serialized predecessor completed. Monitor until fully deployed; contains the1.10.1 fix. Final operational note remains local pending that completion.
+
 ## Version1.11.0 Title Fight layout prepared — 28 October 2026
 
 - New user request: adapt Title Fight UI/layout to templates/layout_title_fight.jpeg. Implemented dedicated components/title-fights.tsx + scoped CSS, with dark arena, metallic/chamfered cards, gold attack/silver defense strips, live team names around VS, state, division emblem and Portugal-local date/time. Current Fight Club brand and official club logo retained; screenshot reference labels/sample names not baked into UI. Division filters/admin poster link/calendar exports retained; historical sets/winner shown in native collapsible history, admin-only unconfirmed games retained, spectator cards link to public Apostas rather than private challenge detail.
