@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.1";
+export const applicationVersion = "1.11.2";
 export const releaseNotes = [
+  {
+    version: "1.11.2",
+    date: "2026-10-28",
+    title: "Resumo acompanha jogos desde o início",
+    changes: [
+      "Jogos em curso entram nas pendências do Resumo assim que começa o horário marcado, com acesso à agenda e ao jogo.",
+      "No fim do horário previsto, a pendência passa automaticamente para Resultados por registar; desaparece após confirmação dos sets oficiais.",
+      "Resumo atualiza nas mudanças de horário e ao regressar à aplicação, sem exigir recarregar a página.",
+    ],
+  },
   {
     version: "1.11.1",
     date: "2026-10-28",

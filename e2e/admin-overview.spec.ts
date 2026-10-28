@@ -1,4 +1,7 @@
-import { canRecordOfficialResult } from "../lib/result-readiness";
+import {
+  canRecordOfficialResult,
+  isMatchInProgress,
+} from "../lib/result-readiness";
 import { applicationVersion, releaseNotes } from "../lib/release-notes";
 import { weeklyChallengeWeek } from "../lib/weekly";
 import { effectiveStatus } from "../lib/rules";
@@ -44,6 +47,7 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
       (c: any) =>
         c.status === "disputed" ||
         canRecordOfficialResult(c) ||
+        isMatchInProgress(c) ||
         (c.weekStart === weeklyChallengeWeek(state) &&
           effectiveStatus(c) === "expired") ||
         (c.status === "schedule_pending" &&

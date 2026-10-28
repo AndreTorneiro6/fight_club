@@ -1,8 +1,30 @@
 import { test, expect } from "@playwright/test";
 import { enterAdminWorkspace } from "./workspace-helper";
-test("admin overview shows ended scheduled games and removes the task after recording sets", async ({
+test("overview follows game start and end without reload, then removes the task after official sets", async ({
   page,
 }) => {
+  const base = Date.now();
+  const start = base + 10 * 60000;
+  const end = start + 90 * 60000;
+  await page.clock.install({ time: new Date(base) });
+  await page.route("**/api/league", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const data = await response.json();
+    const game = data.challenges?.find(
+      (c: any) => c._id === "test-transition-game",
+    );
+    if (game?.status === "scheduled") {
+      game.scheduledAt = new Date(start).toISOString();
+      game.durationMinutes = 90;
+      for (const booking of data.matches ?? [])
+        if (booking.challengeId === game._id) {
+          booking.start = new Date(start).toISOString();
+          booking.end = new Date(end).toISOString();
+        }
+    }
+    await route.fulfill({ response, json: data });
+  });
   await page.goto("/auth");
   await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
   await page
@@ -19,8 +41,36 @@ test("admin overview shows ended scheduled games and removes the task after reco
     exact: true,
   });
   const task = panel.getByRole("button", { name: /Resultados por registar/ });
+  const ongoing = panel.getByRole("button", { name: /Jogos em curso/ });
+  await expect(panel).toBeVisible();
+  await page.clock.pauseAt(new Date(start - 1000));
+  await expect(task).toHaveCount(0);
+  await expect(ongoing).toHaveCount(0);
+  await expect(panel.locator(":scope > .row .badge")).toHaveText("0 pendentes");
+  await page.clock.runFor(1001);
+  await expect(ongoing).toBeVisible();
+  await expect(ongoing.locator(".admin-task-count")).toHaveText("1");
+  await expect(task).toHaveCount(0);
+  await expect(panel.locator(":scope > .row .badge")).toHaveText("1 pendentes");
+  await expect(
+    panel
+      .getByRole("link")
+      .filter({ hasText: "Em curso · A aguardar resultado" }),
+  ).toHaveAttribute("href", "/desafios/test-transition-game");
+  await ongoing.click();
+  await expect(
+    page.getByRole("heading", { name: "Agenda de jogos", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Registar resultado", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Resumo", exact: true }).click();
+  await expect(ongoing).toBeVisible();
+  await page.clock.fastForward(90 * 60000);
+  await expect(ongoing).toHaveCount(0);
   await expect(task).toBeVisible();
   await expect(task.locator(".admin-task-count")).toHaveText("1");
+  await expect(panel.locator(":scope > .row .badge")).toHaveText("1 pendentes");
   const gameLink = panel
     .getByRole("link")
     .filter({ hasText: "Resultado por registar" });
@@ -49,6 +99,7 @@ test("admin overview shows ended scheduled games and removes the task after reco
   await expect(modal).toHaveCount(0);
   await page.goto("/admin");
   await expect(task).toHaveCount(0);
+  await expect(ongoing).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "/var/tmp/fc-admin-pending-results-mobile.png",

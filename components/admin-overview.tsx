@@ -7,7 +7,11 @@ import {
 } from "@/lib/round-transition";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { canRecordOfficialResult } from "@/lib/result-readiness";
+import {
+  canRecordOfficialResult,
+  isMatchInProgress,
+  nextMatchTransition,
+} from "@/lib/result-readiness";
 import { clubWeek } from "@/lib/calendar";
 import { ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react";
 import { effectiveStatus } from "@/lib/rules";
@@ -27,8 +31,22 @@ export default function AdminOverview({
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30000);
-    return () => clearInterval(timer);
+    const boundary = nextMatchTransition(s.challenges, now);
+    const delay = Math.max(
+      1,
+      Math.min(30000, (boundary ?? Infinity) - Date.now()),
+    );
+    const timer = setTimeout(() => setNow(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [s.challenges, now]);
+  useEffect(() => {
+    const sync = () => setNow(Date.now());
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
   }, []);
   const [scheduleDivision, setScheduleDivision] = useState("all"),
     [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
@@ -61,6 +79,7 @@ export default function AdminOverview({
         c.scheduleProposal?.challengerConfirmed &&
         c.scheduleProposal?.defenderConfirmed,
     ),
+    ongoing = s.challenges.filter((c) => isMatchInProgress(c, now)),
     results = s.challenges.filter(
       (c) => c.status !== "disputed" && canRecordOfficialResult(c, now),
     ),
@@ -78,6 +97,13 @@ export default function AdminOverview({
         detail:
           "As duas duplas já aceitaram o horário. Falta a confirmação do clube.",
         action: () => onSelect("approvals"),
+      },
+      {
+        label: "Jogos em curso",
+        count: ongoing.length,
+        detail:
+          "Acompanha os jogos iniciados. O pedido de resultado aparece no fim do horário previsto.",
+        action: () => onSelect("games"),
       },
       {
         label: "Resultados por registar",
@@ -106,7 +132,7 @@ export default function AdminOverview({
         action: onRegistrations,
       },
     ].filter((t) => t.count > 0),
-    attention = [...disputes, ...club, ...results, ...overdue]
+    attention = [...ongoing, ...disputes, ...club, ...results, ...overdue]
       .sort(matchOrder(now))
       .slice(0, 5),
     activePlayers = s.players.filter(
@@ -200,7 +226,9 @@ export default function AdminOverview({
               {tasks.reduce((n, t) => n + t.count, 0)} pendentes
             </span>
           </div>
-          <p className="muted">Decisões que dependem da organização.</p>
+          <p className="muted">
+            Acompanhamento dos jogos e decisões da organização.
+          </p>
           {tasks.length ? (
             <div className="admin-task-list">
               {tasks.map((task) => (
@@ -243,11 +271,13 @@ export default function AdminOverview({
                   <span className="badge">
                     {c.status === "disputed"
                       ? "Disputa"
-                      : canRecordOfficialResult(c, now)
-                        ? "Resultado por registar"
-                        : effectiveStatus(c) === "expired"
-                          ? "Prazo ultrapassado"
-                          : "Confirmar jogo"}
+                      : isMatchInProgress(c, now)
+                        ? "Em curso · A aguardar resultado"
+                        : canRecordOfficialResult(c, now)
+                          ? "Resultado por registar"
+                          : effectiveStatus(c) === "expired"
+                            ? "Prazo ultrapassado"
+                            : "Confirmar jogo"}
                   </span>
                   <ArrowRight size={14} />
                 </Link>
