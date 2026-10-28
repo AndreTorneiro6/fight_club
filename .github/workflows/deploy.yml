@@ -57,6 +57,11 @@ jobs:
           TMPDIR: ${{ runner.temp }}
           DEMO_TEST_ADMIN_PAIR: "1"
 
+      - name: Check Title Fight template layout and mobile spectators
+        run: npx playwright test e2e/title-fight-layout.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check admin pending official results
         run: npx playwright test e2e/admin-pending-results.spec.ts
         env:

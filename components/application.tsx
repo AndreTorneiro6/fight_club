@@ -16,7 +16,8 @@ import NotificationEventIcon from "./notification-event-icon";
 import MatchCardExport from "./match-card-export";
 import AdminChangelog from "./admin-changelog";
 import { applicationVersion } from "@/lib/release-notes";
-import { isTitleMatch, isOfficialTitleMatch } from "@/lib/title-matches";
+import TitleFights from "./title-fights";
+import { isTitleMatch } from "@/lib/title-matches";
 import ChallengeOriginLabel from "./challenge-origin";
 import { challengeOrigin, challengeOriginLabels } from "@/lib/challenge-origin";
 import AdminOverview from "./admin-overview";
@@ -886,7 +887,7 @@ export function Application({
               <Empty text="Esta área é exclusiva dos administradores." />
             )
           ) : route === "title-fight" ? (
-            <TitleFights {...actions} />
+            <TitleFights state={s} />
           ) : route === "campeoes" ? (
             <Champions {...actions} />
           ) : route === "epocas" ? (
@@ -5984,114 +5985,6 @@ function Courts({ s, run, busy }: Actions) {
         </form>
       </div>
     </Section>
-  );
-}
-
-function TitleFights({ s }: Actions) {
-  const [division, setDivision] = useState("all");
-  const pool = s.challenges.filter(
-    (c) =>
-      (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
-  );
-  const upcoming = pool
-    .filter((c) => isOfficialTitleMatch(c, s) && c.status !== "completed")
-    .sort((a, b) =>
-      (a.scheduledAt ?? a.createdAt).localeCompare(
-        b.scheduledAt ?? b.createdAt,
-      ),
-    );
-  const completed = pool
-    .filter((c) => isOfficialTitleMatch(c, s) && c.status === "completed")
-    .sort((a, b) =>
-      (b.scheduledAt ?? b.createdAt).localeCompare(
-        a.scheduledAt ?? a.createdAt,
-      ),
-    );
-  const pending = pool.filter(
-    (c) =>
-      ["accepted", "schedule_pending"].includes(c.status) &&
-      !isOfficialTitleMatch(c, s),
-  );
-  return (
-    <>
-      <Heading
-        eyebrow="JOGOS PELO TÍTULO"
-        title="Title Fight"
-        description="Os confrontos pelo primeiro lugar de cada divisão. A dupla no topo defende o título."
-      />
-      {s.actor.role === "admin" && (
-        <Link
-          className="button"
-          href={`/admin?tab=posters&mode=title&division=${division}`}
-        >
-          Gerar cartazes dos jogos pelo título
-        </Link>
-      )}
-
-      <div className="toolbar">
-        <label>
-          Divisão dos jogos do título
-          <select
-            value={division}
-            onChange={(e) => setDivision(e.target.value)}
-          >
-            <option value="all">Todas as divisões</option>
-            {s.divisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <Section title="Jogos pelo título">
-        <p className="muted">
-          Jogos confirmados pela organização. Consulta as duplas, o horário e o
-          estado do confronto.
-        </p>
-        {upcoming.length ? (
-          <div className="challenge-grid">
-            {upcoming.map((c) => (
-              <ChallengeCard key={c._id} s={s} c={c} />
-            ))}
-          </div>
-        ) : (
-          <Empty text="Ainda não existem jogos pelo título confirmados nesta divisão." />
-        )}
-      </Section>
-      {s.actor.role === "admin" && pending.length > 0 && (
-        <Section title="Confrontos pelo título por marcar">
-          <p className="muted">
-            O adversário já está atribuído. Falta combinar e confirmar o horário
-            para publicar o jogo.
-          </p>
-          <div className="challenge-grid">
-            {pending.map((c) => (
-              <ChallengeCard key={c._id} s={s} c={c} />
-            ))}
-          </div>
-        </Section>
-      )}
-      <Section title="Histórico dos jogos pelo título">
-        {completed.length ? (
-          <div className="challenge-grid">
-            {completed.map((c) => (
-              <div key={c._id} className="stack">
-                <ChallengeCard s={s} c={c} />
-                <SetScoreDisplay challenge={c} />
-                {c.winnerId && (
-                  <small className="success">
-                    Vitória de {challengeTeamName(c, c.winnerId, s.players)}
-                  </small>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty text="Ainda não existem jogos pelo título concluídos nesta divisão." />
-        )}
-      </Section>
-    </>
   );
 }
 

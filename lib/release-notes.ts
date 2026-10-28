@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.10.1";
+export const applicationVersion = "1.11.0";
 export const releaseNotes = [
+  {
+    version: "1.11.0",
+    date: "2026-10-28",
+    title: "Title Fight com o visual da arena",
+    changes: [
+      "Novo layout dos jogos pelo título inspirado no modelo fornecido: arena escura, molduras metálicas, duplas de ataque e defesa e destaque ao confronto.",
+      "Cartões mostram os nomes reais, divisão, horário e estado do jogo; histórico recolhível com resultados por sets e dupla vencedora.",
+      "Filtros de divisão, calendários e acesso administrativo aos cartazes mantidos; apresentação adaptada ao telemóvel e ao modo espetador.",
+    ],
+  },
   {
     version: "1.10.1",
     date: "2026-10-28",

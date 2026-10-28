@@ -1,0 +1,566 @@
+.page {
+  --arena-gold: #edb84c;
+  max-width: 1080px;
+  margin: -12px auto 0;
+  padding: 20px clamp(10px, 2.5vw, 28px) 30px;
+  color: #f0f0ec;
+  background:
+    radial-gradient(ellipse at 0 30%, #9d530d19, transparent 48%),
+    radial-gradient(ellipse at 100% 75%, #be68161c, transparent 45%), #080c0f;
+  border: 1px solid #c8a45e20;
+  border-radius: 9px;
+}
+.hero {
+  text-align: center;
+  background:
+    linear-gradient(#080c0f66, #080c0fee 82%),
+    url("/title-fight-arena.png") center top / 100% auto no-repeat;
+}
+.brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 20px 24px;
+}
+.brandRow img {
+  width: clamp(65px, 10vw, 115px);
+  height: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  transform: skew(-8deg);
+  text-align: center;
+  line-height: 0.95;
+}
+.brand strong {
+  font: 400 clamp(36px, 5.5vw, 70px)/1 var(--display);
+  color: #e6e7e6;
+  text-shadow:
+    2px 3px #202123,
+    0 -1px white,
+    0 6px 24px #d277224d;
+  letter-spacing: 1px;
+}
+.brand span {
+  font: 400 clamp(18px, 2.3vw, 29px)/1.2 var(--display);
+  border-bottom: 2px solid var(--arena-gold);
+  border-top: 1px solid #e5aa4a96;
+  margin-top: 4px;
+  padding: 3px 8px;
+}
+.hero h1 {
+  position: relative;
+  font: 400 clamp(37px, 6.5vw, 78px)/1.08 var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--arena-gold);
+  margin: 0;
+  padding: 18px 0 12px;
+  border-top: 1px solid #d89d35bd;
+  border-bottom: 1px solid #d89d3580;
+  text-shadow: 2px 3px 0 #6740127a;
+}
+.hero h1 span {
+  color: #eee;
+}
+.hero h1::after {
+  content: "";
+  position: absolute;
+  height: 3px;
+  width: 40%;
+  bottom: -2px;
+  left: 30%;
+  background: linear-gradient(90deg, transparent, #fff6bb, transparent);
+  box-shadow: 0 0 17px #f0ae2d;
+}
+.hero p {
+  max-width: 680px;
+  margin: 19px auto 10px;
+  color: #c0c1c3;
+  font-size: clamp(13px, 1.6vw, 17px);
+  line-height: 1.65;
+}
+.toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 15px 0 22px;
+}
+.toolbar label {
+  font-size: 11px;
+  color: #aeb1b7;
+  margin: 0;
+}
+.toolbar select {
+  min-width: 185px;
+  min-height: 42px;
+  margin-top: 5px;
+  background: #101419;
+  border: 1px solid #555047;
+  color: #eee;
+}
+.posterLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #ddbd79;
+  font-size: 11px;
+  padding: 10px 0;
+}
+.games {
+  display: grid;
+  gap: 23px;
+}
+.card {
+  --frame: #e8b955;
+  --metal: #ead596;
+  position: relative;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    #fff1ae,
+    var(--frame) 12%,
+    #946021 28%,
+    #e6bc64 51%,
+    #956527 72%,
+    #ffdb73
+  );
+  clip-path: polygon(
+    17px 0,
+    calc(100% - 17px) 0,
+    100% 17px,
+    100% calc(100% - 17px),
+    calc(100% - 17px) 100%,
+    17px 100%,
+    0 calc(100% - 17px),
+    0 17px
+  );
+}
+.card[data-division="bronze"] {
+  --frame: #e67b2b;
+  --metal: #e4975d;
+  background: linear-gradient(
+    135deg,
+    #ffddb1,
+    #f6913b 16%,
+    #813c19 30%,
+    #f2944a 55%,
+    #b45424 80%,
+    #ffcb8f
+  );
+}
+.card[data-division="prata"] {
+  --metal: #dce1e5;
+}
+.card .matchLink {
+  display: block;
+  position: relative;
+  border: 0;
+  margin: 0;
+  padding: clamp(13px, 2.6vw, 26px);
+  border-radius: 0;
+  background:
+    linear-gradient(#06080a22, #06080a30),
+    url("/title-fight-arena.png") center center / cover;
+  clip-path: polygon(
+    16px 0,
+    calc(100% - 16px) 0,
+    100% 16px,
+    100% calc(100% - 16px),
+    calc(100% - 16px) 100%,
+    16px 100%,
+    0 calc(100% - 16px),
+    0 16px
+  );
+  color: #eee;
+  transition: filter 0.2s;
+}
+.card .matchLink:hover {
+  transform: none;
+  filter: brightness(1.13);
+}
+.card:focus-within {
+  background: #fff2b7;
+}
+.matchLink:focus-visible {
+  outline: 3px solid #fff5ac;
+  outline-offset: -7px;
+}
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: clamp(18px, 2.5vw, 25px);
+}
+.matchNumber {
+  color: #c1c3c6;
+  font: 400 clamp(15px, 2vw, 25px)/1.15 var(--display);
+}
+.matchNumber b {
+  font-weight: 400;
+  color: #edc26b;
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: #51e998;
+  font-size: clamp(10px, 1.4vw, 15px);
+  font-weight: 700;
+  padding: 8px 10px;
+  border: 1px solid #65707188;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #292f30ea, #0b0e11f2);
+  box-shadow: inset 0 0 8px #aaa2;
+}
+.status i {
+  background: currentColor;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+.status[data-status="result_pending"],
+.status[data-status="disputed"] {
+  color: #ffcc72;
+}
+.status[data-status="completed"] {
+  color: #c5d5ed;
+}
+.status[data-status="live"] {
+  color: #ff9b67;
+}
+.sides {
+  width: 78%;
+  margin: 0 auto;
+  display: grid;
+  gap: 8px;
+}
+.sides > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 13px;
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px),
+    0 8px
+  );
+  font: 400 clamp(13px, 2vw, 24px)/1.15 var(--display);
+  border: 1px solid;
+}
+.sides svg {
+  flex: 0 0 20px;
+}
+.sides span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.attack {
+  color: #f4c565;
+  border-color: #b48c3e;
+  background: linear-gradient(135deg, #8061284d, #281d0be8);
+}
+.defense {
+  color: #e8e9eb;
+  border-color: #c1c2c6;
+  background: linear-gradient(135deg, #6c727b80, #191d23ee);
+}
+.faceoff {
+  width: 76%;
+  margin: clamp(18px, 2.8vw, 30px) auto 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+  text-shadow:
+    0 2px 3px #000,
+    0 0 14px #000;
+}
+.faceoff strong {
+  font: 400 clamp(22px, 3.4vw, 40px)/1.08 var(--display);
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.versus {
+  font: italic 400 clamp(34px, 5vw, 57px)/1 var(--display);
+  color: #efba4a;
+  transform: skew(-13deg);
+  text-shadow: 2px 3px #7c4918;
+}
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.division {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  min-width: 120px;
+  color: var(--metal);
+  font: 400 clamp(19px, 2.7vw, 30px)/1 var(--display);
+  text-transform: uppercase;
+}
+.division b {
+  font-weight: 400;
+  border: 1px solid var(--metal);
+  border-left: 0;
+  padding: 9px 20px 9px 27px;
+  margin-left: -15px;
+  background: linear-gradient(135deg, #30343c, #090c11 65%);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 9px) 0,
+    100% 50%,
+    calc(100% - 9px) 100%,
+    0 100%
+  );
+}
+.emblem {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 51px;
+  height: 51px;
+  flex-shrink: 0;
+  border: 2px solid var(--metal);
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--metal), #151719 47%, #06090b);
+  box-shadow:
+    0 0 0 3px #090b0e,
+    inset 0 0 0 3px #242a30;
+}
+.emblem svg {
+  filter: drop-shadow(1px 2px 1px #000);
+  fill: #ffffff14;
+}
+.date {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 7px;
+  color: #c1c6cd;
+  font-size: clamp(10px, 1.7vw, 18px);
+}
+.date svg {
+  flex-shrink: 0;
+}
+.date time {
+  text-align: right;
+}
+.calendar {
+  display: flex;
+  justify-content: end;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 8px 17px;
+  background: #0b0e12;
+}
+.calendar a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #c8b787;
+  min-height: 28px;
+}
+.result {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  margin: -8px 0 20px;
+  font-size: 12px;
+  color: #aee4be;
+  text-align: center;
+}
+.history {
+  margin-top: 25px;
+  padding: 0 18px;
+  border: 1px solid #51565a;
+  background: linear-gradient(135deg, #1d222955, #090d11);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    0 100%,
+    0 12px
+  );
+}
+.history summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px 0;
+  color: #e8e9eb;
+  text-align: center;
+  text-transform: uppercase;
+  font: 400 clamp(22px, 3.5vw, 39px)/1.2 var(--display);
+}
+.history summary::-webkit-details-marker {
+  display: none;
+}
+.history summary span {
+  font: 700 11px var(--sans);
+  color: #caad72;
+  border: 1px solid #93733b88;
+  border-radius: 50%;
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+.history summary > svg {
+  flex-basis: 100%;
+  color: #edb84c;
+  filter: drop-shadow(0 0 6px #dc951a80);
+  transition: transform 0.2s;
+}
+.history[open] summary > svg {
+  transform: rotate(180deg);
+}
+.history[open] > .games {
+  padding-bottom: 18px;
+}
+.history summary:focus-visible {
+  outline: 2px solid #edb84c;
+  outline-offset: -3px;
+}
+.empty {
+  margin: 0;
+  padding: 30px 18px;
+  text-align: center;
+  color: #c5c8cd;
+  line-height: 1.7;
+  border: 1px solid #5b4d3560;
+  background: #111419;
+}
+.hint {
+  color: #b6bbc1;
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 560px) {
+  .page {
+    margin: -10px -9px 0;
+    padding: 13px 9px 22px;
+    border-color: #b68b3d25;
+  }
+  .brandRow {
+    padding: 8px 6px 18px;
+    gap: 15px;
+  }
+  .brand strong {
+    font-size: clamp(34px, 8vw, 44px);
+  }
+  .brand span {
+    font-size: 18px;
+  }
+  .hero h1 {
+    font-size: clamp(34px, 8.3vw, 46px);
+    padding: 14px 0 10px;
+  }
+  .hero p {
+    margin-top: 17px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .toolbar {
+    padding-top: 10px;
+    padding-bottom: 16px;
+  }
+  .toolbar select {
+    min-width: 170px;
+  }
+  .card .matchLink {
+    background-color: #06080a;
+    background-size:
+      cover,
+      100% auto;
+    background-repeat: no-repeat;
+  }
+  .cardTop {
+    gap: 6px;
+    margin-bottom: 15px;
+  }
+  .sides {
+    width: 85%;
+    gap: 7px;
+  }
+  .sides > div {
+    padding: 7px 9px;
+    gap: 7px;
+    font-size: 15px;
+  }
+  .sides svg {
+    width: 16px;
+    flex-basis: 16px;
+  }
+  .faceoff {
+    width: 77%;
+    margin-top: 16px;
+    margin-bottom: 19px;
+  }
+  .faceoff strong {
+    font-size: clamp(21px, 5.7vw, 28px);
+  }
+  .division {
+    min-width: 105px;
+    font-size: 20px;
+  }
+  .emblem {
+    width: 39px;
+    height: 39px;
+  }
+  .emblem svg {
+    width: 22px;
+  }
+  .division b {
+    padding: 8px 15px 8px 22px;
+  }
+  .cardFooter {
+    gap: 7px;
+  }
+  .date {
+    font-size: 11px;
+    gap: 5px;
+  }
+  .date svg {
+    width: 17px;
+  }
+  .history {
+    padding: 0 10px;
+  }
+  .history summary {
+    font-size: 24px;
+    padding: 19px 0 16px;
+    gap: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card .matchLink,
+  .history summary > svg {
+    transition: none;
+  }
+}
