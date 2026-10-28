@@ -59,7 +59,7 @@ test("overview follows game start and end without reload, then removes the task 
       .getByRole("link")
       .filter({ hasText: "Em curso · A aguardar resultado" }),
   ).toHaveAttribute("href", "/desafios/test-transition-game");
-  const today = panel.getByRole("region", {
+  const today = page.getByRole("region", {
     name: "Jogos de hoje",
     exact: true,
   });

@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.4";
+export const applicationVersion = "1.11.5";
 export const releaseNotes = [
+  {
+    version: "1.11.5",
+    date: "2026-10-28",
+    title: "Jogos de hoje num cartão próprio",
+    changes: [
+      "Jogos de hoje apresentados num cartão independente logo abaixo de Competição — Esta jornada, fora das prioridades.",
+      "O cartão acompanha o dia atual em Portugal; resultados oficiais em falta continuam nas ações pendentes, mesmo em dias seguintes.",
+    ],
+  },
   {
     version: "1.11.4",
     date: "2026-10-28",

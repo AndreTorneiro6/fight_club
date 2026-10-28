@@ -38,6 +38,19 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
   await expect(
     page.getByRole("button", { name: "Ideias", exact: true }),
   ).toHaveCount(0);
+  const today = page.getByRole("region", {
+    name: "Jogos de hoje",
+    exact: true,
+  });
+  await expect(today).toBeVisible();
+  await expect(
+    page.locator(".admin-week-panel + .admin-today-panel"),
+  ).toHaveCount(1);
+  await expect(
+    page
+      .locator(".admin-action-panel")
+      .getByRole("region", { name: "Jogos de hoje", exact: true }),
+  ).toHaveCount(0);
   const state = await (await page.request.get("/api/league")).json();
   const count =
     state.players.filter(

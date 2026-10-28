@@ -1,3 +1,14 @@
+## Version1.11.5 daily games card below competition — 28 October 2026
+
+- Latest user correction supersedes earlier instruction to place daily games inside priorities: Jogos de hoje must be an independent card immediately below Competição / Esta jornada. Moved intact rolling Lisbon-day list into sidebar after admin-week-panel and before next-round handoff, outside admin-action-panel. Ongoing/result tasks remain under priorities; past-day missing official results remain pending. No date/score/result/ranking changes.
+- Updated existing overview browser asserts exact adjacent card order and absence from priorities; full start/end, optional score/player auto-update and official result lifecycle browser now locates independent daily region. Local typecheck,463 tests and build pass; overview/court regressions and expanded two-session score/result lifecycle browser pass. Version1.11.5 ready for deployment.
+- Predecessor1.11.4 e22ef397cf55bdeb07ac17fe8546c52b1a228969 /run40774709911 passed all hosted checks, now in final Pi installation.1.11.3 summary/live-score already verified live at809558a93cc30a311782fd1970501f227911add8. Continue deployment/verification of1.11.4 then latest1.11.5. No production emails/results/bets/messages edited by this work. Preserve unrelated ZIP deletion/templates/CROMOS plan.
+
+## Version1.11.3 live;1.11.4 Title Fight queued — 28 October 2026
+
+- Run40772869282 succeeded ALL checks and Pi deployment at809558a93cc30a311782fd1970501f227911add8. Exact live marker verified; app/worker running0 restarts, public health ok. Read-only production helper verification shows today's games11,12,17 all now completed and pendingResults0 (real administrators submitted independently; no production result edits by agent). leagueEmailsEnabled=false. Optional live scores and rolling daily summary are live.
+- Title Fight1.11.4 commit e22ef397cf55bdeb07ac17fe8546c52b1a228969 /run40774709911 now validating after serialized predecessor completed. Final463 tests/typecheck/build and dedicated updated layout browser passed locally. Continue until exact live SHA and health confirmed. Preserve unrelated source ZIP deletion, Untitled.jpeg, CROMOS plan and template uploads.
+
 ## Version1.11.4 updated Title Fight reference prepared — 28 October 2026
 
 - User supplied/updated templates/layout_title_fight.jpeg and requested corresponding UI fix during1.11.3 deployment. Cards now place code-native league crest/name at upper left, metadata and attack/defense strips at right, faceoff below and date bottom right. Distinct illuminated gold/silver/orange frames and decorative atmosphere; silver pseudo-background grayscale, bronze orange. Native vector crown/star/helmet and laurel crest; no changes to live team names/champion data/ranking/results. Existing arena PNG reused unchanged, no new image generation. Official logo remains legible on dark header. Calendar controls, history, spectator links and optional live score retained.

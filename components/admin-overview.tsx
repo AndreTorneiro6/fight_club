@@ -260,59 +260,6 @@ export default function AdminOverview({
               </div>
             </div>
           )}
-          <section
-            className="admin-next-actions stack"
-            aria-labelledby="admin-today-title"
-          >
-            <div className="row between wrap">
-              <h3 id="admin-today-title">Jogos de hoje</h3>
-              <span className="badge">
-                {todayMatches(s.challenges, now).length}
-              </span>
-            </div>
-            {!todayMatches(s.challenges, now).length && (
-              <p className="muted">Não há jogos marcados para hoje.</p>
-            )}
-            {todayMatches(s.challenges, now).map((c) => (
-              <Link
-                className="inset stack"
-                key={c._id}
-                href={`/desafios/${c._id}`}
-              >
-                <strong>
-                  #{c.number} ·{" "}
-                  {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
-                  {challengeTeamName(c, c.defenderId, s.players)}
-                </strong>
-                <span>
-                  {new Date(c.scheduledAt!).toLocaleTimeString("pt-PT", {
-                    timeZone: "Europe/Lisbon",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  ·{" "}
-                  {s.courts.find((court) => court._id === c.courtId)?.name ??
-                    "Campo por indicar"}
-                </span>
-                <span className="badge">
-                  {c.status === "completed"
-                    ? "Resultado oficial"
-                    : c.status === "disputed"
-                      ? "Disputa"
-                      : canRecordOfficialResult(c, now)
-                        ? "Resultado por registar"
-                        : isMatchInProgress(c, now)
-                          ? "Em curso"
-                          : "Agendado"}
-                </span>
-                {c.status === "completed" ? (
-                  <span>{c.score}</span>
-                ) : (
-                  <LiveMatchScore c={c} />
-                )}
-              </Link>
-            ))}
-          </section>
           {attention.length > 0 && (
             <div className="admin-next-actions">
               <h3>Confrontos a rever</h3>
@@ -486,6 +433,58 @@ export default function AdminOverview({
               Rankings
             </button>
           </div>
+        </section>
+        <section
+          className="panel admin-today-panel stack"
+          aria-labelledby="admin-today-title"
+        >
+          <div className="row between wrap">
+            <h2 id="admin-today-title">Jogos de hoje</h2>
+            <span className="badge">
+              {todayMatches(s.challenges, now).length}
+            </span>
+          </div>
+          {!todayMatches(s.challenges, now).length && (
+            <p className="muted">Não há jogos marcados para hoje.</p>
+          )}
+          {todayMatches(s.challenges, now).map((c) => (
+            <Link
+              className="inset stack"
+              key={c._id}
+              href={`/desafios/${c._id}`}
+            >
+              <strong>
+                #{c.number} · {challengeTeamName(c, c.challengerId, s.players)}{" "}
+                × {challengeTeamName(c, c.defenderId, s.players)}
+              </strong>
+              <span>
+                {new Date(c.scheduledAt!).toLocaleTimeString("pt-PT", {
+                  timeZone: "Europe/Lisbon",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                ·{" "}
+                {s.courts.find((court) => court._id === c.courtId)?.name ??
+                  "Campo por indicar"}
+              </span>
+              <span className="badge">
+                {c.status === "completed"
+                  ? "Resultado oficial"
+                  : c.status === "disputed"
+                    ? "Disputa"
+                    : canRecordOfficialResult(c, now)
+                      ? "Resultado por registar"
+                      : isMatchInProgress(c, now)
+                        ? "Em curso"
+                        : "Agendado"}
+              </span>
+              {c.status === "completed" ? (
+                <span>{c.score}</span>
+              ) : (
+                <LiveMatchScore c={c} />
+              )}
+            </Link>
+          ))}
         </section>
         {handoffLinks.length > 0 && (
           <section
