@@ -93,6 +93,31 @@ test("title fight template uses live teams, division filters, collapsible result
   await expect(upcoming.locator("[data-title-match]")).toHaveCount(2);
   await expect(upcoming).toContainText("André Torneiro + Ruizinho");
   await expect(upcoming).toContainText("Hélder Mota + Mário Simões");
+  for (const division of ["prata", "bronze"]) {
+    const card = upcoming.locator(`[data-division="${division}"]`);
+    await expect(
+      card.getByLabel(`Liga ${division === "prata" ? "Prata" : "Bronze"}`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    const positions = await card.evaluate((el) => {
+      const crest = el
+        .querySelector('[aria-label^="Liga "]')!
+        .getBoundingClientRect();
+      const vs = el
+        .querySelector('[aria-label="contra"]')!
+        .getBoundingClientRect();
+      const art = getComputedStyle(
+        el.querySelector("a.challenge-card")!,
+        "::before",
+      );
+      return { crestAboveFaceoff: crest.top < vs.top, filter: art.filter };
+    });
+    expect(positions.crestAboveFaceoff).toBe(true);
+    expect(positions.filter).toContain(
+      division === "prata" ? "grayscale(1)" : "hue-rotate(-16deg)",
+    );
+  }
   await expect(
     upcoming.locator('a.challenge-card[href="/desafios/' + gameIds[0] + '"]'),
   ).toBeVisible();
@@ -178,10 +203,12 @@ test("title fight template uses live teams, division filters, collapsible result
   await page.evaluate(() =>
     document.documentElement.setAttribute("data-theme", "fight-club"),
   );
-  await expect(upcoming.locator("a.challenge-card").first()).toHaveCSS(
-    "background-image",
-    /title-fight-arena\.png/,
-  );
+  expect(
+    await upcoming
+      .locator("a.challenge-card")
+      .first()
+      .evaluate((el) => getComputedStyle(el, "::before").backgroundImage),
+  ).toContain("title-fight-arena.png");
   await page.screenshot({
     path: "test-results/title-fight-mobile-long-names.png",
     fullPage: true,

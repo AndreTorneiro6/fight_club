@@ -61,12 +61,7 @@ function TitleMatchCard({
       }).format(new Date(start))
     : undefined;
   const event = calendarMatch(s, c, s.actor);
-  const Emblem =
-    division?.code === "prata"
-      ? Star
-      : division?.code === "bronze"
-        ? Shield
-        : Crown;
+  const Emblem = division?.code === "prata" ? Star : Crown;
   return (
     <article
       className={styles.card}
@@ -82,6 +77,58 @@ function TitleMatchCard({
             : `/desafios/${encodeURIComponent(c._id)}`
         }
       >
+        <div
+          className={styles.division}
+          aria-label={`Liga ${division?.name ?? "Liga"}`}
+        >
+          <span className={styles.emblem}>
+            <svg
+              className={styles.laurel}
+              viewBox="0 0 100 100"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle
+                cx="50"
+                cy="50"
+                r="46"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                d="M44 88C8 77 7 30 32 13M56 88C92 77 93 30 68 13"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              />
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <g key={i} transform={`rotate(${i * 10 - 35} 50 50)`}>
+                  <path
+                    d="M18 48q-11-7-7-15 10 3 7 15M82 48q11-7 7-15-10 3-7 15"
+                    fill="currentColor"
+                  />
+                </g>
+              ))}
+            </svg>
+            {division?.code === "bronze" ? (
+              <svg
+                viewBox="0 0 48 52"
+                width="44"
+                height="48"
+                aria-hidden="true"
+                fill="currentColor"
+              >
+                <path d="M21 3h6v10c12 2 16 12 15 25L29 48V30l8-3-1-5-9 3v-8h-6v8l-9-3-1 5 8 3v18L6 38C5 25 9 15 21 13Z" />
+                <path d="M15 8 24 1l9 7-3 3-6-4-6 4Z" />
+              </svg>
+            ) : (
+              <Emblem size={42} aria-hidden="true" />
+            )}
+          </span>
+          <span className={styles.leagueName}>
+            <small>Liga</small>
+            <b>{division?.name ?? "Liga"}</b>
+          </span>
+        </div>
         <div className={styles.cardTop}>
           <span className={styles.matchNumber}>
             <b>#{String(c.number).padStart(3, "0")}</b> · TITLE FIGHT
@@ -94,11 +141,13 @@ function TitleMatchCard({
         <div className={styles.sides}>
           <div className={styles.attack}>
             <PadelRacket />
-            <span>Ataque · {attack}</span>
+            <strong>Ataque</strong>
+            <span>{attack}</span>
           </div>
           <div className={styles.defense}>
             <Shield size={21} aria-hidden="true" />
-            <span>Defesa · {defense}</span>
+            <strong>Defesa</strong>
+            <span>{defense}</span>
           </div>
         </div>
         <div className={styles.faceoff}>
@@ -108,7 +157,9 @@ function TitleMatchCard({
           </span>
           <strong>{defense}</strong>
         </div>
-        <LiveMatchScore c={c} />
+        <div className={styles.liveScore}>
+          <LiveMatchScore c={c} />
+        </div>
         {c.status === "completed" && (
           <div className={styles.result}>
             <SetScoreDisplay challenge={c} />
@@ -120,12 +171,6 @@ function TitleMatchCard({
           </div>
         )}
         <div className={styles.cardFooter}>
-          <span className={styles.division}>
-            <span className={styles.emblem}>
-              <Emblem size={27} aria-hidden="true" />
-            </span>
-            <b>{division?.name ?? "Liga"}</b>
-          </span>
           <span className={styles.date}>
             <CalendarDays size={21} aria-hidden="true" />
             {date ? (

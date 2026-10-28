@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.3";
+export const applicationVersion = "1.11.4";
 export const releaseNotes = [
+  {
+    version: "1.11.4",
+    date: "2026-10-28",
+    title: "Title Fight segue o novo modelo",
+    changes: [
+      "Emblema e nome da liga no topo esquerdo, com ataque e defesa alinhados à direita e confronto em destaque.",
+      "Ouro, prata e bronze com molduras, cores e atmosfera próprias; data no canto inferior direito e histórico compacto.",
+      "Nomes, horários, resultados e marcadores provisórios permanecem dinâmicos, com adaptação a telemóvel.",
+    ],
+  },
   {
     version: "1.11.3",
     date: "2026-10-28",

@@ -20,3 +20,7 @@ Final generation prompt:
 The existing Bebas Neue and Manrope families are served from `public/fonts` and preloaded by the root layout, so the layout and mobile navigation do not depend on a third-party font request. The browser regression blocks Google Fonts requests explicitly.
 
 Original unmodified font binaries and their SIL Open Font License notices were obtained from the official [Bebas Neue](https://github.com/google/fonts/tree/main/ofl/bebasneue) and [Manrope](https://github.com/google/fonts/tree/main/ofl/manrope) directories in Google Fonts. License files are stored beside each font.
+
+## Updated layout — 28 October 2026
+
+The latest supplied reference places the league crest at the top left, match metadata above the side strips on the right, the central team faceoff below, and the date at bottom right. Cards now follow that grid, with square illuminated frames and division-specific gold/silver/bronze palettes. Silver artwork is grayscale and bronze uses a warmer orange filter; filters affect only the decorative background pseudo-element, preserving text/status colors. The crest is code-native vector artwork (laurel ring with crown, star or helmet), and all team/score/date content remains HTML. Existing arena art is reused unchanged. Brand, calendar actions, permissions and history interaction remain functional.
