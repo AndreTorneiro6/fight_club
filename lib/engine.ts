@@ -1,3 +1,4 @@
+import { executeChampionHistory } from "./champion-history";
 import { executeClubPhotos } from "./club-photos";
 import {
   executeMatchVoting,
@@ -647,6 +648,8 @@ export function execute(
       "Esta ação não está disponível no modo espetador.",
       403,
     );
+  if (featureType === "admin.champions.correct-history")
+    return executeChampionHistory(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.test."))
     return executeAdminTest(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.placement."))

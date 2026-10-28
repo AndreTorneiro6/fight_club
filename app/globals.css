@@ -1,4 +1,17 @@
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap");
+@font-face {
+  font-family: "Bebas Neue";
+  src: url("/fonts/bebas-neue/BebasNeue-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope/Manrope-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

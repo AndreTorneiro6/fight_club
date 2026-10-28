@@ -5,6 +5,8 @@ test("title fight template uses live teams, division filters, collapsible result
   page,
 }) => {
   test.setTimeout(150000);
+  await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
+  await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
   await page.goto("/auth");
   await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
   await page

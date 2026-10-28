@@ -30,6 +30,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-PT" suppressHydrationWarning>
       <head>
+        <link
+          rel="preload"
+          href="/fonts/bebas-neue/BebasNeue-Regular.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/manrope/Manrope-Variable.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem('fightclub-theme');if(t==='fight-night'){t='fight-club';localStorage.setItem('fightclub-theme',t)}if(['arena','fight-club','forest','ocean','violet'].includes(t))document.documentElement.dataset.theme=t}catch(e){}`,
