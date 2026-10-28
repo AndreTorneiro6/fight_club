@@ -213,3 +213,36 @@ test("a status change invalidates an open season editor", () => {
   );
   assert.throws(() => execute(s, admin, update, now), /Outro administrador/);
 });
+
+test("spectators never create an archived division or increase current and planned competitive totals", () => {
+  for (const status of ["active", "paused", "draft"] as const) {
+    const s = fixture();
+    s.seasons[0].status = status;
+    const before = seasonDetails(s, s.seasons[0]);
+    s.players.push({
+      ...s.players[0],
+      _id: "spectator",
+      spectator: true,
+      divisionId: "",
+      position: 0,
+      partner: "",
+      partnerId: undefined,
+    });
+    assert.deepEqual(seasonDetails(s, s.seasons[0]), before);
+  }
+});
+test("historical archived divisions and player snapshots remain available after current spectator assignment", () => {
+  const s = fixture();
+  const season = s.seasons[0];
+  season.status = "completed";
+  season.archivedRankings = structuredClone(s.players);
+  season.archivedRankings[0].divisionId = "former-division";
+  const before = seasonDetails(s, season);
+  Object.assign(s.players[0], { spectator: true, divisionId: "", position: 0 });
+  assert.deepEqual(seasonDetails(s, season), before);
+  assert.equal(before.players, 4);
+  assert.equal(
+    before.divisions.find((d) => d.id === "former-division")?.name,
+    "Divisão arquivada",
+  );
+});

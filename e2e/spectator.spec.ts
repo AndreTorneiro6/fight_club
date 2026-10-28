@@ -163,5 +163,18 @@ test("both admins preview spectator; only admin assignment enables spectators, w
   await expect(
     user.getByRole("heading", { name: "O teu desempenho" }),
   ).toHaveCount(0);
+  await user.goto("/epocas");
+  await user.getByText("Detalhes da época", { exact: true }).click();
+  const seasonTable = user.getByRole("table", {
+    name: /Jogadores e jogos por divisão/,
+  });
+  await expect(seasonTable.getByRole("row")).toHaveCount(4);
+  await expect(seasonTable).not.toContainText("Divisão arquivada");
+  await expect(
+    user
+      .locator("dl > div")
+      .filter({ has: user.locator("dt", { hasText: "Jogadores" }) })
+      .locator("dd"),
+  ).toHaveText("23");
   await userContext.close();
 });

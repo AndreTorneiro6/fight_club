@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.10.0";
+export const applicationVersion = "1.10.1";
 export const releaseNotes = [
+  {
+    version: "1.10.1",
+    date: "2026-10-28",
+    title: "Épocas sem divisão fictícia para espetadores",
+    changes: [
+      "Espetadores ficam excluídos dos totais de jogadores e divisões da época; deixam de criar uma linha Divisão arquivada.",
+      "Rankings e divisões históricas guardados nas épocas anteriores mantêm-se disponíveis.",
+    ],
+  },
   {
     version: "1.10.0",
     date: "2026-10-28",

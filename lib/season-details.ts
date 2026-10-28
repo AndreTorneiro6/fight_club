@@ -15,7 +15,11 @@ export function seasonDetails(state: State, season: Season) {
       .map((m) => m.challengeId),
   );
   const eligible = (p: Player) =>
-    p.status !== "removed" && !p.awaitingApproval && !p.registrationRejectedAt;
+    !p.spectator &&
+    !!p.divisionId &&
+    p.status !== "removed" &&
+    !p.awaitingApproval &&
+    !p.registrationRejectedAt;
   const source = season.archivedRankings
     ? "archived"
     : season.status === "completed"
