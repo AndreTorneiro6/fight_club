@@ -119,6 +119,18 @@ test("MongoDB transactions serialize simultaneous court bookings and preserve pe
         number: 99,
         challengerId: "player-8",
         defenderId: "player-6",
+        challengerTeam: [
+          {
+            playerId: "player-8",
+            name: s.players.find((p) => p._id === "player-8")!.name,
+          },
+        ],
+        defenderTeam: [
+          {
+            playerId: "player-6",
+            name: s.players.find((p) => p._id === "player-6")!.name,
+          },
+        ],
         status: "accepted",
       });
     });

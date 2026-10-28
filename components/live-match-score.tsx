@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import styles from "./live-match-score.module.css";
 import type { Challenge, View } from "@/lib/types";
 import { completedLiveSet, liveScoreFor } from "@/lib/live-score";
 import { challengeTeamName } from "@/lib/team-competition";
@@ -24,7 +25,7 @@ export function LiveMatchScore({ c }: { c: Challenge }) {
   if (!current) return null;
   return (
     <div
-      className="inset stack"
+      className={styles.score}
       aria-label={`Marcador provisório do jogo ${c.number}`}
     >
       <strong>
@@ -37,7 +38,7 @@ export function LiveMatchScore({ c }: { c: Challenge }) {
             .join(" · ")}
         </span>
       )}
-      <small>Provisório · ATAQUE / DEFESA · A aguardar resultado oficial</small>
+      <small>Provisório · ATAQUE / DEFESA</small>
     </div>
   );
 }
@@ -56,8 +57,13 @@ export function LiveMatchScoreEditor({
   const [open, setOpen] = useState(false);
   if (s.actor.role !== "admin" || !liveScoreFor(c, now)) return null;
   return (
-    <div className="stack">
-      <button disabled={busy} onClick={() => setOpen(!open)}>
+    <div className={styles.editor}>
+      <button
+        disabled={busy}
+        aria-expanded={open}
+        aria-controls={`live-score-${c._id}`}
+        onClick={() => setOpen(!open)}
+      >
         Atualizar marcador (opcional)
       </button>
       {open && (
@@ -100,7 +106,8 @@ function ScoreForm({
   });
   return (
     <form
-      className="inset stack"
+      id={`live-score-${c._id}`}
+      className={`inset ${styles.form}`}
       aria-label={`Atualizar marcador do jogo ${c.number}`}
       onSubmit={async (e) => {
         e.preventDefault();

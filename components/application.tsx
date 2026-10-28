@@ -3017,11 +3017,16 @@ function Games(a: Actions) {
         onChange={setWeek}
         minWeek={firstCompetitionWeek(s)}
       />
-      <div className="toolbar">
-        <div className="tabs">
+      <div className="games-controls">
+        <div
+          className="tabs games-scopes"
+          role="group"
+          aria-label="Mostrar jogos"
+        >
           {s.actor.role !== "spectator" && (
             <button
               className={!all ? "active" : ""}
+              aria-pressed={!all}
               onClick={() => {
                 setAll(false);
                 setDivision("all");
@@ -3030,18 +3035,10 @@ function Games(a: Actions) {
               Meus jogos
             </button>
           )}
-          <button
-            className={all && division === "all" ? "active" : ""}
-            onClick={() => {
-              setAll(true);
-              setDivision("all");
-            }}
-          >
-            Jogos da liga
-          </button>
           {myDivision && s.actor.role !== "spectator" && (
             <button
               className={all && division === myDivision ? "active" : ""}
+              aria-pressed={all && division === myDivision}
               onClick={() => {
                 setAll(true);
                 setDivision(myDivision);
@@ -3050,25 +3047,36 @@ function Games(a: Actions) {
               Minha liga
             </button>
           )}
-        </div>
-        <label>
-          Liga dos jogos
-          <select
-            aria-label="Liga dos jogos"
-            value={division}
-            onChange={(e) => {
-              setDivision(e.target.value);
+          <button
+            className={all && division !== myDivision ? "active" : ""}
+            aria-pressed={all && division !== myDivision}
+            onClick={() => {
               setAll(true);
+              setDivision("all");
             }}
           >
-            <option value="all">Todas as ligas</option>
-            {s.divisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            Jogos da liga
+          </button>
+        </div>
+        <div
+          className="tabs games-divisions"
+          role="group"
+          aria-label="Liga dos jogos"
+        >
+          {s.divisions.map((d) => (
+            <button
+              key={d._id}
+              className={division === d._id ? "active" : ""}
+              aria-pressed={division === d._id}
+              onClick={() => {
+                setDivision(d._id);
+                setAll(true);
+              }}
+            >
+              {d.name}
+            </button>
+          ))}
+        </div>
       </div>
       {games.length ? (
         <div className="challenge-grid">

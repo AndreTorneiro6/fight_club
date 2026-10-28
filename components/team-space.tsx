@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Challenge, View } from "@/lib/types";
 import { currentTeam, teamSpaceId, type TeamSpace } from "@/lib/team-space";
 import { challengeMemberIds } from "@/lib/team-competition";
+import styles from "./team-space.module.css";
 type Run = (command: unknown, message?: string) => Promise<unknown>;
 export function TeamWorkspace({
   s,
@@ -21,13 +22,22 @@ export function TeamWorkspace({
   const id = teamSpaceId(members.map((p) => p._id));
   const space = s.teamSpaces?.find((space) => space._id === id);
   return (
-    <section className="panel stack" aria-labelledby="team-space-title">
+    <section
+      className={`panel ${styles.root}`}
+      aria-labelledby="team-space-title"
+    >
       <div>
         <div className="eyebrow gold">A TUA DUPLA</div>
         <h2 id="team-space-title">{members.map((p) => p.name).join(" + ")}</h2>
       </div>
-      <EntrySong key={id} {...{ space, run, busy }} />
-      <TeamConversation key={`chat:${id}`} {...{ s, run, busy }} teamId={id} />
+      <div className={styles.columns}>
+        <EntrySong key={id} {...{ space, run, busy }} />
+        <TeamConversation
+          key={`chat:${id}`}
+          {...{ s, run, busy }}
+          teamId={id}
+        />
+      </div>
     </section>
   );
 }
@@ -43,6 +53,7 @@ function EntrySong({
   const [url, setUrl] = useState(space?.youtubeUrl ?? "");
   const [version, setVersion] = useState(space?.version ?? 0);
   const [dirty, setDirty] = useState(false);
+  const [editing, setEditing] = useState(false);
   useEffect(() => {
     if (!dirty) {
       setUrl(space?.youtubeUrl ?? "");
@@ -50,73 +61,101 @@ function EntrySong({
     }
   }, [space?.youtubeUrl, space?.version, dirty]);
   return (
-    <div className="inset stack">
+    <div className={styles.song}>
       <h3>Música de entrada</h3>
       <p className="muted">
-        Os dois podem editar. O administrador pode abrir o vídeo para reproduzir
-        a música na entrada da dupla.
+        Partilhada pelos dois. O admin abre o link na entrada da dupla.
       </p>
-      {space?.youtubeUrl && (
-        <a
-          className="button"
-          href={space.youtubeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+      <div className={styles.songActions}>
+        {space?.youtubeUrl && (
+          <a
+            className="button"
+            href={space.youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Abrir música no YouTube
+          </a>
+        )}
+        <button
+          type="button"
+          className="ghost"
+          aria-expanded={editing}
+          disabled={busy}
+          onClick={() => setEditing(!editing)}
         >
-          Abrir música no YouTube
-        </a>
-      )}
-      <form
-        className="stack"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (
-            await run(
-              {
-                type: "team.song.save",
-                expectedVersion: version,
-                youtubeUrl: url,
-              },
-              "Música da dupla atualizada.",
-            )
-          )
-            setDirty(false);
-        }}
-      >
-        <label>
-          Link do YouTube
-          <input
-            aria-label="Música de entrada — link do YouTube"
-            type="url"
-            maxLength={2048}
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              setDirty(true);
-            }}
-            placeholder="https://www.youtube.com/watch?v=…"
-          />
-        </label>
-        <small>Deixa vazio para remover a música.</small>
-        <button disabled={busy || !dirty}>Guardar música de entrada</button>
-        {dirty && version !== (space?.version ?? 0) && (
-          <>
-            <p role="status">
-              O teu parceiro alterou a música. O teu texto foi mantido.
-            </p>
+          {space?.youtubeUrl ? "Alterar música" : "Adicionar música"}
+        </button>
+      </div>
+      {editing && (
+        <form
+          className={styles.form}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (
+              await run(
+                {
+                  type: "team.song.save",
+                  expectedVersion: version,
+                  youtubeUrl: url,
+                },
+                "Música da dupla atualizada.",
+              )
+            ) {
+              setDirty(false);
+              setEditing(false);
+            }
+          }}
+        >
+          <label>
+            Link do YouTube
+            <input
+              aria-label="Música de entrada — link do YouTube"
+              type="url"
+              maxLength={2048}
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setDirty(true);
+              }}
+              placeholder="https://www.youtube.com/watch?v=…"
+            />
+          </label>
+          <small>Deixa vazio para remover a música.</small>
+          <div className={styles.songActions}>
+            <button disabled={busy || !dirty}>Guardar música de entrada</button>
             <button
               type="button"
+              disabled={busy}
               onClick={() => {
                 setDirty(false);
+                setEditing(false);
                 setUrl(space?.youtubeUrl ?? "");
                 setVersion(space?.version ?? 0);
               }}
             >
-              Usar música atual da dupla
+              Cancelar
             </button>
-          </>
-        )}
-      </form>
+          </div>
+          {dirty && version !== (space?.version ?? 0) && (
+            <>
+              <p role="status">
+                O teu parceiro alterou a música. O teu texto foi mantido.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDirty(false);
+                  setUrl(space?.youtubeUrl ?? "");
+                  setVersion(space?.version ?? 0);
+                }}
+              >
+                Usar música atual da dupla
+              </button>
+            </>
+          )}
+        </form>
+      )}
     </div>
   );
 }
@@ -147,12 +186,14 @@ function TeamConversation({
     if (box.current) box.current.scrollTop = box.current.scrollHeight;
   }, [tail]);
   return (
-    <section className="stack" aria-labelledby="team-chat-title">
+    <section className={styles.conversation} aria-labelledby="team-chat-title">
       <h3 id="team-chat-title">Chat da dupla</h3>
-      <small className="muted">
-        Privado — só os dois jogadores desta dupla podem ler e enviar mensagens.
-      </small>
-      <div ref={box} className="chat-box stack" aria-live="polite">
+      <small className="muted">Privado entre os dois jogadores.</small>
+      <div
+        ref={box}
+        className={`chat-box ${styles.messages}`}
+        aria-live="polite"
+      >
         {!messages.length && (
           <p className="muted">
             Ainda não há mensagens. Combina os próximos treinos com o teu
@@ -160,7 +201,7 @@ function TeamConversation({
           </p>
         )}
         {messages.map((m) => (
-          <article className="inset stack" key={m._id}>
+          <article className={styles.message} key={m._id}>
             <strong>
               {s.players.find((p) => p._id === m.playerId)?.name ?? "Jogador"}
             </strong>
@@ -180,7 +221,7 @@ function TeamConversation({
         ))}
       </div>
       <form
-        className="stack"
+        className={styles.form}
         onSubmit={async (e) => {
           e.preventDefault();
           const body = text.trim();
@@ -211,6 +252,7 @@ function TeamConversation({
           Mensagem para a dupla
           <textarea
             required
+            rows={2}
             maxLength={2000}
             value={text}
             disabled={busy}

@@ -449,7 +449,7 @@ export default function AdminOverview({
           )}
           {todayMatches(s.challenges, now).map((c) => (
             <Link
-              className="inset stack"
+              className="admin-today-game"
               key={c._id}
               href={`/desafios/${c._id}`}
             >

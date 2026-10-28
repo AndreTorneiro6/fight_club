@@ -1,0 +1,53 @@
+.score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel2);
+  min-width: 0;
+}
+.score strong {
+  font-size: 14px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.score > span {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.score small {
+  flex-basis: 100%;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.editor {
+  display: grid;
+  gap: 12px;
+}
+.editor > button {
+  justify-self: start;
+  min-height: 44px;
+}
+.form {
+  display: grid;
+  gap: 12px;
+}
+.form p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 700px) {
+  .form input,
+  .form select {
+    font-size: 16px;
+  }
+  .score {
+    padding: 9px 10px;
+  }
+}

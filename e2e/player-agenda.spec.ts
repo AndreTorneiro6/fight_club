@@ -56,14 +56,30 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
   );
   await expect(other).toBeVisible();
   await page.getByRole("button", { name: "Minha liga", exact: true }).click();
-  await expect(page.getByLabel("Liga dos jogos", { exact: true })).toHaveValue(
-    myDivision,
-  );
+  await page
+    .locator(".games-controls")
+    .screenshot({ path: "/var/tmp/fc-games-controls-mobile.png" });
+  const leagues = page.getByRole("group", {
+    name: "Liga dos jogos",
+    exact: true,
+  });
+  await expect(
+    leagues.getByRole("button", {
+      name: state.divisions.find((d: any) => d._id === myDivision).name,
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("combobox", { name: "Liga dos jogos", exact: true }),
+  ).toHaveCount(0);
   await expect(link).toHaveCount(0);
   await expect(other).toBeVisible();
-  await page
-    .getByLabel("Liga dos jogos", { exact: true })
-    .selectOption(otherDivision);
+  await leagues
+    .getByRole("button", {
+      name: state.divisions.find((d: any) => d._id === otherDivision).name,
+      exact: true,
+    })
+    .click();
   await expect(link).toBeVisible();
   await expect(other).toHaveCount(0);
   await expect(

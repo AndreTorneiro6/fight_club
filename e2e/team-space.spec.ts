@@ -59,6 +59,9 @@ test("both partners edit a shared song and chat privately; admin can play song w
       await user.goto("/perfil");
     }
     await first
+      .getByRole("button", { name: "Adicionar música", exact: true })
+      .click();
+    await first
       .getByLabel("Música de entrada — link do YouTube", { exact: true })
       .fill("https://youtu.be/dQw4w9WgXcQ?t=5");
     await first
@@ -70,6 +73,9 @@ test("both partners edit a shared song and chat privately; admin can play song w
         exact: true,
       }),
     ).toHaveAttribute("href", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    await second
+      .getByRole("button", { name: "Alterar música", exact: true })
+      .click();
     await second
       .getByLabel("Música de entrada — link do YouTube", { exact: true })
       .fill("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
@@ -120,6 +126,12 @@ test("both partners edit a shared song and chat privately; admin can play song w
     await expect(
       page.getByRole("region", { name: "Chat da dupla", exact: true }),
     ).not.toContainText(secret);
+    await first
+      .locator('[aria-labelledby="team-space-title"]')
+      .screenshot({ path: "/var/tmp/fc-team-space-card-desktop.png" });
+    await second
+      .locator('[aria-labelledby="team-space-title"]')
+      .screenshot({ path: "/var/tmp/fc-team-space-card-mobile.png" });
     await second.screenshot({
       path: "/var/tmp/fc-team-space-mobile.png",
       fullPage: true,

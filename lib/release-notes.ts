@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.7";
+export const applicationVersion = "1.11.8";
 export const releaseNotes = [
+  {
+    version: "1.11.8",
+    date: "2026-10-28",
+    title: "Controlos de Jogos e ecrãs mais compactos",
+    changes: [
+      "Jogos com botões Meus jogos, Minha liga e Jogos da liga, seguidos de Ouro, Prata e Bronze, sem select.",
+      "Espaço da dupla, marcadores e jogos de hoje com menos volume e melhor separação; música e conversa lado a lado em ecrãs grandes.",
+      "Title Fight com títulos mais equilibrados e mais espaço entre cartões; controlos adaptados ao telemóvel.",
+    ],
+  },
   {
     version: "1.11.7",
     date: "2026-10-28",

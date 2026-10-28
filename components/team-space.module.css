@@ -1,0 +1,105 @@
+.root {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+.root h2 {
+  font: 700 17px/1.4 var(--sans);
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.root h3 {
+  font: 700 14px/1.4 var(--sans);
+  margin: 0;
+}
+.root p {
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+.root small {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 20px;
+  align-items: start;
+}
+.song,
+.conversation {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.conversation {
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+.form {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.form button,
+.song > a {
+  justify-self: start;
+  min-height: 44px;
+}
+.form textarea {
+  min-height: 72px;
+}
+.messages {
+  max-height: 240px;
+  gap: 8px;
+  padding: 2px;
+}
+.message {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel2);
+}
+.message strong {
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .root {
+    padding: 16px;
+    gap: 18px;
+  }
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .conversation {
+    padding: 18px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+  .root h2 {
+    font-size: 16px;
+  }
+  .form input,
+  .form textarea {
+    font-size: 16px;
+  }
+  .messages {
+    max-height: 220px;
+  }
+}
+
+.songActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.songActions > button,
+.songActions > a {
+  min-height: 44px;
+}
