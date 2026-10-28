@@ -46,7 +46,7 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
       # A fresh demo database keeps aggregate logins below the production rate limit.
-      - name: Check admin overview and read-only player court availability
+      - name: Check admin court availability and hidden player calendar
         run: npx playwright test e2e/admin-overview.spec.ts e2e/court-availability.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
@@ -56,6 +56,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
           DEMO_TEST_ADMIN_PAIR: "1"
+
+      - name: Check consistent nearest-first games and player calendar visibility
+        run: npx playwright test e2e/match-ordering.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
 
       - name: Check Title Fight template layout and mobile spectators
         run: npx playwright test e2e/title-fight-layout.spec.ts

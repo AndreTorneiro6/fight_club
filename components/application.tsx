@@ -1,4 +1,5 @@
 "use client";
+import { matchOrder, matchStart } from "@/lib/match-order";
 import { canRecordOfficialResult } from "@/lib/result-readiness";
 import ChallengeChat from "./challenge-chat";
 import MatchCalendarActions from "./match-calendar-actions";
@@ -1337,9 +1338,7 @@ function Dashboard(a: Actions) {
     mine = s.challenges.filter((c) => !!challengeSide(c, p._id, s.players)),
     next = mine
       .filter((c) => !terminal.has(effectiveStatus(c)))
-      .sort((a, b) =>
-        (a.scheduledAt ?? a.playBy).localeCompare(b.scheduledAt ?? b.playBy),
-      )[0],
+      .sort(matchOrder())[0],
     div = s.divisions.find((d) => d._id === p.divisionId),
     season = s.seasons.find((x) => x.status === "active");
   const completed = mine
@@ -1851,8 +1850,7 @@ function Rankings(a: Actions) {
 }
 function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
   const name = (id: string) => challengeTeamName(c, id, s.players);
-  const when =
-    c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
+  const when = matchStart(c);
   return (
     <div className="stack">
       <Link
@@ -1931,7 +1929,7 @@ function Challenges(a: Actions) {
           (filter === "active" && !terminal.has(effectiveStatus(c))) ||
           (filter === "completed" && terminal.has(effectiveStatus(c)))),
     )
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort(matchOrder());
   const eligible = s.players.filter((x) => !challengeReason(s, p, x));
   const eligibleTeams = rankingEntries(s.players, p.divisionId)
     .map((entry) => ({
@@ -2969,16 +2967,11 @@ function Games(a: Actions) {
     .filter(
       (c) =>
         (c.scheduledAt || c.scheduleProposal) &&
-        clubWeek(c.scheduleProposal?.start ?? c.scheduledAt ?? c.createdAt)
-          .start === week &&
+        clubWeek(matchStart(c) ?? c.createdAt).start === week &&
         (all || involves(c, s.actor.playerId, s.players)) &&
         !["cancelled", "refused", "expired"].includes(c.status),
     )
-    .sort((a, b) =>
-      (b.scheduleProposal?.start ?? b.scheduledAt ?? b.playBy).localeCompare(
-        a.scheduleProposal?.start ?? a.scheduledAt ?? a.playBy,
-      ),
-    );
+    .sort(matchOrder());
   return (
     <>
       <Heading
@@ -2992,7 +2985,7 @@ function Games(a: Actions) {
           </a>
         }
       />
-      {s.actor.role !== "spectator" && (
+      {s.actor.role === "admin" && (
         <Section title="Disponibilidade dos campos">
           <CourtAvailability
             isAdmin={s.actor.role === "admin"}
@@ -3608,7 +3601,7 @@ function PlayerHistory({ s, p }: { s: View; p: Player }) {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     challenges = s.challenges
       .filter((c) => !!challengeSide(c, p._id, s.players))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      .sort(matchOrder());
   return (
     <Section
       title="Histórico da dupla"
@@ -4381,11 +4374,7 @@ function AdminResults(a: Actions) {
                 c.status,
               )),
     )
-    .sort((a, b) =>
-      (b.scheduledAt ?? b.createdAt).localeCompare(
-        a.scheduledAt ?? a.createdAt,
-      ),
-    );
+    .sort(matchOrder());
   return (
     <Section title="Registo de resultados">
       <div className="stack">
@@ -4508,9 +4497,7 @@ function AdminChallenges(a: Actions) {
             .trim(),
         ),
   );
-  const list = base
-    .filter((c) => matchesStatus(c, status))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const list = base.filter((c) => matchesStatus(c, status)).sort(matchOrder());
   const groups = [
     {
       label: "Acompanhar",

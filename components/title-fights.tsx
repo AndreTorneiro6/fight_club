@@ -1,5 +1,6 @@
 "use client";
 
+import { matchOrder } from "@/lib/match-order";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -159,24 +160,18 @@ function TitleMatchCard({
 
 export default function TitleFights({ state: s }: { state: View }) {
   const [division, setDivision] = useState("all");
-  const pool = s.challenges.filter(
-    (c) =>
-      (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
+  const pool = s.challenges
+    .filter(
+      (c) =>
+        (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
+    )
+    .sort(matchOrder());
+  const upcoming = pool.filter(
+    (c) => isOfficialTitleMatch(c, s) && c.status !== "completed",
   );
-  const upcoming = pool
-    .filter((c) => isOfficialTitleMatch(c, s) && c.status !== "completed")
-    .sort((a, b) =>
-      (a.scheduledAt ?? a.createdAt).localeCompare(
-        b.scheduledAt ?? b.createdAt,
-      ),
-    );
-  const completed = pool
-    .filter((c) => isOfficialTitleMatch(c, s) && c.status === "completed")
-    .sort((a, b) =>
-      (b.scheduledAt ?? b.createdAt).localeCompare(
-        a.scheduledAt ?? a.createdAt,
-      ),
-    );
+  const completed = pool.filter(
+    (c) => isOfficialTitleMatch(c, s) && c.status === "completed",
+  );
   const pending = pool.filter(
     (c) =>
       ["accepted", "schedule_pending"].includes(c.status) &&

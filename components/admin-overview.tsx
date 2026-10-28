@@ -1,4 +1,5 @@
 "use client";
+import { matchOrder } from "@/lib/match-order";
 import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import {
   divisionRoundCompletion,
@@ -45,12 +46,7 @@ export default function AdminOverview({
                 e.firstCompetitionWeek),
         ),
     )
-    .sort(
-      (a, b) =>
-        (a.weekStart ?? clubWeek(a.createdAt).start).localeCompare(
-          b.weekStart ?? clubWeek(b.createdAt).start,
-        ) || a.createdAt.localeCompare(b.createdAt),
-    );
+    .sort(matchOrder(now));
   const visibleUnscheduled = unscheduled.filter(
     (c) => scheduleDivision === "all" || c.divisionId === scheduleDivision,
   );
@@ -110,7 +106,9 @@ export default function AdminOverview({
         action: onRegistrations,
       },
     ].filter((t) => t.count > 0),
-    attention = [...disputes, ...club, ...results, ...overdue].slice(0, 5),
+    attention = [...disputes, ...club, ...results, ...overdue]
+      .sort(matchOrder(now))
+      .slice(0, 5),
     activePlayers = s.players.filter(
       (p) =>
         p.status === "active" &&

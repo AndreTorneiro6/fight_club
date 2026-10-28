@@ -4,7 +4,7 @@ import { courtDayIntervals } from "../lib/court-day";
 import { addClubDays, clubDay, clubDateTime } from "../lib/calendar";
 
 for (const admin of [false, true])
-  test(`${admin ? "admin" : "player"} can check courts; only admin receives booking links for unoccupied slots`, async ({
+  test(`${admin ? "admin can check courts and book unoccupied slots" : "player agenda hides court calendar while challenge availability remains read-only"}`, async ({
     page,
   }) => {
     const day = addClubDays(clubDay(Date.now()), 1);
@@ -143,6 +143,17 @@ for (const admin of [false, true])
       });
     });
     await page.goto("/jogos");
+    if (!admin) {
+      await expect(
+        page.getByRole("heading", {
+          name: "Disponibilidade dos campos",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      await expect(page.getByLabel("Dia para consultar")).toHaveCount(0);
+      await expect(page.locator(".court-day-scroll")).toHaveCount(0);
+      return;
+    }
     await page.getByLabel("Dia para consultar").fill(day);
     await expect(page.getByLabel("Dia para consultar")).toHaveAttribute(
       "type",
@@ -259,10 +270,8 @@ for (const admin of [false, true])
         .getByRole("button", { name: "Saltar visita", exact: true })
         .click();
       await page.goto("/jogos");
-      await page.getByLabel("Dia para consultar").fill(day);
-      await page
-        .locator('[data-timeline-court="c"] [data-status="clear"]')
-        .click();
+      await expect(page.getByLabel("Dia para consultar")).toHaveCount(0);
+      await expect(page.locator(".court-day-scroll")).toHaveCount(0);
       await expect(page.locator('a[href*="playtomic"]')).toHaveCount(0);
       const response = await page.request.get(
         `/api/courts/availability?day=${day}`,

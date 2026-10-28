@@ -1,3 +1,4 @@
+import { matchOrder } from "./match-order";
 import type { Challenge } from "./types";
 import { clubWeek } from "./calendar";
 
@@ -10,6 +11,6 @@ export function initialAgendaWeek(challenges: Challenge[], now = Date.now()) {
         !["cancelled", "refused", "expired"].includes(c.status) &&
         Date.parse(c.scheduledAt) + c.durationMinutes * 60000 > now,
     )
-    .sort((a, b) => a.scheduledAt!.localeCompare(b.scheduledAt!))[0];
+    .sort(matchOrder(now))[0];
   return clubWeek(next?.scheduledAt ?? now).start;
 }

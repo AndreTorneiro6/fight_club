@@ -1,3 +1,4 @@
+import { matchOrder } from "@/lib/match-order";
 import { normalizePlayerAttributes } from "@/lib/padel-attributes";
 import { NextResponse } from "next/server";
 import { requireActor } from "@/lib/auth";
@@ -52,6 +53,7 @@ export async function GET() {
         ),
         matches: state.challenges
           .filter((c) => c.officialPublication)
+          .sort(matchOrder())
           .map((c) => ({
             id: c._id,
             number: c.number,

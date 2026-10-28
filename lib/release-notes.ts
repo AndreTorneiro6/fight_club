@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.0";
+export const applicationVersion = "1.11.1";
 export const releaseNotes = [
+  {
+    version: "1.11.1",
+    date: "2026-10-28",
+    title: "Jogos pela proximidade do horário",
+    changes: [
+      "Disponibilidade dos campos retirada da agenda de jogador; a organização mantém o calendário na administração.",
+      "Listas de jogos apresentam primeiro os encontros a decorrer e os próximos, do mais próximo para o mais distante; jogos sem horário ficam no fim.",
+      "Histórico do mais recente para o mais antigo, com a mesma ordenação em Jogos, Desafios, Title Fight, apostas e administração.",
+    ],
+  },
   {
     version: "1.11.0",
     date: "2026-10-28",

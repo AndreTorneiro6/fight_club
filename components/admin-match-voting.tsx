@@ -1,4 +1,5 @@
 "use client";
+import { matchOrder } from "@/lib/match-order";
 import { useEffect, useState } from "react";
 import { formatSetScores } from "@/lib/set-scores";
 import {
@@ -52,11 +53,7 @@ export default function AdminMatchVoting({
         isVotingMatch(s, c) &&
         (division === "all" || c.divisionId === division),
     )
-    .sort(
-      (a, b) =>
-        (a.scheduledAt ?? "9999").localeCompare(b.scheduledAt ?? "9999") ||
-        a.number - b.number,
-    );
+    .sort(matchOrder(clock));
   const game = games.find((c) => c._id === selected);
   function votingState(c: View["challenges"][number]) {
     const stored = (s.matchVotes ?? []).find(

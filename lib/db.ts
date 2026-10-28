@@ -1,3 +1,4 @@
+import { matchOrder } from "./match-order";
 import { filterSpectatorView } from "./spectator-view";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { teamPosition } from "./team-competition";
@@ -543,6 +544,7 @@ export async function view(actor: Actor): Promise<View> {
       (actor.role === "admin" && n.playerId === "__admins__"),
   );
   filterSpectatorView(s, actor);
+  s.challenges.sort(matchOrder());
   return {
     ...s,
     actor: publicActor(actor),

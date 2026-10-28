@@ -24,6 +24,7 @@ test("player agenda immediately shows upcoming league fixtures, while My games r
     state.actor.playerId,
   );
   await page.goto("/jogos");
+  await expect(page.getByLabel("Dia para consultar")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Jogos da liga", exact: true }),
   ).toHaveClass("active");
