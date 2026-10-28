@@ -78,6 +78,10 @@ async function indexes(db: Db) {
     .collection("gamificationProfiles")
     .createIndex({ playerId: 1 }, { unique: true });
   await db.collection("sponsors").createIndex({ published: 1, order: 1 });
+  await db.collection("teamMessages").createIndex({ teamId: 1, createdAt: 1 });
+  await db
+    .collection("teamMessages")
+    .createIndex({ playerId: 1, requestId: 1 }, { unique: true });
   await db.collection("coinEntries").createIndex(
     { requestId: 1 },
     {
@@ -176,14 +180,39 @@ async function indexes(db: Db) {
 export async function readState(
   db: Db,
   session?: ClientSession,
+  options: { audit?: boolean; notificationsFor?: Actor } = {},
 ): Promise<State> {
   const state = {} as State;
-  // A session must not run parallel operations within a transaction.
-  for (const key of collections)
-    (state[key] as Entity[]) = (await db
+  const read = async (key: (typeof collections)[number]) => {
+    if (key === "audit" && options.audit === false) {
+      state.audit = [];
+      return;
+    }
+    const recipient = options.notificationsFor;
+    const filter =
+      key === "notifications" && recipient
+        ? {
+            playerId: {
+              $in: [
+                recipient.playerId,
+                ...(recipient.role === "admin" ? ["__admins__"] : []),
+              ],
+            },
+          }
+        : {};
+    (state[key] as Entity[]) = await db
       .collection<Entity>(key)
-      .find({}, { session })
-      .toArray()) as Entity[];
+      .find(filter, { session })
+      .toArray();
+  };
+  if (session) {
+    // MongoDB sessions must not run parallel operations within a transaction.
+    for (const key of collections) await read(key);
+  } else {
+    // Bound independent snapshot reads so active clients do not exhaust the connection pool.
+    for (let offset = 0; offset < collections.length; offset += 8)
+      await Promise.all(collections.slice(offset, offset + 8).map(read));
+  }
   const admins = await db
     .collection<User>("users")
     .find({ role: "admin", verified: true }, { session })
@@ -401,9 +430,15 @@ export async function mutate(actor: Actor, command: unknown) {
     return result;
   });
 }
-export async function view(actor: Actor): Promise<View> {
+export async function view(
+  actor: Actor,
+  options: { includeAudit?: boolean } = {},
+): Promise<View> {
   const { db } = await database();
-  const s = await readState(db);
+  const s = await readState(db, undefined, {
+    audit: actor.role === "admin" && options.includeAudit !== false,
+    notificationsFor: actor,
+  });
   ensure(s.settings.length, "Inicializa a liga com npm run seed.", 503);
   const me = s.players.find((p) => p._id === actor.playerId);
   if (

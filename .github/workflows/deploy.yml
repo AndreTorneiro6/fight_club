@@ -67,6 +67,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check shared team song and private team chat
+        run: npx playwright test e2e/team-space.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check admin pending official results
         run: npx playwright test e2e/admin-pending-results.spec.ts
         env:

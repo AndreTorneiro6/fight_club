@@ -1,4 +1,5 @@
 "use client";
+import { TeamWorkspace, AdminEntrySongs } from "./team-space";
 import { LiveMatchScore, LiveMatchScoreEditor } from "./live-match-score";
 import { matchOrder, matchStart } from "@/lib/match-order";
 import { canRecordOfficialResult } from "@/lib/result-readiness";
@@ -184,7 +185,11 @@ import {
   addClubDays,
 } from "@/lib/calendar";
 
-async function request(url: string, body?: unknown) {
+async function request(
+  url: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+) {
   const res = await fetch(
     url,
     body instanceof FormData
@@ -195,7 +200,7 @@ async function request(url: string, body?: unknown) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
           }
-        : { cache: "no-store" },
+        : { cache: "no-store", headers },
   );
   const data = await res.json();
   if (!res.ok)
@@ -441,11 +446,17 @@ export function Application({
     (text: string, bad = false) => setToast({ text, bad }),
     [],
   );
+  const searchParams = useSearchParams();
+  const includeAudit =
+    route === "admin" &&
+    ["audit", "matchmaking"].includes(searchParams.get("tab") ?? "");
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
     const sequence = ++refreshSequence.current;
     try {
-      const next = await request("/api/league");
+      const next = await request("/api/league", undefined, {
+        "X-League-View": includeAudit ? "full" : "compact",
+      });
       if (sequence !== refreshSequence.current) return;
       setS(next);
       setError("");
@@ -465,7 +476,7 @@ export function Application({
       }
       setError((e as Error).message);
     }
-  }, [router]);
+  }, [router, includeAudit]);
   const { connection: chatConnection, updateAvailable } = useLeagueUpdates(
     !!route && !["auth", "inscricao"].includes(route),
     refresh,
@@ -2367,6 +2378,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
             )}
             <ChallengeOriginLabel s={s} c={c} detailed />
             <Versus s={s} c={c} />
+            <AdminEntrySongs s={s} c={c} />
             <LiveMatchScore c={c} />
             <div className="inset row between wrap">
               <span>
@@ -3063,6 +3075,7 @@ function Games(a: Actions) {
           {games.map((c) => (
             <div key={c._id}>
               <ChallengeCard s={s} c={c} />
+              <AdminEntrySongs s={s} c={c} />
               <AdminMatchActions {...a} c={c} />
               {s.actor.role === "admin" && <AdminResultButton {...a} c={c} />}
             </div>
@@ -3365,6 +3378,7 @@ function Profile(a: Actions) {
       <Link className="button" href="/ajuda">
         <BookOpen size={17} /> Como usar a app · Guia passo a passo
       </Link>
+      <TeamWorkspace s={s} run={run} busy={busy} />
       <div className="detail-grid">
         <div className="stack">
           <Section

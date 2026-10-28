@@ -1,3 +1,4 @@
+import { filterTeamSpaceView } from "./team-space";
 import { isVotingMatch } from "./match-voting-targets";
 import { anonymousMatchVotes } from "./anonymous-match-votes";
 import {
@@ -10,6 +11,7 @@ import type { Actor, State } from "./types";
 
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
+  filterTeamSpaceView(state, actor);
   state.matchVoteSummaries = anonymousMatchVotes(state);
   state.matchVotes = (state.matchVotes ?? []).filter(
     (vote) => vote.userId === actor.userId,

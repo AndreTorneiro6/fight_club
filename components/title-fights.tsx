@@ -1,4 +1,5 @@
 "use client";
+import { AdminEntrySongs } from "./team-space";
 import { LiveMatchScore } from "./live-match-score";
 
 import { matchOrder } from "@/lib/match-order";
@@ -183,6 +184,7 @@ function TitleMatchCard({
           </span>
         </div>
       </Link>
+      <AdminEntrySongs s={s} c={c} />
       {event && (
         <div
           className={styles.calendar}

@@ -266,6 +266,8 @@ export async function sendPushDelivery(
       { endpoint: subscription.endpoint, keys: subscription.keys },
       JSON.stringify(pushNotificationPayload(job, process.env.APP_URL)),
       {
+        timeout: 10000,
+        urgency: "high",
         TTL: job.expiresAt
           ? Math.max(
               1,

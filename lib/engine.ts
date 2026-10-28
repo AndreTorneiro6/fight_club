@@ -1,3 +1,4 @@
+import { executeTeamSpace } from "./team-space-command";
 import { executeLiveScore } from "./live-score-command";
 import { executeChampionHistory } from "./champion-history";
 import { executeClubPhotos } from "./club-photos";
@@ -649,6 +650,8 @@ export function execute(
       "Esta ação não está disponível no modo espetador.",
       403,
     );
+  if (featureType.startsWith("team."))
+    return executeTeamSpace(s, actor, raw, timestamp);
   if (featureType === "admin.live-score.save")
     return executeLiveScore(s, actor, raw, timestamp);
   if (featureType === "admin.champions.correct-history")

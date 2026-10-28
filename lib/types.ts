@@ -1,3 +1,4 @@
+import type { TeamSpace, TeamMessage } from "./team-space";
 import type { LiveScore } from "./live-score";
 import type { MatchVoteSummary } from "./anonymous-match-votes";
 import type { ClubPhoto, ClubPhotoUnlock } from "./club-photo-types";
@@ -430,6 +431,8 @@ export interface State {
   stickerRewards?: StickerReward[];
   adminNotes?: AdminNote[];
   playerAttributes?: PlayerAttributes[];
+  teamSpaces?: TeamSpace[];
+  teamMessages?: TeamMessage[];
   engagementSettings?: EngagementSettings[];
   predictions?: Prediction[];
   competitionConfigurations?: CompetitionConfiguration[];
@@ -475,6 +478,8 @@ export const collections = [
   "stickerRewards",
   "adminNotes",
   "playerAttributes",
+  "teamSpaces",
+  "teamMessages",
   "engagementSettings",
   "predictions",
   "competitionConfigurations",

@@ -5,11 +5,16 @@ import { rateLimit, requireActor } from "@/lib/auth";
 import { database, mutate, view } from "@/lib/db";
 import { sameOrigin, failure } from "@/lib/http";
 export const runtime = "nodejs";
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return NextResponse.json(await view(await requireActor()), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      await view(await requireActor(), {
+        includeAudit: request.headers.get("X-League-View") !== "compact",
+      }),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (e) {
     return failure(e);
   }

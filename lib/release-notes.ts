@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.6";
+export const applicationVersion = "1.11.7";
 export const releaseNotes = [
+  {
+    version: "1.11.7",
+    date: "2026-10-28",
+    title: "Espaço da dupla e notificações mais rápidas",
+    changes: [
+      "Música de entrada da dupla no perfil: os dois jogadores podem editar o link do YouTube; admins podem abri-lo no jogo e no Title Fight.",
+      "Chat privado da dupla no perfil, visível exclusivamente aos dois membros, com atualização automática.",
+      "Fila push processada a cada cinco segundos com envios em paralelo; a página evita carregar auditoria quando não é necessária, preservando todo o histórico.",
+    ],
+  },
   {
     version: "1.11.6",
     date: "2026-10-28",
