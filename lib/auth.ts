@@ -44,11 +44,11 @@ export async function requireActor(): Promise<Actor> {
     .collection<Player>("players")
     .findOne({ userId: user._id });
   ensure(p, "Perfil não encontrado.", 403);
-  return workspaceActor(user, session, p._id);
+  return workspaceActor(user, session, p._id, p);
 }
 export async function selectWorkspace(raw: unknown) {
   const { workspace } = z
-    .object({ workspace: z.enum(["admin", "player"]) })
+    .object({ workspace: z.enum(["admin", "player", "spectator"]) })
     .strict()
     .parse(raw);
   const authentication = await currentAuthentication();
@@ -66,6 +66,12 @@ export async function selectWorkspace(raw: unknown) {
     ensure(
       account?.role === "admin" && account.verified,
       "Sem permissão.",
+      403,
+    );
+    const profile = state.players.find((p) => p.userId === user._id);
+    ensure(
+      profile && (workspace !== "player" || !profile.spectator),
+      "Este perfil é espetador.",
       403,
     );
     const changed = await db.collection<Session>("sessions").updateOne(

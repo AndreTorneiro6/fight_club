@@ -51,6 +51,12 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check spectator assignment, both admin previews and spectator predictions
+        run: npx playwright test e2e/spectator.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEMO_TEST_ADMIN_PAIR: "1"
+
       - name: Check admin pending official results
         run: npx playwright test e2e/admin-pending-results.spec.ts
         env:

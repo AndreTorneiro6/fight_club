@@ -12,6 +12,7 @@ export function rankingEntries(
   const eligible = players
     .filter(
       (player) =>
+        !player.spectator &&
         player.divisionId === divisionId &&
         player.status !== "removed" &&
         !player.awaitingApproval &&

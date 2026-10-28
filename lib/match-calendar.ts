@@ -1,3 +1,4 @@
+import { isVotingMatch } from "./match-voting-targets";
 import type { Challenge, State, Actor } from "./types";
 import { challengeSide, challengeTeamName } from "./team-competition";
 export function calendarMatch(s: State, c: Challenge, actor: Actor) {
@@ -6,7 +7,9 @@ export function calendarMatch(s: State, c: Challenge, actor: Actor) {
       c.status,
     ) ||
     !c.scheduledAt ||
-    (actor.role !== "admin" && !challengeSide(c, actor.playerId, s.players))
+    (actor.role !== "admin" &&
+      !(actor.role === "spectator" && isVotingMatch(s, c)) &&
+      !challengeSide(c, actor.playerId, s.players))
   )
     return undefined;
   const match = s.matches.find((m) => m.challengeId === c._id),

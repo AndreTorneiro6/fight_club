@@ -118,7 +118,11 @@ export default function AdminMatchVoting({
             </button>
           ))}
         </div>
-        <p>Prevê o resultado de cada set e conversa sobre o jogo.</p>
+        <p>
+          {s.actor.role === "spectator"
+            ? "Prevê o resultado de cada set e acompanha a conversa sobre o jogo."
+            : "Prevê o resultado de cada set e conversa sobre o jogo."}
+        </p>
         <p className="muted">
           Um palpite por pessoa e jogo. O terceiro set só é necessário com um
           set ganho por cada dupla. As previsões não alteram resultados

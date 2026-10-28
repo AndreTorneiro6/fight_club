@@ -14,6 +14,7 @@ export async function GET(
     const actor = await requireActor(),
       { id } = await params,
       { db } = await database();
+    ensure(actor.role !== "spectator", "Sem acesso ao chat privado.", 403);
     async function allowed() {
       const c = await db
         .collection<Challenge>("challenges")

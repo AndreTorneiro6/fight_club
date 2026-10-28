@@ -66,6 +66,7 @@ function assertAdmin(actor: Actor) {
 function roster(state: State) {
   return state.players.filter(
     (p) =>
+      !p.spectator &&
       p.status !== "removed" &&
       !p.awaitingApproval &&
       !p.registrationRejectedAt &&

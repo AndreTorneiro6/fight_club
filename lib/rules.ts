@@ -59,6 +59,8 @@ export function challengeReason(
   now = Date.now(),
   title = false,
 ): string | null {
+  if (me.spectator || defender.spectator)
+    return "Os espetadores não participam em desafios.";
   const rules = s.settings[0];
   const weekly = weeklyReason(s, me, defender, now);
   if (weekly) return weekly;

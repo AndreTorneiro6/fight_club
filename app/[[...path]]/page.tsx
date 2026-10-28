@@ -1,6 +1,6 @@
 import { Application } from "@/components/application";
 import { requireActor } from "@/lib/auth";
-import { adminOnlyRoutes } from "@/lib/workspace-routes";
+import { adminOnlyRoutes, spectatorRoutes } from "@/lib/workspace-routes";
 import { LeagueError } from "@/lib/rules";
 import { redirect, notFound } from "next/navigation";
 const routes = new Set([
@@ -37,7 +37,7 @@ export default async function Page({
   const { path = [] } = await params;
   const route = path.join("/");
   if (!routes.has(route) && !/^desafios\/[^/]+$/.test(route)) notFound();
-  if (adminOnlyRoutes.has(route)) {
+  if (!["", "auth", "inscricao", "privacidade"].includes(route)) {
     let actor;
     try {
       actor = await requireActor();
@@ -45,11 +45,26 @@ export default async function Page({
       if (
         error instanceof LeagueError &&
         (error.status === 401 || error.status === 403)
-      )
-        redirect("/auth");
+      ) {
+        if (adminOnlyRoutes.has(route)) redirect("/auth");
+        return (
+          <Application
+            route={route}
+            googleEnabled={!!process.env.GOOGLE_CLIENT_ID}
+            demo={process.env.DEMO_MODE === "true"}
+          />
+        );
+      }
       throw error;
     }
-    if (actor.role !== "admin") redirect("/inicio");
+    if (actor.role === "spectator" && !spectatorRoutes.has(route))
+      redirect("/ranking");
+    if (
+      adminOnlyRoutes.has(route) &&
+      actor.role !== "admin" &&
+      !actor.workspaceSelectionRequired
+    )
+      redirect("/inicio");
   }
   if (route === "privacidade")
     return (

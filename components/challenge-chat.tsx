@@ -26,6 +26,7 @@ export default function ChallengeChat({
   busy: boolean;
   connection?: "connecting" | "live" | "reconnecting";
 }) {
+  const readOnly = s.actor.role === "spectator";
   const [text, setText] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [query, setQuery] = useState<{
@@ -149,7 +150,7 @@ export default function ChallengeChat({
                 })}
                 {m.updatedAt ? " · editada" : ""}
               </small>
-              {m.playerId === s.actor.playerId && (
+              {!readOnly && m.playerId === s.actor.playerId && (
                 <ChatMessageActions
                   message={m}
                   community={community}
@@ -161,171 +162,175 @@ export default function ChallengeChat({
           ))
         ) : (
           <p>
-            {community
-              ? "Quem vai ganhar? Abre a conversa sobre este jogo."
-              : "Combina os detalhes do jogo com o teu adversário."}
+            {readOnly
+              ? "Ainda não existem mensagens sobre este jogo."
+              : community
+                ? "Quem vai ganhar? Abre a conversa sobre este jogo."
+                : "Combina os detalhes do jogo com o teu adversário."}
           </p>
         )}
       </div>
-      <form
-        className="stack"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (busy || sending.current || !text.trim()) return;
-          const mentionIds = selected.filter((id) => {
-            const target = targets.find((t) => t.playerId === id);
-            return target && text.includes(`@${target.name}`);
-          });
-          const payload = JSON.stringify([c._id, text, mentionIds]);
-          if (community && requestId.current?.payload !== payload)
-            requestId.current = { payload, id: crypto.randomUUID() };
-          sending.current = true;
-          setSendError("");
-          try {
-            const result = await run(
-              {
-                type: community ? "match-discussion.send" : "message.send",
-                challengeId: c._id,
-                text,
-                mentionIds,
-                ...(community ? { requestId: requestId.current!.id } : {}),
-              },
-              "",
-            );
-            if (!result) {
+      {!readOnly && (
+        <form
+          className="stack"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (busy || sending.current || !text.trim()) return;
+            const mentionIds = selected.filter((id) => {
+              const target = targets.find((t) => t.playerId === id);
+              return target && text.includes(`@${target.name}`);
+            });
+            const payload = JSON.stringify([c._id, text, mentionIds]);
+            if (community && requestId.current?.payload !== payload)
+              requestId.current = { payload, id: crypto.randomUUID() };
+            sending.current = true;
+            setSendError("");
+            try {
+              const result = await run(
+                {
+                  type: community ? "match-discussion.send" : "message.send",
+                  challengeId: c._id,
+                  text,
+                  mentionIds,
+                  ...(community ? { requestId: requestId.current!.id } : {}),
+                },
+                "",
+              );
+              if (!result) {
+                setSendError(
+                  "Não foi possível enviar. A mensagem foi mantida; tenta novamente.",
+                );
+                return;
+              }
+              requestId.current = undefined;
+              setText("");
+              setSelected([]);
+              setQuery(null);
+              input.current?.focus();
+            } catch {
               setSendError(
                 "Não foi possível enviar. A mensagem foi mantida; tenta novamente.",
               );
-              return;
+            } finally {
+              sending.current = false;
             }
-            requestId.current = undefined;
-            setText("");
-            setSelected([]);
-            setQuery(null);
-            input.current?.focus();
-          } catch {
-            setSendError(
-              "Não foi possível enviar. A mensagem foi mantida; tenta novamente.",
-            );
-          } finally {
-            sending.current = false;
-          }
-        }}
-      >
-        {sendError && (
-          <p className="error" role="alert">
-            {sendError}
-          </p>
-        )}
-        <small>
-          {community
-            ? "Os jogadores do jogo, quem já participou na conversa e as pessoas mencionadas recebem notificações. Escreve @ para mencionar."
-            : "Escreve @ e escolhe um jogador ou administrador para o mencionar e notificar."}
-        </small>
-        {matches.length > 0 && (
-          <div
-            className="inset stack chat-mention-options"
-            id={`mention-list-${c._id}`}
-            role="listbox"
-            aria-label="Pessoas que podes mencionar"
-          >
-            {matches.map((target, index) => (
-              <button
-                type="button"
-                role="option"
-                id={`mention-option-${target.playerId}`}
-                aria-selected={active === index}
-                className={`row between ${active === index ? "primary" : ""}`}
-                key={target.playerId}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(target)}
-              >
-                <span>@{target.name}</span>
-                <small>
-                  {target.kind === "admin"
-                    ? "Administrador"
-                    : community
-                      ? "Jogador da liga"
-                      : "Jogador do desafio"}
-                </small>
-              </button>
-            ))}
+          }}
+        >
+          {sendError && (
+            <p className="error" role="alert">
+              {sendError}
+            </p>
+          )}
+          <small>
+            {community
+              ? "Os jogadores do jogo, quem já participou na conversa e as pessoas mencionadas recebem notificações. Escreve @ para mencionar."
+              : "Escreve @ e escolhe um jogador ou administrador para o mencionar e notificar."}
+          </small>
+          {matches.length > 0 && (
+            <div
+              className="inset stack chat-mention-options"
+              id={`mention-list-${c._id}`}
+              role="listbox"
+              aria-label="Pessoas que podes mencionar"
+            >
+              {matches.map((target, index) => (
+                <button
+                  type="button"
+                  role="option"
+                  id={`mention-option-${target.playerId}`}
+                  aria-selected={active === index}
+                  className={`row between ${active === index ? "primary" : ""}`}
+                  key={target.playerId}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => choose(target)}
+                >
+                  <span>@{target.name}</span>
+                  <small>
+                    {target.kind === "admin"
+                      ? "Administrador"
+                      : community
+                        ? "Jogador da liga"
+                        : "Jogador do desafio"}
+                  </small>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="row">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Mencionar alguém"
+              onClick={() => {
+                const caret = input.current?.selectionStart ?? text.length,
+                  prefix = caret && !/\s/.test(text[caret - 1]) ? " @" : "@",
+                  value = text.slice(0, caret) + prefix + text.slice(caret);
+                update(value, caret + prefix.length);
+                requestAnimationFrame(() => {
+                  input.current?.focus();
+                  input.current?.setSelectionRange(
+                    caret + prefix.length,
+                    caret + prefix.length,
+                  );
+                });
+              }}
+            >
+              <AtSign size={18} />
+            </button>
+            <input
+              ref={input}
+              className="flex-1"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={matches.length > 0}
+              aria-controls={`mention-list-${c._id}`}
+              aria-activedescendant={
+                matches.length
+                  ? `mention-option-${matches[Math.min(active, matches.length - 1)].playerId}`
+                  : undefined
+              }
+              value={text}
+              onChange={(e) =>
+                update(
+                  e.target.value,
+                  e.target.selectionStart ?? e.target.value.length,
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setQuery(null);
+                  return;
+                }
+                if (!matches.length) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setActive((i) => (i + 1) % matches.length);
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setActive((i) => (i + matches.length - 1) % matches.length);
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  choose(matches[Math.min(active, matches.length - 1)]);
+                }
+              }}
+              name="text"
+              placeholder="Escreve uma mensagem…"
+              aria-label="Mensagem"
+              required
+              maxLength={2000}
+            />
+            <button
+              disabled={busy || !text.trim()}
+              aria-label="Enviar mensagem"
+              className="primary"
+            >
+              <ArrowRight size={17} />
+            </button>
           </div>
-        )}
-        <div className="row">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Mencionar alguém"
-            onClick={() => {
-              const caret = input.current?.selectionStart ?? text.length,
-                prefix = caret && !/\s/.test(text[caret - 1]) ? " @" : "@",
-                value = text.slice(0, caret) + prefix + text.slice(caret);
-              update(value, caret + prefix.length);
-              requestAnimationFrame(() => {
-                input.current?.focus();
-                input.current?.setSelectionRange(
-                  caret + prefix.length,
-                  caret + prefix.length,
-                );
-              });
-            }}
-          >
-            <AtSign size={18} />
-          </button>
-          <input
-            ref={input}
-            className="flex-1"
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={matches.length > 0}
-            aria-controls={`mention-list-${c._id}`}
-            aria-activedescendant={
-              matches.length
-                ? `mention-option-${matches[Math.min(active, matches.length - 1)].playerId}`
-                : undefined
-            }
-            value={text}
-            onChange={(e) =>
-              update(
-                e.target.value,
-                e.target.selectionStart ?? e.target.value.length,
-              )
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setQuery(null);
-                return;
-              }
-              if (!matches.length) return;
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setActive((i) => (i + 1) % matches.length);
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setActive((i) => (i + matches.length - 1) % matches.length);
-              }
-              if (e.key === "Enter") {
-                e.preventDefault();
-                choose(matches[Math.min(active, matches.length - 1)]);
-              }
-            }}
-            name="text"
-            placeholder="Escreve uma mensagem…"
-            aria-label="Mensagem"
-            required
-            maxLength={2000}
-          />
-          <button
-            disabled={busy || !text.trim()}
-            aria-label="Enviar mensagem"
-            className="primary"
-          >
-            <ArrowRight size={17} />
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
     </section>
   );
 }

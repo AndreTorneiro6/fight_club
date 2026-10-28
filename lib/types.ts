@@ -53,6 +53,8 @@ export interface PaymentStatus {
   updatedBy: string;
 }
 export interface Player extends Entity {
+  /** Assigned only by administration; no competitive division or player card. */
+  spectator?: boolean;
   /** Derived for API views; position remains an internal legacy ordering slot. */
   teamPosition?: number;
   previousTeamPosition?: number;
@@ -498,16 +500,17 @@ export const collections = [
   "champions",
   "seasons",
 ] as const;
-export type Workspace = "admin" | "player";
+export type Workspace = "admin" | "player" | "spectator";
 export interface Actor {
-  accountRole?: Workspace;
+  accountRole?: "admin" | "player";
+  availableWorkspaces?: Workspace[];
   workspace?: Workspace;
   workspaceSelectionRequired?: boolean;
   /** Internal server-only session identity; never serialized. */
   sessionId?: string;
   userId: string;
   playerId: string;
-  role: "admin" | "player";
+  role: Workspace;
 }
 export interface User extends Entity {
   privacyAcceptedAt?: string;

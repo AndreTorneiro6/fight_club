@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Shield, UserRound } from "lucide-react";
+import { ChevronDown, Shield, UserRound, Eye } from "lucide-react";
 
-type Workspace = "admin" | "player";
-type Props = { onSelect: (workspace: Workspace) => Promise<void> };
+import type { Workspace } from "@/lib/types";
+type Props = {
+  onSelect: (workspace: Workspace) => Promise<void>;
+  available?: Workspace[];
+};
 
-export default function WorkspaceChoice({ onSelect }: Props) {
+export default function WorkspaceChoice({
+  onSelect,
+  available = ["admin", "player", "spectator"],
+}: Props) {
   const [pending, setPending] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
   async function select(workspace: Workspace) {
@@ -36,15 +42,22 @@ export default function WorkspaceChoice({ onSelect }: Props) {
           direito.
         </p>
         <div className="workspace-options">
-          <button disabled={!!pending} onClick={() => void select("player")}>
-            <UserRound size={30} />
-            <strong>Entrar como jogador</strong>
-            <span>O teu cartão, desafios, jogos e palpites.</span>
-          </button>
+          {available.includes("player") && (
+            <button disabled={!!pending} onClick={() => void select("player")}>
+              <UserRound size={30} />
+              <strong>Entrar como jogador</strong>
+              <span>O teu cartão, desafios, jogos e palpites.</span>
+            </button>
+          )}
           <button disabled={!!pending} onClick={() => void select("admin")}>
             <Shield size={30} />
             <strong>Entrar como administrador</strong>
             <span>Gerir a liga, aprovar jornadas e guardar ideias.</span>
+          </button>
+          <button disabled={!!pending} onClick={() => void select("spectator")}>
+            <Eye size={30} />
+            <strong>Entrar como espetador</strong>
+            <span>Acompanhar rankings, jogos e participar nas apostas.</span>
           </button>
         </div>
         {pending && <p role="status">A abrir o espaço…</p>}
@@ -61,6 +74,7 @@ export default function WorkspaceChoice({ onSelect }: Props) {
 export function WorkspaceSwitcher({
   workspace,
   onSelect,
+  available = ["admin", "player", "spectator"],
 }: Props & { workspace: Workspace }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -94,23 +108,35 @@ export function WorkspaceSwitcher({
         aria-controls="workspace-options"
         onClick={() => setOpen(!open)}
       >
-        {workspace === "admin" ? <Shield size={16} /> : <UserRound size={16} />}
+        {workspace === "admin" ? (
+          <Shield size={16} />
+        ) : workspace === "spectator" ? (
+          <Eye size={16} />
+        ) : (
+          <UserRound size={16} />
+        )}
         <span className="workspace-current">
-          {workspace === "admin" ? "Administrador" : "Jogador"}
+          {workspace === "admin"
+            ? "Administrador"
+            : workspace === "spectator"
+              ? "Espetador"
+              : "Jogador"}
         </span>
         <ChevronDown size={14} />
       </button>
       {open && (
         <div className="workspace-dropdown panel stack" id="workspace-options">
           <strong>O teu espaço</strong>
-          <button
-            disabled={pending}
-            aria-pressed={workspace === "player"}
-            onClick={() => void select("player")}
-          >
-            <UserRound size={16} />
-            Jogador{workspace === "player" ? " ✓" : ""}
-          </button>
+          {available.includes("player") && (
+            <button
+              disabled={pending}
+              aria-pressed={workspace === "player"}
+              onClick={() => void select("player")}
+            >
+              <UserRound size={16} />
+              Jogador{workspace === "player" ? " ✓" : ""}
+            </button>
+          )}
           <button
             disabled={pending}
             aria-pressed={workspace === "admin"}
@@ -118,6 +144,14 @@ export function WorkspaceSwitcher({
           >
             <Shield size={16} />
             Administrador{workspace === "admin" ? " ✓" : ""}
+          </button>
+          <button
+            disabled={pending}
+            aria-pressed={workspace === "spectator"}
+            onClick={() => void select("spectator")}
+          >
+            <Eye size={16} />
+            Espetador{workspace === "spectator" ? " ✓" : ""}
           </button>
           {error && (
             <p className="error" role="alert">

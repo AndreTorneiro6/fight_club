@@ -32,3 +32,15 @@ export function isManagementRoute(route: string) {
     route.startsWith("desafios/")
   );
 }
+
+export const spectatorLinks = leagueInformationLinks.filter(([path]) =>
+  ["title-fight", "campeoes", "epocas", "estatisticas"].includes(path),
+);
+export const spectatorRoutes = new Set([
+  "ranking",
+  "jogos",
+  "apostas",
+  "perfil",
+  "notificacoes",
+  ...spectatorLinks.map(([path]) => path),
+]);

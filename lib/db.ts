@@ -1,8 +1,9 @@
+import { filterSpectatorView } from "./spectator-view";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { teamPosition } from "./team-competition";
 import { reconcileCoins } from "./coins";
 import { publicActor, workspaceActor } from "./workspace";
-import type { Session, User } from "./types";
+import type { Player, Session, User } from "./types";
 import { emailLookup, normalizeEmail, EMAIL_IN_USE } from "./email";
 import { enqueueNotifications } from "./notification-delivery";
 import { settlePredictions } from "./predictions";
@@ -336,7 +337,11 @@ export async function validateActorSession(
     .collection<User>("users")
     .findOne({ _id: actor.userId }, { session });
   ensure(active && user?.verified, "Sessão expirada.", 401);
-  const current = workspaceActor(user, active, actor.playerId);
+  const profile = await db
+    .collection<Player>("players")
+    .findOne({ _id: actor.playerId, userId: actor.userId }, { session });
+  ensure(profile, "Perfil não encontrado.", 403);
+  const current = workspaceActor(user, active, actor.playerId, profile);
   ensure(
     !current.workspaceSelectionRequired &&
       current.role === actor.role &&
@@ -537,6 +542,7 @@ export async function view(actor: Actor): Promise<View> {
       n.playerId === actor.playerId ||
       (actor.role === "admin" && n.playerId === "__admins__"),
   );
+  filterSpectatorView(s, actor);
   return {
     ...s,
     actor: publicActor(actor),

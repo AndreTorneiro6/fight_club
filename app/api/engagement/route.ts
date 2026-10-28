@@ -19,6 +19,7 @@ export async function GET() {
     const state = await readState((await database()).db);
     const profile = state.players.find((p) => p._id === actor.playerId);
     if (
+      actor.role === "spectator" ||
       !profile ||
       profile.awaitingApproval ||
       profile.registrationRejectedAt ||

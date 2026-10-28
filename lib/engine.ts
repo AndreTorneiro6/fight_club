@@ -518,6 +518,15 @@ export const commandSchema = z.discriminatedUnion("type", [
     confirmation: z.literal("ELIMINAR"),
   }),
   z.object({
+    type: z.literal("admin.spectator.save"),
+    playerId: id.optional(),
+    name: playerFields.name,
+    email: playerFields.email,
+    phone: playerFields.phone,
+    photo: playerFields.photo,
+    status: playerFields.status,
+  }),
+  z.object({
     type: z.literal("admin.player.save"),
     playerId: id.optional(),
     teamPosition: z.number().int().min(1).max(10000).optional(),
@@ -618,6 +627,26 @@ export function execute(
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  const profile = s.players.find((p) => p._id === actor.playerId);
+  if (
+    actor.role === "spectator" ||
+    (profile?.spectator && actor.role !== "admin")
+  )
+    ensure(
+      [
+        "profile.save",
+        "notifications.read",
+        "notifications.preferences",
+        "match-vote.predict",
+        "match-vote.save",
+        "match-vote.remove",
+        "admin.match-vote.predict",
+        "admin.match-vote.save",
+        "admin.match-vote.remove",
+      ].includes(featureType),
+      "Esta ação não está disponível no modo espetador.",
+      403,
+    );
   if (featureType.startsWith("admin.test."))
     return executeAdminTest(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.placement."))
@@ -789,6 +818,7 @@ export function execute(
       createdAt: now,
     });
   const eligiblePartner = (candidate: Player) =>
+    !candidate.spectator &&
     candidate.status !== "removed" &&
     !candidate.awaitingApproval &&
     !candidate.registrationRejectedAt;
@@ -979,7 +1009,8 @@ export function execute(
   };
   const compact = (divisionId: string, reason: string) => {
     const players = s.players.filter(
-      (p) => p.divisionId === divisionId && p.status !== "removed",
+      (p) =>
+        !p.spectator && p.divisionId === divisionId && p.status !== "removed",
     );
     const locked = new Set(
       players
@@ -3769,6 +3800,85 @@ export function execute(
       });
       return { deletedPlayerId: p._id };
     }
+    case "admin.spectator.save": {
+      const { type, playerId, ...data } = cmd;
+      const existing = playerId ? player(playerId) : undefined;
+      ensure(
+        !existing?.userId || data.email,
+        "Um perfil com conta precisa de um email.",
+      );
+      ensure(
+        !data.email ||
+          !s.players.some(
+            (p) => p._id !== playerId && normalizeEmail(p.email) === data.email,
+          ),
+        EMAIL_IN_USE,
+        409,
+      );
+      const before = existing ? { ...existing } : null;
+      if (existing && !existing.spectator) {
+        const affected = teamMembers(s.players, existing._id);
+        ensure(
+          affected.every(
+            (p) =>
+              activeChallenges(s, p._id, timestamp).length === 0 &&
+              !frozenRanking(s, p._id, timestamp),
+          ),
+          "Resolve os desafios e o congelamento da dupla antes de mudar para espetador.",
+        );
+        ensure(
+          !managedRoundOpen(s, existing.divisionId),
+          "Fecha a jornada oficial antes de alterar a dupla.",
+        );
+        pair(existing, undefined, before!, "");
+      }
+      let p = existing;
+      if (!p) {
+        p = {
+          _id: uid(),
+          ...data,
+          number: Math.max(0, ...s.players.map((p) => p.number)) + 1,
+          divisionId: "",
+          position: 0,
+          previousPosition: 0,
+          partner: "",
+          wins: 0,
+          losses: 0,
+          challengesWon: 0,
+          challengesLost: 0,
+          createdAt: now,
+        };
+        s.players.push(p);
+      }
+      if (p.phone !== data.phone && p.notificationPreferences) {
+        p.notificationPreferences.whatsapp = false;
+        delete p.notificationPreferences.whatsappConsentAt;
+      }
+      Object.assign(p, data, {
+        spectator: true,
+        divisionId: "",
+        position: 0,
+        previousPosition: 0,
+        partner: "",
+        partnerId: undefined,
+        awaitingApproval: false,
+        registrationRejectedAt: undefined,
+      });
+      if (before && !before.spectator) {
+        history(
+          p,
+          before.position,
+          "Alterado para espetador",
+          undefined,
+          before.divisionId,
+        );
+        compact(before.divisionId, "Saída de jogador para modo espetador");
+        s.availability = s.availability.filter((w) => w.playerId !== p!._id);
+        s.exceptions = s.exceptions.filter((w) => w.playerId !== p!._id);
+      }
+      log("player.spectator.saved", { before, after: p });
+      return { id: p._id };
+    }
     case "admin.player.save": {
       const {
         type,
@@ -3899,6 +4009,7 @@ export function execute(
           compact(oldDivision, "Remoção da época");
         }
       }
+      p.spectator = false;
       if (
         requestedTeamPosition === undefined &&
         data.status !== "removed" &&

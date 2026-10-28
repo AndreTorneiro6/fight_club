@@ -1,7 +1,11 @@
 import { challengeTeamName } from "./team-competition";
 import type { View } from "./types";
 import { adminGroups } from "./admin-sections";
-import { managementLinks, playerLinks } from "./workspace-routes";
+import {
+  managementLinks,
+  playerLinks,
+  spectatorLinks,
+} from "./workspace-routes";
 export interface SearchEntry {
   id: string;
   label: string;
@@ -46,15 +50,23 @@ export function searchEntries(state: View): SearchEntry[] {
   ) => entries.push({ id, label, description, href, keywords, kind });
   const links = admin
     ? managementLinks
-    : ([
-        ["inicio", "Início"],
-        ["ranking", "Ranking"],
-        ["desafios", "Desafios"],
-        ["jogos", "Jogos"],
-        ["apostas", "Central de Apostas"],
-        ["perfil", "Perfil"],
-        ...playerLinks,
-      ] as const);
+    : state.actor.role === "spectator"
+      ? ([
+          ["ranking", "Ranking"],
+          ["jogos", "Jogos"],
+          ["apostas", "Central de Apostas"],
+          ["perfil", "Perfil"],
+          ...spectatorLinks,
+        ] as const)
+      : ([
+          ["inicio", "Início"],
+          ["ranking", "Ranking"],
+          ["desafios", "Desafios"],
+          ["jogos", "Jogos"],
+          ["apostas", "Central de Apostas"],
+          ["perfil", "Perfil"],
+          ...playerLinks,
+        ] as const);
   for (const [path, label] of links)
     add(
       `page:${path}`,
@@ -105,7 +117,11 @@ export function searchEntries(state: View): SearchEntry[] {
       ...(c.challengerTeam ?? []).map((p) => p.playerId),
       ...(c.defenderTeam ?? []).map((p) => p.playerId),
     ];
-    if (!admin && !ids.includes(state.actor.playerId)) continue;
+    if (
+      state.actor.role === "spectator" ||
+      (!admin && !ids.includes(state.actor.playerId))
+    )
+      continue;
     if (c.competitionRoundId && !c.officialPublication) continue;
     const name = (id: string) => challengeTeamName(c, id, state.players);
     add(
@@ -117,7 +133,9 @@ export function searchEntries(state: View): SearchEntry[] {
       "Jogo",
     );
   }
-  for (const sponsor of (state.sponsors ?? []).filter((p) => p.published))
+  for (const sponsor of (state.sponsors ?? []).filter(
+    (p) => p.published && state.actor.role !== "spectator",
+  ))
     add(
       `sponsor:${sponsor._id}`,
       sponsor.name,

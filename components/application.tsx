@@ -36,6 +36,8 @@ import {
   managementLinks,
   playerLinks,
   isManagementRoute,
+  spectatorLinks,
+  spectatorRoutes,
 } from "@/lib/workspace-routes";
 import {
   Suspense,
@@ -477,7 +479,10 @@ export function Application({
     if (!s || s.actor.workspaceSelectionRequired) return;
     const adminArea = s.actor.role === "admin";
     if (adminArea && !isManagementRoute(route)) router.replace("/admin");
-    if (!adminArea && adminOnlyRoutes.has(route)) router.replace("/inicio");
+    if (s.actor.role === "spectator" && !spectatorRoutes.has(route))
+      router.replace("/ranking");
+    else if (!adminArea && adminOnlyRoutes.has(route))
+      router.replace("/inicio");
   }, [s, route, router]);
   useEffect(() => {
     if (toast) {
@@ -538,16 +543,28 @@ export function Application({
         )}
       </main>
     );
-  async function chooseWorkspace(workspace: "admin" | "player") {
+  async function chooseWorkspace(workspace: "admin" | "player" | "spectator") {
     await request("/api/auth/workspace", { workspace });
     setMenu(false);
     await refresh();
-    router.replace(workspace === "admin" ? "/admin" : "/inicio");
+    router.replace(
+      workspace === "admin"
+        ? "/admin"
+        : workspace === "spectator"
+          ? "/ranking"
+          : "/inicio",
+    );
   }
   if (s.actor.workspaceSelectionRequired)
-    return <WorkspaceChoice onSelect={chooseWorkspace} />;
+    return (
+      <WorkspaceChoice
+        onSelect={chooseWorkspace}
+        available={s.actor.availableWorkspaces}
+      />
+    );
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     admin = s.actor.role === "admin",
+    spectator = s.actor.role === "spectator",
     unread = s.notifications.filter((n) => !n.read).length;
   if ((p.awaitingApproval || p.registrationRejectedAt) && !admin)
     return (
@@ -586,7 +603,8 @@ export function Application({
     );
   if (
     (admin && !isManagementRoute(route)) ||
-    (!admin && adminOnlyRoutes.has(route))
+    (!admin && adminOnlyRoutes.has(route)) ||
+    (spectator && !spectatorRoutes.has(route))
   )
     return (
       <main className="center-screen">
@@ -623,15 +641,17 @@ export function Application({
     "Desafio";
   return (
     <>
-      {!route.startsWith("ajuda") && (!admin || route === "admin") && (
-        <FirstVisitWalkthrough
-          key={`${p._id}:${admin}`}
-          playerId={p._id}
-          admin={admin}
-        />
-      )}
+      {!spectator &&
+        !route.startsWith("ajuda") &&
+        (!admin || route === "admin") && (
+          <FirstVisitWalkthrough
+            key={`${p._id}:${admin}`}
+            playerId={p._id}
+            admin={admin}
+          />
+        )}
       <aside className="sidebar">
-        <Link href={admin ? "/admin" : "/inicio"}>
+        <Link href={admin ? "/admin" : spectator ? "/ranking" : "/inicio"}>
           <Logo />
         </Link>
         {admin ? (
@@ -650,19 +670,23 @@ export function Application({
           </>
         ) : (
           <>
-            <div className="nav-label">A TUA ARENA</div>
-            {nav.map((n) => (
-              <Link
-                key={n.path}
-                href={"/" + n.path}
-                className={`nav-link ${route.startsWith(n.path) ? "active" : ""}`}
-              >
-                <n.icon size={17} />
-                {n.label}
-              </Link>
-            ))}
+            <div className="nav-label">
+              {spectator ? "ACOMPANHAR A LIGA" : "A TUA ARENA"}
+            </div>
+            {nav
+              .filter((n) => !spectator || spectatorRoutes.has(n.path))
+              .map((n) => (
+                <Link
+                  key={n.path}
+                  href={"/" + n.path}
+                  className={`nav-link ${route.startsWith(n.path) ? "active" : ""}`}
+                >
+                  <n.icon size={17} />
+                  {n.label}
+                </Link>
+              ))}
             <div className="nav-label">INFORMAÇÃO DA LIGA</div>
-            {playerLinks
+            {(spectator ? spectatorLinks : playerLinks)
               .map(([path, label]) => ({
                 path,
                 label,
@@ -752,7 +776,8 @@ export function Application({
             </span>
             {s.actor.accountRole === "admin" && (
               <WorkspaceSwitcher
-                workspace={admin ? "admin" : "player"}
+                workspace={s.actor.role}
+                available={s.actor.availableWorkspaces}
                 onSelect={chooseWorkspace}
               />
             )}
@@ -772,7 +797,12 @@ export function Application({
               <div className="desktop-meta">
                 <div style={{ fontSize: 11, fontWeight: 800 }}>{p.name}</div>
                 <small>
-                  {admin ? "Administrador" : "Jogador"} · #{p.number}
+                  {admin
+                    ? "Administrador"
+                    : spectator
+                      ? "Espetador"
+                      : "Jogador"}
+                  {!spectator && ` · #${p.number}`}
                 </small>
               </div>
             </Link>
@@ -781,7 +811,7 @@ export function Application({
         <GlobalSearch state={s} />
         <main className="content">
           <PlayerAppRegistration />
-          {!admin && s.settings[0]?.weeklyCompetition && (
+          {!admin && !spectator && s.settings[0]?.weeklyCompetition && (
             <ChallengeOpeningCountdown
               round={s.weeklyRounds.find(
                 (r) =>
@@ -819,7 +849,11 @@ export function Application({
           ) : route === "jogos" ? (
             <Games {...actions} />
           ) : route === "perfil" ? (
-            <Profile {...actions} />
+            spectator ? (
+              <SpectatorProfile {...actions} />
+            ) : (
+              <Profile {...actions} />
+            )
           ) : route === "cartoes" ? (
             <PlayerCards revision={s} />
           ) : route === "jornadas" ? (
@@ -893,16 +927,18 @@ export function Application({
             </Link>
           </>
         ) : (
-          nav.map((n) => (
-            <Link
-              key={n.path}
-              href={"/" + n.path}
-              className={`${route.startsWith(n.path) ? "active" : ""} ${n.path === "apostas" ? "betting-nav" : ""}`}
-            >
-              <n.icon size={19} />
-              {n.label}
-            </Link>
-          ))
+          nav
+            .filter((n) => !spectator || spectatorRoutes.has(n.path))
+            .map((n) => (
+              <Link
+                key={n.path}
+                href={"/" + n.path}
+                className={`${route.startsWith(n.path) ? "active" : ""} ${n.path === "apostas" ? "betting-nav" : ""}`}
+              >
+                <n.icon size={19} />
+                {n.label}
+              </Link>
+            ))
         )}
       </nav>
       {menu && (
@@ -911,7 +947,12 @@ export function Application({
           close={() => setMenu(false)}
         >
           <div className="stack">
-            {(admin ? managementLinks : playerLinks).map(([path, label]) => (
+            {(admin
+              ? managementLinks
+              : spectator
+                ? spectatorLinks
+                : playerLinks
+            ).map(([path, label]) => (
               <Link
                 className="button"
                 key={path}
@@ -1764,7 +1805,9 @@ function RankingTable({
 function Rankings(a: Actions) {
   const { s } = a,
     p = s.players.find((p) => p._id === s.actor.playerId)!,
-    [division, setDivision] = useState(p.divisionId);
+    [division, setDivision] = useState(
+      p.divisionId || s.divisions[0]?._id || "",
+    );
   return (
     <>
       <Heading
@@ -1811,7 +1854,14 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
     c.status === "schedule_pending" ? c.scheduleProposal?.start : c.scheduledAt;
   return (
     <div className="stack">
-      <Link href={"/desafios/" + c._id} className="challenge-card">
+      <Link
+        href={
+          s.actor.role === "spectator"
+            ? `/apostas?jogo=${encodeURIComponent(c._id)}`
+            : "/desafios/" + c._id
+        }
+        className="challenge-card"
+      >
         <div className="row between">
           <small>
             #{String(c.number).padStart(3, "0")}{" "}
@@ -2941,12 +2991,14 @@ function Games(a: Actions) {
           </a>
         }
       />
-      <Section title="Disponibilidade dos campos">
-        <CourtAvailability
-          isAdmin={s.actor.role === "admin"}
-          revision={JSON.stringify([s.courts, s.matches])}
-        />
-      </Section>
+      {s.actor.role !== "spectator" && (
+        <Section title="Disponibilidade dos campos">
+          <CourtAvailability
+            isAdmin={s.actor.role === "admin"}
+            revision={JSON.stringify([s.courts, s.matches])}
+          />
+        </Section>
+      )}
       <WeekNavigation
         week={week}
         onChange={setWeek}
@@ -2954,12 +3006,14 @@ function Games(a: Actions) {
       />
       <div className="toolbar">
         <div className="tabs">
-          <button
-            className={!all ? "active" : ""}
-            onClick={() => setAll(false)}
-          >
-            Meus jogos
-          </button>
+          {s.actor.role !== "spectator" && (
+            <button
+              className={!all ? "active" : ""}
+              onClick={() => setAll(false)}
+            >
+              Meus jogos
+            </button>
+          )}
           <button className={all ? "active" : ""} onClick={() => setAll(true)}>
             Jogos da liga
           </button>
@@ -3176,6 +3230,81 @@ const weekdays = [
   "Sexta-feira",
   "Sábado",
 ];
+function SpectatorProfile({ s, run, busy, notify }: Actions) {
+  const p = s.players.find((p) => p._id === s.actor.playerId)!;
+  const [photo, setPhoto] = useState(p.photo);
+  return (
+    <>
+      <Heading
+        eyebrow="O TEU PERFIL"
+        title="Espetador"
+        description="Acompanha a liga e participa nas apostas."
+      />
+      <Section title="Dados pessoais">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            await run(
+              {
+                type: "profile.save",
+                ...Object.fromEntries(new FormData(e.currentTarget)),
+                partner: p.partner,
+                photo,
+              },
+              "Perfil atualizado.",
+            );
+          }}
+        >
+          <Avatar p={{ ...p, photo }} large />
+          <label>
+            Fotografia · JPG, PNG ou WebP até 2 MB
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file)
+                  try {
+                    setPhoto(await uploadPhoto(file));
+                  } catch (e) {
+                    notify((e as Error).message, true);
+                  }
+              }}
+            />
+          </label>
+          <label>
+            Nome
+            <input name="name" defaultValue={p.name} minLength={2} required />
+          </label>
+          <label>
+            Email
+            <input value={p.email} readOnly />
+          </label>
+          <label>
+            Telefone
+            <input name="phone" defaultValue={p.phone} maxLength={40} />
+          </label>
+          <button className="primary" disabled={busy}>
+            Guardar perfil
+          </button>
+        </form>
+      </Section>
+      <Section title="Notificações no telemóvel">
+        <PushNotificationSettings />
+      </Section>
+      <Section title="Email e WhatsApp">
+        <NotificationSettings
+          key={JSON.stringify([p.phone, p.notificationPreferences])}
+          player={p}
+          leagueEmailsEnabled={s.settings[0]?.leagueEmailsEnabled === true}
+          busy={busy}
+          save={(input) => run(input, "Preferências de alertas guardadas.")}
+        />
+      </Section>
+    </>
+  );
+}
+
 function Profile(a: Actions) {
   const { s, run, busy, notify } = a,
     p = s.players.find((p) => p._id === s.actor.playerId)!,
@@ -4564,7 +4693,10 @@ function AdminPlayers(
         : !p.awaitingApproval && !p.registrationRejectedAt,
   );
   const matchesPlayerFilter = (p: Player, value: string) =>
-    value === "all" || p.divisionId === value || p.status === value;
+    value === "all" ||
+    p.divisionId === value ||
+    p.status === value ||
+    (value === "spectator" && p.spectator === true);
   const list = registrationPlayers
     .filter(
       (p) =>
@@ -4625,6 +4757,7 @@ function AdminPlayers(
           {[
             ["all", "Todos"],
             ...s.divisions.map((d) => [d._id, d.name]),
+            ["spectator", "Espetadores"],
             ["active", "Ativos"],
             ["suspended", "Suspensos"],
             ["removed", "Removidos"],
@@ -4736,8 +4869,14 @@ function AdminPlayers(
                         </div>
                       </td>
                       <td>
-                        <DivisionBadge s={s} id={p.divisionId} />{" "}
-                        <strong>#{teamPosition(s.players, p._id)}</strong>
+                        {p.spectator ? (
+                          <span className="badge">Espetador</span>
+                        ) : (
+                          <DivisionBadge s={s} id={p.divisionId} />
+                        )}{" "}
+                        {!p.spectator && (
+                          <strong>#{teamPosition(s.players, p._id)}</strong>
+                        )}
                       </td>
                       <td>
                         <span className="badge">
@@ -4806,7 +4945,9 @@ function AdminPlayers(
                               )
                                 void run(
                                   {
-                                    type: "admin.player.save",
+                                    type: p.spectator
+                                      ? "admin.spectator.save"
+                                      : "admin.player.save",
                                     playerId: p._id,
                                     ...playerData(p),
                                     status:
@@ -4872,13 +5013,14 @@ function AdminPlayers(
                               />
                             </summary>
                             <div className="admin-player-action-list">
-                              {(p.status === "active" ||
-                                s.exceptions.some(
-                                  (entry) =>
-                                    entry.playerId === p._id &&
-                                    entry.vacation &&
-                                    entry.to >= clubDay(Date.now()),
-                                )) &&
+                              {!p.spectator &&
+                                (p.status === "active" ||
+                                  s.exceptions.some(
+                                    (entry) =>
+                                      entry.playerId === p._id &&
+                                      entry.vacation &&
+                                      entry.to >= clubDay(Date.now()),
+                                  )) &&
                                 !p.awaitingApproval &&
                                 !p.registrationRejectedAt && (
                                   <button
@@ -4912,7 +5054,9 @@ function AdminPlayers(
                                       )
                                         void run(
                                           {
-                                            type: "admin.player.save",
+                                            type: p.spectator
+                                              ? "admin.spectator.save"
+                                              : "admin.player.save",
                                             playerId: p._id,
                                             ...playerData(p),
                                             status: "removed",
@@ -5320,6 +5464,7 @@ function PlayerEditor({
   close,
 }: Actions & { p?: Player; close: () => void }) {
   const [photo, setPhoto] = useState(p?.photo ?? "");
+  const [spectator, setSpectator] = useState(p?.spectator === true);
   return (
     <Modal title={p ? "Editar jogador" : "Adicionar jogador"} close={close}>
       <form
@@ -5329,11 +5474,12 @@ function PlayerEditor({
           if (
             await run(
               {
-                type: "admin.player.save",
+                type: spectator ? "admin.spectator.save" : "admin.player.save",
                 playerId: p?._id,
                 ...data,
                 photo,
-                position: p?.position ?? Number(data.teamPosition),
+                position:
+                  p && !p.spectator ? p.position : Number(data.teamPosition),
                 teamPosition: Number(data.teamPosition),
               },
               "Jogador guardado.",
@@ -5346,6 +5492,22 @@ function PlayerEditor({
           Nome
           <input name="name" defaultValue={p?.name} minLength={2} required />
         </label>
+        <label>
+          Tipo de acesso
+          <select
+            value={spectator ? "spectator" : "player"}
+            onChange={(e) => setSpectator(e.target.value === "spectator")}
+          >
+            <option value="player">Jogador</option>
+            <option value="spectator">Espetador</option>
+          </select>
+        </label>
+        {spectator && (
+          <p>
+            Sem divisão, desafios, cromo ou caderneta. Pode acompanhar a liga e
+            apostar.
+          </p>
+        )}
         <div className="form-grid">
           <label>
             Email
@@ -5360,33 +5522,37 @@ function PlayerEditor({
             Telefone
             <input name="phone" defaultValue={p?.phone} />
           </label>
-          <label>
-            Divisão
-            <select
-              name="divisionId"
-              defaultValue={p?.divisionId ?? ""}
-              required
-            >
-              <option value="" disabled>
-                Escolher categoria
-              </option>
-              {s.divisions.map((d) => (
-                <option value={d._id} key={d._id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Posição da dupla
-            <input
-              type="number"
-              name="teamPosition"
-              defaultValue={p ? teamPosition(s.players, p._id) || 1 : 1}
-              min={1}
-              required
-            />
-          </label>
+          {!spectator && (
+            <>
+              <label>
+                Divisão
+                <select
+                  name="divisionId"
+                  defaultValue={p?.divisionId ?? ""}
+                  required
+                >
+                  <option value="" disabled>
+                    Escolher categoria
+                  </option>
+                  {s.divisions.map((d) => (
+                    <option value={d._id} key={d._id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Posição da dupla
+                <input
+                  type="number"
+                  name="teamPosition"
+                  defaultValue={p ? teamPosition(s.players, p._id) || 1 : 1}
+                  min={1}
+                  required
+                />
+              </label>
+            </>
+          )}
           <label>
             Estado
             <select name="status" defaultValue={p?.status ?? "active"}>
@@ -5396,10 +5562,12 @@ function PlayerEditor({
               <option value="removed">Removido da época</option>
             </select>
           </label>
-          <label>
-            Parceiro
-            <input name="partner" defaultValue={p?.partner} />
-          </label>
+          {!spectator && (
+            <label>
+              Parceiro
+              <input name="partner" defaultValue={p?.partner} />
+            </label>
+          )}
         </div>
         <label>
           Fotografia
@@ -6277,78 +6445,88 @@ function Statistics({ s }: Actions) {
       <Heading
         eyebrow="CONHECE O TEU JOGO"
         title="Estatísticas"
-        description="O teu percurso, os teus adversários e as conquistas da liga."
+        description={
+          s.actor.role === "spectator"
+            ? "As equipas e as conquistas da liga."
+            : "O teu percurso, os teus adversários e as conquistas da liga."
+        }
       />
       <div className="home-grid">
-        <Section title="O teu desempenho">
-          <div className="stack">
-            <div className="row between">
-              <strong>Taxa de vitórias</strong>
-              <strong className="gold">
-                {p.wins + p.losses
-                  ? Math.round((p.wins / (p.wins + p.losses)) * 100)
-                  : 0}
-                %
-              </strong>
-            </div>
-            <div className="metrics-bar">
-              <span
-                style={{
-                  width: `${p.wins + p.losses ? (p.wins / (p.wins + p.losses)) * 100 : 0}%`,
-                }}
-              />
-            </div>
-            <div className="row between">
-              <span className="muted">Vitórias</span>
-              <strong>{p.wins}</strong>
-            </div>
-            <div className="row between">
-              <span className="muted">Derrotas</span>
-              <strong>{p.losses}</strong>
-            </div>
-            <div className="row between">
-              <span className="muted">Jogos realizados</span>
-              <strong>{p.wins + p.losses}</strong>
-            </div>
-            <div className="row between">
-              <span className="muted">Desafios ativos</span>
-              <strong>{activeChallenges(s, p._id, Date.now()).length}</strong>
-            </div>
-          </div>
-        </Section>
-        <Section title="Confronto direto">
-          <div className="stack">
-            <label>
-              Adversário
-              <select
-                value={opponent}
-                onChange={(e) => setOpponent(e.target.value)}
-              >
-                <option value="">Escolhe uma dupla</option>
-                {opponents.map((t) => (
-                  <option value={t.members[0]._id} key={t.id}>
-                    {t.members.map((m) => m.name).join(" + ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {opponent ? (
-              <>
+        {s.actor.role !== "spectator" && (
+          <>
+            <Section title="O teu desempenho">
+              <div className="stack">
                 <div className="row between">
-                  <span>Tu</span>
-                  <strong className="display gold" style={{ fontSize: 35 }}>
-                    {head.filter(won).length} –{" "}
-                    {head.filter((r) => !won(r)).length}
+                  <strong>Taxa de vitórias</strong>
+                  <strong className="gold">
+                    {p.wins + p.losses
+                      ? Math.round((p.wins / (p.wins + p.losses)) * 100)
+                      : 0}
+                    %
                   </strong>
-                  <span>Adversário</span>
                 </div>
-                <small>{head.length} jogos confirmados</small>
-              </>
-            ) : (
-              <p>Seleciona um adversário para ver o histórico.</p>
-            )}
-          </div>
-        </Section>
+                <div className="metrics-bar">
+                  <span
+                    style={{
+                      width: `${p.wins + p.losses ? (p.wins / (p.wins + p.losses)) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <div className="row between">
+                  <span className="muted">Vitórias</span>
+                  <strong>{p.wins}</strong>
+                </div>
+                <div className="row between">
+                  <span className="muted">Derrotas</span>
+                  <strong>{p.losses}</strong>
+                </div>
+                <div className="row between">
+                  <span className="muted">Jogos realizados</span>
+                  <strong>{p.wins + p.losses}</strong>
+                </div>
+                <div className="row between">
+                  <span className="muted">Desafios ativos</span>
+                  <strong>
+                    {activeChallenges(s, p._id, Date.now()).length}
+                  </strong>
+                </div>
+              </div>
+            </Section>
+            <Section title="Confronto direto">
+              <div className="stack">
+                <label>
+                  Adversário
+                  <select
+                    value={opponent}
+                    onChange={(e) => setOpponent(e.target.value)}
+                  >
+                    <option value="">Escolhe uma dupla</option>
+                    {opponents.map((t) => (
+                      <option value={t.members[0]._id} key={t.id}>
+                        {t.members.map((m) => m.name).join(" + ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {opponent ? (
+                  <>
+                    <div className="row between">
+                      <span>Tu</span>
+                      <strong className="display gold" style={{ fontSize: 35 }}>
+                        {head.filter(won).length} –{" "}
+                        {head.filter((r) => !won(r)).length}
+                      </strong>
+                      <span>Adversário</span>
+                    </div>
+                    <small>{head.length} jogos confirmados</small>
+                  </>
+                ) : (
+                  <p>Seleciona um adversário para ver o histórico.</p>
+                )}
+              </div>
+            </Section>
+          </>
+        )}
         <Section title="Mais vitórias na liga" className="full">
           <div className="stack">
             {leaders.map((team, i) => {

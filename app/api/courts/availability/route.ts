@@ -11,6 +11,7 @@ import type { Challenge, Court, Match, Player } from "@/lib/types";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
+    ensure(actor.role !== "spectator", "Sem acesso à marcação de campos.", 403);
     await rateLimit(`courts:${actor.userId}`, 60);
     const q = new URL(request.url).searchParams;
     const challengeId = z

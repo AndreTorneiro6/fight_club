@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.9.1";
+export const applicationVersion = "1.10.0";
 export const releaseNotes = [
+  {
+    version: "1.10.0",
+    date: "2026-10-28",
+    title: "Modo espetador",
+    changes: [
+      "Administradores podem atribuir o acesso Espetador em Jogadores, mantendo as opções de estado existentes.",
+      "Espetadores acompanham ranking, jogos, apostas, perfil, Title Fight, Hall of Champions, épocas e estatísticas, e podem fazer palpites.",
+      "Sem divisão ou ações de competição, jornadas oficiais, prémios, regras, patrocínios, cromo, caderneta ou trocas.",
+      "Administradores podem validar o espaço de espetador sem alterar o seu perfil de jogador ou ranking.",
+    ],
+  },
   {
     version: "1.9.1",
     date: "2026-10-27",
