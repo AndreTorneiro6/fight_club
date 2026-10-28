@@ -1,4 +1,5 @@
 "use client";
+import { LiveMatchScore, LiveMatchScoreEditor } from "./live-match-score";
 import { matchOrder, matchStart } from "@/lib/match-order";
 import { canRecordOfficialResult } from "@/lib/result-readiness";
 import ChallengeChat from "./challenge-chat";
@@ -1882,6 +1883,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
           {name(c.challengerId)} <span className="gold">vs</span>{" "}
           {name(c.defenderId)}
         </h3>
+        <LiveMatchScore c={c} />
         <ChallengeOriginLabel s={s} c={c} />
         <WeeklyQueueNotice s={s} challenge={c} />
         {c.queueClosureReason && <small>{c.queueClosureReason}</small>}
@@ -2366,6 +2368,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
             )}
             <ChallengeOriginLabel s={s} c={c} detailed />
             <Versus s={s} c={c} />
+            <LiveMatchScore c={c} />
             <div className="inset row between wrap">
               <span>
                 <CalendarDays size={14} />{" "}
@@ -4109,6 +4112,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
   const ready = canRecordOfficialResult(c);
   return (
     <div className="stack space-top">
+      <LiveMatchScoreEditor s={s} c={c} run={run} busy={busy} />
       {rankingReview && (
         <p className="error" role="alert">
           O resultado foi corrigido. O ranking precisa de revisão administrativa

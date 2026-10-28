@@ -44,3 +44,27 @@ export function nextMatchTransition(challenges: Challenge[], now = Date.now()) {
   }
   return next === Infinity ? undefined : next;
 }
+
+/** Day boundaries follow the club timezone, independent of the browser or server timezone. */
+export function todayMatches(challenges: Challenge[], now = Date.now()) {
+  const day = (timestamp: number) =>
+    new Date(timestamp).toLocaleDateString("en-CA", {
+      timeZone: "Europe/Lisbon",
+    });
+  const today = day(now);
+  return challenges
+    .filter(
+      (c) =>
+        c.scheduledAt &&
+        Number.isFinite(Date.parse(c.scheduledAt)) &&
+        ["scheduled", "result_pending", "disputed", "completed"].includes(
+          c.status,
+        ) &&
+        day(Date.parse(c.scheduledAt)) === today,
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(a.scheduledAt!) - Date.parse(b.scheduledAt!) ||
+        a.number - b.number,
+    );
+}

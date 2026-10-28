@@ -1,4 +1,5 @@
 "use client";
+import { LiveMatchScore, LiveMatchScoreEditor } from "./live-match-score";
 import { matchOrder } from "@/lib/match-order";
 import { useEffect, useState } from "react";
 import { formatSetScores } from "@/lib/set-scores";
@@ -239,6 +240,10 @@ export default function AdminMatchVoting({
           {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
           {challengeTeamName(c, c.defenderId, s.players)}
         </h3>
+        {!official && <LiveMatchScore c={c} />}
+        {!official && (
+          <LiveMatchScoreEditor s={s} c={c} run={run} busy={busy} />
+        )}
         {official && (
           <section
             className="inset stack"

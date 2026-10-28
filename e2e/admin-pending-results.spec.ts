@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { enterAdminWorkspace } from "./workspace-helper";
 test("overview follows game start and end without reload, then removes the task after official sets", async ({
   page,
+  browser,
 }) => {
   const base = Date.now();
   const start = base + 10 * 60000;
@@ -17,6 +18,7 @@ test("overview follows game start and end without reload, then removes the task 
     if (game?.status === "scheduled") {
       game.scheduledAt = new Date(start).toISOString();
       game.durationMinutes = 90;
+      if (game.liveScore) game.liveScore.scheduledAt = game.scheduledAt;
       for (const booking of data.matches ?? [])
         if (booking.challengeId === game._id) {
           booking.start = new Date(start).toISOString();
@@ -57,6 +59,38 @@ test("overview follows game start and end without reload, then removes the task 
       .getByRole("link")
       .filter({ hasText: "Em curso · A aguardar resultado" }),
   ).toHaveAttribute("href", "/desafios/test-transition-game");
+  const today = panel.getByRole("region", {
+    name: "Jogos de hoje",
+    exact: true,
+  });
+  await expect(today.getByLabel(/Marcador provisório do jogo/)).toContainText(
+    "Sets · 0–0",
+  );
+  const viewerContext = await browser.newContext();
+  const viewer = await viewerContext.newPage();
+  await viewer.goto("/auth");
+  await viewer
+    .getByLabel("Email", { exact: true })
+    .fill("jogador@fightclub.local");
+  await viewer
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
+  await viewer.getByRole("button", { name: "Entrar na arena" }).click();
+  await expect(viewer).toHaveURL(/\/inicio/);
+  await viewer
+    .getByRole("button", { name: "Saltar visita", exact: true })
+    .click();
+  await viewer.goto("/apostas?jogo=test-transition-game");
+  const publicScore = viewer.getByLabel("Marcador provisório do jogo 987", {
+    exact: true,
+  });
+  await expect(publicScore).toContainText("Sets · 0–0");
+  await expect(
+    viewer.getByRole("button", {
+      name: "Atualizar marcador (opcional)",
+      exact: true,
+    }),
+  ).toHaveCount(0);
   await ongoing.click();
   await expect(
     page.getByRole("heading", { name: "Agenda de jogos", exact: true }),
@@ -64,6 +98,50 @@ test("overview follows game start and end without reload, then removes the task 
   await expect(
     page.getByRole("button", { name: "Registar resultado", exact: true }),
   ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Atualizar marcador (opcional)", exact: true })
+    .click();
+  let editor = page.getByRole("form", { name: /Atualizar marcador do jogo/ });
+  await editor.getByLabel("Sets ataque", { exact: true }).fill("1");
+  await editor
+    .getByRole("button", { name: "Guardar marcador provisório" })
+    .click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByLabel(/Marcador provisório do jogo/)).toContainText(
+    "Sets · 1–0",
+  );
+  await expect(publicScore).toContainText("Sets · 1–0");
+  await page
+    .getByRole("button", { name: "Atualizar marcador (opcional)", exact: true })
+    .click();
+  editor = page.getByRole("form", { name: /Atualizar marcador do jogo/ });
+  await editor
+    .getByLabel("Detalhe do marcador", { exact: true })
+    .selectOption("games");
+  await editor.getByLabel("1.º set · Ataque", { exact: true }).fill("6");
+  await editor.getByLabel("1.º set · Defesa", { exact: true }).fill("4");
+  await editor.getByRole("button", { name: "Adicionar set" }).click();
+  await editor.getByLabel("2.º set · Ataque", { exact: true }).fill("3");
+  await editor.getByLabel("2.º set · Defesa", { exact: true }).fill("2");
+  await editor
+    .getByRole("button", { name: "Guardar marcador provisório" })
+    .click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByLabel(/Marcador provisório do jogo/)).toContainText(
+    "2.º set: 3–2",
+  );
+  await expect(publicScore).toContainText("2.º set: 3–2");
+  const provisional = await (await page.request.get("/api/league")).json();
+  const provisionalGame = provisional.challenges.find(
+    (c: any) => c._id === "test-transition-game",
+  );
+  expect(provisionalGame.status).toBe("scheduled");
+  expect(provisionalGame.winnerId).toBeUndefined();
+  expect(
+    provisional.results.filter(
+      (r: any) => r.challengeId === "test-transition-game",
+    ),
+  ).toHaveLength(0);
   await page.getByRole("button", { name: "Resumo", exact: true }).click();
   await expect(ongoing).toBeVisible();
   await page.clock.fastForward(90 * 60000);
@@ -72,6 +150,8 @@ test("overview follows game start and end without reload, then removes the task 
   await expect(task.locator(".admin-task-count")).toHaveText("1");
   await expect(panel.locator(":scope > .row .badge")).toHaveText("1 pendentes");
   const gameLink = panel
+    .locator(".admin-next-actions")
+    .filter({ has: page.getByRole("heading", { name: "Confrontos a rever" }) })
     .getByRole("link")
     .filter({ hasText: "Resultado por registar" });
   await expect(gameLink).toHaveAttribute(
@@ -97,6 +177,11 @@ test("overview follows game start and end without reload, then removes the task 
     .getByRole("button", { name: "Guardar resultado e atualizar ranking" })
     .click();
   await expect(modal).toHaveCount(0);
+  await expect(publicScore).toHaveCount(0);
+  await expect(
+    viewer.getByLabel("Resultado oficial do jogo 987", { exact: true }),
+  ).toBeVisible();
+  await viewerContext.close();
   await page.goto("/admin");
   await expect(task).toHaveCount(0);
   await expect(ongoing).toHaveCount(0);

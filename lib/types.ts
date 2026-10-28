@@ -1,3 +1,4 @@
+import type { LiveScore } from "./live-score";
 import type { MatchVoteSummary } from "./anonymous-match-votes";
 import type { ClubPhoto, ClubPhotoUnlock } from "./club-photo-types";
 import type { MatchVotingSettings } from "./match-voting-targets";
@@ -182,6 +183,7 @@ export interface Challenge extends Entity {
   durationMinutes: number;
   winnerId?: string;
   score?: string;
+  liveScore?: LiveScore;
   setScores?: SetScore[];
   reportedBy?: string;
   disputeNote?: string;

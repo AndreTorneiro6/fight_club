@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.2";
+export const applicationVersion = "1.11.3";
 export const releaseNotes = [
+  {
+    version: "1.11.3",
+    date: "2026-10-28",
+    title: "Marcador provisório e jogos de hoje",
+    changes: [
+      "Todos os jogos iniciados mostram 0–0 automaticamente; o admin pode atualizar opcionalmente só os sets ou os jogos de cada set.",
+      "Marcador visível nos jogos, Title Fight e Central de Apostas. A confirmação oficial continua a determinar ranking, apostas e notificações.",
+      "Jogos de hoje aparecem em O que precisas de fazer no Resumo, com horário e estado; os resultados em falta continuam assinalados após o fim previsto.",
+    ],
+  },
   {
     version: "1.11.2",
     date: "2026-10-28",

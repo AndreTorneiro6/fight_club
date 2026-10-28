@@ -1,4 +1,5 @@
 "use client";
+import { LiveMatchScore } from "./live-match-score";
 
 import { matchOrder } from "@/lib/match-order";
 import { useState } from "react";
@@ -107,6 +108,7 @@ function TitleMatchCard({
           </span>
           <strong>{defense}</strong>
         </div>
+        <LiveMatchScore c={c} />
         {c.status === "completed" && (
           <div className={styles.result}>
             <SetScoreDisplay challenge={c} />
