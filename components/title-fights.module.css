@@ -228,7 +228,7 @@
   width: 100%;
 }
 .frozenCanvas {
-  aspect-ratio: 805 / 1015;
+  aspect-ratio: 704 / 320;
   background: #071421;
 }
 .frozenHeading {
@@ -390,4 +390,78 @@
     gap: 12px;
     font-size: 11px;
   }
+}
+
+/* Frozen overview follows the original wide match-card proportions. */
+.frozenCanvas .frozenHeading {
+  left: 4%;
+  right: 4%;
+  top: 5%;
+}
+.frozenCanvas .frozenHeading > strong {
+  width: 28%;
+}
+.frozenCanvas .frozenHeading > span {
+  padding: 3px 7px;
+  font-size: clamp(9px, 2cqw, 17px);
+}
+.frozenCanvas .frozenNotice {
+  left: 4%;
+  right: 4%;
+  top: 24%;
+}
+.frozenCanvas .frozenNotice [role="status"] {
+  margin: 0;
+  gap: 3px;
+}
+.frozenCanvas .frozenNotice [role="status"] > span {
+  width: clamp(110px, 30cqw, 260px);
+}
+.frozenCanvas .frozenNotice small {
+  font-size: clamp(8px, 1.5cqw, 12px);
+}
+.frozenCanvas .frozenNames {
+  left: 5%;
+  right: 5%;
+  top: 53%;
+  grid-template-columns: minmax(0, 1fr) 10% minmax(0, 1fr);
+}
+.frozenCanvas .initials {
+  display: none;
+}
+.frozenCanvas .frozenNames > div {
+  gap: 3px;
+}
+.frozenCanvas .frozenNames strong {
+  font-size: clamp(11px, 3cqw, 29px);
+  line-height: 1.1;
+}
+.frozenCanvas .frozenNames small {
+  font-size: clamp(8px, 1.6cqw, 12px);
+}
+.frozenCanvas .frozenDate {
+  bottom: 5%;
+  left: 5%;
+  right: 5%;
+  min-height: 0;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 6px;
+  font-size: clamp(8px, 1.8cqw, 16px);
+}
+.frozenCanvas .frozenDate svg {
+  width: clamp(10px, 2cqw, 18px);
+  height: clamp(10px, 2cqw, 18px);
+}
+.frozenCanvas .frozenVersus {
+  mix-blend-mode: screen;
+}
+.frozenCanvas .frozenNames strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-shadow:
+    0 2px 4px #000,
+    0 0 8px #000;
 }

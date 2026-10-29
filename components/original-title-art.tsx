@@ -61,6 +61,7 @@ export function OriginalTitleArt({
     | Division
     | "header"
     | "frozen"
+    | "frozen-wide"
     | "frozen-label"
     | "frozen-vs"
     | "frozen-heading";
@@ -71,17 +72,19 @@ export function OriginalTitleArt({
   const crop: Rect =
     variant === "header"
       ? [0, 61, 740, 232]
-      : variant === "frozen"
-        ? [25, 312, 805, 1015]
-        : variant === "frozen-heading"
-          ? [74, 347, 315, 64]
-          : variant === "frozen-label"
-            ? [73, 437, 330, 68]
-            : variant === "frozen-vs"
-              ? [398, 871, 80, 100]
-              : crops[variant];
+      : variant === "frozen-wide"
+        ? [25, 312, 805, 366]
+        : variant === "frozen"
+          ? [25, 312, 805, 1015]
+          : variant === "frozen-heading"
+            ? [74, 347, 315, 64]
+            : variant === "frozen-label"
+              ? [73, 437, 330, 68]
+              : variant === "frozen-vs"
+                ? [398, 871, 80, 100]
+                : crops[variant];
   const holes: readonly Rect[] =
-    variant === "frozen"
+    variant === "frozen" || variant === "frozen-wide"
       ? [
           [70, 349, 360, 76],
           [640, 350, 150, 65],
@@ -136,6 +139,23 @@ export function OriginalTitleArt({
           preserveAspectRatio="none"
           clipPath={`url(#${mask}-fields)`}
         />
+      )}
+      {variant === "frozen-wide" && (
+        <>
+          <defs>
+            <clipPath id={`${mask}-bottom`}>
+              <rect x="25" y="651" width="805" height="27" />
+            </clipPath>
+          </defs>
+          <g clipPath={`url(#${mask}-bottom)`}>
+            <image
+              href={frozenSource}
+              width="853"
+              height="1844"
+              transform="translate(0 -649)"
+            />
+          </g>
+        </>
       )}
     </svg>
   );

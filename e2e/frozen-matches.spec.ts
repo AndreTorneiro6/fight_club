@@ -127,13 +127,15 @@ test("frozen title and normal challenges share the ice template and thaw after v
     expect(Math.abs(sizes[0].width - sizes[1].width)).toBeLessThan(1);
 
     if (width === 1280) expect(sizes[0].width).toBeGreaterThan(900);
-    // Frozen retains its supplied portrait proportions; normal Bronze retains
-    // the original wide illustration. Both use the full available card width.
+    expect(sizes.every((size) => size.height < size.width / 2)).toBe(true);
+    await title.screenshot({ path: `/var/tmp/frozen-title-${width}.png` });
+    // Normal Bronze is unchanged. Frozen now has the original wide match-card
+    // aspect as well as full width; it must not grow into a tall portrait.
     const ratios = sizes
       .map((size) => size.height / size.width)
       .sort((a, b) => a - b);
-    expect(ratios[0]).toBeCloseTo(327 / 704, 2);
-    expect(ratios[1]).toBeCloseTo(1015 / 805, 2);
+    expect(ratios[0]).toBeCloseTo(320 / 704, 2);
+    expect(ratios[1]).toBeCloseTo(327 / 704, 2);
     await page
       .locator(`[data-title-match="${normalTitleId}"]`)
       .screenshot({ path: `/var/tmp/title-size-normal-${width}.png` });

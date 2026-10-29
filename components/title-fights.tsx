@@ -74,7 +74,7 @@ function TitleMatchCard({
       >
         <div className={frozen ? styles.frozenCanvas : styles.canvas}>
           <OriginalTitleArt
-            variant={frozen ? "frozen" : code}
+            variant={frozen ? "frozen-wide" : code}
             id={c._id}
             className={styles.artwork}
           />

@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.14";
+export const applicationVersion = "1.11.15";
 export const releaseNotes = [
+  {
+    version: "1.11.15",
+    date: "2026-10-29",
+    title: "Congelado com o formato largo dos outros jogos",
+    changes: [
+      "O cartão congelado usa a largura e as proporções horizontais dos jogos normais, sem aumentar a altura; Ouro, Prata e Bronze mantêm o tamanho original.",
+    ],
+  },
   {
     version: "1.11.14",
     date: "2026-10-29",
