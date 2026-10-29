@@ -1,3 +1,9 @@
+## Pentest retest accounts completely removed from active data — 29 October 2026
+
+- User asked whether27admin pending items came from their repeat pentest. Read-only live overview calculation confirmed all27 were unapproved/unverified registrations, no other task categories. Names Retest Capfill01–12, Retest Applicant/Genuine Applicant/Prata Probe, QA Retest, Probe and spreadsheet payload=1+1; all created29October10:15–10:23Z. User explicitly authorized complete deletion and then said continue.
+- Preflight ran all27 existing validated admin.player.delete commands on a cloned live state: permitted, zero changes to remaining67players, challenges or results. Executed same commands in ONE normal league transaction with repeated exact-count/name/time/unverified/nonadmin guards and invariants aborting any unrelated player/game/result change. Existing transaction cleanup atomically removed linked users, sessions, tokens, photos, subscriptions and delivery jobs. Standard deletion audit/history retained.
+- Postcheck:0targetplayers/users/sessions/tokens/photos/pushsubscriptions/deliveries remain;0pendingregistrations;67players remain. Publichealthok. No app code change/deployment required and no real results/rankings changed. Cleanup task COMPLETE.
+
 ## Version 1.11.11 LIVE: frozen game19 visible in every workspace — 29 October 2026
 
 - Run40864994069 succeeded all hosted checks and Pi deployment at exact revision `6572d195e69fab3bb06626177a63b0d39fd2dd80`. Package1.11.11; app/worker running with0restarts; publichealthok. Required local/hosted480tests, typecheck, build and allbrowsergroups passed.
