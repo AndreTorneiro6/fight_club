@@ -8,6 +8,7 @@ export const releaseNotes = [
     changes: [
       "Prévia para administradores com inventário por época, repetidos disponíveis e reservados, comunidade opcional e negociações de vários cromos.",
       "Chat privado, contrapropostas, aceitação da versão atual, comprovativos, bloqueios e denúncias com acesso de suporte registado. Os avisos usam a aplicação e push.",
+      "Cada cromo obtido pode ser virado para consultar o verso com cartoon, slogan, assinatura e avaliação fora de campo guardados na prévia administrativa.",
       "O acesso de jogadores e espetadores à caderneta permanece desligado nesta publicação.",
     ],
   },

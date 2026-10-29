@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { PlayerStickerArtwork } from "./player-sticker-artwork";
 import type { Player } from "@/lib/types";
 import type { PlayerAttributes } from "@/lib/padel-attributes";
@@ -27,8 +28,9 @@ export default function LeagueCardArtwork({
   theme,
   back,
   photo,
+  unknownSocial = false,
 }: {
-  player: Player;
+  player: Pick<Player, "name">;
   profile: Pick<
     GamificationProfile,
     "nickname" | "social" | "slogan" | "signature"
@@ -39,7 +41,9 @@ export default function LeagueCardArtwork({
   theme: keyof typeof cardMetals;
   back: boolean;
   photo: string;
+  unknownSocial?: boolean;
 }) {
+  const instanceId = useId().replace(/:/g, "");
   if (!back)
     return (
       <PlayerStickerArtwork
@@ -51,7 +55,7 @@ export default function LeagueCardArtwork({
       />
     );
   const metal = cardMetals[theme];
-  const id = `card-${back ? "back" : "front"}-${theme}`;
+  const id = `card-${instanceId}-${back ? "back" : "front"}-${theme}`;
   const initials = player.name
     .split(/\s+/)
     .slice(0, 2)
@@ -284,7 +288,7 @@ export default function LeagueCardArtwork({
             <rect
               x="335"
               y={808 + i * 35}
-              width={(290 * profile.social[key]) / 99}
+              width={unknownSocial ? 0 : (290 * profile.social[key]) / 99}
               height="20"
               rx="4"
               fill={`url(#${id}-metal)`}
@@ -297,7 +301,7 @@ export default function LeagueCardArtwork({
               fontSize="23"
               fontWeight="900"
             >
-              {profile.social[key]}
+              {unknownSocial ? "—" : profile.social[key]}
             </text>
           </g>
         ))}

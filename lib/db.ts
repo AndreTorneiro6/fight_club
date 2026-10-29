@@ -227,6 +227,8 @@ export async function readState(
         "divisions",
         "seasons",
         "playerAttributes",
+        "gamificationProfiles",
+        "gamificationSettings",
         "results",
         "challenges",
         "settings",

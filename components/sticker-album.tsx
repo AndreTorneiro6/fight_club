@@ -7,6 +7,7 @@ import type {
 } from "@/lib/sticker-types";
 import { engagementCommand } from "./engagement-client";
 import styles from "./sticker-album.module.css";
+import { StickerReverse } from "./sticker-reverse";
 import { PlayerStickerArtwork } from "./player-sticker-artwork";
 import { StickerCommunity, type StickerQuery } from "./sticker-community";
 
@@ -73,6 +74,7 @@ export function StickerAlbum({
     [reducedMotion, setReducedMotion] = useState(false);
   const previewRef = useRef<HTMLDialogElement>(null);
   const [focused, setFocused] = useState("");
+  const [focusedBack, setFocusedBack] = useState(false);
   const focusedPlayer = data?.roster.find(
     (player) => player.playerId === focused,
   );
@@ -375,6 +377,7 @@ export function StickerAlbum({
           aria-label={`Ampliar cromo de ${p.name}`}
           onClick={() => {
             setFocused(p.playerId);
+            setFocusedBack(false);
             previewRef.current?.showModal();
           }}
         >
@@ -392,6 +395,20 @@ export function StickerAlbum({
             />
           </div>
         </button>
+        {p.count > 0 && (
+          <button
+            type="button"
+            className={styles.turnCromo}
+            aria-label={`Ver verso de ${p.name}`}
+            onClick={() => {
+              setFocused(p.playerId);
+              setFocusedBack(true);
+              previewRef.current?.showModal();
+            }}
+          >
+            Ver verso
+          </button>
+        )}
         <span className={styles.quantity}>
           {reveal
             ? repeats
@@ -989,19 +1006,53 @@ export function StickerAlbum({
           Fechar
         </button>
         {focusedPlayer && (
-          <div className={styles.cardArtwork}>
-            <PlayerStickerArtwork
-              name={focusedPlayer.name}
-              photo={focusedPlayer.photo}
-              theme={
-                focusedPlayer.divisionCode === "ouro" ||
-                focusedPlayer.divisionCode === "prata"
-                  ? focusedPlayer.divisionCode
-                  : "bronze"
-              }
-              assessment={focusedPlayer.assessment}
-              concealed={focusedPlayer.count < 1}
-            />
+          <div
+            className={styles.faceTabs}
+            role="group"
+            aria-label="Faces do cromo"
+          >
+            <button
+              type="button"
+              aria-pressed={!focusedBack}
+              onClick={() => setFocusedBack(false)}
+            >
+              Frente
+            </button>
+            <button
+              type="button"
+              aria-pressed={focusedBack}
+              disabled={focusedPlayer.count < 1}
+              onClick={() => setFocusedBack(true)}
+            >
+              Verso
+            </button>
+          </div>
+        )}
+        {focusedPlayer && (
+          <div
+            className={focusedBack ? styles.reverseArtwork : styles.cardArtwork}
+          >
+            {focusedBack && focusedPlayer.count > 0 ? (
+              <StickerReverse
+                key={focusedPlayer.playerId}
+                card={focusedPlayer}
+                settings={data?.backSettings}
+                isAdmin={!!data?.isAdmin}
+              />
+            ) : (
+              <PlayerStickerArtwork
+                name={focusedPlayer.name}
+                photo={focusedPlayer.photo}
+                theme={
+                  focusedPlayer.divisionCode === "ouro" ||
+                  focusedPlayer.divisionCode === "prata"
+                    ? focusedPlayer.divisionCode
+                    : "bronze"
+                }
+                assessment={focusedPlayer.assessment}
+                concealed={focusedPlayer.count < 1}
+              />
+            )}
           </div>
         )}
       </dialog>

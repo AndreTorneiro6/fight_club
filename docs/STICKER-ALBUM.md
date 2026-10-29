@@ -10,6 +10,12 @@ Por defeito, `communityEnabled` e `tradesEnabled` são falsos. A prévia adminis
 
 Uma conta tem um inventário por época, partilhado entre espaços. Espetadores aprovados e ativos podem colecionar e trocar; não originam um cromo próprio no catálogo. Descoberta e novas propostas exigem adesão individual. Pausar propostas retira a pessoa da descoberta sem terminar negociações existentes.
 
+## Frente e verso dos cromos
+
+Cada cromo obtido tem a opção **Ver verso**; a ampliação permite alternar **Frente / Verso**. A frente conserva o modelo original Ouro/Prata/Bronze. O verso reutiliza o desenho já existente das cartas, com cartoon da fotografia, slogan, assinatura, apelido e autoavaliação fora de campo. Campos por preencher não inventam pontuações; um zero guardado continua a ser zero. Cromos em falta não revelam o verso.
+
+Nesta publicação privada, os dados sociais do verso e a geração de cartoons mantêm acesso exclusivo de administrador. A projeção inclui apenas os campos de apresentação, sem autores, versões ou datas do perfil. Não são alargadas as permissões do endpoint de cartoons.
+
 ## Negociar
 
 Escolher um parceiro na comunidade, indicar os cromos e quantidades em **Dás / Recebes** e enviar. São permitidas quantidades diferentes: 1 por 1, 1 por 2, 1 por 3 e vários por vários. A comunidade revela apenas repetidos disponíveis e oportunidades, sem contactos, inventários completos ou recompensas alheias.

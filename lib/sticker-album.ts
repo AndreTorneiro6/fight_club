@@ -1,3 +1,4 @@
+import { defaultGamificationSettings } from "./gamification-types";
 import {
   awardStickerPack,
   catalogCards,
@@ -261,6 +262,8 @@ export function stickerAlbumView(
     ? stickerCounts(state, season._id, actor.userId)
     : new Map<string, number>();
   const settings = season ? stickerSettings(state, season._id) : null;
+  const backSettings =
+    state.gamificationSettings?.[0] ?? defaultGamificationSettings;
   const cards = season
     ? catalogCards(state, season._id)
     : roster(state).map((p) => {
@@ -326,13 +329,37 @@ export function stickerAlbumView(
             row.userId === actor.userId &&
             row.stickerPlayerId === card.playerId,
         )?.reserved ?? 0;
+      const profile =
+        actor.role === "admin"
+          ? state.gamificationProfiles?.find(
+              (profile) => profile.playerId === card.playerId,
+            )
+          : undefined;
       return {
         ...card,
+        ...(profile
+          ? {
+              back: {
+                nickname: profile.nickname,
+                slogan: profile.slogan,
+                signature: profile.signature,
+                social: { ...profile.social },
+              },
+            }
+          : {}),
         count,
         reserved,
         availableDuplicates: Math.max(0, count - 1 - reserved),
       };
     }),
+    ...(actor.role === "admin"
+      ? {
+          backSettings: {
+            backTitle: backSettings.backTitle,
+            labels: { ...backSettings.labels },
+          },
+        }
+      : {}),
     ownPacks,
     ownRewards: (state.stickerRewards ?? []).filter(
       (r) => r.userId === actor.userId,

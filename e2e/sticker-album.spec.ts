@@ -1,3 +1,4 @@
+import { defaultAvatar } from "../lib/gamification-types";
 import { openAdminSection } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -81,6 +82,50 @@ test("private album supports daily packs, concurrent settings and one-time club 
   expect(opened.ownPacks).toHaveLength(1);
   expect(opened.ownPacks[0].stickerPlayerIds).toHaveLength(3);
   expect(opened.progress.visits).toBe(1);
+  const owned = opened.roster.find((card: { count: number }) => card.count > 0);
+  const league = await (await page.request.get("/api/league")).json();
+  const existing = league.gamificationProfiles.find(
+    (profile: { playerId: string }) => profile.playerId === owned.playerId,
+  );
+  const backSaved = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.gamification.profile",
+      playerId: owned.playerId,
+      expectedVersion: existing?.version ?? 0,
+      expectedSettingsVersion: league.gamificationSettings[0]?.version ?? 0,
+      nickname: "Cromo de teste",
+      slogan: "O verso também faz parte da coleção",
+      signature: [
+        [
+          { x: 0.1, y: 0.2 },
+          { x: 0.8, y: 0.7 },
+        ],
+      ],
+      avatar: existing?.avatar ?? defaultAvatar,
+      social: { bar: 0, banter: 11, partner: 22, fairplay: 33 },
+    },
+  });
+  expect(backSaved.ok()).toBe(true);
+  await page
+    .getByRole("button", { name: `Ver verso de ${owned.name}`, exact: true })
+    .first()
+    .click();
+  await expect(
+    preview.getByRole("img", { name: /^Verso cartoon/ }),
+  ).toBeVisible();
+  await expect(
+    preview.getByText("O verso também faz parte da coleção", { exact: true }),
+  ).toBeVisible();
+  await expect(preview.locator("polyline")).toHaveCount(1);
+  await expect(preview.getByText("0", { exact: true })).toBeVisible();
+  await preview.getByRole("button", { name: "Frente", exact: true }).click();
+  await expect(preview.locator("svg[data-cromo-template]")).toBeVisible();
+  await preview.getByRole("button", { name: "Verso", exact: true }).click();
+  await expect(
+    preview.getByText("Cromo de teste", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Obter vale", exact: true }).click();
   await expect(page.getByText(/Vale disponível — apresenta/)).toBeVisible();
   const claimed = await (await page.request.get("/api/album")).json();

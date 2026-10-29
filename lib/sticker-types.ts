@@ -1,3 +1,7 @@
+import type {
+  GamificationProfile,
+  GamificationSettings,
+} from "./gamification-types";
 import type { PlayerAttributes } from "./padel-attributes";
 /** Public presentation types. Community access is explicitly enabled per season; private preview is admin-only. */
 export type StickerRewardMetric = "visits" | "matches" | "collection";
@@ -53,6 +57,7 @@ export interface StickerAlbumView {
   isAdmin?: boolean;
   currentPlayerId?: string;
   seasons?: { id: string; name: string; active: boolean }[];
+  backSettings?: Pick<GamificationSettings, "backTitle" | "labels">;
   trading?: import("./sticker-trade-types").StickerTradingView;
   season: { _id: string; name: string; active?: boolean } | null;
   settings: StickerSettings | null;
@@ -64,6 +69,10 @@ export interface StickerAlbumView {
     photo: string;
     division: string;
     divisionCode: string;
+    back?: Pick<
+      GamificationProfile,
+      "nickname" | "slogan" | "signature" | "social"
+    >;
     count: number;
     reserved?: number;
     availableDuplicates?: number;

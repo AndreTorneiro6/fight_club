@@ -1,3 +1,10 @@
+## Administrator release correction: include every collected cromo's reverse — 29 October 2026
+
+- During authorized admin-only publication, user identified missing backs. Cancelled second workflow40967878498 before deployment to include correction. First workflow40967495062 failed only release-version consistency (package bump preceded release-notes entry); corrected locally and checks restored. No production changes yet.
+- Album now has Ver verso on each owned sticker in packs/catalog; modal switches Frente/Verso, missing stickers cannot reveal a back. Reuses LeagueCardArtwork's existing cartoon/slogan/signature/nickname/social reverse without redrawing templates. React useId prevents gradient/clip collisions. Saved0 retained; unknown social assessment shows—.
+- Dedicated album reads include gamification settings/profiles; projection includes only safe display fields and ONLY effective admins, retaining private cartoon generation's existing admin permission. Player/public album projection never receives social profile/signature metadata. Cartoon loaded only on reverse intent; cancellable fetch, object URL cleanup/retry. No external photo URLs processed.
+- Typecheck,502tests and build pass after correction; targeted browser front/back + old export/template3tests pass, including saved slogan/signature/social0 in the actual album reverse and switching back to the unchanged original front. Push corrected release and monitor through exact Pi deploy + private activation. Keep communityEnabled=false, tradesEnabled=true; do not opt accounts into discovery automatically. User requested publication for admins only.
+
 ## Version 1.11.17 publishing for ADMINISTRATORS ONLY — 29 October 2026
 
 - User explicitly requested “publish for admin”. Authorized deployment of the completed feature plus enabling private trading for effective administrators. Keep communityEnabled=false; do not open player/spectator access or opt accounts into discovery automatically. The two admins can opt in themselves in Comunidade. Existing packs/settings/vouchers must be preserved.

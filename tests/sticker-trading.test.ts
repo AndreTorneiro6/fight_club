@@ -1,3 +1,7 @@
+import {
+  defaultAvatar,
+  defaultGamificationSettings,
+} from "../lib/gamification-types";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -664,4 +668,42 @@ test("an archived published collection remains readable when a new private seaso
   const publicState = structuredClone(s);
   filterFeatureView(publicState, a);
   assert.equal(publicState.stickerAccess!.enabled, true);
+});
+
+test("album reverse projects saved social fields for administrators without profile metadata or public disclosure", () => {
+  const s = state();
+  s.gamificationSettings = [
+    { ...defaultGamificationSettings, updatedBy: "private-author" },
+  ];
+  s.gamificationProfiles = [
+    {
+      _id: "profile",
+      playerId: "p1",
+      version: 9,
+      nickname: "Apelido",
+      slogan: "O meu slogan",
+      signature: [
+        [
+          { x: 0.1, y: 0.2 },
+          { x: 0.3, y: 0.4 },
+        ],
+      ],
+      avatar: defaultAvatar,
+      social: { bar: 0, banter: 11, partner: 22, fairplay: 33 },
+      createdAt: iso,
+      updatedAt: iso,
+      updatedBy: "private-author",
+    },
+  ];
+  const management = stickerAlbumView(s, admin, now),
+    card = management.roster.find((card) => card.playerId === "p1")!;
+  assert.equal(card.back!.social.bar, 0);
+  assert.equal(card.back!.slogan, "O meu slogan");
+  assert.equal(card.back!.signature!.length, 1);
+  assert.equal("updatedBy" in card.back!, false);
+  assert.equal("version" in card.back!, false);
+  assert.equal("updatedBy" in management.backSettings!, false);
+  const publicView = stickerAlbumView(s, a, now);
+  assert.equal(publicView.backSettings, undefined);
+  assert.ok(publicView.roster.every((card) => card.back === undefined));
 });
