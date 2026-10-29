@@ -1,0 +1,7 @@
+# Frozen match artwork
+
+Final asset: `public/frozen-match-ice.webp` (322KB). Generated with the built-in image_gen tool using `templates/title_fight_layout_frozen.jpeg` as a style reference; the original generated PNG remains under the Codex generated_images directory. WebP encoding uses quality 88; no names, text, dates or controls are embedded in the image. All application content remains accessible HTML. This background is reused for frozen title and ordinary challenges.
+
+Final prompt:
+
+> Use case: stylized-concept. Asset type: decorative background texture for a responsive frozen padel match card in an existing web application. Input image is a STYLE REFERENCE ONLY, not an edit target. Generate a clean text-free dark midnight-navy background with realistic luminous cyan frost crystals around all four edges and several small icicles hanging from the top and upper right, like the ice frame in the reference. One detailed padel racket partially encased in a translucent ice cube with a snowflake imprint in the upper right corner, occupying only the top right 25 percent. Keep the middle and lower 75 percent very dark and uncluttered so real player names, scores, buttons and accessible HTML can be overlaid. Portrait 2:3 composition, frost border exactly around the outer edges, subtle cool blue mist and ice cracks along the margins. No text, no letters, no numerals, no people, no UI, no badges, no logos, no gold, no phone or screenshot framing. This is solely an atmospheric bitmap background asset, not a full page or mockup.

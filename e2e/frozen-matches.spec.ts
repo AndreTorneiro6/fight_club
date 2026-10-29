@@ -1,0 +1,96 @@
+import { test, expect } from "@playwright/test";
+import { enterAdminWorkspace } from "./workspace-helper";
+
+test("frozen title and normal challenges share the ice template and thaw after vacations are removed", async ({
+  page,
+}) => {
+  test.setTimeout(150000);
+  await page.goto("/auth");
+  await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
+  await page
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
+  await page.getByRole("button", { name: "Entrar na arena" }).click();
+  await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
+  const skip = page.getByRole("button", { name: "Saltar visita", exact: true });
+  if (await skip.isVisible()) await skip.click();
+  const post = async (data: unknown) => {
+    const r = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data,
+    });
+    expect(r.ok(), await r.text()).toBe(true);
+    return r.json();
+  };
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Europe/Lisbon",
+  });
+  const to = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const games: string[] = [];
+  for (const [challengerId, defenderId] of [
+    ["player-7", "player-5"],
+    ["player-10", "player-9"],
+  ]) {
+    await post({
+      type: "exception.add",
+      playerId: challengerId,
+      vacation: true,
+      from: today,
+      to,
+      note: "Frozen match layout demonstration",
+    });
+    const { id } = await post({
+      type: "admin.challenge.create",
+      challengerId,
+      defenderId,
+    });
+    games.push(id);
+    const s = await (await page.request.get("/api/league")).json();
+    if (
+      s.challenges.find((c: { _id: string }) => c._id === id).status ===
+      "pending"
+    )
+      await post({ type: "challenge.respond", challengeId: id, accept: true });
+  }
+  for (const [i, id] of games.entries()) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/desafios/${id}`);
+    const card = page
+      .locator("section.panel")
+      .filter({ has: page.locator(`[data-frozen-match="${id}"]`) });
+    await expect(card).toContainText("Jogo congelado");
+    await expect(card).toContainText("Adiado por férias");
+    expect(
+      await card.evaluate(
+        (e) => getComputedStyle(e, "::before").backgroundImage,
+      ),
+    ).toContain("frozen-match-ice.webp");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await card.screenshot({
+      path: `/var/tmp/frozen-${i ? "title" : "normal"}-mobile.png`,
+    });
+  }
+  await page.goto("/title-fight");
+  await page
+    .getByText("Confrontos pelo título por marcar", { exact: false })
+    .click();
+  const title = page.locator(`[data-title-match="${games[1]}"]`);
+  await expect(title).toHaveAttribute("data-frozen", "true");
+  await expect(title).toContainText("Jogo congelado");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await title.screenshot({ path: "/var/tmp/frozen-title-desktop.png" });
+  const state = await (await page.request.get("/api/league")).json();
+  for (const e of state.exceptions.filter(
+    (e: { note: string }) => e.note === "Frozen match layout demonstration",
+  ))
+    await post({ type: "exception.delete", exceptionId: e._id });
+  await page.goto(`/desafios/${games[0]}`);
+  await expect(page.locator(`[data-frozen-match="${games[0]}"]`)).toHaveCount(
+    0,
+  );
+});

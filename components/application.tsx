@@ -1,4 +1,7 @@
 "use client";
+import { matchFrozenUntil } from "@/lib/match-freeze";
+import { FrozenMatchNotice } from "./frozen-match";
+import frozenStyles from "./frozen-match.module.css";
 import { TeamWorkspace, AdminEntrySongs } from "./team-space";
 import { LiveMatchScore, LiveMatchScoreEditor } from "./live-match-score";
 import { matchOrder, matchStart } from "@/lib/match-order";
@@ -1870,14 +1873,14 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
             ? `/apostas?jogo=${encodeURIComponent(c._id)}`
             : "/desafios/" + c._id
         }
-        className="challenge-card"
+        className={`challenge-card ${matchFrozenUntil(s, c) ? `${frozenStyles.surface} ${frozenStyles.compact}` : ""}`}
       >
         <div className="row between">
           <small>
             #{String(c.number).padStart(3, "0")}{" "}
             {isTitleMatch(c, s) ? "· TITLE FIGHT" : ""}
           </small>
-          <Status c={c} />
+          {!matchFrozenUntil(s, c) && <Status c={c} />}
         </div>
         <div className="row wrap" style={{ marginTop: 12 }}>
           <span className="badge gold">
@@ -1893,6 +1896,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
           {name(c.challengerId)} <span className="gold">vs</span>{" "}
           {name(c.defenderId)}
         </h3>
+        <FrozenMatchNotice s={s} c={c} />
         <LiveMatchScore c={c} />
         <ChallengeOriginLabel s={s} c={c} />
         <WeeklyQueueNotice s={s} challenge={c} />
@@ -2356,7 +2360,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
         eyebrow={isTitleMatch(c, s) ? "COMBATE PELO CINTURÃO" : "A TUA ARENA"}
         title={`Desafio #${String(c.number).padStart(3, "0")}`}
         description={`${name(c.challengerId)} vs ${name(c.defenderId)}`}
-        right={<Status c={c} />}
+        right={!matchFrozenUntil(s, c) ? <Status c={c} /> : undefined}
       />
       <MatchCalendarActions s={s} c={c} />
       {admin && <MatchCardExport s={s} c={c} />}
@@ -2367,9 +2371,14 @@ function ChallengeDetail(a: Actions & { id: string }) {
 
           <Section
             title={isTitleMatch(c, s) ? "Title Fight" : "O confronto"}
+            className={matchFrozenUntil(s, c) ? frozenStyles.surface : ""}
             right={<DivisionBadge s={s} id={c.divisionId} />}
           >
-            <Status c={c} />
+            {matchFrozenUntil(s, c) ? (
+              <FrozenMatchNotice s={s} c={c} />
+            ) : (
+              <Status c={c} />
+            )}
             <WeeklyQueueNotice s={s} challenge={c} />
             {c.queueClosureReason && (
               <p className="inset" role="status">

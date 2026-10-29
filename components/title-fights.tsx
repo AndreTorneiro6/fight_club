@@ -1,4 +1,6 @@
 "use client";
+import { matchFrozenUntil } from "@/lib/match-freeze";
+import { FrozenMatchNotice } from "./frozen-match";
 import { AdminEntrySongs } from "./team-space";
 import { LiveMatchScore } from "./live-match-score";
 
@@ -68,6 +70,7 @@ function TitleMatchCard({
       className={styles.card}
       data-division={division?.code}
       data-title-match={c._id}
+      data-frozen={matchFrozenUntil(s, c) ? "true" : undefined}
       aria-label={`Jogo pelo título ${c.number}`}
     >
       <Link
@@ -136,7 +139,7 @@ function TitleMatchCard({
           </span>
           <span className={styles.status} data-status={status}>
             <i aria-hidden="true" />
-            {statusLabels[status]}
+            {matchFrozenUntil(s, c) ? "Congelado" : statusLabels[status]}
           </span>
         </div>
         <div className={styles.sides}>
@@ -151,6 +154,11 @@ function TitleMatchCard({
             <span>{defense}</span>
           </div>
         </div>
+        {matchFrozenUntil(s, c) && (
+          <div className={styles.frozenNotice}>
+            <FrozenMatchNotice s={s} c={c} />
+          </div>
+        )}
         <div className={styles.faceoff}>
           <strong>{attack}</strong>
           <span className={styles.versus} aria-label="contra">

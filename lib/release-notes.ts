@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.9";
+export const applicationVersion = "1.11.10";
 export const releaseNotes = [
+  {
+    version: "1.11.10",
+    date: "2026-10-29",
+    title: "Jogos congelados com visual de gelo",
+    changes: [
+      "Title Fight e desafios normais adiados por férias usam a moldura de gelo, raquete congelada e indicação Jogo congelado.",
+      "Os cartões mostram a data de regresso e retomam o visual normal quando termina o congelamento, mantendo as regras e as ações existentes.",
+    ],
+  },
   {
     version: "1.11.9",
     date: "2026-10-29",

@@ -610,3 +610,29 @@
     transition: none;
   }
 }
+
+.card[data-frozen="true"] {
+  --frame: #a2e8ff;
+  --metal: #d8f4ff;
+  --smoke-filter: none;
+  border: 1px solid #afeaff;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #6ecdf0;
+  box-shadow: 0 0 18px #50caff55;
+}
+.page .card[data-frozen="true"] .matchLink {
+  background: #071725;
+}
+.page .card[data-frozen="true"] .matchLink::before {
+  background:
+    linear-gradient(#03142320, #03142340),
+    url("/frozen-match-ice.webp") center / 100% 100%;
+}
+.frozenNotice {
+  grid-column: 1 / -1;
+}
+.card[data-frozen="true"] .status {
+  color: #a8e8ff;
+  border-color: #99e4ff88;
+}
