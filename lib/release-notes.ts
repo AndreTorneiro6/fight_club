@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.16";
+export const applicationVersion = "1.11.17";
 export const releaseNotes = [
+  {
+    version: "1.11.17",
+    date: "2026-10-29",
+    title: "Caderneta e trocas em prévia administrativa",
+    changes: [
+      "Prévia para administradores com inventário por época, repetidos disponíveis e reservados, comunidade opcional e negociações de vários cromos.",
+      "Chat privado, contrapropostas, aceitação da versão atual, comprovativos, bloqueios e denúncias com acesso de suporte registado. Os avisos usam a aplicação e push.",
+      "O acesso de jogadores e espetadores à caderneta permanece desligado nesta publicação.",
+    ],
+  },
   {
     version: "1.11.16",
     date: "2026-10-29",
