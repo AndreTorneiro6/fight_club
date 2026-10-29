@@ -3395,3 +3395,66 @@ test("only admins can configure the league email policy; account mail is separat
   assert.equal(s.settings[0].leagueEmailsEnabled, false);
   assert.equal(s.audit.at(-1)?.action, "notifications.email-policy");
 });
+
+test("post-match vacations cannot suppress either side's official result", () => {
+  for (const winnerId of ["p8", "p6"]) {
+    const s = fixture(),
+      c = schedule(s);
+    execute(
+      s,
+      actor(8),
+      {
+        type: "exception.add",
+        vacation: true,
+        from: "2026-10-17",
+        to: "2026-10-20",
+        note: "Férias",
+      },
+      time + 2 * 86400000,
+    );
+    execute(
+      s,
+      actor(1, "admin"),
+      {
+        type: "admin.result.record",
+        challengeId: c._id,
+        winnerId,
+        score: "6-0, 6-0",
+      },
+      time + 2 * 86400000,
+    );
+    assert.equal(c.status, "completed");
+    assert.equal(
+      s.results.find((r) => r.challengeId === c._id)?.winnerId,
+      winnerId,
+    );
+  }
+});
+
+test("all challenge chat messages restrict delivery to push, including admin and no mentions", () => {
+  for (const sender of [actor(8), actor(1, "admin")]) {
+    const s = fixture(),
+      c = schedule(s);
+    s.notifications = [];
+    execute(
+      s,
+      sender,
+      {
+        type: "message.send",
+        challengeId: c._id,
+        text: "Visit https://example.test/\nMessage",
+        mentionIds: [],
+      },
+      time,
+    );
+    assert.ok(s.notifications.length);
+    assert.ok(
+      s.notifications.every(
+        (n) => JSON.stringify(n.deliveryChannels) === '["push"]',
+      ),
+    );
+    assert.ok(
+      s.notifications.every((n) => n.chatMessageId === s.messages.at(-1)?._id),
+    );
+  }
+});

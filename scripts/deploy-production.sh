@@ -24,7 +24,7 @@ previous_worker="$(docker inspect fight-club-worker-1 --format '{{.Image}}')"
 [[ "$previous_image" == "$previous_worker" ]] || { echo 'App and worker differ; review before deploying.' >&2; exit 65; }
 docker image tag "$previous_image" fightclub:previous-deployment
 backup_name="fight-club-before-actions-${revision}.archive.gz"
-docker exec fight-club-backup-1 bash -c 'umask 077; mongodump --quiet --uri="$MONGODB_URI" --archive="/backups/$1" --gzip' -- "$backup_name"
+docker exec fight-club-backup-1 bash -c 'umask 077; options=(); [[ -z "${MONGODB_BACKUP_URI:-}" ]] || options+=(--oplog); mongodump --quiet --uri="${MONGODB_BACKUP_URI:-$MONGODB_URI}" --archive="/backups/$1" --gzip "${options[@]}"' -- "$backup_name"
 snapshot_dir="$(mktemp -d)"
 trap 'rm -rf "$snapshot_dir"' EXIT
 cp -p .env.production "$snapshot_dir/previous.env"

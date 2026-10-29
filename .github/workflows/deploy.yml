@@ -89,6 +89,17 @@ jobs:
           TMPDIR: ${{ runner.temp }}
           DEMO_TEST_ROUND_TRANSITION: "1"
 
+      - name: Check neutral production registration responses
+        run: npx playwright test e2e/registration-security.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+          DEMO_TEST_PRODUCTION_AUTH: "1"
+
+      - name: Check authentication recovery and photograph authorization
+        run: npx playwright test e2e/security-regressions.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check private unlockable photographs
         run: npx playwright test e2e/club-photos.spec.ts
         env:

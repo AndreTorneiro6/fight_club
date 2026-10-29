@@ -5,12 +5,20 @@ services:
     profiles:
       - standalone-proxy
 
+  mongo:
+    networks:
+      - data
+      - shared-mongo
+
   app:
     labels:
       - traefik.docker.network=web-app_default
       - traefik.http.routers.fightclub.tls.certresolver=letsencrypt
 
 networks:
+  shared-mongo:
+    external: true
+    name: wbglabs_data
   proxy:
     external: true
     name: web-app_default

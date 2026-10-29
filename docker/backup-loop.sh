@@ -19,12 +19,15 @@ umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
+backup_options=()
+[[ -z "${MONGODB_BACKUP_URI:-}" ]] || backup_options+=(--oplog)
+
 while true; do
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   name="fight-club-${stamp}.archive.gz"
   temp="$BACKUP_DIR/.${name}.tmp"
 
-  if mongodump --uri="$MONGODB_URI" --archive="$temp" --gzip; then
+  if mongodump --uri="${MONGODB_BACKUP_URI:-$MONGODB_URI}" --archive="$temp" --gzip "${backup_options[@]}"; then
     chmod 600 "$temp"
     mv "$temp" "$BACKUP_DIR/$name"
     find "$BACKUP_DIR" -maxdepth 1 -type f -name 'fight-club-*.archive.gz' \

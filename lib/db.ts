@@ -1,3 +1,4 @@
+import { validateProfilePhoto } from "./photo-access";
 import { matchOrder } from "./match-order";
 import { filterSpectatorView } from "./spectator-view";
 import { weeklyPublishedAt } from "./weekly-publication";
@@ -388,6 +389,22 @@ export async function mutate(actor: Actor, command: unknown) {
     const previousEmails = new Map(
       s.players.map((player) => [player._id, normalizeEmail(player.email)]),
     );
+    if (
+      command &&
+      typeof command === "object" &&
+      "type" in command &&
+      command.type === "profile.save" &&
+      "photo" in command &&
+      typeof command.photo === "string"
+    ) {
+      await validateProfilePhoto(
+        db,
+        session,
+        actor,
+        s.players.find((p) => p._id === actor.playerId)?.photo ?? "",
+        command.photo,
+      );
+    }
     const result = execute(s, actor, command);
     settlePredictions(s);
     for (const player of s.players) {

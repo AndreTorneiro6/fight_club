@@ -8,12 +8,12 @@ archive="${1:?Usage: restore.sh /backups/<archive>.archive.gz}"
   exit 2
 }
 
-echo "This will replace Fight Club data in MongoDB with the selected backup."
+echo "This will replace databases present in the selected shared MongoDB backup."
 read -r -p 'Type RESTORE to continue: ' confirmation
 [[ "$confirmation" == RESTORE ]] || {
   echo "Restore cancelled."
   exit 1
 }
 
-mongorestore --uri="$MONGODB_URI" --archive="$archive" --gzip --drop
+mongorestore --uri="${MONGODB_BACKUP_URI:-$MONGODB_URI}" --archive="$archive" --gzip --drop
 echo "Restore completed."

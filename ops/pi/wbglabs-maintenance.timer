@@ -1,0 +1,12 @@
+[Unit]
+Description=Update and reboot the Raspberry Pi daily at 03:00 Portugal time
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Lisbon
+AccuracySec=1min
+RandomizedDelaySec=0
+Persistent=false
+Unit=wbglabs-maintenance.service
+
+[Install]
+WantedBy=timers.target

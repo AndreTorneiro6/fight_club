@@ -210,7 +210,12 @@ test("administrator mentions retain one delivery per participant, and ordinary c
     now,
   );
   assert.equal(old.messages[0].mentions, undefined);
-  assert.ok(old.notifications.some((n) => n.playerId === "__admins__"));
+  assert.ok(old.notifications.some((n) => n.playerId === "p5"));
+  assert.ok(
+    old.notifications.every(
+      (n) => JSON.stringify(n.deliveryChannels) === '["push"]',
+    ),
+  );
 });
 test("stored mention names survive renames and split safely without interpreting message HTML or regex", () => {
   const message = {

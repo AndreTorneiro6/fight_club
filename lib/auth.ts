@@ -248,10 +248,19 @@ export async function createAccount(data: {
         "Escolhe uma categoria válida para o ranking: Ouro, Prata ou Bronze.",
       );
       const count = s.players.filter(
-        (x) => x.divisionId === div._id && x.status !== "removed",
+        (x) =>
+          x.divisionId === div._id &&
+          x.status !== "removed" &&
+          !x.awaitingApproval,
       ).length;
       ensure(
-        count < div.capacity,
+        s.players.filter((x) => x.divisionId === div._id && x.awaitingApproval)
+          .length < 100,
+        "Existem muitas inscrições por analisar. Contacta o clube.",
+        429,
+      );
+      ensure(
+        (!bootstrap && !invited) || count < div.capacity,
         "A categoria escolhida está completa. Escolhe outra categoria ou contacta o clube.",
       );
       const occupied = new Set(
@@ -310,7 +319,6 @@ export async function login(raw: unknown) {
       password: z.string().min(1).max(72),
     })
     .parse(raw);
-  await rateLimit(`email:${digest(data.email)}`);
   const { db } = await database(),
     user = await db.collection<User>("users").findOne({ email: data.email });
   const ok = await compare(data.password, user?.passwordHash || dummyHash);
@@ -443,6 +451,12 @@ export async function resetAccount(raw: unknown) {
       .updateOne(
         { _id: user!._id },
         { $set: { passwordHash, verified: true } },
+        { session },
+      );
+    await db
+      .collection<Token>("tokens")
+      .deleteMany(
+        { email: token.email, purpose: { $in: ["reset", "invite", "verify"] } },
         { session },
       );
     await db

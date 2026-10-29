@@ -550,3 +550,23 @@ test("independent paper publication honors a saved countdown, otherwise waits fo
     );
   assert.equal(r.divisionChallengeOpenings?.silver, null);
 });
+
+test("expired abandoned games do not block publication while accepted games still do", () => {
+  const s = fixture();
+  for (const game of s.challenges.filter((c) => c.divisionId === "gold"))
+    result(s, game._id);
+  const game = s.challenges.find((c) => c.divisionId === "gold")!;
+  s.challenges.push({ ...game, _id: "abandoned", status: "expired" });
+  assert.equal(divisionRoundCompletion(s, "season", "gold", week).ready, true);
+  s.challenges.at(-1)!.status = "accepted";
+  assert.equal(divisionRoundCompletion(s, "season", "gold", week).ready, false);
+});
+
+test("a published round containing only expired challenges can close without invented results", () => {
+  const s = fixture();
+  for (const game of s.challenges) game.status = "expired";
+  const completion = divisionRoundCompletion(s, "season", "gold", week);
+  assert.equal(completion.ready, true);
+  assert.equal(completion.total, 0);
+  assert.equal(completion.completed, 0);
+});

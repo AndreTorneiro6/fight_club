@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.8";
+export const applicationVersion = "1.11.9";
 export const releaseNotes = [
+  {
+    version: "1.11.9",
+    date: "2026-10-29",
+    title: "Proteção de contas, fotografias e resultados",
+    changes: [
+      "Recuperar a conta invalida todos os links anteriores; tentativas de entrada não bloqueiam o email de outro jogador.",
+      "Inscrições pendentes deixam de ocupar a capacidade da divisão; aprovação mantém o limite e o registo protege a existência de contas.",
+      "Fotografias não publicadas protegidas, chat apenas por push e exportações com proteção contra fórmulas.",
+      "Férias posteriores ao jogo não impedem o resultado; desafios expirados deixam de bloquear o fecho da jornada.",
+    ],
+  },
   {
     version: "1.11.8",
     date: "2026-10-28",

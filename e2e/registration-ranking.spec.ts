@@ -62,6 +62,7 @@ test("registration requires an explicit ranking category and approval preserves 
       type: "admin.player.save",
       playerId: player._id,
       ...player,
+      teamPosition: undefined, // Pending profiles have no ranked team yet.
       status: "active",
     },
   });
@@ -86,6 +87,7 @@ test("registration requires an explicit ranking category and approval preserves 
       type: "admin.player.save",
       playerId: player._id,
       ...player,
+      teamPosition: undefined, // Pending profiles have no ranked team yet.
       status: "removed",
     },
   });

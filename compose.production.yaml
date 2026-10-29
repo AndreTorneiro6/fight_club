@@ -68,6 +68,10 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
+      # Application processes must not inherit shared Mongo administrator/backup credentials.
+      MONGO_INITDB_ROOT_USERNAME: ""
+      MONGO_INITDB_ROOT_PASSWORD: ""
+      MONGODB_BACKUP_URI: ""
       PORT: 3000
       HOSTNAME: 0.0.0.0
     depends_on:
@@ -110,6 +114,10 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
+      # Application processes must not inherit shared Mongo administrator/backup credentials.
+      MONGO_INITDB_ROOT_USERNAME: ""
+      MONGO_INITDB_ROOT_PASSWORD: ""
+      MONGODB_BACKUP_URI: ""
     depends_on:
       mongo:
         condition: service_healthy

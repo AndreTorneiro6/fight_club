@@ -1,3 +1,4 @@
+import { spreadsheetCell } from "@/lib/spreadsheet";
 import { readLimitedBody } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
@@ -29,15 +30,17 @@ export async function GET(request: Request) {
       sheet = book.addWorksheet("Jogadores");
     sheet.addRow(headers);
     for (const p of s.players)
-      sheet.addRow([
-        p.name,
-        p.email,
-        p.phone,
-        s.divisions.find((d) => d._id === p.divisionId)?.name,
-        p.position,
-        p.partner,
-        p.status,
-      ]);
+      sheet.addRow(
+        [
+          p.name,
+          p.email,
+          p.phone,
+          s.divisions.find((d) => d._id === p.divisionId)?.name,
+          p.position,
+          p.partner,
+          p.status,
+        ].map(spreadsheetCell),
+      );
     const csv = new URL(request.url).searchParams.get("format") === "csv";
     const buffer = csv
       ? await book.csv.writeBuffer()

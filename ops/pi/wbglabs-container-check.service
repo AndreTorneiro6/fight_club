@@ -1,0 +1,15 @@
+[Unit]
+Description=Verify all pre-reboot containers restart and become healthy
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+ConditionPathExists=/var/lib/wbglabs-maintenance/containers-before-reboot.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/libexec/wbglabs-container-check.py
+TimeoutStartSec=7min
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

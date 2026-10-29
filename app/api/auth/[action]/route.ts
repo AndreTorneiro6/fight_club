@@ -1,4 +1,4 @@
-import { emailSchema } from "@/lib/email";
+import { EMAIL_IN_USE, emailSchema } from "@/lib/email";
 import { readJson } from "@/lib/request-body";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -19,10 +19,16 @@ import {
 } from "@/lib/auth";
 import { database, transaction } from "@/lib/db";
 import { failure, sameOrigin } from "@/lib/http";
-import { ensure } from "@/lib/rules";
+import { LeagueError, ensure } from "@/lib/rules";
 import type { Division, Player, User } from "@/lib/types";
 
 export const runtime = "nodejs";
+const registrationAcknowledgement = {
+  ok: true,
+  pending: true,
+  message:
+    "Se o email puder ser registado, receberás instruções para confirmar a conta. Se já tens conta, inicia sessão ou recupera o acesso.",
+};
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ action: string }> },
@@ -47,19 +53,38 @@ export async function POST(
     }
     if (action === "register") {
       const demo = process.env.DEMO_MODE === "true";
-      const user = await register(data, demo);
+      let user: User;
+      try {
+        user = await register(data, demo);
+      } catch (error) {
+        if (
+          !demo &&
+          ((error instanceof LeagueError && error.message === EMAIL_IN_USE) ||
+            (error &&
+              typeof error === "object" &&
+              "code" in error &&
+              error.code === 11000 &&
+              "keyPattern" in error &&
+              error.keyPattern &&
+              typeof error.keyPattern === "object" &&
+              "email" in error.keyPattern))
+        ) {
+          return NextResponse.json(registrationAcknowledgement);
+        }
+        throw error;
+      }
       if (demo) {
         await createSession(user._id);
         return NextResponse.json({ ok: true });
       }
-      await accountLink(user.email, "verify");
-      return NextResponse.json({
-        ok: true,
-        pending: true,
-        message: process.env.SMTP_URL
-          ? "Enviámos um endereço para confirmares o email."
-          : "Conta criada. Contacta o clube para receberes um endereço de confirmação ou recuperação.",
-      });
+      try {
+        await accountLink(user.email, "verify");
+      } catch {
+        console.error(
+          "Registration verification delivery failed; account retained for recovery.",
+        );
+      }
+      return NextResponse.json(registrationAcknowledgement);
     }
     if (action === "verify") {
       await verifyEmail(z.string().parse(data.token));

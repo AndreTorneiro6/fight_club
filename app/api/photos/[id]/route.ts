@@ -5,6 +5,7 @@ import { rateLimit, requireActor } from "@/lib/auth";
 import { database } from "@/lib/db";
 import { failure, sameOrigin } from "@/lib/http";
 import { ensure } from "@/lib/rules";
+import { canReadPhoto } from "@/lib/photo-access";
 import { Binary } from "mongodb";
 interface Photo {
   _id: string;
@@ -58,15 +59,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireActor();
+    const actor = await requireActor();
     const { id } = await params,
       { db } = await database(),
       photo = await db.collection<Photo>("photos").findOne({ _id: id });
-    ensure(photo, "Fotografia não encontrada.", 404);
+    ensure(
+      photo && (await canReadPhoto(db, actor, id, photo.owner)),
+      "Fotografia não encontrada.",
+      404,
+    );
     return new Response(new Uint8Array(photo.data.buffer), {
       headers: {
         "Content-Type": photo.type,
-        "Cache-Control": "private, max-age=86400",
+        "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       },
     });

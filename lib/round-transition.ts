@@ -12,7 +12,7 @@ export function divisionRoundCompletion(
     (r) =>
       r.weekStart === weekStart && (!r.seasonId || r.seasonId === seasonId),
   );
-  const games = s.challenges.filter(
+  const candidates = s.challenges.filter(
     (c) =>
       c.seasonId === seasonId &&
       c.divisionId === divisionId &&
@@ -20,6 +20,7 @@ export function divisionRoundCompletion(
       !["cancelled", "refused"].includes(c.status) &&
       (!c.deferredUntil || c.deferredUntil <= weekStart),
   );
+  const games = candidates.filter((c) => c.status !== "expired");
   const completed = games.filter(
     (c) =>
       c.status === "completed" &&
@@ -38,7 +39,7 @@ export function divisionRoundCompletion(
       !!season &&
       season.status === "active" &&
       !!weeklyPublishedAt(round, divisionId) &&
-      !!games.length &&
+      !!candidates.length &&
       completed.length === games.length &&
       (!season.firstCompetitionWeek ||
         weekStart >= season.firstCompetitionWeek),

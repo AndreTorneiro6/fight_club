@@ -967,9 +967,13 @@ export function execute(
     body: string,
     cid?: string,
     dedupe?: string,
+    metadata?: Pick<
+      Notification,
+      "seasonId" | "deliveryChannels" | "kind" | "chatMessageId"
+    >,
   ) => {
     // Administrative notifications also appear in the activity log. Actor recipients are resolved by the server.
-    notify("__admins__", title, body, cid, dedupe);
+    notify("__admins__", title, body, cid, dedupe, metadata);
   };
   const notifyTeam = (
     pid: string,
@@ -1174,10 +1178,12 @@ export function execute(
       w.divisionId === c.divisionId && l.divisionId === c.divisionId,
       "Os jogadores mudaram de divisão. Resolve a classificação antes de confirmar.",
     );
+    const matchTimestamp = Date.parse(c.scheduledAt ?? c.createdAt);
     ensure(
       !!c.competitionRoundId ||
-        (!frozenRanking(s, w._id, timestamp) &&
-          !frozenRanking(s, l._id, timestamp)),
+        [...winningMembers, ...losingMembers].every(
+          (p) => !frozenRanking(s, p._id, matchTimestamp),
+        ),
       "O ranking está congelado durante as férias. Regista o resultado após o regresso.",
     );
     const championsBefore = structuredClone(
@@ -1204,7 +1210,7 @@ export function execute(
     ) {
       ensure(
         [...winningMembers, ...losingMembers].every(
-          (p) => !frozenRanking(s, p._id, timestamp),
+          (p) => !frozenRanking(s, p._id, matchTimestamp),
         ),
         "O ranking da dupla está protegido por férias.",
       );
@@ -1227,7 +1233,7 @@ export function execute(
         const protectedIds = new Set(
           entries
             .filter((t) =>
-              t.members.some((p) => frozenRanking(s, p._id, timestamp)),
+              t.members.some((p) => frozenRanking(s, p._id, matchTimestamp)),
             )
             .map((t) => t.id),
         );
@@ -3373,7 +3379,7 @@ export function execute(
         ...(mentions.length ? { mentions } : {}),
       };
       s.messages.push(message);
-      if (mentions.length) {
+      {
         const recipients = new Set(
           admin
             ? challengeParticipants(c, s.players)
@@ -3414,33 +3420,15 @@ export function execute(
             "Nova mensagem no desafio",
             cmd.text.slice(0, 120),
             c._id,
+            undefined,
+            {
+              kind: "update",
+              deliveryChannels: ["push"],
+              chatMessageId: message._id,
+            },
           );
         return { id: message._id };
       }
-      if (admin) {
-        for (const playerId of challengeParticipants(c, s.players))
-          notify(
-            playerId,
-            "Mensagem do clube no desafio",
-            cmd.text.slice(0, 120),
-            c._id,
-          );
-      } else {
-        notifyTeam(
-          challengeSide(c, actor.playerId, s.players) === "attack"
-            ? c.defenderId
-            : c.challengerId,
-          "Nova mensagem",
-          cmd.text.slice(0, 120),
-          c._id,
-        );
-        notifyAdmins(
-          "Nova mensagem no desafio",
-          `${player(actor.playerId).name}: ${cmd.text.slice(0, 120)}`,
-          c._id,
-        );
-      }
-      break;
     }
     case "notifications.preferences": {
       const p = me();
@@ -3923,11 +3911,16 @@ export function execute(
       if (
         !existing ||
         existing.divisionId !== data.divisionId ||
-        existing.status === "removed"
+        existing.status === "removed" ||
+        (!!existing.awaitingApproval && data.status === "active")
       )
         ensure(
           s.players.filter(
-            (p) => p.divisionId === data.divisionId && p.status !== "removed",
+            (p) =>
+              p._id !== existing?._id &&
+              p.divisionId === data.divisionId &&
+              p.status !== "removed" &&
+              !p.awaitingApproval,
           ).length < division.capacity,
           "A divisão está completa.",
         );
@@ -4181,7 +4174,10 @@ export function execute(
       ensure(
         cmd.capacity >=
           s.players.filter(
-            (p) => p.divisionId === d._id && p.status !== "removed",
+            (p) =>
+              p.divisionId === d._id &&
+              p.status !== "removed" &&
+              !p.awaitingApproval,
           ).length,
         "A capacidade é inferior ao número de jogadores.",
       );
@@ -4891,6 +4887,7 @@ export function execute(
               s.players.filter(
                 (p) =>
                   p.status !== "removed" &&
+                  !p.awaitingApproval &&
                   (transfers.get(p._id) ?? p.divisionId) === d._id,
               ).length <= d.capacity,
               "A promoção ultrapassa a capacidade de uma divisão.",

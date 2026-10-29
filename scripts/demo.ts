@@ -42,6 +42,9 @@ if (testing && process.env.DEMO_TEST_ADMIN_PAIR === "1") {
 console.log(
   "\nFight Club · Demonstração local com MongoDB replica set\nAdmin: admin@fightclub.local\nJogador: jogador@fightclub.local\nAdversário: adversario@fightclub.local\nPalavra-passe: FightClub2026!\nOs dados são fictícios e ficam em .demo-data/.\n",
 );
+// Exercise production authentication responses against disposable seeded data only.
+if (testing && process.env.DEMO_TEST_PRODUCTION_AUTH === "1")
+  process.env.DEMO_MODE = "false";
 const child = spawn(
   process.execPath,
   [
