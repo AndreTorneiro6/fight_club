@@ -1,4 +1,5 @@
 import { filterTeamSpaceView } from "./team-space";
+import { stickerDay } from "./sticker-album";
 import { isVotingMatch } from "./match-voting-targets";
 import { anonymousMatchVotes } from "./anonymous-match-votes";
 import {
@@ -12,6 +13,54 @@ import type { Actor, State } from "./types";
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
   filterTeamSpaceView(state, actor);
+  const season = state.seasons.find((season) => season.status === "active");
+  const album = state.stickerSettings?.find(
+    (settings) => settings.seasonId === season?._id,
+  );
+  const self = state.players.find(
+    (player) => player._id === actor.playerId && player.userId === actor.userId,
+  );
+  const available =
+    actor.role === "admin" ||
+    !!(
+      (album?.communityEnabled ||
+        state.stickerSettings?.some(
+          (cfg) =>
+            cfg.communityEnabled &&
+            state.stickerPacks?.some(
+              (pack) =>
+                pack.seasonId === cfg.seasonId && pack.userId === actor.userId,
+            ),
+        )) &&
+      self?.status === "active" &&
+      !self.awaitingApproval &&
+      !self.registrationRejectedAt
+    );
+  state.stickerAccess = {
+    enabled: available,
+    remainingPacks:
+      available && album?.enabled
+        ? Math.max(
+            0,
+            album.dailyPacks -
+              (state.stickerPacks ?? []).filter(
+                (pack) =>
+                  pack.userId === actor.userId &&
+                  pack.seasonId === season?._id &&
+                  pack.day === stickerDay(),
+              ).length,
+          )
+        : 0,
+  };
+  // Inventory, negotiations and private chats are projected only by /api/album.
+  state.stickerCatalogs = [];
+  state.stickerInventories = [];
+  state.stickerMovements = [];
+  state.stickerMigrations = [];
+  state.stickerTrades = [];
+  state.stickerTradeMessages = [];
+  state.stickerPreferences = [];
+  state.stickerReports = [];
   state.matchVoteSummaries = anonymousMatchVotes(state);
   state.matchVotes = (state.matchVotes ?? []).filter(
     (vote) => vote.userId === actor.userId,

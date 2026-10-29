@@ -1,3 +1,13 @@
+import type {
+  StickerCatalog,
+  StickerInventory,
+  StickerMovement,
+  StickerMigration,
+  StickerTrade,
+  StickerTradeMessage,
+  StickerPreference,
+  StickerReport,
+} from "./sticker-trade-types";
 import type { TeamSpace, TeamMessage } from "./team-space";
 import type { LiveScore } from "./live-score";
 import type { MatchVoteSummary } from "./anonymous-match-votes";
@@ -235,6 +245,8 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  stickerTradeId?: string;
+  stickerReportId?: string;
   bettingResult?: { userId: string; version: number; fingerprint: string };
   bettingNotice?: boolean;
   chatMessageId?: string;
@@ -426,6 +438,20 @@ export interface State {
   sponsors?: Sponsor[];
   coinSettings?: CoinSettings[];
   coinEntries?: CoinEntry[];
+  /** Derived navigation permission, never persisted. */
+  stickerAccess?: {
+    enabled: boolean;
+    remainingPacks: number;
+    pendingProposals?: number;
+  };
+  stickerCatalogs?: StickerCatalog[];
+  stickerInventories?: StickerInventory[];
+  stickerMovements?: StickerMovement[];
+  stickerMigrations?: StickerMigration[];
+  stickerTrades?: StickerTrade[];
+  stickerTradeMessages?: StickerTradeMessage[];
+  stickerPreferences?: StickerPreference[];
+  stickerReports?: StickerReport[];
   stickerSettings?: StickerSettings[];
   stickerPacks?: StickerPack[];
   stickerRewards?: StickerReward[];
@@ -473,6 +499,14 @@ export const collections = [
   "sponsors",
   "coinSettings",
   "coinEntries",
+  "stickerCatalogs",
+  "stickerInventories",
+  "stickerMovements",
+  "stickerMigrations",
+  "stickerTrades",
+  "stickerTradeMessages",
+  "stickerPreferences",
+  "stickerReports",
   "stickerSettings",
   "stickerPacks",
   "stickerRewards",

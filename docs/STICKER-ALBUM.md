@@ -1,36 +1,41 @@
-# Caderneta do clube — teste privado
+# Caderneta e trocas de cromos
 
-Disponível apenas no espaço **Administrador → Caderneta**. Os dois administradores podem colecionar separadamente com as suas contas. Entrar no espaço Jogador remove este acesso; nenhuma configuração permite publicar a funcionalidade para jogadores nesta versão.
+Implementação local do [plano acordado](CROMOS_EXCHANGE_PLAN.md), preparada para revisão antes do lançamento. A publicação e a ativação para jogadores continuam pendentes de pedido do utilizador. Os modelos originais dos cromos são preservados; ver [proveniência do layout](CROMOS_LAYOUT.md).
 
-## Começar
+## Acesso e configuração
 
-1. Ter uma época ativa e um perfil aprovado associado à conta de administrador.
-2. Abrir Caderneta, guardar a configuração e ativar o teste.
-3. Abrir a saqueta com o botão ou a interação de abanar suportada pelo dispositivo. Ambos usam a mesma ação no servidor.
-4. Consultar os cromos dos jogadores da liga, incluindo repetidos, progresso e vales ganhos. Cada administrador tem a sua coleção.
+A entrada **Caderneta** tem cinco áreas: A minha caderneta, Repetidos, Comunidade, Negociações e Histórico. A entrada destacada mostra saquetas disponíveis e propostas para responder. As notificações abrem a negociação ou mensagem correspondente.
 
-Por defeito: teste desligado, uma saqueta gratuita por dia e três cromos por saqueta. Os limites configuráveis são 1–5 saquetas/dia e 1–10 cromos/saqueta. A mudança do dia segue Europe/Lisbon, incluindo horário de verão. A seleção usa aleatoriedade criptográfica uniforme no servidor; repetidos são possíveis. Não há compras, trocas, probabilidades pagas ou influência sobre ranking, cartões pessoais, palpites ou jogos.
+Por defeito, `communityEnabled` e `tradesEnabled` são falsos. A prévia administrativa existente continua disponível. Em Administrador → Caderneta, a configuração versionada permite ativar separadamente saquetas, comunidade e trocas, definir limites (10 exemplares por lado, 5 negociações iniciadas pendentes, 72 horas por versão) e configurar recompensas. Desligar trocas impede novas propostas, contrapropostas e aceitações; permite consultar o histórico, conversar e cancelar. Não existe ativação automática numa atualização.
 
-## Prémios de fidelização
+Uma conta tem um inventário por época, partilhado entre espaços. Espetadores aprovados e ativos podem colecionar e trocar; não originam um cromo próprio no catálogo. Descoberta e novas propostas exigem adesão individual. Pausar propostas retira a pessoa da descoberta sem terminar negociações existentes.
 
-Os prémios começam desligados. Um administrador pode definir uma descrição (por exemplo, água no clube), o objetivo e a métrica:
+## Negociar
 
-- Dias distintos em que abriu uma saqueta nesta época; este contador não prova presença física no clube.
-- Jogos realmente concluídos com resultado confirmado nesta época, com participação registada nos históricos das equipas; faltas de comparência, recusas, cancelamentos e resultados automáticos não contam. Jogos confirmados sem detalhe de sets continuam válidos.
-- Percentagem de jogadores diferentes colecionados, até 100%.
+Escolher um parceiro na comunidade, indicar os cromos e quantidades em **Dás / Recebes** e enviar. São permitidas quantidades diferentes: 1 por 1, 1 por 2, 1 por 3 e vários por vários. A comunidade revela apenas repetidos disponíveis e oportunidades, sem contactos, inventários completos ou recompensas alheias.
 
-Atingir o objetivo permite reclamar um vale com código privado. Não é uma reserva nem uma entrega automática de um produto. Os vales anteriores continuam visíveis ao alterar a campanha. Mesmo sem uma época ativa, os administradores podem validar vales já emitidos. O outro administrador pode confirmar o código e marcar o vale como utilizado. A utilização só ocorre uma vez, com controlo de versão e auditoria. Correções dos jogos/saquetas que retirem o direito ao prémio bloqueiam a utilização e mostram a razão.
+Só o autor da versão atual reserva os seus exemplares. Uma contraproposta troca essa reserva numa única transação e substitui a versão anterior. Apenas o outro participante pode aceitar a versão atual, no botão junto aos termos exatos. Uma mensagem nunca aceita uma troca nem prolonga a validade.
 
-Mudar o nome, métrica ou objetivo cria uma nova campanha. Vales já reclamados mantêm o prémio e objetivo originais. A percentagem de um vale de coleção usa os jogadores existentes quando foi reclamado; novas inscrições não retiram esse direito.
+A aceitação verifica contas, época, versão e disponibilidade dos dois lados; transfere todos os exemplares de uma vez e preserva sempre a última cópia. Um pedido repetido devolve o comprovativo sem nova transferência. Uma proposta indisponível é invalidada e liberta a reserva. Recusa, cancelamento, expiração, bloqueio, suspensão e encerramento da época também libertam reservas.
 
-## Persistência e privacidade
+Conversas são privadas, com páginas de 100 mensagens e ligações para mensagens antigas. Terminar a negociação torna a conversa só de leitura. É possível silenciar, bloquear e denunciar. Notificações de cromos são **push/in-app**, genéricas e agrupadas para mensagens próximas; não enviam email ou WhatsApp.
 
-Coleções adicionais: `stickerSettings`, `stickerPacks` e `stickerRewards`. Todas as ações passam pelo motor validado e pela transação MongoDB existente. Configuração versionada, pedidos de saquetas idempotentes, limites diários transacionais e chaves únicas impedem duplicações por cliques/repetição de pedidos. A vista inclui apenas as saquetas e coleção da própria conta. Administradores podem consultar os vales para os validar no clube. Contactos pessoais não fazem parte do catálogo.
+## Inventário, catálogo e recompensas
 
-Comandos: `admin.stickers.settings`, `admin.stickers.open`, `admin.stickers.claim` e `admin.stickers.redeem`. Todas as ações e leituras verificam o papel efetivo de administrador antes de processar dados. As coleções são retiradas das vistas dos jogadores. Não existem notificações aos jogadores nem ativação automática de campanhas.
+O catálogo fica fixo por época: inscrições posteriores e mudanças de divisão não alteram o objetivo. A migração parte das saquetas históricas, conserva-as e usa movimentos determinísticos para não duplicar exemplares quando repetida. Transferências têm movimentos imutáveis de entrada e saída e comprovativo com versão e referências.
 
-Testes de domínio: `npx tsx --test tests/sticker-album.test.ts`. Cobrem permissões, calendário de Lisboa/DST, saquetas idempotentes e limites, isolamento das coleções, elegibilidade do catálogo, versões, campanhas, vales, correções e participação histórica em jogos.
+Progresso e prémios de coleção usam o inventário, incluindo cromos recebidos. Dias de saquetas e jogos confirmados mantêm as fontes anteriores; trocar não gera visitas, jogos, moedas ou resultados desportivos. Vales emitidos mantêm os seus objetivos e são revalidados na utilização. Administradores validam e utilizam códigos uma única vez, com versão e auditoria.
 
-## Layout dos cromos — 29 outubro 2026
+O Histórico mostra todas as negociações e os 200 movimentos mais recentes da própria coleção. O suporte dispõe de consulta paginada do registo completo por conta, cancelamento de propostas com motivo e tratamento de denúncias. Administradores só consultam mensagens de terceiros através de uma denúncia, com cada consulta registada. A vista geral da liga nunca inclui inventários, propostas ou conversas privadas, mesmo para administradores.
 
-A caderneta usa os modelos originais Ouro/Prata/Bronze fornecidos, partilhados com o cartão pessoal e a prévia administrativa. Os cromos podem ser ampliados para leitura no telemóvel. O rating e os seis atributos vêm apenas de autoavaliações guardadas; valores ainda não definidos aparecem como travessões. Os cromos por colecionar mantêm fotografia/atributos ocultos. Esta mudança não ativa o plano de trocas nem altera as saquetas, os vales ou a restrição a administradores. Ver [layout e proveniência](CROMOS_LAYOUT.md).
+Coleções: `stickerSettings`, `stickerPacks`, `stickerRewards`, `stickerCatalogs`, `stickerInventories`, `stickerMovements`, `stickerMigrations`, `stickerTrades`, `stickerTradeMessages`, `stickerPreferences`, `stickerReports`. Alterações passam pelo motor validado e pela transação MongoDB existente; índices únicos, controlo de versão e pedidos idempotentes protegem reservas e transferências.
+
+## Verificação local
+
+- `npm run typecheck`, `npm test`, `npm run build`.
+- `tests/sticker-trading.test.ts`: migração, catálogo, quantidades, reservas, versões, recompensas, privacidade, denúncias, bloqueios, expiração e links para mensagens antigas.
+- `tests/sticker-trading-database.test.ts`: transações MongoDB reais com aceitações, cancelamento, contrapropostas e reservas concorrentes.
+- `TMPDIR=/var/tmp DEMO_TEST_STICKER_TRADING=1 npx playwright test e2e/sticker-trading.spec.ts`: piloto descartável com contas diferentes, troca 1 por 3 no telemóvel, atualização em direto, comprovativo, repetição, partilha de inventário entre espaços e espetador sem cromo.
+- Sem a variável do piloto, `e2e/sticker-album.spec.ts`, `personal-cromo.spec.ts` e `gamification.spec.ts` verificam compatibilidade da prévia, vales e modelos originais.
+
+O cenário do piloto só é criado por `scripts/demo.ts --test`; não acrescenta endpoints ou permissões especiais à aplicação.

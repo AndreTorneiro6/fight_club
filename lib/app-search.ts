@@ -67,7 +67,9 @@ export function searchEntries(state: View): SearchEntry[] {
           ["perfil", "Perfil"],
           ...playerLinks,
         ] as const);
-  for (const [path, label] of links)
+  for (const [path, label] of links.filter(
+    ([path]) => path !== "caderneta" || state.stickerAccess?.enabled,
+  ))
     add(
       `page:${path}`,
       label,

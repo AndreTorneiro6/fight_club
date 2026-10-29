@@ -1,3 +1,4 @@
+import { notificationTarget } from "./notification-link";
 import { isVotingMatch } from "./match-voting-targets";
 import { responseNoticeIsCurrent } from "./challenge-response-notices";
 import type { CompetitionChallenge } from "./competition-types";
@@ -80,23 +81,7 @@ export function deliveryContent(n: Notification) {
       n.responseDeadline?.status === "pending"
         ? new Date(n.responseDeadline.respondBy)
         : undefined,
-    path: n.bettingNotice
-      ? `/apostas${n.challengeId ? `?jogo=${encodeURIComponent(n.challengeId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
-      : n.weeklyChallengeOpening
-        ? "/desafios"
-        : n.rankingNotice
-          ? "/ranking"
-          : n.seasonId
-            ? "/epocas"
-            : n.adminTestId
-              ? `/admin?tab=simulation&test=${encodeURIComponent(n.adminTestId)}`
-              : n.challengeId
-                ? `/desafios/${encodeURIComponent(n.challengeId)}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`
-                : n.competitionNotice
-                  ? n.playerId === "__admins__"
-                    ? "/admin?tab=matchmaking"
-                    : "/jornadas"
-                  : "/notificacoes",
+    path: notificationTarget(n),
   };
 }
 /** Created in the same transaction as the league event. Never send inside a retryable transaction. */

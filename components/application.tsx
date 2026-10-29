@@ -1,4 +1,5 @@
 "use client";
+import { notificationTarget } from "@/lib/notification-link";
 import { matchFrozenUntil } from "@/lib/match-freeze";
 import { OriginalTitleArt } from "./original-title-art";
 import { FrozenMatchNotice } from "./frozen-match";
@@ -472,7 +473,7 @@ export function Application({
           window.location.search +
           window.location.hash;
         router.replace(
-          window.location.pathname === "/apostas"
+          ["/apostas", "/caderneta"].includes(window.location.pathname)
             ? `/auth?next=${encodeURIComponent(path)}`
             : "/auth",
         );
@@ -653,6 +654,7 @@ export function Application({
       patrocinios: "Patrocínios",
       jornadas: "Jornadas oficiais",
       cartoes: "Cartões de jogador",
+      caderneta: "Caderneta",
       palpites: "Palpites",
       apostas: "Central de Apostas",
     }[route] ??
@@ -705,6 +707,9 @@ export function Application({
               ))}
             <div className="nav-label">INFORMAÇÃO DA LIGA</div>
             {(spectator ? spectatorLinks : playerLinks)
+              .filter(
+                ([path]) => path !== "caderneta" || s.stickerAccess?.enabled,
+              )
               .map(([path, label]) => ({
                 path,
                 label,
@@ -854,6 +859,28 @@ export function Application({
             </div>
           )}
           {error && <div className="error">{error}</div>}
+          {s.stickerAccess?.enabled && route !== "caderneta" && (
+            <Link
+              href={
+                s.stickerAccess.pendingProposals
+                  ? "/caderneta?negociacoes=1"
+                  : "/caderneta"
+              }
+              className="album-entry"
+            >
+              <BookOpen size={20} />
+              <span>
+                <strong>Caderneta</strong>
+                <small>
+                  {s.stickerAccess.pendingProposals
+                    ? `${s.stickerAccess.pendingProposals} propostas para responder`
+                    : s.stickerAccess.remainingPacks
+                      ? `${s.stickerAccess.remainingPacks} ${s.stickerAccess.remainingPacks === 1 ? "saqueta disponível" : "saquetas disponíveis"}`
+                      : "Coleção, repetidos e negociações"}
+                </small>
+              </span>
+            </Link>
+          )}
           {route === "inicio" ? (
             <Dashboard {...actions} />
           ) : route === "ranking" ? (
@@ -869,6 +896,14 @@ export function Application({
               <SpectatorProfile {...actions} />
             ) : (
               <Profile {...actions} />
+            )
+          ) : route === "caderneta" ? (
+            s.stickerAccess?.enabled ? (
+              <StickerAlbum revision={s} queryKey={searchParams.toString()} />
+            ) : (
+              <Section title="Caderneta">
+                <p>A caderneta ainda não está disponível para esta conta.</p>
+              </Section>
             )
           ) : route === "cartoes" ? (
             <PlayerCards revision={s} />
@@ -966,17 +1001,21 @@ export function Application({
               : spectator
                 ? spectatorLinks
                 : playerLinks
-            ).map(([path, label]) => (
-              <Link
-                className="button"
-                key={path}
-                href={"/" + path}
-                onClick={() => setMenu(false)}
-              >
-                {label}
-                <ArrowRight size={14} />
-              </Link>
-            ))}
+            )
+              .filter(
+                ([path]) => path !== "caderneta" || s.stickerAccess?.enabled,
+              )
+              .map(([path, label]) => (
+                <Link
+                  className="button"
+                  key={path}
+                  href={"/" + path}
+                  onClick={() => setMenu(false)}
+                >
+                  {label}
+                  <ArrowRight size={14} />
+                </Link>
+              ))}
           </div>
         </Modal>
       )}
@@ -1131,7 +1170,9 @@ function Auth({
       } else {
         const next = new URLSearchParams(window.location.search).get("next");
         router.replace(
-          next && /^\/apostas(?:[?#]|$)/.test(next) ? next : "/inicio",
+          next && /^\/(?:apostas|caderneta)(?:[?#]|$)/.test(next)
+            ? next
+            : "/inicio",
         );
       }
     } catch (e) {
@@ -3159,11 +3200,11 @@ function Notifications({ s, run, busy }: Actions) {
             .slice()
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .map((n) =>
-              n.bettingNotice ? (
+              n.bettingNotice || n.stickerTradeId || n.stickerReportId ? (
                 <Link
                   key={n._id}
                   className={`notification betting-notification ${!n.read ? "unread" : ""}`}
-                  href={`/apostas${n.challengeId ? `?jogo=${encodeURIComponent(n.challengeId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`}
+                  href={notificationTarget(n)}
                   onClick={() => {
                     void run(
                       { type: "notifications.read", notificationId: n._id },
@@ -3846,7 +3887,7 @@ function Admin(a: Actions) {
           {!clubPending.length && <Empty text="Não há campos por confirmar." />}
         </Section>
       ) : tab === "album" ? (
-        <StickerAlbum revision={s} />
+        <StickerAlbum revision={s} queryKey={searchParams.toString()} />
       ) : tab === "sponsors" ? (
         <AdminSponsors state={s} run={a.run} busy={a.busy} />
       ) : tab === "gamification" ? (

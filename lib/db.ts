@@ -1,3 +1,4 @@
+import { reconcileStickerTrades } from "./sticker-trading";
 import { validateProfilePhoto } from "./photo-access";
 import { matchOrder } from "./match-order";
 import { filterSpectatorView } from "./spectator-view";
@@ -114,6 +115,39 @@ async function indexes(db: Db) {
   await db
     .collection("stickerRewards")
     .createIndex({ userId: 1, campaignId: 1 }, { unique: true });
+  await db
+    .collection("stickerCatalogs")
+    .createIndex({ seasonId: 1 }, { unique: true });
+  await db
+    .collection("stickerInventories")
+    .createIndex(
+      { seasonId: 1, userId: 1, stickerPlayerId: 1 },
+      { unique: true },
+    );
+  await db
+    .collection("stickerMovements")
+    .createIndex({ seasonId: 1, userId: 1, createdAt: -1 });
+  await db
+    .collection("stickerMigrations")
+    .createIndex({ seasonId: 1 }, { unique: true });
+  await db
+    .collection("stickerTrades")
+    .createIndex({ initiatorUserId: 1, requestId: 1 }, { unique: true });
+  await db
+    .collection("stickerTrades")
+    .createIndex({ seasonId: 1, status: 1, expiresAt: 1 });
+  await db
+    .collection("stickerTradeMessages")
+    .createIndex({ userId: 1, requestId: 1 }, { unique: true });
+  await db
+    .collection("stickerTradeMessages")
+    .createIndex({ tradeId: 1, createdAt: 1, _id: 1 });
+  await db
+    .collection("stickerPreferences")
+    .createIndex({ seasonId: 1, userId: 1 }, { unique: true });
+  await db
+    .collection("stickerReports")
+    .createIndex({ tradeId: 1, reporterUserId: 1, status: 1 });
   await db.collection("adminNotes").createIndex({ archived: 1, updatedAt: -1 });
   await db.collection("users").createIndex({ email: 1 }, { unique: true });
   await db
@@ -181,10 +215,42 @@ async function indexes(db: Db) {
 export async function readState(
   db: Db,
   session?: ClientSession,
-  options: { audit?: boolean; notificationsFor?: Actor } = {},
+  options: { audit?: boolean; notificationsFor?: Actor; album?: boolean } = {},
 ): Promise<State> {
   const state = {} as State;
   const read = async (key: (typeof collections)[number]) => {
+    if (
+      options.album &&
+      !key.startsWith("sticker") &&
+      ![
+        "players",
+        "divisions",
+        "seasons",
+        "playerAttributes",
+        "results",
+        "challenges",
+        "settings",
+      ].includes(key)
+    ) {
+      (state[key] as Entity[]) = [];
+      return;
+    }
+    if (
+      options.notificationsFor &&
+      [
+        "stickerCatalogs",
+        "stickerInventories",
+        "stickerMovements",
+        "stickerMigrations",
+        "stickerTrades",
+        "stickerTradeMessages",
+        "stickerPreferences",
+        "stickerReports",
+      ].includes(key)
+    ) {
+      (state[key] as Entity[]) = [];
+      return;
+    }
     if (key === "audit" && options.audit === false) {
       state.audit = [];
       return;
@@ -284,6 +350,7 @@ export async function transaction<T>(
           before = structuredClone(state);
         const result = await fn(state, db, session);
         reconcileCoins(state, before);
+        reconcileStickerTrades(state, Date.now());
         const expired = expireRejectedRegistrations(state);
         // Explicit deletions and expired refusals revoke account access in the same transaction.
         const remainingPlayers = new Set(
@@ -477,6 +544,23 @@ export async function view(
       ? s.registrationLinks.map((x) => ({ ...x, tokenHash: "" }))
       : [];
   filterFeatureView(s, actor);
+  if (s.stickerAccess?.enabled)
+    s.stickerAccess.pendingProposals = await db
+      .collection("stickerTrades")
+      .countDocuments({
+        status: "PENDING",
+        expiresAt: { $gt: new Date().toISOString() },
+        proposerUserId: { $ne: actor.userId },
+        $or: [
+          { initiatorUserId: actor.userId },
+          { recipientUserId: actor.userId },
+        ],
+        seasonId: {
+          $in: s.seasons
+            .filter((season) => season.status === "active")
+            .map((season) => season._id),
+        },
+      });
   // Expiration is persisted by jobs/commands. Derived UI status stays accurate between scheduler runs.
   const mine = s.challenges
     .filter(

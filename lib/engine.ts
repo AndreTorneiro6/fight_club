@@ -1,3 +1,4 @@
+import { reconcileStickerTrades } from "./sticker-trading";
 import { executeTeamSpace } from "./team-space-command";
 import { executeLiveScore } from "./live-score-command";
 import { executeChampionHistory } from "./champion-history";
@@ -646,7 +647,7 @@ export function execute(
         "admin.match-vote.predict",
         "admin.match-vote.save",
         "admin.match-vote.remove",
-      ].includes(featureType),
+      ].includes(featureType) || featureType.startsWith("stickers."),
       "Esta ação não está disponível no modo espetador.",
       403,
     );
@@ -675,7 +676,10 @@ export function execute(
     return executeClubPhotos(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.coins."))
     return executeCoins(s, actor, raw, timestamp);
-  if (featureType.startsWith("admin.stickers."))
+  if (
+    featureType.startsWith("admin.stickers.") ||
+    featureType.startsWith("stickers.")
+  )
     return executeStickerAlbum(s, actor, raw, timestamp);
   if (featureType.startsWith("admin.notes."))
     return executeAdminNotes(s, actor, raw, timestamp);
@@ -5003,6 +5007,7 @@ export function processDeadlines(
   timestamp = Date.now(),
   generateRoles = true,
 ) {
+  reconcileStickerTrades(s, timestamp);
   processMatchVotingAnnouncement(s, timestamp);
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);

@@ -3081,3 +3081,8 @@ body::before {
   .challenge-card h3 {font-size:21px;line-height:1.25;margin:10px 0;}
   .admin-overview .panel {padding:16px;}
 }
+
+.album-entry { display: flex; align-items: center; gap: 10px; padding: 10px 13px; margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); background: color-mix(in srgb, var(--gold) 7%, transparent); border-radius: 10px; color: var(--gold); }
+.album-entry span { display: grid; gap: 3px; }
+.album-entry strong { font-size: 13px; }
+.album-entry small { color: var(--muted); font-size: 11px; }

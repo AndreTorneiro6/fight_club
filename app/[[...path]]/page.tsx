@@ -26,6 +26,7 @@ const routes = new Set([
   "patrocinios",
   "jornadas",
   "cartoes",
+  "caderneta",
   "palpites",
   "apostas",
 ]);
@@ -83,14 +84,19 @@ export default async function Page({
             disponibilidades privadas não são apresentados aos outros jogadores.
             O chat de cada desafio é acessível aos participantes e ao
             administrador. As conversas da Central de Apostas são visíveis aos
-            jogadores aprovados da liga.
+            jogadores aprovados da liga. Na caderneta, a participação na
+            comunidade é opcional e revela apenas repetidos disponíveis. As
+            conversas das trocas são privadas entre os participantes; a
+            administração só as consulta através de uma denúncia, com o acesso
+            registado.
           </p>
           <p>
             A inscrição exige confirmação de email e aprovação pelo clube. Os
-            alertas operacionais por email podem ser desativados no perfil. As
-            mensagens WhatsApp exigem autorização separada, revogável no perfil.
-            Os fornecedores de alojamento/base de dados e dos canais de
-            mensagens tratam os dados necessários a esses serviços.
+            emails são usados apenas para questões de conta. As trocas e as
+            mensagens geram avisos na aplicação e por push. As mensagens
+            WhatsApp exigem autorização separada, revogável no perfil. Os
+            fornecedores de alojamento/base de dados e dos canais de mensagens
+            tratam os dados necessários a esses serviços.
           </p>
           <p>
             Os resultados e o histórico desportivo são conservados para manter a

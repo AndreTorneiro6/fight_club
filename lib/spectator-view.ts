@@ -54,7 +54,9 @@ export function filterSpectatorView(s: State, actor: Actor) {
     prizes: [],
   }));
   s.notifications = s.notifications.filter(
-    (n) => n.playerId === actor.playerId && !!n.bettingNotice,
+    (n) =>
+      n.playerId === actor.playerId &&
+      (!!n.bettingNotice || !!n.stickerTradeId),
   );
   s.history = s.history.filter(
     (h) => !h.challengeId || games.has(h.challengeId),

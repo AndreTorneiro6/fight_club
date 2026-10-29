@@ -37,4 +37,3 @@ Referência: `templates/cromo_prata_bronze.jpeg`
 ## Verificação
 
 Teste de igualdade binária dos originais e geometria dos campos. Comparação no navegador de cada cromo renderizado contra o JPEG original: zero píxeis alterados fora dos campos dinâmicos/fotografia, com pequena margem para antialias. Verifica valores reais incluindo0, nome completo dentro da moldura, fotos privadas, exportação das duas faces, cartão pessoal, filtros e caderneta privada/saquetas/ampliação/recompensas. As operações de teste usam apenas dados da demonstração isolada, sem alterar coleções reais.
-

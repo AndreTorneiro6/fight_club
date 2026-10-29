@@ -23,6 +23,11 @@ const port =
   "3000";
 process.env.APP_URL ??= `http://localhost:${port}`;
 await seed(true);
+if (testing && process.env.DEMO_TEST_STICKER_TRADING === "1") {
+  const { seedStickerTradingTest } =
+    await import("./test-sticker-trading-fixture");
+  await seedStickerTradingTest();
+}
 if (testing && process.env.DEMO_TEST_ROUND_TRANSITION === "1") {
   const { seedRoundTransitionTest } =
     await import("./test-round-transition-fixture");

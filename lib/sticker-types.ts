@@ -1,11 +1,16 @@
 import type { PlayerAttributes } from "./padel-attributes";
-/** Public presentation types. Album access remains restricted to effective administrators. */
+/** Public presentation types. Community access is explicitly enabled per season; private preview is admin-only. */
 export type StickerRewardMetric = "visits" | "matches" | "collection";
 export interface StickerSettings {
   _id: string;
   seasonId: string;
   version: number;
   enabled: boolean;
+  communityEnabled?: boolean;
+  tradesEnabled?: boolean;
+  maxTradeCopies?: number;
+  maxPendingTrades?: number;
+  tradeHours?: number;
   dailyPacks: number;
   packSize: number;
   rewardEnabled: boolean;
@@ -44,8 +49,12 @@ export interface StickerReward {
   requiredRosterIds?: string[];
 }
 export interface StickerAlbumView {
-  preview: true;
-  season: { _id: string; name: string } | null;
+  preview: boolean;
+  isAdmin?: boolean;
+  currentPlayerId?: string;
+  seasons?: { id: string; name: string; active: boolean }[];
+  trading?: import("./sticker-trade-types").StickerTradingView;
+  season: { _id: string; name: string; active?: boolean } | null;
   settings: StickerSettings | null;
   day: string;
   remainingPacks: number;
@@ -56,6 +65,8 @@ export interface StickerAlbumView {
     division: string;
     divisionCode: string;
     count: number;
+    reserved?: number;
+    availableDuplicates?: number;
     assessment?: Pick<PlayerAttributes, "overall" | "attributes">;
   }[];
   ownPacks: StickerPack[];

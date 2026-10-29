@@ -250,3 +250,41 @@
   margin: 0 0 10px auto;
   min-height: 36px;
 }
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tabs button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ffffff30);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tabs button[aria-pressed="true"] {
+  border-color: #c3a35a;
+  background: #c3a35a20;
+}
+.tabCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  margin-left: 6px;
+  border-radius: 99px;
+  color: #191a1f;
+  background: #dec77e;
+  font-size: 11px;
+}
+.header label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.header select {
+  max-width: 240px;
+  min-width: 0;
+}

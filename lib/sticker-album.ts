@@ -1,3 +1,17 @@
+import {
+  awardStickerPack,
+  catalogCards,
+  migrateStickerInventory,
+  stickerCounts,
+} from "./sticker-inventory";
+import {
+  executeStickerTrading,
+  projectedStickerState,
+  requireStickerAccess,
+  stickerCollector,
+  stickerTradingCommands,
+  stickerTradingView,
+} from "./sticker-trading";
 import { normalizePlayerAttributes } from "./padel-attributes";
 import { randomInt, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -27,6 +41,11 @@ const schema = z.discriminatedUnion("type", [
       seasonId: z.string().min(1),
       expectedVersion: z.number().int().min(0),
       enabled: z.boolean(),
+      communityEnabled: z.boolean().optional(),
+      tradesEnabled: z.boolean().optional(),
+      maxTradeCopies: z.number().int().min(1).max(100).optional(),
+      maxPendingTrades: z.number().int().min(1).max(50).optional(),
+      tradeHours: z.number().int().min(1).max(168).optional(),
       dailyPacks: z.number().int().min(1).max(5),
       packSize: z.number().int().min(1).max(10),
       rewardEnabled: z.boolean(),
@@ -84,6 +103,11 @@ export function stickerSettings(
       seasonId,
       version: 0,
       enabled: false,
+      communityEnabled: false,
+      tradesEnabled: false,
+      maxTradeCopies: 10,
+      maxPendingTrades: 5,
+      tradeHours: 72,
       dailyPacks: 1,
       packSize: 3,
       rewardEnabled: false,
@@ -105,10 +129,13 @@ function progress(
   const packs = (state.stickerPacks ?? []).filter(
     (p) => p.userId === userId && p.seasonId === seasonId,
   );
-  const available = new Set(roster(state).map((p) => p._id));
-  const collected = new Set(
-    packs.flatMap((p) => p.stickerPlayerIds).filter((id) => available.has(id)),
-  ).size;
+  const available = new Set(
+    catalogCards(state, seasonId).map((card) => card.playerId),
+  );
+  const counts = stickerCounts(state, seasonId, userId);
+  const collected = [...available].filter(
+    (id) => (counts.get(id) ?? 0) > 0,
+  ).length;
   const matches = new Set(
     state.results
       .filter(
@@ -173,59 +200,151 @@ export function stickerAlbumView(
   state: State,
   actor: Actor,
   timestamp = Date.now(),
+  options: {
+    seasonId?: string;
+    tradeId?: string;
+    beforeMessageId?: string;
+    messageId?: string;
+  } = {},
 ): StickerAlbumView {
-  assertAdmin(actor);
-  const season = state.seasons.find((s) => s.status === "active") ?? null;
+  if (options.tradeId) {
+    const trade = state.stickerTrades?.find(
+      (t) =>
+        t._id === options.tradeId &&
+        [t.initiatorUserId, t.recipientUserId].includes(actor.userId),
+    );
+    ensure(trade, "Negociação não encontrada.", 404);
+    ensure(
+      !options.seasonId || options.seasonId === trade.seasonId,
+      "A negociação pertence a outra época.",
+      400,
+    );
+    options = { ...options, seasonId: trade.seasonId };
+  }
+  const mine = new Set(
+    (state.stickerPacks ?? [])
+      .filter((p) => p.userId === actor.userId)
+      .map((p) => p.seasonId),
+  );
+  for (const trade of state.stickerTrades ?? [])
+    if ([trade.initiatorUserId, trade.recipientUserId].includes(actor.userId))
+      mine.add(trade.seasonId);
+  const season = options.seasonId
+    ? state.seasons.find((s) => s._id === options.seasonId)
+    : (state.seasons.find(
+        (season) =>
+          season.status === "active" &&
+          (actor.role === "admin" ||
+            state.stickerSettings?.some(
+              (cfg) => cfg.seasonId === season._id && cfg.communityEnabled,
+            )),
+      ) ??
+      [...state.seasons]
+        .reverse()
+        .find(
+          (season) =>
+            mine.has(season._id) &&
+            (actor.role === "admin" ||
+              state.stickerSettings?.some(
+                (cfg) => cfg.seasonId === season._id && cfg.communityEnabled,
+              )),
+        ) ??
+      state.seasons.find((season) => season.status === "active"));
+  if (options.seasonId) ensure(season, "Época não encontrada.", 404);
+  if (actor.role !== "admin")
+    requireStickerAccess(state, actor, season?._id ?? "");
+  const projected = projectedStickerState(state, timestamp);
   const ownPacks = (state.stickerPacks ?? []).filter(
     (p) => p.userId === actor.userId && p.seasonId === season?._id,
   );
-  const counts = new Map<string, number>();
-  for (const id of ownPacks.flatMap((p) => p.stickerPlayerIds))
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+  const counts = season
+    ? stickerCounts(state, season._id, actor.userId)
+    : new Map<string, number>();
   const settings = season ? stickerSettings(state, season._id) : null;
+  const cards = season
+    ? catalogCards(state, season._id)
+    : roster(state).map((p) => {
+        const d = state.divisions.find((d) => d._id === p.divisionId)!;
+        const saved = state.playerAttributes?.find((a) => a.playerId === p._id),
+          normalized = saved ? normalizePlayerAttributes(saved) : undefined;
+        return {
+          playerId: p._id,
+          name: p.name,
+          photo: p.photo,
+          division: d.name,
+          divisionCode: d.code,
+          ...(normalized
+            ? {
+                assessment: {
+                  overall: normalized.overall,
+                  attributes: normalized.attributes,
+                },
+              }
+            : {}),
+        };
+      });
   return {
-    preview: true,
-    season: season ? { _id: season._id, name: season.name } : null,
-    settings,
+    preview: !settings?.communityEnabled,
+    isAdmin: actor.role === "admin",
+    currentPlayerId: actor.playerId,
+    season: season
+      ? {
+          _id: season._id,
+          name: season.name,
+          active: season.status === "active",
+        }
+      : null,
+    seasons: state.seasons
+      .filter(
+        (s) =>
+          actor.role === "admin" ||
+          ((mine.has(s._id) || s.status === "active") &&
+            state.stickerSettings?.some(
+              (cfg) => cfg.seasonId === s._id && cfg.communityEnabled,
+            )),
+      )
+      .map((s) => ({ id: s._id, name: s.name, active: s.status === "active" })),
+    settings:
+      settings && actor.role !== "admin"
+        ? { ...settings, updatedBy: "" }
+        : settings,
     day: stickerDay(timestamp),
-    remainingPacks: settings?.enabled
-      ? Math.max(
-          0,
-          settings.dailyPacks -
-            ownPacks.filter((p) => p.day === stickerDay(timestamp)).length,
-        )
-      : 0,
-    roster: roster(state).map((p) => {
-      const d = state.divisions.find((d) => d._id === p.divisionId)!;
-      const saved = state.playerAttributes?.find(
-        (card) => card.playerId === p._id,
-      );
-      const normalized = saved ? normalizePlayerAttributes(saved) : undefined;
+    remainingPacks:
+      settings?.enabled && season?.status === "active"
+        ? Math.max(
+            0,
+            settings.dailyPacks -
+              ownPacks.filter((p) => p.day === stickerDay(timestamp)).length,
+          )
+        : 0,
+    roster: cards.map((card) => {
+      const count = counts.get(card.playerId) ?? 0;
+      const reserved =
+        projected.stickerInventories?.find(
+          (row) =>
+            row.seasonId === season?._id &&
+            row.userId === actor.userId &&
+            row.stickerPlayerId === card.playerId,
+        )?.reserved ?? 0;
       return {
-        ...(normalized
-          ? {
-              assessment: {
-                overall: normalized.overall,
-                attributes: normalized.attributes,
-              },
-            }
-          : {}),
-        playerId: p._id,
-        name: p.name,
-        photo: p.photo,
-        division: d.name,
-        divisionCode: d.code,
-        count: counts.get(p._id) ?? 0,
+        ...card,
+        count,
+        reserved,
+        availableDuplicates: Math.max(0, count - 1 - reserved),
       };
     }),
     ownPacks,
     ownRewards: (state.stickerRewards ?? []).filter(
       (r) => r.userId === actor.userId,
     ),
-    redemptions: [...(state.stickerRewards ?? [])],
+    redemptions:
+      actor.role === "admin" ? [...(state.stickerRewards ?? [])] : [],
     progress: season
       ? progress(state, actor.userId, actor.playerId, season._id)
       : { visits: 0, matches: 0, collection: 0, collected: 0, total: 0 },
+    ...(season
+      ? { trading: stickerTradingView(projected, actor, season._id, options) }
+      : {}),
   };
 }
 /** Must be invoked within the shared MongoDB transaction. Never publishes or changes competition data. */
@@ -235,8 +354,23 @@ export function executeStickerAlbum(
   raw: unknown,
   timestamp = Date.now(),
 ) {
-  assertAdmin(actor);
-  const cmd = schema.parse(raw);
+  const requestedType =
+    raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
+  if (stickerTradingCommands.has(requestedType as never))
+    return executeStickerTrading(state, actor, raw, timestamp);
+  const publicAction =
+    requestedType === "stickers.open" || requestedType === "stickers.claim";
+  if (!publicAction) assertAdmin(actor);
+  const cmd = schema.parse(
+    publicAction
+      ? {
+          ...(raw as Record<string, unknown>),
+          type: requestedType.replace(/^stickers\./, "admin.stickers."),
+        }
+      : raw,
+  );
+  if (publicAction && "seasonId" in cmd)
+    requireStickerAccess(state, actor, cmd.seasonId);
   const now = new Date(timestamp).toISOString();
   if (cmd.type === "admin.stickers.redeem") {
     const reward = state.stickerRewards?.find((r) => r._id === cmd.rewardId);
@@ -258,11 +392,9 @@ export function executeStickerAlbum(
     );
     const rosterIds = reward.requiredRosterIds;
     const owned = new Set(
-      (state.stickerPacks ?? [])
-        .filter(
-          (p) => p.userId === reward.userId && p.seasonId === reward.seasonId,
-        )
-        .flatMap((p) => p.stickerPlayerIds),
+      [...stickerCounts(state, reward.seasonId, reward.userId)]
+        .filter(([, count]) => count > 0)
+        .map(([id]) => id),
     );
     const rewardProgress =
       reward.metric === "collection" && rosterIds?.length
@@ -316,7 +448,9 @@ export function executeStickerAlbum(
       settings.rewardTarget !== cmd.rewardTarget;
     const updated: StickerSettings = {
       ...settings,
-      ...cmd,
+      ...Object.fromEntries(
+        Object.entries(cmd).filter(([, value]) => value !== undefined),
+      ),
       _id: settings._id,
       version: settings.version + 1,
       campaignId:
@@ -338,6 +472,8 @@ export function executeStickerAlbum(
       ...(state.stickerSettings ?? []).filter((s) => s.seasonId !== season._id),
       saved,
     ];
+    if (saved.communityEnabled)
+      migrateStickerInventory(state, season._id, actor.userId, now);
     audit(state, actor, cmd.type, { before: settings, after: saved }, now);
     return { version: saved.version };
   }
@@ -345,7 +481,7 @@ export function executeStickerAlbum(
     (p) => p._id === actor.playerId && p.userId === actor.userId,
   );
   ensure(
-    p && roster(state).some((entry) => entry._id === p._id),
+    p && stickerCollector(state, actor.userId)?._id === p._id,
     "É necessário um perfil aprovado da liga para colecionar.",
     403,
   );
@@ -378,7 +514,13 @@ export function executeStickerAlbum(
       "Já abriste as saquetas disponíveis hoje. Volta amanhã (hora de Lisboa).",
       409,
     );
-    const candidates = roster(state);
+    if (publicAction)
+      migrateStickerInventory(state, season._id, actor.userId, now);
+    const candidates = state.stickerMigrations?.some(
+      (m) => m.seasonId === season._id,
+    )
+      ? catalogCards(state, season._id).map((card) => card.playerId)
+      : roster(state).map((p) => p._id);
     ensure(
       candidates.length,
       "Não existem jogadores elegíveis para a coleção.",
@@ -393,15 +535,17 @@ export function executeStickerAlbum(
       requestId: cmd.requestId,
       stickerPlayerIds: Array.from(
         { length: settings.packSize },
-        () => candidates[randomInt(candidates.length)]._id,
+        () => candidates[randomInt(candidates.length)],
       ),
       createdAt: now,
     };
     (state.stickerPacks ??= []).push(pack);
+    if (state.stickerMigrations?.some((m) => m.seasonId === season._id))
+      awardStickerPack(state, pack, now);
     audit(
       state,
       actor,
-      cmd.type,
+      publicAction ? requestedType : cmd.type,
       { packId: pack._id, seasonId: season._id },
       now,
     );
@@ -437,14 +581,18 @@ export function executeStickerAlbum(
     version: 1,
     claimedAt: now,
     ...(settings.rewardMetric === "collection"
-      ? { requiredRosterIds: roster(state).map((p) => p._id) }
+      ? {
+          requiredRosterIds: catalogCards(state, season._id).map(
+            (card) => card.playerId,
+          ),
+        }
       : {}),
   };
   (state.stickerRewards ??= []).push(reward);
   audit(
     state,
     actor,
-    cmd.type,
+    publicAction ? requestedType : cmd.type,
     { rewardId: reward._id, campaignId: reward.campaignId },
     now,
   );

@@ -110,11 +110,11 @@ test("player projection hides drafts, approvals, unrelated challenges and other 
   assert.doesNotMatch(JSON.stringify(state), /Informação médica privada/);
 });
 
-test("administrator projection preserves private proposals for review", () => {
+test("administrator projection preserves competition proposals for review", () => {
   const state = fixture(),
     before = structuredClone(state);
   filterFeatureView(state, { ...actor, role: "admin" });
-  assert.deepEqual(state, { ...before, matchVoteSummaries: [] });
+  assert.deepEqual(state, { ...before, matchVoteSummaries: [], stickerAccess: { enabled: true, remainingPacks: 0 } });
 });
 
 test("an approved schedule without publication cannot become public by setting its status alone", () => {
