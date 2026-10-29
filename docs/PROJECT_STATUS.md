@@ -1,3 +1,9 @@
+## Version 1.11.17 publishing for ADMINISTRATORS ONLY — 29 October 2026
+
+- User explicitly requested “publish for admin”. Authorized deployment of the completed feature plus enabling private trading for effective administrators. Keep communityEnabled=false; do not open player/spectator access or opt accounts into discovery automatically. The two admins can opt in themselves in Comunidade. Existing packs/settings/vouchers must be preserved.
+- Preflight live1.11.16 exact4af01e9 healthy; active season-1 stickerSettings version5 enabledtrue, no community/trading flags, zero trading preferences, two administrator accounts. No production mutation yet. After hosted checks and exact Pi deploy, use validated engine + Mongo transaction to preserve existing settings, set communityEnabled=false/tradesEnabled=true, migrate existing inventory once and verify public/player denial and admin access. All notifications remain push/in-app only.
+- Release includes version bump1.11.17; full implementation local validation501tests/typecheck/build +3trading and3artwork/legacybrowser tests already passed. Monitor the entire hosted workflow then app/worker exact SHA/health, complete private activation and update this handoff before reporting published.
+
 ## Full caderneta + trading plan implemented and verified LOCALLY — 29 October 2026
 
 - User authorized implementation: “we have made a plan for troca de cromos and how caderneta should work implement both”. Full implementation is complete locally. Publication is intentionally pending the user's request, as explicitly required by docs/CROMOS_EXCHANGE_PLAN.md §10. Do not push to deploy or activate real community/trading merely to save documentation. Community/trading default false; no production data changed.
