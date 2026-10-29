@@ -76,19 +76,49 @@ test("frozen title and normal challenges share the ice template and thaw after v
     });
   }
   await page.goto("/title-fight");
-  await page
-    .getByText("Confrontos pelo título por marcar", { exact: false })
-    .click();
+  const frozenSection = page.getByRole("region", {
+    name: "Jogos pelo título congelados",
+    exact: true,
+  });
+  await expect(frozenSection).toBeVisible();
+  await expect(
+    frozenSection.locator(`[data-title-match="${games[1]}"]`),
+  ).toBeVisible();
+  await expect(page.locator(`[data-title-match="${games[1]}"]`)).toHaveCount(1);
   const title = page.locator(`[data-title-match="${games[1]}"]`);
   await expect(title).toHaveAttribute("data-frozen", "true");
   await expect(title).toContainText("Jogo congelado");
   await page.setViewportSize({ width: 1280, height: 900 });
   await title.screenshot({ path: "/var/tmp/frozen-title-desktop.png" });
+  for (const workspace of ["player", "spectator"]) {
+    const switched = await page.request.post("/api/auth/workspace", {
+      headers: { Origin: "http://localhost:3100" },
+      data: { workspace },
+    });
+    expect(switched.ok(), await switched.text()).toBe(true);
+    await page.goto("/title-fight");
+    await expect(frozenSection).toBeVisible();
+    await expect(
+      frozenSection.locator(`[data-title-match="${games[1]}"]`),
+    ).toBeVisible();
+    await expect(page.locator(`[data-title-match="${games[1]}"]`)).toHaveCount(
+      1,
+    );
+    await expect(frozenSection.locator("[data-challenge-origin]")).toHaveCount(
+      0,
+    );
+  }
+  await page.request.post("/api/auth/workspace", {
+    headers: { Origin: "http://localhost:3100" },
+    data: { workspace: "admin" },
+  });
   const state = await (await page.request.get("/api/league")).json();
   for (const e of state.exceptions.filter(
     (e: { note: string }) => e.note === "Frozen match layout demonstration",
   ))
     await post({ type: "exception.delete", exceptionId: e._id });
+  await page.goto("/title-fight");
+  await expect(frozenSection).toHaveCount(0);
   await page.goto(`/desafios/${games[0]}`);
   await expect(page.locator(`[data-frozen-match="${games[0]}"]`)).toHaveCount(
     0,

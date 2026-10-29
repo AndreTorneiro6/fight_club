@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.10";
+export const applicationVersion = "1.11.11";
 export const releaseNotes = [
+  {
+    version: "1.11.11",
+    date: "2026-10-29",
+    title: "Jogos congelados visíveis no Title Fight",
+    changes: [
+      "Os confrontos pelo título congelados por férias aparecem numa secção aberta para administradores, jogadores e espetadores, mesmo antes de terem horário.",
+      "Cada jogo aparece uma única vez e mantém o visual de gelo e a data de regresso.",
+    ],
+  },
   {
     version: "1.11.10",
     date: "2026-10-29",

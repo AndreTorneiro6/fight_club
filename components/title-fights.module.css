@@ -636,3 +636,12 @@
   color: #a8e8ff;
   border-color: #99e4ff88;
 }
+
+.frozenSection {
+  margin-block: 22px;
+}
+.frozenSection > h2 {
+  color: #b7eaff;
+  font: 400 28px/1.2 var(--display);
+  margin: 0 0 14px;
+}

@@ -223,8 +223,12 @@ export default function TitleFights({ state: s }: { state: View }) {
         (division === "all" || c.divisionId === division) && isTitleMatch(c, s),
     )
     .sort(matchOrder());
+  const frozen = pool.filter((c) => !!matchFrozenUntil(s, c));
   const upcoming = pool.filter(
-    (c) => isOfficialTitleMatch(c, s) && c.status !== "completed",
+    (c) =>
+      isOfficialTitleMatch(c, s) &&
+      c.status !== "completed" &&
+      !matchFrozenUntil(s, c),
   );
   const completed = pool.filter(
     (c) => isOfficialTitleMatch(c, s) && c.status === "completed",
@@ -232,7 +236,8 @@ export default function TitleFights({ state: s }: { state: View }) {
   const pending = pool.filter(
     (c) =>
       ["accepted", "schedule_pending"].includes(c.status) &&
-      !isOfficialTitleMatch(c, s),
+      !isOfficialTitleMatch(c, s) &&
+      !matchFrozenUntil(s, c),
   );
   return (
     <div className={styles.page}>
@@ -253,8 +258,8 @@ export default function TitleFights({ state: s }: { state: View }) {
           <span>Jogos</span> pelo título
         </h1>
         <p>
-          Jogos confirmados pela organização. Consulta as duplas, o horário e o
-          estado do confronto.
+          Consulta os jogos confirmados e os confrontos congelados por férias,
+          com as duplas, o horário e o estado do jogo.
         </p>
       </header>
       <div className={styles.toolbar}>
@@ -282,6 +287,19 @@ export default function TitleFights({ state: s }: { state: View }) {
           </Link>
         )}
       </div>
+      {frozen.length > 0 && (
+        <section
+          aria-label="Jogos pelo título congelados"
+          className={styles.frozenSection}
+        >
+          <h2>Jogos congelados</h2>
+          <div className={styles.games}>
+            {frozen.map((c) => (
+              <TitleMatchCard key={c._id} state={s} game={c} />
+            ))}
+          </div>
+        </section>
+      )}
       <section
         className={styles.games}
         aria-label="Jogos pelo título confirmados"

@@ -400,3 +400,52 @@ test("spectator bettors receive official outcome notices after submission withou
   filterSpectatorView(s, spectator);
   assert.ok(s.notifications.some((n) => n._id === notice._id));
 });
+
+test("spectators see frozen accepted titles with a return date but not private vacations or ordinary pending games", () => {
+  const s = fixture();
+  const future = new Date(Date.now() + 30 * 86400000).toISOString();
+  s.challenges = [
+    {
+      _id: "frozen-title",
+      number: 1,
+      challengerId: "p2",
+      defenderId: "p1",
+      challengerPosition: 2,
+      defenderPosition: 1,
+      divisionId: "d1",
+      seasonId: "s1",
+      status: "accepted",
+      titleFight: true,
+      scheduleBy: future,
+      playBy: future,
+      respondBy: future,
+      createdAt: new Date().toISOString(),
+      durationMinutes: 90,
+      scheduleProposal: { _id: "private-proposal" },
+    } as State["challenges"][number],
+  ];
+  s.challenges.push({
+    ...s.challenges[0],
+    _id: "ordinary",
+    titleFight: false,
+    defenderId: "p3",
+    defenderPosition: 3,
+  });
+  s.exceptions.push({
+    _id: "holiday",
+    playerId: "p2",
+    vacation: true,
+    from: "2020-01-01",
+    to: "2090-01-01",
+    note: "Private vacation details",
+  });
+  filterSpectatorView(s, spectator);
+  assert.deepEqual(
+    s.challenges.map((c) => c._id),
+    ["frozen-title"],
+  );
+  assert.equal(s.challenges[0].deferredUntil, "2090-01-02");
+  assert.equal(s.challenges[0].scheduleProposal, undefined);
+  assert.deepEqual(s.exceptions, []);
+  assert.deepEqual(s.messages, []);
+});

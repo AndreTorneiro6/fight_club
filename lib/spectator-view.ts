@@ -1,13 +1,29 @@
+import { matchFrozenUntil } from "./match-freeze";
+import { isTitleMatch } from "./title-matches";
 import type { Actor, State } from "./types";
 import { isVotingMatch } from "./match-voting-targets";
 
-/** A spectator sees published matches, never participant-only coordination or league administration. */
+/** Public match information only, without participant coordination or league administration. */
 export function filterSpectatorView(s: State, actor: Actor) {
   if (actor.role !== "spectator") return;
+  // Public title fixtures may be frozen before a court/time is confirmed. Expose
+  // only their return date; never expose vacations or participant coordination.
+  const frozenTitles = new Map(
+    s.challenges
+      .filter(
+        (c) =>
+          ["accepted", "schedule_pending", "scheduled"].includes(c.status) &&
+          (!c.competitionRoundId || !!c.officialPublication) &&
+          isTitleMatch(c, s),
+      )
+      .map((c) => [c._id, matchFrozenUntil(s, c)] as const)
+      .filter((entry): entry is readonly [string, string] => !!entry[1]),
+  );
   s.challenges = s.challenges
-    .filter((c) => isVotingMatch(s, c))
+    .filter((c) => isVotingMatch(s, c) || frozenTitles.has(c._id))
     .map((c) => ({
       ...c,
+      deferredUntil: frozenTitles.get(c._id) ?? c.deferredUntil,
       scheduleProposal: undefined,
       refusalReason: undefined,
       refusalNote: undefined,
