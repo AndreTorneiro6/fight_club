@@ -1,6 +1,6 @@
+import { PlayerStickerArtwork } from "./player-sticker-artwork";
 import type { Player } from "@/lib/types";
 import type { PlayerAttributes } from "@/lib/padel-attributes";
-import { attributeKeys } from "@/lib/padel-attributes";
 import type { PlayerCard } from "@/lib/player-cards";
 import type {
   GamificationProfile,
@@ -17,14 +17,6 @@ export const cardMetals = {
     dark: "#744428",
     label: "BRONZE",
   },
-};
-const labels = {
-  speed: "Velocidade",
-  smash: "Smash",
-  lob: "Lob",
-  volley: "Voleio",
-  defense: "Defesa",
-  physic: "Físico",
 };
 export default function LeagueCardArtwork({
   player,
@@ -48,6 +40,16 @@ export default function LeagueCardArtwork({
   back: boolean;
   photo: string;
 }) {
+  if (!back)
+    return (
+      <PlayerStickerArtwork
+        name={player.name}
+        photo={photo}
+        theme={theme}
+        assessment={attributes}
+        label={`Frente · ${player.name} · ${theme.toUpperCase()}`}
+      />
+    );
   const metal = cardMetals[theme];
   const id = `card-${back ? "back" : "front"}-${theme}`;
   const initials = player.name
@@ -195,319 +197,111 @@ export default function LeagueCardArtwork({
         stroke={metal.mid}
         strokeWidth="3"
       />
-      {!back ? (
-        <>
-          <text
-            x="132"
-            y="310"
-            textAnchor="middle"
-            fill={`url(#${id}-metal)`}
-            fontSize="115"
-            fontWeight="900"
-          >
-            {attributes?.overall ?? "—"}
-          </text>
-          <text
-            x="132"
-            y="345"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="28"
-            fontWeight="900"
-          >
-            GERAL
-          </text>
-          <text
-            x="132"
-            y="379"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="13"
-          >
-            RATING PESSOAL
-          </text>
-          <text
-            x="132"
-            y="399"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="13"
-          >
-            AUTOAVALIAÇÃO
-          </text>
-          {box(555, 170, 140, 118)}
-          <text
-            x="625"
-            y="215"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="28"
-            fontWeight="900"
-          >
-            {metal.label}
-          </text>
-          <text
-            x="625"
-            y="250"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="12"
-          >
-            DIVISÃO ATUAL
-          </text>
-          {box(555, 308, 140, 174)}
-          <text
-            x="625"
-            y="346"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="16"
-          >
-            NEIVA
-          </text>
-          <text
-            x="625"
-            y="371"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="16"
-          >
-            PADEL CLUB
-          </text>
-          <text
-            x="625"
-            y="435"
-            textAnchor="middle"
-            fill={metal.mid}
-            fontSize="17"
-          >
-            {stats?.champion ? "CAMPEÃO" : "FIGHT CLUB"}
-          </text>
-          {box(62, 520, 636, 86)}
-          <text
-            x="380"
-            y="575"
-            textAnchor="middle"
-            fill={metal.light}
-            fontWeight="900"
-            fontStyle="italic"
-            fontSize={player.name.length > 22 ? 32 : 43}
-            textLength={player.name.length > 30 ? 580 : undefined}
-            lengthAdjust="spacingAndGlyphs"
-          >
-            {player.name}
-          </text>
-          <text
-            x="380"
-            y="641"
-            textAnchor="middle"
-            fill={metal.mid}
-            fontSize="28"
-            fontWeight="900"
-          >
-            {metal.label}
-          </text>
-          {box(62, 668, 255, 290)}
-          {title("ATRIBUTOS PADEL", 78, 699, 17)}
-          {attributeKeys.map((key, i) => (
-            <g key={key}>
-              <rect
-                x="77"
-                y={714 + i * 38}
-                width="225"
-                height="31"
-                fill={i % 2 ? metal.dark : "#151719"}
-                opacity=".7"
+      <>
+        <rect x="100" y="480" width="560" height="90" fill="#080b0ed9" />
+        <text
+          x="380"
+          y="512"
+          textAnchor="middle"
+          fill={metal.light}
+          fontSize="19"
+          fontStyle="italic"
+        >
+          {(profile.slogan || "O teu slogan, a tua identidade.").slice(0, 50)}
+        </text>
+        <text
+          x="380"
+          y="539"
+          textAnchor="middle"
+          fill={metal.light}
+          fontSize="19"
+          fontStyle="italic"
+        >
+          {(profile.slogan || "").slice(50)}
+        </text>
+        {box(62, 590, 636, 100)}
+        <text
+          x="380"
+          y="626"
+          textAnchor="middle"
+          fill={metal.mid}
+          fontSize="15"
+          letterSpacing="3"
+        >
+          ASSINATURA DO JOGADOR
+        </text>
+        {profile.signature?.length ? (
+          <g transform="translate(200 637)">
+            {profile.signature.map((stroke, i) => (
+              <polyline
+                key={i}
+                points={stroke.map((p) => `${p.x * 360},${p.y * 42}`).join(" ")}
+                fill="none"
+                stroke={metal.light}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
-              <text x="88" y={737 + i * 38} fill={metal.light} fontSize="18">
-                {labels[key]}
-              </text>
-              <text
-                x="285"
-                y={737 + i * 38}
-                textAnchor="end"
-                fill={metal.light}
-                fontSize="23"
-                fontWeight="900"
-              >
-                {attributes?.attributes[key] ?? "—"}
-              </text>
-            </g>
-          ))}
-          {box(332, 668, 366, 142)}
-          {title("ESTATÍSTICAS FIGHT CLUB", 349, 699, 17)}
-          {["JOGOS", "VITÓRIAS", "DERROTAS", "WIN RATE"].map((label, i) => (
-            <g key={label}>
-              <text
-                x={380 + i * 90}
-                y="737"
-                fill={metal.light}
-                fontSize="11"
-                textAnchor="middle"
-              >
-                {label}
-              </text>
-              <text
-                x={380 + i * 90}
-                y="777"
-                fill={metal.light}
-                fontWeight="900"
-                fontSize="28"
-                textAnchor="middle"
-              >
-                {!stats
-                  ? "—"
-                  : i === 0
-                    ? stats.played
-                    : i === 1
-                      ? stats.won
-                      : i === 2
-                        ? stats.played - stats.won
-                        : stats.wins === null
-                          ? "—"
-                          : `${stats.wins}%`}
-              </text>
-            </g>
-          ))}
-          {box(332, 826, 366, 132)}
-          {title("ÚLTIMOS 5 JOGOS", 349, 859, 17)}
-          {!stats?.recent.length ? (
-            <text x="350" y="908" fill={metal.light} fontSize="17">
-              Sem resultados confirmados
+            ))}
+          </g>
+        ) : (
+          <text
+            x="380"
+            y="667"
+            textAnchor="middle"
+            fill={metal.light}
+            fontSize="16"
+          >
+            Por assinar
+          </text>
+        )}
+        <text
+          x="380"
+          y="733"
+          textAnchor="middle"
+          fill={metal.light}
+          fontSize="31"
+          fontStyle="italic"
+          fontWeight="900"
+        >
+          {profile.nickname || player.name}
+        </text>
+        {box(62, 755, 636, 203)}
+        {title("FORA DE CAMPO · AUTOAVALIAÇÃO", 80, 787, 18)}
+        {socialKeys.map((key, i) => (
+          <g key={key}>
+            <text x="83" y={825 + i * 35} fill={metal.light} fontSize="19">
+              {settings.labels[key]}
             </text>
-          ) : (
-            stats.recent.map((r, i) => (
-              <g key={i}>
-                <circle
-                  cx={369 + i * 65}
-                  cy="905"
-                  r="22"
-                  fill="#080b0e"
-                  stroke={r === "V" ? "#8ed36b" : "#e47c68"}
-                  strokeWidth="3"
-                />
-                <text
-                  x={369 + i * 65}
-                  y="913"
-                  textAnchor="middle"
-                  fill={metal.light}
-                  fontSize="24"
-                >
-                  {r}
-                </text>
-              </g>
-            ))
-          )}
-        </>
-      ) : (
-        <>
-          <rect x="100" y="480" width="560" height="90" fill="#080b0ed9" />
-          <text
-            x="380"
-            y="512"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="19"
-            fontStyle="italic"
-          >
-            {(profile.slogan || "O teu slogan, a tua identidade.").slice(0, 50)}
-          </text>
-          <text
-            x="380"
-            y="539"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="19"
-            fontStyle="italic"
-          >
-            {(profile.slogan || "").slice(50)}
-          </text>
-          {box(62, 590, 636, 100)}
-          <text
-            x="380"
-            y="626"
-            textAnchor="middle"
-            fill={metal.mid}
-            fontSize="15"
-            letterSpacing="3"
-          >
-            ASSINATURA DO JOGADOR
-          </text>
-          {profile.signature?.length ? (
-            <g transform="translate(200 637)">
-              {profile.signature.map((stroke, i) => (
-                <polyline
-                  key={i}
-                  points={stroke
-                    .map((p) => `${p.x * 360},${p.y * 42}`)
-                    .join(" ")}
-                  fill="none"
-                  stroke={metal.light}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ))}
-            </g>
-          ) : (
+            <rect
+              x="335"
+              y={808 + i * 35}
+              width="290"
+              height="20"
+              rx="4"
+              fill="#26282a"
+            />
+            <rect
+              x="335"
+              y={808 + i * 35}
+              width={(290 * profile.social[key]) / 99}
+              height="20"
+              rx="4"
+              fill={`url(#${id}-metal)`}
+            />
             <text
-              x="380"
-              y="667"
-              textAnchor="middle"
+              x="671"
+              y={825 + i * 35}
+              textAnchor="end"
               fill={metal.light}
-              fontSize="16"
+              fontSize="23"
+              fontWeight="900"
             >
-              Por assinar
+              {profile.social[key]}
             </text>
-          )}
-          <text
-            x="380"
-            y="733"
-            textAnchor="middle"
-            fill={metal.light}
-            fontSize="31"
-            fontStyle="italic"
-            fontWeight="900"
-          >
-            {profile.nickname || player.name}
-          </text>
-          {box(62, 755, 636, 203)}
-          {title("FORA DE CAMPO · AUTOAVALIAÇÃO", 80, 787, 18)}
-          {socialKeys.map((key, i) => (
-            <g key={key}>
-              <text x="83" y={825 + i * 35} fill={metal.light} fontSize="19">
-                {settings.labels[key]}
-              </text>
-              <rect
-                x="335"
-                y={808 + i * 35}
-                width="290"
-                height="20"
-                rx="4"
-                fill="#26282a"
-              />
-              <rect
-                x="335"
-                y={808 + i * 35}
-                width={(290 * profile.social[key]) / 99}
-                height="20"
-                rx="4"
-                fill={`url(#${id}-metal)`}
-              />
-              <text
-                x="671"
-                y={825 + i * 35}
-                textAnchor="end"
-                fill={metal.light}
-                fontSize="23"
-                fontWeight="900"
-              >
-                {profile.social[key]}
-              </text>
-            </g>
-          ))}
-        </>
-      )}
+          </g>
+        ))}
+      </>
       <text
         x="380"
         y="990"

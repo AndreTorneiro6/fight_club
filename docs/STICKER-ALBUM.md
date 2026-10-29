@@ -30,3 +30,7 @@ Coleções adicionais: `stickerSettings`, `stickerPacks` e `stickerRewards`. Tod
 Comandos: `admin.stickers.settings`, `admin.stickers.open`, `admin.stickers.claim` e `admin.stickers.redeem`. Todas as ações e leituras verificam o papel efetivo de administrador antes de processar dados. As coleções são retiradas das vistas dos jogadores. Não existem notificações aos jogadores nem ativação automática de campanhas.
 
 Testes de domínio: `npx tsx --test tests/sticker-album.test.ts`. Cobrem permissões, calendário de Lisboa/DST, saquetas idempotentes e limites, isolamento das coleções, elegibilidade do catálogo, versões, campanhas, vales, correções e participação histórica em jogos.
+
+## Layout dos cromos — 29 outubro 2026
+
+A caderneta usa os modelos originais Ouro/Prata/Bronze fornecidos, partilhados com o cartão pessoal e a prévia administrativa. Os cromos podem ser ampliados para leitura no telemóvel. O rating e os seis atributos vêm apenas de autoavaliações guardadas; valores ainda não definidos aparecem como travessões. Os cromos por colecionar mantêm fotografia/atributos ocultos. Esta mudança não ativa o plano de trocas nem altera as saquetas, os vales ou a restrição a administradores. Ver [layout e proveniência](CROMOS_LAYOUT.md).

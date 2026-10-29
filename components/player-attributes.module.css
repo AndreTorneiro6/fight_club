@@ -222,3 +222,10 @@
     gap: 1rem;
   }
 }
+
+.templateCard {
+  align-self: start;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  min-width: 0;
+}

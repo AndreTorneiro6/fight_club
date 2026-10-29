@@ -69,8 +69,8 @@ test("cards export original tier designs, predictions hide unpublished matches a
   const personalImage = await readFile(
     (await (await personalDownload).path())!,
   );
-  expect(personalImage.readUInt32BE(16)).toBe(720);
-  expect(personalImage.readUInt32BE(20)).toBe(1000);
+  expect(personalImage.readUInt32BE(16)).toBe(1024);
+  expect(personalImage.readUInt32BE(20)).toBe(1536);
   const select = page.getByRole("combobox", { name: "Liga", exact: true });
   for (const league of ["Ouro", "Prata", "Bronze"]) {
     await select.selectOption({ label: league });

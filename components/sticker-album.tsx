@@ -7,6 +7,7 @@ import type {
 } from "@/lib/sticker-types";
 import { engagementCommand } from "./engagement-client";
 import styles from "./sticker-album.module.css";
+import { PlayerStickerArtwork } from "./player-sticker-artwork";
 
 type Draft = {
   enabled: boolean;
@@ -47,6 +48,11 @@ export function StickerAlbum({ revision }: { revision?: unknown }) {
     [motion, setMotion] = useState(false),
     [code, setCode] = useState(""),
     [reducedMotion, setReducedMotion] = useState(false);
+  const previewRef = useRef<HTMLDialogElement>(null);
+  const [focused, setFocused] = useState("");
+  const focusedPlayer = data?.roster.find(
+    (player) => player.playerId === focused,
+  );
   const dirtyRef = useRef(false),
     sequence = useRef(0),
     requestId = useRef<string | null>(null),
@@ -237,25 +243,29 @@ export function StickerAlbum({ revision }: { revision?: unknown }) {
         data-owned={p.count > 0}
         key={`${playerId}-${index}`}
       >
-        {p.photo && (p.count > 0 || reveal) ? (
-          <img
-            className={styles.portrait}
-            src={p.photo}
-            alt={`Fotografia de ${p.name}`}
-          />
-        ) : (
-          <div className={styles.portrait} aria-hidden="true">
-            {p.count > 0
-              ? p.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")
-              : "?"}
+        <button
+          type="button"
+          className={styles.cromoButton}
+          aria-label={`Ampliar cromo de ${p.name}`}
+          onClick={() => {
+            setFocused(p.playerId);
+            previewRef.current?.showModal();
+          }}
+        >
+          <div className={styles.cardArtwork}>
+            <PlayerStickerArtwork
+              name={p.name}
+              photo={p.photo}
+              theme={
+                p.divisionCode === "ouro" || p.divisionCode === "prata"
+                  ? p.divisionCode
+                  : "bronze"
+              }
+              assessment={p.assessment}
+              concealed={p.count < 1 && !reveal}
+            />
           </div>
-        )}
-        <strong>{p.name}</strong>
-        <small>{p.division}</small>
+        </button>
         <span className={styles.quantity}>
           {reveal
             ? repeats
@@ -675,6 +685,40 @@ export function StickerAlbum({ revision }: { revision?: unknown }) {
           )}
         </section>
       )}
+      <dialog
+        ref={previewRef}
+        className={styles.cromoDialog}
+        aria-label="Cromo ampliado"
+        onClose={() => setFocused("")}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) previewRef.current?.close();
+        }}
+      >
+        <button
+          type="button"
+          autoFocus
+          className={styles.closePreview}
+          onClick={() => previewRef.current?.close()}
+        >
+          Fechar
+        </button>
+        {focusedPlayer && (
+          <div className={styles.cardArtwork}>
+            <PlayerStickerArtwork
+              name={focusedPlayer.name}
+              photo={focusedPlayer.photo}
+              theme={
+                focusedPlayer.divisionCode === "ouro" ||
+                focusedPlayer.divisionCode === "prata"
+                  ? focusedPlayer.divisionCode
+                  : "bronze"
+              }
+              assessment={focusedPlayer.assessment}
+              concealed={focusedPlayer.count < 1}
+            />
+          </div>
+        )}
+      </dialog>
     </section>
   );
 }

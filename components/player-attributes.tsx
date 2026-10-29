@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { PlayerStickerArtwork } from "./player-sticker-artwork";
+import { rasterizeCardSvg } from "./gamification-export";
 import {
   attributeKeys,
   personalRating,
@@ -38,6 +40,7 @@ export function PlayerAttributesEditor({
   refresh: () => Promise<void>;
   adminTarget?: boolean;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
   const [draft, setDraft] = useState<{
     attributes: PadelAttributes;
     overall?: number;
@@ -84,107 +87,9 @@ export function PlayerAttributesEditor({
     setBusy(true);
     setMessage("");
     try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 720;
-      canvas.height = 1000;
-      const ctx = canvas.getContext("2d")!;
-      const colors =
-        card.theme === "ouro"
-          ? ["#201a08", "#c99b3e"]
-          : card.theme === "prata"
-            ? ["#111c29", "#a8c5df"]
-            : ["#25150e", "#c18658"];
-      const gradient = ctx.createLinearGradient(0, 0, 720, 1000);
-      gradient.addColorStop(0, colors[0]);
-      gradient.addColorStop(1, colors[1]);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 720, 1000);
-      ctx.strokeStyle = "#ffffff77";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(30, 30, 660, 940);
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText("FIGHT CLUB · PADEL", 360, 85);
-      ctx.font = "bold 125px sans-serif";
-      ctx.fillText(String(rating), 165, 225);
-      let photoDrawn = false;
-      if (card.photo) {
-        try {
-          const url = new URL(card.photo, location.origin);
-          if (url.origin === location.origin) {
-            const image = new Image();
-            image.src = url.href;
-            await image.decode();
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(480, 185, 76, 0, Math.PI * 2);
-            ctx.clip();
-            const scale = Math.max(152 / image.width, 152 / image.height);
-            ctx.drawImage(
-              image,
-              480 - (image.width * scale) / 2,
-              185 - (image.height * scale) / 2,
-              image.width * scale,
-              image.height * scale,
-            );
-            ctx.restore();
-            photoDrawn = true;
-          }
-        } catch {
-          /* A missing photograph falls back to initials. */
-        }
-      }
-      if (!photoDrawn) {
-        ctx.font = "bold 64px sans-serif";
-        ctx.fillText(
-          card.name
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((word) => word[0])
-            .join(""),
-          480,
-          205,
-        );
-      }
-      ctx.font = "22px sans-serif";
-      ctx.fillText("RATING PESSOAL · AUTOAVALIAÇÃO", 360, 280);
-      ctx.font = "bold 40px sans-serif";
-      const words = card.name.split(/\s+/);
-      let line = "",
-        y = 365;
-      for (const word of words) {
-        const next = line ? `${line} ${word}` : word;
-        if (ctx.measureText(next).width > 580 && line) {
-          ctx.fillText(line, 360, y);
-          y += 46;
-          line = word;
-        } else line = next;
-      }
-      ctx.fillText(line, 360, y);
-      ctx.font = "24px sans-serif";
-      ctx.fillText(card.division.toUpperCase(), 360, y + 45);
-      let row = Math.max(490, y + 100);
-      ctx.font = "28px sans-serif";
-      for (const key of attributeKeys) {
-        ctx.textAlign = "left";
-        ctx.fillText(labels[key], 90, row);
-        ctx.textAlign = "right";
-        ctx.fillText(String(attributes[key]), 630, row);
-        row += 57;
-      }
-      ctx.textAlign = "center";
-      ctx.font = "21px sans-serif";
-      ctx.fillText("Atributos declarados pelo jogador · 0–99", 360, 920);
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob(
-          (value) =>
-            value
-              ? resolve(value)
-              : reject(new Error("Não foi possível gerar a imagem.")),
-          "image/png",
-        ),
-      );
+      const svg = cardRef.current?.querySelector("svg");
+      if (!svg) throw new Error("Cartão indisponível.");
+      const blob = await rasterizeCardSvg(svg, 1024, 1536);
       const file = new File([blob], "fight-club-cartao-pessoal.png", {
         type: "image/png",
       });
@@ -229,41 +134,16 @@ export function PlayerAttributesEditor({
       </div>
       <div className={styles.columns}>
         <article
-          className={`${styles.card} ${styles[card.theme]}`}
+          className={styles.templateCard}
+          ref={cardRef}
           aria-label="Pré-visualização do cartão pessoal"
         >
-          <div className={styles.top}>
-            <strong>
-              {rating}
-              <small>GERAL</small>
-            </strong>
-            <span>
-              {card.division.toUpperCase()}
-              <br />
-              PADEL CLUB
-            </span>
-          </div>
-          {card.photo ? (
-            <img src={card.photo} alt={card.name} className={styles.photo} />
-          ) : (
-            <div className={styles.initials}>
-              {card.name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join("")}
-            </div>
-          )}
-          <h3>{card.name}</h3>
-          <span className={styles.source}>ATRIBUTOS PESSOAIS</span>
-          <div className={styles.metrics}>
-            {attributeKeys.map((key) => (
-              <div key={key}>
-                <strong>{attributes[key]}</strong>
-                <span>{labels[key]}</span>
-              </div>
-            ))}
-          </div>
+          <PlayerStickerArtwork
+            name={card.name}
+            photo={card.photo}
+            theme={card.theme}
+            assessment={{ overall: rating, attributes }}
+          />
         </article>
         <form
           className={styles.form}

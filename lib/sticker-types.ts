@@ -1,3 +1,4 @@
+import type { PlayerAttributes } from "./padel-attributes";
 /** Public presentation types. Album access remains restricted to effective administrators. */
 export type StickerRewardMetric = "visits" | "matches" | "collection";
 export interface StickerSettings {
@@ -55,6 +56,7 @@ export interface StickerAlbumView {
     division: string;
     divisionCode: string;
     count: number;
+    assessment?: Pick<PlayerAttributes, "overall" | "attributes">;
   }[];
   ownPacks: StickerPack[];
   ownRewards: StickerReward[];

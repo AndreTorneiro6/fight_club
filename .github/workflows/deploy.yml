@@ -45,6 +45,10 @@ jobs:
       - run: npx playwright test e2e/workspaces.spec.ts e2e/sticker-album.spec.ts e2e/coins.spec.ts e2e/sponsors.spec.ts e2e/gamification.spec.ts e2e/global-search.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
+      - name: Check original personal cromo artwork and PNG export
+        run: npx playwright test e2e/personal-cromo.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
       # A fresh demo database keeps aggregate logins below the production rate limit.
       - name: Check admin court availability and hidden player calendar
         run: npx playwright test e2e/admin-overview.spec.ts e2e/court-availability.spec.ts

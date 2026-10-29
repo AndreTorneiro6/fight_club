@@ -439,16 +439,7 @@ function SettingsEditor({ state, run, busy }: Props) {
           </button>
         </p>
       )}
-      <label>
-        Título da frente
-        <input
-          disabled={busy}
-          required
-          maxLength={40}
-          value={value.frontTitle}
-          onChange={(e) => setDraft({ ...value, frontTitle: e.target.value })}
-        />
-      </label>
+      <p>O cabeçalho da frente acompanha o modelo da divisão.</p>
       <label>
         Título do verso
         <input

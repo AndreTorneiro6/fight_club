@@ -1,3 +1,4 @@
+import { verifyOriginalCromoArt } from "./cromo-artwork-helper";
 import { openAdminSection } from "./workspace-helper";
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -82,7 +83,7 @@ test("admin preview saves slogan/signature, renders division cards and exports b
   await expect(
     area
       .getByRole("article", { name: "Frente da carta", exact: true })
-      .locator("image"),
+      .locator('image[aria-label^="Fotografia"]'),
   ).toHaveAttribute("href", photo);
   await area
     .getByLabel("Alcunha no verso", { exact: true })
@@ -197,6 +198,30 @@ test("admin preview saves slogan/signature, renders division cards and exports b
         !p.registrationRejectedAt,
     );
     if (!member) continue;
+    const assessments = await (
+      await page.request.get("/api/engagement")
+    ).json();
+    const saved = assessments.personalCards.find(
+      (entry: { playerId: string }) => entry.playerId === member._id,
+    );
+    const assessed = await page.request.post("/api/league", {
+      headers: { Origin: origin },
+      data: {
+        type: "player.attributes.save",
+        playerId: member._id,
+        expectedVersion: saved?.version ?? 0,
+        overall: 91,
+        attributes: {
+          speed: 12,
+          smash: 34,
+          lob: 56,
+          volley: 78,
+          defense: 90,
+          physic: 0,
+        },
+      },
+    });
+    expect(assessed.ok(), await assessed.text()).toBe(true);
     await area
       .getByLabel("Jogador para testar a carta", { exact: true })
       .selectOption(member._id);
@@ -208,6 +233,9 @@ test("admin preview saves slogan/signature, renders division cards and exports b
       "aria-label",
       `Frente · ${member.name} · ${division.code.toUpperCase()}`,
     );
+    await expect(front.locator('[data-cromo-field="rating"]')).toHaveText("91");
+    await expect(front.locator('[data-cromo-field="physic"]')).toHaveText("0");
+    await verifyOriginalCromoArt(front.locator("svg"), division.code);
   }
   await switchWorkspace(page, "player");
   const deniedCartoon = await page.request.post(`${photo}/cartoon`, {

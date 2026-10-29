@@ -1,3 +1,4 @@
+import { normalizePlayerAttributes } from "./padel-attributes";
 import { randomInt, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, State } from "./types";
@@ -196,7 +197,19 @@ export function stickerAlbumView(
       : 0,
     roster: roster(state).map((p) => {
       const d = state.divisions.find((d) => d._id === p.divisionId)!;
+      const saved = state.playerAttributes?.find(
+        (card) => card.playerId === p._id,
+      );
+      const normalized = saved ? normalizePlayerAttributes(saved) : undefined;
       return {
+        ...(normalized
+          ? {
+              assessment: {
+                overall: normalized.overall,
+                attributes: normalized.attributes,
+              },
+            }
+          : {}),
         playerId: p._id,
         name: p.name,
         photo: p.photo,

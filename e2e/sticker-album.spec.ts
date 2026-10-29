@@ -64,6 +64,19 @@ test("private album supports daily packs, concurrent settings and one-time club 
   await expect(
     page.getByRole("button", { name: "Abrir saqueta", exact: true }),
   ).toBeDisabled();
+  await page
+    .getByRole("button", { name: /^Ampliar cromo de/ })
+    .first()
+    .click();
+  const preview = page.getByRole("dialog", { name: "Cromo ampliado" });
+  await expect(preview).toBeVisible();
+  await expect(preview.locator("svg[data-cromo-template]")).toBeVisible();
+  const artworkIds = await page
+    .locator("svg[data-cromo-template] [id]")
+    .evaluateAll((nodes) => nodes.map((node) => node.id));
+  expect(new Set(artworkIds).size).toBe(artworkIds.length);
+  await page.keyboard.press("Escape");
+  await expect(preview).not.toBeVisible();
   const opened = await (await page.request.get("/api/album")).json();
   expect(opened.ownPacks).toHaveLength(1);
   expect(opened.ownPacks[0].stickerPlayerIds).toHaveLength(3);

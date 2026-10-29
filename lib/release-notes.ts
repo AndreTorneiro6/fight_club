@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.15";
+export const applicationVersion = "1.11.16";
 export const releaseNotes = [
+  {
+    version: "1.11.16",
+    date: "2026-10-29",
+    title: "Cromos com os modelos originais",
+    changes: [
+      "Cartão pessoal, frente da carta dos administradores e cromos da caderneta seguem os modelos Ouro, Prata e Bronze fornecidos, com fotografia, rating e seis atributos reais.",
+      "A exportação pessoal usa o mesmo desenho da prévia; os cromos da caderneta podem ser ampliados no telemóvel. A caderneta mantém-se privada para os administradores.",
+    ],
+  },
   {
     version: "1.11.15",
     date: "2026-10-29",
