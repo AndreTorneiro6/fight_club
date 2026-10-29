@@ -1,3 +1,9 @@
+## Version 1.11.10 LIVE: frozen Title Fight and normal challenge ice layout — 29 October 2026
+
+- Run40855930985 succeeded all hosted checks and Pi deployment. Exact live revision `ccd543e3aa9e6db589886d1965d4f8207ebd5f8e`, package1.11.10; app and worker running with0restarts, app healthy. Publichealthok; frozen-match-ice.webp returnsHTTP200/image-webp. All six existingcontainers remain running/healthy. No host reboot or Mongo topology changes for this release.
+- New ice background/frame/racket, snowflake Jogo congelado badge and return date applied to frozen Title Fight overview cards, normal challenge cards and either challenge detail. Uses persisted deferment and participating members' current vacations; no new freezing command or changes to ranking, results, privacy or permitted actions. Restores normal presentation on return and excludes already played/completed/terminal games. Checked actual game19 read-only (accepted/deferred until16November); no production game edits.
+- Local typecheck,479tests/build and frozen/title-layout browser groups passed. Hosted fullbrowserregressions allpassed includingnewfrozenmobile/desktop/thaw coverage. Built-inimagegen artifact `public/frozen-match-ice.webp`322KB; complete prompt/provenance in docs/FROZEN_MATCH_ASSET.md. Reference templates/title_fight_layout_frozen.jpeg preserveduntracked with other user templates. Demo screenshots in /var/tmp/frozen-*; all real content remains HTML, no embedded player text. This task is complete; preserve unrelated ZIP deletion, Untitled, CROMOS plan and confidential original pentest report.
+
 ## Version 1.11.10 prepared: frozen matches use the supplied ice layout — 29 October 2026
 
 - User supplied `templates/title_fight_layout_frozen.jpeg` and requests the ice treatment for frozen Title Fight and normal challenges. Inspected reference and read-only production game19: accepted, deferredUntil2026-11-16, participants with active vacations. No production data writes.
