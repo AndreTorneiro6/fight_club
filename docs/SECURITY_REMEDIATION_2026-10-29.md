@@ -17,3 +17,5 @@ Source: the confidential Fight Club slice of the 27 October Strix report (nine f
 Verification uses disposable Mongo replica sets and browser accounts. No production messages, results, passwords or rankings were changed for these PoCs. No paid Strix rerun was launched; these are direct regression/PoC checks, not a new full Strix assessment.
 
 Infrastructure: both applications use separate scoped users/databases on one private Mongo replica set; application containers do not inherit backup/root credentials. Full shared-database backups retain the administrative URI only in the backup service. Daily host updates/reboot run at 03:00 Europe/Lisbon with a fresh backup and post-boot container health verification.
+
+Release1.11.9 is live at `c303f534df07c56fc98a7d765404fdde380d39bd`. GitHub run40848541115 passed all checks and Pi deployment:477 tests, typecheck, build and browser regressions. Both applications and the private shared Mongo remained healthy after deployment.
