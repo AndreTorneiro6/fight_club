@@ -1,4 +1,4 @@
-import { Snowflake } from "lucide-react";
+import { OriginalTitleArt } from "./original-title-art";
 import { matchFrozenUntil } from "@/lib/match-freeze";
 import { fmtDate } from "@/lib/rules";
 import type { Challenge, View } from "@/lib/types";
@@ -10,7 +10,8 @@ export function FrozenMatchNotice({ s, c }: { s: View; c: Challenge }) {
   return (
     <div className={styles.notice} role="status" data-frozen-match={c._id}>
       <span className={styles.badge}>
-        <Snowflake size={22} aria-hidden="true" /> Jogo congelado
+        <OriginalTitleArt variant="frozen-label" id={`${c._id}-label`} />
+        <span className="sr-only">Jogo congelado</span>
       </span>
       <small>
         Adiado por férias · disponível a partir de{" "}

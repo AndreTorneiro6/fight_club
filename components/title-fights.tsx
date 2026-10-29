@@ -1,20 +1,13 @@
 "use client";
-import { matchFrozenUntil } from "@/lib/match-freeze";
-import { FrozenMatchNotice } from "./frozen-match";
-import { AdminEntrySongs } from "./team-space";
-import { LiveMatchScore } from "./live-match-score";
-
-import { matchOrder } from "@/lib/match-order";
 import { useState } from "react";
 import Link from "next/link";
-import {
-  CalendarDays,
-  ChevronDown,
-  Crown,
-  Download,
-  Shield,
-  Star,
-} from "lucide-react";
+import { CalendarDays, ChevronDown, Download } from "lucide-react";
+import { AdminEntrySongs } from "./team-space";
+import { LiveMatchScore } from "./live-match-score";
+import { FrozenMatchNotice } from "./frozen-match";
+import { OriginalTitleArt, originalTitleSlot } from "./original-title-art";
+import { matchFrozenUntil } from "@/lib/match-freeze";
+import { matchOrder } from "@/lib/match-order";
 import { effectiveStatus, fmtTime } from "@/lib/rules";
 import { statusLabels, type Challenge, type View } from "@/lib/types";
 import { challengeTeamName } from "@/lib/team-competition";
@@ -23,25 +16,6 @@ import { calendarMatch, googleCalendarLink } from "@/lib/match-calendar";
 import { SetScoreDisplay } from "./set-score-fields";
 import styles from "./title-fights.module.css";
 
-function PadelRacket() {
-  return (
-    <svg
-      width="22"
-      height="26"
-      viewBox="0 0 24 28"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      aria-hidden="true"
-    >
-      <ellipse cx="14" cy="10" rx="6.5" ry="8" transform="rotate(30 14 10)" />
-      <path
-        d="m9 16-5 8 2 1 5-8M11 7h.01M15 6h.01M17 10h.01M13 11h.01M10 13h.01M15 15h.01"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 function TitleMatchCard({
   state: s,
   game: c,
@@ -50,9 +24,14 @@ function TitleMatchCard({
   game: Challenge;
 }) {
   const division = s.divisions.find((d) => d._id === c.divisionId);
-  const status = effectiveStatus(c);
-  const attack = challengeTeamName(c, c.challengerId, s.players);
-  const defense = challengeTeamName(c, c.defenderId, s.players);
+  const code =
+    division?.code === "prata" || division?.code === "bronze"
+      ? division.code
+      : "ouro";
+  const frozen = !!matchFrozenUntil(s, c),
+    status = effectiveStatus(c);
+  const attack = challengeTeamName(c, c.challengerId, s.players),
+    defense = challengeTeamName(c, c.defenderId, s.players);
   const start =
     s.matches.find((m) => m.challengeId === c._id)?.start ?? c.scheduledAt;
   const date = start
@@ -64,13 +43,25 @@ function TitleMatchCard({
       }).format(new Date(start))
     : undefined;
   const event = calendarMatch(s, c, s.actor);
-  const Emblem = division?.code === "prata" ? Star : Crown;
+  const compactStatus =
+    status === "result_pending"
+      ? "Por validar"
+      : status === "schedule_pending"
+        ? "A confirmar"
+        : statusLabels[status];
+  const initials = (id: string) =>
+    (s.players.find((p) => p._id === id)?.name ?? "")
+      .trim()
+      .split(/\s+/)
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("");
   return (
     <article
       className={styles.card}
-      data-division={division?.code}
+      data-division={code}
       data-title-match={c._id}
-      data-frozen={matchFrozenUntil(s, c) ? "true" : undefined}
+      data-frozen={frozen ? "true" : undefined}
       aria-label={`Jogo pelo título ${c.number}`}
     >
       <Link
@@ -81,90 +72,122 @@ function TitleMatchCard({
             : `/desafios/${encodeURIComponent(c._id)}`
         }
       >
-        <div
-          className={styles.division}
-          aria-label={`Liga ${division?.name ?? "Liga"}`}
-        >
-          <span className={styles.emblem}>
-            <svg
-              className={styles.laurel}
-              viewBox="0 0 100 100"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                cx="50"
-                cy="50"
-                r="46"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <path
-                d="M44 88C8 77 7 30 32 13M56 88C92 77 93 30 68 13"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              />
-              {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                <g key={i} transform={`rotate(${i * 10 - 35} 50 50)`}>
-                  <path
-                    d="M18 48q-11-7-7-15 10 3 7 15M82 48q11-7 7-15-10 3-7 15"
-                    fill="currentColor"
+        <div className={frozen ? styles.frozenCanvas : styles.canvas}>
+          <OriginalTitleArt
+            variant={frozen ? "frozen" : code}
+            id={c._id}
+            className={styles.artwork}
+          />
+          {frozen ? (
+            <>
+              <div className={styles.frozenHeading}>
+                <strong>
+                  <span className="sr-only">Title Fight</span>
+                  <OriginalTitleArt
+                    variant="frozen-heading"
+                    id={`${c._id}-heading`}
                   />
-                </g>
-              ))}
-            </svg>
-            {division?.code === "bronze" ? (
-              <svg
-                viewBox="0 0 48 52"
-                width="44"
-                height="48"
-                aria-hidden="true"
-                fill="currentColor"
+                </strong>
+                <span>{division?.name ?? "Liga"}</span>
+              </div>
+              <div className={styles.frozenNotice}>
+                <FrozenMatchNotice s={s} c={c} />
+              </div>
+              <div className={styles.frozenNames}>
+                <div>
+                  <span className={styles.initials}>
+                    {initials(c.challengerId)}
+                  </span>
+                  <strong>{attack}</strong>
+                  <small>Ataque</small>
+                </div>
+                <OriginalTitleArt
+                  variant="frozen-vs"
+                  id={`${c._id}-vs`}
+                  className={styles.frozenVersus}
+                />
+                <div>
+                  <span className={styles.initials}>
+                    {initials(c.defenderId)}
+                  </span>
+                  <strong>{defense}</strong>
+                  <small>Defesa</small>
+                </div>
+              </div>
+              <div className={styles.frozenDate}>
+                <CalendarDays size={18} aria-hidden="true" />{" "}
+                {date ? `${date} · ${fmtTime(start!)}` : "Horário por definir"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={styles.division}
+                aria-label={`Liga ${division?.name ?? "Liga"}`}
               >
-                <path d="M21 3h6v10c12 2 16 12 15 25L29 48V30l8-3-1-5-9 3v-8h-6v8l-9-3-1 5 8 3v18L6 38C5 25 9 15 21 13Z" />
-                <path d="M15 8 24 1l9 7-3 3-6-4-6 4Z" />
-              </svg>
-            ) : (
-              <Emblem size={42} aria-hidden="true" />
-            )}
-          </span>
-          <span className={styles.leagueName}>
-            <small>Liga</small>
-            <b>{division?.name ?? "Liga"}</b>
-          </span>
-        </div>
-        <div className={styles.cardTop}>
-          <span className={styles.matchNumber}>
-            <b>#{String(c.number).padStart(3, "0")}</b> · TITLE FIGHT
-          </span>
-          <span className={styles.status} data-status={status}>
-            <i aria-hidden="true" />
-            {matchFrozenUntil(s, c) ? "Congelado" : statusLabels[status]}
-          </span>
-        </div>
-        <div className={styles.sides}>
-          <div className={styles.attack}>
-            <PadelRacket />
-            <strong>Ataque</strong>
-            <span>{attack}</span>
-          </div>
-          <div className={styles.defense}>
-            <Shield size={21} aria-hidden="true" />
-            <strong>Defesa</strong>
-            <span>{defense}</span>
-          </div>
-        </div>
-        {matchFrozenUntil(s, c) && (
-          <div className={styles.frozenNotice}>
-            <FrozenMatchNotice s={s} c={c} />
-          </div>
-        )}
-        <div className={styles.faceoff}>
-          <strong>{attack}</strong>
-          <span className={styles.versus} aria-label="contra">
-            VS
-          </span>
-          <strong>{defense}</strong>
+                <span className="sr-only">Liga {division?.name}</span>
+              </div>
+              <div
+                className={styles.cardTop}
+                style={originalTitleSlot(code, "meta")}
+              >
+                <span className={styles.matchNumber}>
+                  #{String(c.number).padStart(3, "0")} · TITLE FIGHT
+                </span>
+                <span
+                  className={styles.status}
+                  data-status={status}
+                  aria-label={statusLabels[status]}
+                >
+                  <i aria-hidden="true" />
+                  {compactStatus}
+                </span>
+              </div>
+              <span
+                className={styles.sideName}
+                style={originalTitleSlot(code, "attack")}
+              >
+                <span className="sr-only">Ataque: </span>
+                <span className={styles.sideText}>{attack}</span>
+              </span>
+              <span
+                className={styles.sideName}
+                style={originalTitleSlot(code, "defense")}
+              >
+                <span className="sr-only">Defesa: </span>
+                <span className={styles.sideText}>{defense}</span>
+              </span>
+              <strong
+                className={styles.teamName}
+                data-long={attack.length > 42 ? "true" : undefined}
+                style={originalTitleSlot(code, "attacker")}
+              >
+                {attack}
+              </strong>
+              <span className={styles.versusAnchor} aria-label="contra">
+                <span className="sr-only">VS</span>
+              </span>
+              <strong
+                className={styles.teamName}
+                data-long={defense.length > 42 ? "true" : undefined}
+                style={originalTitleSlot(code, "defender")}
+              >
+                {defense}
+              </strong>
+              <span
+                className={styles.date}
+                style={originalTitleSlot(code, "date")}
+              >
+                {date ? (
+                  <time dateTime={start}>
+                    {date} · {fmtTime(start!)}
+                  </time>
+                ) : (
+                  "Por marcar"
+                )}
+              </span>
+            </>
+          )}
         </div>
         <div className={styles.liveScore}>
           <LiveMatchScore c={c} />
@@ -179,18 +202,6 @@ function TitleMatchCard({
             )}
           </div>
         )}
-        <div className={styles.cardFooter}>
-          <span className={styles.date}>
-            <CalendarDays size={21} aria-hidden="true" />
-            {date ? (
-              <time dateTime={start}>
-                {date} · {fmtTime(start!)}
-              </time>
-            ) : (
-              "Horário por confirmar"
-            )}
-          </span>
-        </div>
       </Link>
       <AdminEntrySongs s={s} c={c} />
       {event && (
@@ -242,21 +253,12 @@ export default function TitleFights({ state: s }: { state: View }) {
   return (
     <div className={styles.page}>
       <header className={styles.hero}>
-        <div className={styles.brandRow}>
-          <div className={styles.brand} aria-label="Fight Club Padel League">
-            <strong>FIGHT CLUB</strong>
-            <span>PADEL LEAGUE</span>
-          </div>
-          <img
-            src="/neiva-club-transparent.png"
-            width="88"
-            height="88"
-            alt="Neiva Padel Club"
-          />
-        </div>
-        <h1>
-          <span>Jogos</span> pelo título
-        </h1>
+        <OriginalTitleArt
+          variant="header"
+          id="page-header"
+          className={styles.originalHeader}
+        />
+        <h1 className="sr-only">Jogos pelo título</h1>
         <p>
           Consulta os jogos confirmados e os confrontos congelados por férias,
           com as duplas, o horário e o estado do jogo.

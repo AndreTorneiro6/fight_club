@@ -61,11 +61,9 @@ test("frozen title and normal challenges share the ice template and thaw after v
       .filter({ has: page.locator(`[data-frozen-match="${id}"]`) });
     await expect(card).toContainText("Jogo congelado");
     await expect(card).toContainText("Adiado por férias");
-    expect(
-      await card.evaluate(
-        (e) => getComputedStyle(e, "::before").backgroundImage,
-      ),
-    ).toContain("frozen-match-ice.webp");
+    await expect(
+      card.locator('svg[data-original-art="frozen"] image').first(),
+    ).toHaveAttribute("href", "/title-fight-original-frozen.jpeg");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

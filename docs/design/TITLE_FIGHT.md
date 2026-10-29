@@ -1,26 +1,23 @@
-# Title Fight visual reference
+# Title Fight: original supplied artwork
 
-Reference: `templates/layout_title_fight.jpeg`, supplied by the user.
+The user requested preserving their images everywhere on 29 October 2026. This supersedes the previous generated arena and recreated vector crests.
 
-The page uses live HTML for the teams, match numbers, division, date, state and result. The reference's sample names and scores are not embedded in the artwork. The current Fight Club brand and official Neiva Padel Club logo are retained. The arena artwork is decorative, and the history is a keyboard-accessible native disclosure. Spectators open the public betting page rather than private challenge details.
+## Page cards
 
-## Arena artwork
+`public/title-fight-original-layout.jpeg` is a byte-identical copy of `templates/layout_title_fight.jpeg`. `OriginalTitleArt` uses SVG viewports to display the original header and each division card without recoloring, filtering or redrawing its emblems, fighters, frames and VS graphics. Phone chrome and navigation from the screenshot are cropped away.
 
-- Built-in `image_gen` tool (not the CLI).
-- Saved asset: [public/title-fight-arena.png](../../public/title-fight-arena.png).
-- Reference used for visual style: the supplied layout image.
-- Opaque landscape background,1536×1024. No live content, brand marks, names or scores rendered in the image.
+Only rectangles containing example match numbers, status, team names and dates receive localized text restoration from `public/title-fight-text-restoration.webp`. All remaining pixels come from the original JPEG. Accessible HTML displays actual data over those fields. Scores/results remain below the artwork. Frozen titles remain visible to all three workspaces; public spectators still open betting rather than private challenge details.
 
-Final generation prompt:
+The restoration was produced with the built-in image_gen editing tool, using the original layout as the sole input. Output was copied from the Codex generated_images directory into the workspace; it is used only through field-sized SVG clips, never as a replacement illustration. No CLI/API key was used.
 
-> Create one production website decorative BACKGROUND asset based on the supplied reference image (reference is a UI layout, not an image to copy wholesale). Output a single LANDSCAPE 1536x1024 rectangular illustration. Match the reference match card atmosphere: almost black distressed metal, subtle chain-link fencing at the outer edges, amber/gold burning smoke and sparse sparks at both sides; two anonymous dark padel player silhouettes facing each other with rackets, confined to the extreme left and right lower edges, cropped naturally, each occupies at most 17 percent of the width. They are generic sporting silhouettes, no real identities. Keep the middle 65 percent very dark and completely unobstructed, with barely visible metal texture; preserve lots of empty space in the upper middle for live HTML text. Light gold ember flares at the outer corners. Premium cinematic black-and-gold padel fight-night style, dramatic rim lighting, realistic smoky texture. This is BACKGROUND ART ONLY: absolutely NO letters, NO numbers, NO text, NO logos, NO badge, NO VS lettering, NO borders/frames, NO UI elements, NO cards, NO device mockup, NO watermark. Fill the entire rectangular output with the backdrop. Do not render the reference UI, just its decorative smoky black/gold sports atmosphere.
+Final edit prompt:
+
+> Precise local text cleanup, NOT a redesign. Edit the supplied screenshot, preserve its exact 740x1600 composition, crop, borders, logos, colors, fighters, rackets, laurels, gold crown emblem, silver star emblem, bronze helmet emblem, VS brush graphics, lights, particles, typography outside the editable fields, and every other element. Remove ONLY the printed example match numbers (#001/#002/#003), the small TITLE FIGHT next to those match numbers, the word Marcado and its green dot inside each status pill (keep pill glass and frame), the player/team names inside all six attack/defense strips (keep Ataque, Defesa, icons and strip frames), the two large centered team names in each of the three cards (keep their VS artwork exactly), and all three bottom-right example dates and times (keep calendar icons). Reconstruct the original dark smoky/metallic textures smoothly behind those removed strings, without black blocks, boxes, blurring or covers. Do not remove or modify LIGA OURO, LIGA PRATA, LIGA BRONZE, the whole page header, the subtitle, the history heading or navigation. There are three card rectangles approximately gold x19 y355 w704 h320; silver x19 y681 w704 h320; bronze x19 y1008 w704 h327. Do not move anything. Do not redraw or reinterpret any illustration. Output the same full screenshot at the same composition. Only tiny rectangles containing variable data from your output will be used; every other pixel will still come from the untouched original file.
+
+## Exported posters
+
+The existing original JPEG plus localized field restoration approach is retained. The additional Bronze belt/emblem replacement has been removed: original three-star artwork is preserved. Browser regression compares the entire top 1200 pixels of all three exported title posters against the originals, including the belt. Regular ranking/fixtures retain their existing canonical division emblem.
 
 ## Fonts
 
-The existing Bebas Neue and Manrope families are served from `public/fonts` and preloaded by the root layout, so the layout and mobile navigation do not depend on a third-party font request. The browser regression blocks Google Fonts requests explicitly.
-
-Original unmodified font binaries and their SIL Open Font License notices were obtained from the official [Bebas Neue](https://github.com/google/fonts/tree/main/ofl/bebasneue) and [Manrope](https://github.com/google/fonts/tree/main/ofl/manrope) directories in Google Fonts. License files are stored beside each font.
-
-## Updated layout — 28 October 2026
-
-The latest supplied reference places the league crest at the top left, match metadata above the side strips on the right, the central team faceoff below, and the date at bottom right. Cards now follow that grid, with square illuminated frames and division-specific gold/silver/bronze palettes. Silver artwork is grayscale and bronze uses a warmer orange filter; filters affect only the decorative background pseudo-element, preserving text/status colors. The crest is code-native vector artwork (laurel ring with crown, star or helmet), and all team/score/date content remains HTML. Existing arena art is reused unchanged. Brand, calendar actions, permissions and history interaction remain functional.
+Existing local Bebas Neue and Manrope families remain in use, with their SIL Open Font License files under `public/fonts`. No external font request is needed.

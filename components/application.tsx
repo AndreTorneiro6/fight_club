@@ -1,5 +1,6 @@
 "use client";
 import { matchFrozenUntil } from "@/lib/match-freeze";
+import { OriginalTitleArt } from "./original-title-art";
 import { FrozenMatchNotice } from "./frozen-match";
 import frozenStyles from "./frozen-match.module.css";
 import { TeamWorkspace, AdminEntrySongs } from "./team-space";
@@ -1873,8 +1874,15 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
             ? `/apostas?jogo=${encodeURIComponent(c._id)}`
             : "/desafios/" + c._id
         }
-        className={`challenge-card ${matchFrozenUntil(s, c) ? `${frozenStyles.surface} ${frozenStyles.compact}` : ""}`}
+        className={`challenge-card ${matchFrozenUntil(s, c) ? frozenStyles.surface : ""}`}
       >
+        {matchFrozenUntil(s, c) && (
+          <OriginalTitleArt
+            variant="frozen"
+            id={`${c._id}-list`}
+            className={frozenStyles.art}
+          />
+        )}
         <div className="row between">
           <small>
             #{String(c.number).padStart(3, "0")}{" "}
@@ -2374,6 +2382,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
             className={matchFrozenUntil(s, c) ? frozenStyles.surface : ""}
             right={<DivisionBadge s={s} id={c.divisionId} />}
           >
+            {matchFrozenUntil(s, c) && (
+              <OriginalTitleArt
+                variant="frozen"
+                id={`${c._id}-detail`}
+                className={frozenStyles.art}
+              />
+            )}
             {matchFrozenUntil(s, c) ? (
               <FrozenMatchNotice s={s} c={c} />
             ) : (

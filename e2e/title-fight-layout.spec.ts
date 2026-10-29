@@ -107,16 +107,16 @@ test("title fight template uses live teams, division filters, collapsible result
       const vs = el
         .querySelector('[aria-label="contra"]')!
         .getBoundingClientRect();
-      const art = getComputedStyle(
-        el.querySelector("a.challenge-card")!,
-        "::before",
-      );
-      return { crestAboveFaceoff: crest.top < vs.top, filter: art.filter };
+      const art = el.querySelector("svg[data-original-art]")!;
+      return {
+        crestAboveFaceoff: crest.top < vs.top,
+        filter: getComputedStyle(art).filter,
+        source: art.querySelector("image")!.getAttribute("href"),
+      };
     });
     expect(positions.crestAboveFaceoff).toBe(true);
-    expect(positions.filter).toContain(
-      division === "prata" ? "grayscale(1)" : "hue-rotate(-16deg)",
-    );
+    expect(positions.filter).toBe("none");
+    expect(positions.source).toBe("/title-fight-original-layout.jpeg");
   }
   await expect(
     upcoming.locator('a.challenge-card[href="/desafios/' + gameIds[0] + '"]'),
@@ -203,12 +203,9 @@ test("title fight template uses live teams, division filters, collapsible result
   await page.evaluate(() =>
     document.documentElement.setAttribute("data-theme", "fight-club"),
   );
-  expect(
-    await upcoming
-      .locator("a.challenge-card")
-      .first()
-      .evaluate((el) => getComputedStyle(el, "::before").backgroundImage),
-  ).toContain("title-fight-arena.png");
+  await expect(
+    upcoming.locator('svg[data-original-art="prata"] image').first(),
+  ).toHaveAttribute("href", "/title-fight-original-layout.jpeg");
   await page.screenshot({
     path: "test-results/title-fight-mobile-long-names.png",
     fullPage: true,

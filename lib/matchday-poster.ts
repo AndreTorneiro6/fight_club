@@ -86,20 +86,7 @@ async function load(key: PosterTemplate): Promise<HTMLCanvasElement> {
       w,
       h,
     );
-  if (key === "title-bronze") {
-    const restored = await loadImage("title-bronze-emblem-clean");
-    ctx.drawImage(
-      restored,
-      (330 * restored.width) / BW,
-      (588 * restored.height) / BH,
-      (280 * restored.width) / BW,
-      (95 * restored.height) / BH,
-      330,
-      588,
-      280,
-      95,
-    );
-  }
+
   return canvas;
 }
 const date = (value: string) =>
@@ -319,8 +306,6 @@ export async function renderMatchdayPoster({
     );
   const { text, names } = drawing(ctx);
   if (title) {
-    if (cards[0].divisionCode === "bronze")
-      await drawBronzeEmblem(ctx, 419, 588, 112);
     titleCard(ctx, cards[0], mode);
   } else {
     if (!results) {

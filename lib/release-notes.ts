@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.11";
+export const applicationVersion = "1.11.12";
 export const releaseNotes = [
+  {
+    version: "1.11.12",
+    date: "2026-10-29",
+    title: "Title Fight com a arte original",
+    changes: [
+      "Cartões das três divisões e jogos congelados preservam os fundos, emblemas, molduras e efeitos das imagens fornecidas.",
+      "Cartazes exportados mantêm também o desenho original, com nomes, datas, estados e resultados atualizados.",
+    ],
+  },
   {
     version: "1.11.11",
     date: "2026-10-29",
