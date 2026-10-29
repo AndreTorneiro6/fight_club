@@ -1,3 +1,7 @@
+## Pi Desktop button repaired — 29 October 2026 09:43Z
+
+- User could not use Desktop after kiosk profile repair. Root cause: clock_pid() in host ~/.local/share/screen-clock/server.py only matched old browser-profile; /api/desktop returned200 even when no matching process existed. Corrected exact --user-data-dir allowlist for old/new owned kiosk profiles, retained executable+--kiosk validation and origin/host checks, returns409 if no browser. Backup server.py.before-desktop-fix-20261029; service restarted. RealbuttonPOST returned200 and confirmedbrowser81598terminated; grimproveddesktopvisible. Closed orphankeyringdialoggcr-prompter2265 left fromoldbrowser; no keyringcredentialschanged. Leftdesktopopen asuserrequested. Reusableops/pi/fix-clock-desktop.py retainedinsource. FightClub1.11.9/allcontainersuntouched.
+
 ## 1.11.9 LIVE; host/database/security work complete — 29 October 2026 09:40Z
 
 - SUCCESS run40848541115 (allhostedchecks+Pi deployment): exactlivec303f534df07c56fc98a7d765404fdde380d39bd; app/workerpackage1.11.9, bothrunning0restarts. PublicFightClubhealthok; AtlasloginHTTP200.477unit/integrationtests/typecheck/build andallhostedbrowsergroupspassed, includingproductionregistrationparity/authrecovery/photoaccessPoCs. Per-findingverification in docs/SECURITY_REMEDIATION_2026-10-29.md. No paidStrixrescanlaunched; do notclaimfullnewpentest. Account-onlyemailpolicy preserved.
