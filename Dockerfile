@@ -1,7 +1,8 @@
+# syntax=docker/dockerfile:1
 FROM node:22-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,id=fight-club-npm,target=/root/.npm,sharing=locked npm ci --prefer-offline
 
 FROM dependencies AS builder
 WORKDIR /app
@@ -9,7 +10,7 @@ COPY . .
 ARG APP_URL=https://fight-club.wbglabs.io
 ENV APP_URL=${APP_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN --mount=type=cache,id=fight-club-next,target=/app/.next/cache,sharing=locked npm run build
 
 FROM node:22-alpine AS runner
 RUN apk add --no-cache python3 py3-pillow

@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.17";
+export const applicationVersion = "1.11.18";
 export const releaseNotes = [
+  {
+    version: "1.11.18",
+    date: "2026-10-29",
+    title: "Publicações incrementais e validação do alcance de três posições",
+    changes: [
+      "As publicações reutilizam caches de dependências e compilação, reduzindo trabalho repetido e mantendo verificações de saúde e recuperação da versão anterior.",
+      "Validação adicional do emparelhamento em Ouro e Prata com alcance de três posições, preservando os jogos atribuídos e as regras do título.",
+    ],
+  },
   {
     version: "1.11.17",
     date: "2026-10-29",

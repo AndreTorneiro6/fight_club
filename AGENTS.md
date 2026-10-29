@@ -6,6 +6,12 @@
 - MongoDB requires a replica set (Atlas or the included local demo runner).
 - Run `npm run typecheck`, `npm test` and `npm run build` after substantive changes.
 
+## Deployment preference
+
+- The user requests incremental deployments to reduce release time: reuse cached build layers and unchanged dependencies/assets, and update only affected application services. Avoid unnecessary clean builds, dependency reinstalls or infrastructure restarts.
+- Keep each release consistent and traceable to its validated revision, with health checks and rollback. Compiled application changes still require a coherent production build; do not patch individual files into a running compiled release.
+- Documentation/test-only changes do not require a production deployment. Prefer patch version increments for compatible fixes; use the appropriate minor/major version for feature or breaking releases.
+
 ## Saved project status
 
 - Before starting work, read `docs/PROJECT_STATUS.md` for the saved feature, deployment, testing and outstanding-issue context.

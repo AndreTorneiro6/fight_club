@@ -12,3 +12,12 @@ fight-club-source.zip
 Pasted image.png
 
 .local-ai/
+
+# Reference sources, private reports and verification artifacts are not build inputs.
+fight-club/
+docs/
+tests/
+e2e/
+.github/
+AGENTS.md
+Untitled.jpeg

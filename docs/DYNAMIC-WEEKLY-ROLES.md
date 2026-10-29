@@ -1,20 +1,16 @@
 # Papéis dinâmicos por prioridade
 
-Publicado em 25/10/2026 (67ca0ae). Modo dinâmico ativo apenas na Bronze, alcance 3; abertura continua manual. Ouro e Prata atuais preservados. Consultar PROJECT_STATUS.md para verificação.
+Verificado em 29/10/2026: modo dinâmico ativo em **Ouro, Prata e Bronze**, com alcance **3 em cada divisão**. O valor global continua 2, mas os três valores específicos por divisão têm precedência. A elegibilidade do título continua limitada pela configuração própria (`titleMaxPosition=3`).
 
-Depois de um deploy autorizado, em **Admin → Regras da competição**:
+Em **Admin → Regras da competição**, a distância de cada divisão guarda imediatamente. O motor usa sempre a distância configurada para essa divisão, recalcula os papéis efetivos da semana publicada e atualiza os rascunhos gerados. O plano em cache é invalidado quando mudam a distância, as posições ou os compromissos. Não é necessário alterar o algoritmo quando o alcance muda.
 
-- Selecionar **Distância de ataque · Bronze = 3**: guarda imediatamente, sem o botão geral de guardar. Preservar Ouro e Prata atuais.
-- Manter **Competição semanal** e **Desafios semanais obrigatórios** ativos.
-- Ativar **Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade** e selecionar apenas **Bronze**. Ouro e Prata desta semana ficam fora do modo dinâmico.
-
-Os valores são configurações independentes por divisão. O título mantém a elegibilidade configurada: alargar a distância da Bronze não permite automaticamente ao 4.º desafiar o campeão. A publicação e abertura dos papéis continuam obrigatórias. Ativar a regra não abre uma divisão que esteja em espera pelo administrador, não recria jogos e não altera os confrontos já atribuídos.
+A publicação e abertura dos papéis continuam obrigatórias. Alterar o alcance não abre uma divisão em espera, não recria jogos nem altera os confrontos já atribuídos.
 
 ## O que acontece após um desafio
 
 O primeiro desafio válido fica reservado às duas duplas. O algoritmo calcula o máximo de jogos possível com os compromissos protegidos. Se um emparelhamento estiver presente em **todas** as soluções de cobertura máxima, atribui esse adversário automaticamente, sem aceitar/recusar o confronto. Se houver alternativas, mantém a escolha disponível. Os papéis efetivos e avisos pertencem à dupla, incluindo ambos os parceiros.
 
-Em Ouro, **12→10** reserva **11→9**: o 11 só alcança 10 e 9, e o 10 está ocupado. O 9 passa a DEFESA. **4→2** força **3→1**; o 5 fica em DEFESA.
+Os exemplos históricos de Ouro com alcance **2** — **12→10** força **11→9**, ou **4→2** força **3→1** — não devem ser aplicados automaticamente ao alcance **3**. Com alcance 3 há outras alternativas; só os emparelhamentos comuns a todas as soluções de cobertura máxima são obrigatórios.
 
 Na Bronze com alcance 3, **9→6**, seguido de **8→5**, deixa o 10 apenas com o 7 e força **10→7**. Já **10→8**, sozinho, deixa várias combinações válidas: não se inventa um confronto obrigatório.
 
@@ -30,7 +26,7 @@ Ausências que cubram a semana inteira retiram a dupla das novas opções autom�
 
 ## Validação
 
-361 testes, typecheck e build passaram. A simulação automática cobre as escolhas iniciais da Bronze compatíveis com cobertura total, obtendo cinco jogos sem repetir duplas, e os exemplos de prioridade de Ouro/Bronze. O teste de navegador verifica o desafio e o novo papel do segundo parceiro. O teste Mongo executa pedidos simultâneos e confirma que só um ocupa a vaga, incluindo os emparelhamentos derivados.
+A simulação automática cobre todas as escolhas iniciais compatíveis com cobertura total: cinco jogos na Bronze de dez duplas e seis jogos em Ouro/Prata de doze duplas, com alcance 3 e sem repetir duplas. Testes adicionais aumentam a distância de 2 para 3 através do comando administrativo, verificando novas opções, invalidação de cache e preservação dos jogos comprometidos. Os exemplos históricos com alcance 2 continuam testados como configuração alternativa. O teste de navegador verifica o desafio e o novo papel do segundo parceiro. O teste Mongo executa pedidos simultâneos e confirma que só um ocupa a vaga, incluindo os emparelhamentos derivados.
 
 ## Contagem decrescente por divisão
 

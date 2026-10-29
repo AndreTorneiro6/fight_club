@@ -29,5 +29,5 @@ for image in json.loads(docker("image", "inspect", *image_ids)) if image_ids els
             # No force: Docker also protects containers created after our snapshot.
             subprocess.run(["docker", "image", "rm", tag], check=True)
 
-# Discard only unused cache older than an hour; preserve current build reuse.
-subprocess.run(["docker", "builder", "prune", "--all", "--force", "--filter", "until=1h"], check=True)
+# Keep a week of build reuse so daily releases can reuse compiler/package caches.
+subprocess.run(["docker", "builder", "prune", "--all", "--force", "--filter", "until=168h"], check=True)

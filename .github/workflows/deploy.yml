@@ -36,6 +36,14 @@ jobs:
       - run: npm test
         env:
           TMPDIR: ${{ runner.temp }}
+      - name: Restore incremental compiler cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-node22-next-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-node22-next-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-node22-next-
       - run: npm run build
       # ubuntu-24.04 already provides the shared libraries needed for headless
       # Chromium. Avoid reinstalling fonts/Xvfb and upgrading system libraries

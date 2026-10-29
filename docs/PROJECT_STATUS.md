@@ -1,3 +1,22 @@
+## Version1.11.18 incremental deployment prepared — 29 October 2026
+
+- User explicitly requests apply optimizations and deploy pending reach3 validation/preferences. Docker now preserves npm downloads and .next/cache in locked BuildKit caches; hosted CI restores compiler cache across commits/version bumps. Docker context excludes reference app/docs/tests/e2e/private reports; runtime assets and scripts preserved. Retention keeps unused cache for a week rather than one hour. Backup/revision/rollback/health and app+worker-only update unchanged.
+- Local typecheck,506tests and production build pass; deployment shell and cleanup Python syntax pass. Version/package/notes1.11.18. First new cache build warms mounts; future releases reuse them. No runtime pairing algorithm change needed or league data mutation authorized by this release. Keep sticker community private/admin-only and all live reach3 settings unchanged.
+- Next commit only intended files, push HEAD to deploy branch, monitor all hosted checks and exact Pi deployment, verify app/worker revision1.11.18/health and cache mounts before declaring live. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential untracked pentest report.
+
+## Deployment preference saved — 29 October 2026
+
+- User requests incremental/patch-style deployment for speed on every future release. Saved permanent guidance in AGENTS.md: reuse caches/unchanged dependencies/assets, update affected services only, avoid clean builds and infrastructure restarts. Preserve validated revision, consistent compiled build, health checks and rollback. Documentation/test-only edits need no deployment.
+- Inspected current deploy: Docker build already uses normal layer caching and Compose updates app/worker with --no-deps. No deployment machinery or live services changed in this preference update; no new speedup claimed. Future optimizations must preserve release consistency.
+
+## Reach-three algorithm audit — 29 October 2026
+
+- User corrected outdated reach2 statement: live read confirms divisionChallengeDistances Ouro=3, Prata=3, Bronze=3; global fallback2, titleMaxPosition3, dynamic mode enabled for all3. Older2/2/3 notes are historical, not current configuration.
+- Read-only production snapshot analyzed with current domain planner for week2026-10-26: Ouro12teams/6protected commitments/maximum6; Prata12/6/6; Bronze10/5/5. No remaining options, forced edges or planner errors. No production writes, new games or notices.
+- Algorithm already uses configured per-division reach, positions and protected commitments. Cache includes distances/positions/commitments; admin distance command refreshes effective roles and generated drafts. No runtime rewrite needed. Existing commitments must remain protected after reach changes.
+- Added Ouro/Prata reach3 coverage: every initially coverage-compatible choice completes6disjoint valid games, both partners retain actual roles, title restriction preserved; admin2→3 change invalidates cached plan, enables new3-position choices and preserves earlier commitments. Historical reach2 tests retained as alternate configuration. Updated stale DYNAMIC-WEEKLY-ROLES guide.
+- Local typecheck,506tests and production build pass. Only tests/docs changed; no deployment required for existing reach3 runtime behavior. Preserve unrelated ZIP deletion, Untitled.jpeg and confidential pentest report.
+
 ## Version 1.11.17 LIVE — administrator-only album/trades WITH sticker backs — 29 October 2026
 
 - User authorized “publish for admin”, then identified missing cromo backs. Completed both requests and published exact revision `b89a0230467db58cc8b380fac0591299f184cd3d`. GitHub40968408629 SUCCESS: hosted502tests/typecheck/build/allbrowsergroups, Pi deploy and public health. App and worker exact same revision,0restarts, apphealthy/workerrunning. Runtime package and applicationVersion both1.11.17; public /api/health={ok:true}.

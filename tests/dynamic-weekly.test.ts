@@ -13,7 +13,11 @@ import { dynamicWeeklyPlan } from "../lib/dynamic-weekly";
 import { challengeDistance } from "../lib/challenge-distance";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
-function fixture(code: DivisionCode = "bronze", count = 10) {
+function fixture(
+  code: DivisionCode = "bronze",
+  count = 10,
+  distance = code === "bronze" ? 3 : 2,
+) {
   const s = Object.fromEntries(
     collections.map((c) => [c, []]),
   ) as unknown as State;
@@ -24,7 +28,7 @@ function fixture(code: DivisionCode = "bronze", count = 10) {
       weeklyMandatoryChallenges: true,
       weeklyDynamicRoles: true,
       maxPositionsAbove: 2,
-      divisionChallengeDistances: code === "bronze" ? { bronze: 3 } : {},
+      divisionChallengeDistances: { [code]: distance },
     },
   ];
   s.seasons = [
@@ -125,7 +129,7 @@ test("Gold 12→10 reserves the sole remaining target of 11, even though 9 could
   assert.throws(() => send(s, 9, 7), /necessário|atribuído|defesa/);
   assert.equal(s.challenges.length, 2);
 });
-test("Bronze accepts three positions while Gold still rejects the same distance and champion restriction remains separate", () => {
+test("per-division configuration supports different distances and keeps champion eligibility separate", () => {
   const bronze = fixture();
   send(bronze, 9, 6);
   assert.equal(pairing(bronze, 9, 6)?.effectiveChallengeDistance, 3);
@@ -502,3 +506,83 @@ test("distance selection applies immediately to new options, preserves committed
     /administradores/,
   );
 });
+
+for (const code of ["ouro", "prata"] as const) {
+  test(`${code}: increasing reach from two to three recalculates cached choices and preserves committed games`, () => {
+    const s = fixture(code, 12, 2);
+    send(s, 12, 10);
+    const committed = structuredClone(s.challenges);
+    const oldPlan = dynamicWeeklyPlan(s, code, week);
+    assert.ok(
+      !oldPlan.eligible.some(
+        (p) => p.attackerId === "t8a" && p.defenderId === "t5a",
+      ),
+    );
+    execute(
+      s,
+      { ...actor(1), role: "admin" },
+      {
+        type: "admin.challenge.distance.set",
+        divisionId: code,
+        distance: 3,
+        expectedDistance: 2,
+        reason: "Alcance atualizado para três posições",
+      },
+      now,
+    );
+    const plan = dynamicWeeklyPlan(s, code, week);
+    assert.notEqual(plan, oldPlan);
+    assert.equal(challengeDistance(s, code), 3);
+    assert.ok(
+      plan.eligible.some(
+        (p) => p.attackerId === "t8a" && p.defenderId === "t5a",
+      ),
+    );
+    for (const c of committed)
+      assert.deepEqual(
+        s.challenges.find((p) => p._id === c._id),
+        c,
+      );
+    send(s, 8, 5);
+    assert.equal(pairing(s, 8, 5)?.effectiveChallengeDistance, 3);
+    assert.equal(plan.maximumMatches, 6);
+  });
+
+  test(`${code}: every coverage-compatible first choice at reach three finishes six games without repeating teams`, () => {
+    const base = fixture(code, 12, 3);
+    const choices = dynamicWeeklyPlan(base, code, week).eligible;
+    assert.ok(
+      choices.some((p) => p.attackerId === "t12a" && p.defenderId === "t9a"),
+    );
+    for (const choice of choices) {
+      const s = fixture(code, 12, 3);
+      const rank = (id: string) => Number(id.match(/^t(\d+)/)![1]);
+      send(s, rank(choice.attackerId), rank(choice.defenderId));
+      for (let i = 0; i < 12 && s.challenges.length < 6; i++) {
+        const next = dynamicWeeklyPlan(s, code, week).eligible[0];
+        assert.ok(next);
+        send(s, rank(next.attackerId), rank(next.defenderId));
+      }
+      assert.equal(s.challenges.length, 6);
+      assert.equal(
+        new Set(
+          s.challenges.flatMap((c) => [c.challengerTeamId, c.defenderTeamId]),
+        ).size,
+        12,
+      );
+      for (const c of s.challenges) {
+        assert.equal(c.status, "accepted");
+        assert.ok(c.challengerPosition > c.defenderPosition);
+        assert.ok(c.challengerPosition - c.defenderPosition <= 3);
+        if (c.defenderPosition === 1)
+          assert.ok(c.challengerPosition <= s.settings[0].titleMaxPosition);
+        for (const m of c.challengerTeam ?? [])
+          assert.equal(weeklyRole(s, m.playerId, now), "attack");
+        for (const m of c.defenderTeam ?? [])
+          assert.equal(weeklyRole(s, m.playerId, now), "defense");
+      }
+      assert.equal(s.matches.length, 0);
+      assert.equal(s.results.length, 0);
+    }
+  });
+}
