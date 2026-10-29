@@ -21,3 +21,9 @@ The existing original JPEG plus localized field restoration approach is retained
 ## Fonts
 
 Existing local Bebas Neue and Manrope families remain in use, with their SIL Open Font License files under `public/fonts`. No external font request is needed.
+
+## Equal card dimensions — 29 October 2026, 1.11.13
+
+The user clarified that ALL Title Fight cards should occupy the same size as the frozen card, on desktop and mobile. Normal/frozen illustration canvases now share max-width520px and aspect805/1015. Original normal artwork is arranged in SVG viewports within that portrait canvas: frame corners/edges, division emblem/text, role strips, fighters and VS retain the supplied image pixels; the emblems/figures keep their proportions. Dynamic team names and dates use the larger portrait layout. Explicit source-rectangle clipping prevents neighboring screenshot examples from leaking into a slice. No new bitmap artwork or changes to exported posters.
+
+Browser coverage compares normal and frozen canvas width/height at1280,390,320px, in addition to all-workspace visibility/privacy and thawing.

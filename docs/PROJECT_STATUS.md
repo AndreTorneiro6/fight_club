@@ -1,3 +1,9 @@
+## Version 1.11.13 prepared: equal Title Fight card dimensions — 29 October 2026
+
+- User clarified ALL Title Fight cards must have the same width AND height as the frozen card, on mobile and desktop. Normal/frozen illustration canvases now use a common max-width520px and aspect805/1015. Reflowed original normal artwork through bounded SVG slices (frame, division emblem/title, role strips, figures, VS); figures/emblems keep proportions, actual team/date/status text uses portrait positions. No new bitmap art or poster changes. Source JPEGs remain unchanged; source clipping prevents example UI leaking across slices.
+- Local typecheck/build and481tests pass. One initial existing concurrent Mongo reconciliation test failed with stale-preview error; fresh full suite481/481passed without domain/test changes. Title-layout browser passed; frozen regression compares normal/frozen width and height at1280,390,320px while retaining three-workspace visibility/privacy/thaw checks. Final frozen check passed; next commit/deploy and verify exact live revision. No real league data changes.
+- Preserve unrelated ZIP deletion, Untitled, confidential pentest report, CROMOS plan and cromo templates. No infrastructure changes.
+
 ## Version 1.11.12 LIVE: supplied Title Fight images restored everywhere — 29 October 2026
 
 - Live exact revision `33c404cf726f27be3c4704aacb5c8c315096dfdb`, package1.11.12. App/worker both running that revision with0restarts; apphealthy, public/api/healthok. Public normal/frozen JPEGs and both field-restoration WebPs fetched and SHA256-compared successfully against local files. Original JPEGs also byte-equality tested against supplied templates.

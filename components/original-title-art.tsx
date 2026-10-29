@@ -39,15 +39,20 @@ export function originalTitleSlot(
   division: string | undefined,
   slot: keyof typeof slots.ouro,
 ): CSSProperties {
-  const d: Division =
-    division === "prata" || division === "bronze" ? division : "ouro";
-  const [cx, cy, cw, ch] = crops[d],
-    [x, y, w, h] = slots[d][slot];
+  const fields: Record<keyof typeof slots.ouro, Rect> = {
+    meta: [425, 42, 335, 135],
+    attack: [295, 253, 445, 51],
+    defense: [295, 335, 445, 51],
+    attacker: [175, 485, 455, 100],
+    defender: [175, 715, 455, 100],
+    date: [120, 895, 565, 55],
+  };
+  const [x, y, w, h] = fields[slot];
   return {
-    left: `${(100 * (x - cx)) / cw}%`,
-    top: `${(100 * (y - cy)) / ch}%`,
-    width: `${(100 * w) / cw}%`,
-    height: `${(100 * h) / ch}%`,
+    left: `${(100 * x) / 805}%`,
+    top: `${(100 * y) / 1015}%`,
+    width: `${(100 * w) / 805}%`,
+    height: `${(100 * h) / 1015}%`,
   };
 }
 
@@ -56,6 +61,7 @@ export function OriginalTitleArt({
   variant,
   id,
   className,
+  portrait = false,
 }: {
   variant:
     | Division
@@ -66,6 +72,7 @@ export function OriginalTitleArt({
     | "frozen-heading";
   id: string;
   className?: string;
+  portrait?: boolean;
 }) {
   const frozen = variant.startsWith("frozen");
   const crop: Rect =
@@ -101,24 +108,8 @@ export function OriginalTitleArt({
           ] as Rect[])
         : [];
   const mask = `original-title-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}-${variant}`;
-  return (
-    <svg
-      className={className}
-      viewBox={crop.join(" ")}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-      data-original-art={variant}
-    >
-      {holes.length > 0 && (
-        <defs>
-          <clipPath id={`${mask}-fields`}>
-            {holes.map(([x, y, width, height], i) => (
-              <rect key={i} x={x} y={y} width={width} height={height} />
-            ))}
-          </clipPath>
-        </defs>
-      )}
+  const layers = (
+    <>
       <image
         href={frozen ? frozenSource : source}
         width={frozen ? 853 : 740}
@@ -136,6 +127,143 @@ export function OriginalTitleArt({
           preserveAspectRatio="none"
           clipPath={`url(#${mask}-fields)`}
         />
+      )}
+    </>
+  );
+  const slice = (from: Rect, to: Rect, key: string, soft = false) => (
+    <svg
+      key={key}
+      style={{ overflow: "hidden" }}
+      x={to[0]}
+      y={to[1]}
+      width={to[2]}
+      height={to[3]}
+      viewBox={from.join(" ")}
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <clipPath id={`${mask}-${key}-slice`} clipPathUnits="userSpaceOnUse">
+          {key === "crest" ? (
+            <ellipse
+              cx={from[0] + from[2] / 2}
+              cy={from[1] + from[3] / 2}
+              rx={from[2] * 0.49}
+              ry={from[3] * 0.49}
+            />
+          ) : (
+            <rect x={from[0]} y={from[1]} width={from[2]} height={from[3]} />
+          )}
+        </clipPath>
+        {soft && (
+          <>
+            <radialGradient id={`${mask}-${key}-fade`}>
+              <stop offset="40%" stopColor="white" />
+              <stop offset="100%" stopColor="black" />
+            </radialGradient>
+            <mask
+              id={`${mask}-${key}-mask`}
+              maskUnits="userSpaceOnUse"
+              x={from[0]}
+              y={from[1]}
+              width={from[2]}
+              height={from[3]}
+            >
+              <rect
+                x={from[0]}
+                y={from[1]}
+                width={from[2]}
+                height={from[3]}
+                fill={`url(#${mask}-${key}-fade)`}
+              />
+            </mask>
+          </>
+        )}
+      </defs>
+      <g
+        clipPath={`url(#${mask}-${key}-slice)`}
+        mask={soft ? `url(#${mask}-${key}-mask)` : undefined}
+      >
+        {layers}
+      </g>
+    </svg>
+  );
+  const normalPortrait =
+    portrait &&
+    (variant === "ouro" || variant === "prata" || variant === "bronze");
+  const [cx, cy, cw, ch] = crop;
+  const strips: Rect =
+    variant === "ouro"
+      ? [260, 428, 395, 89]
+      : variant === "prata"
+        ? [282, 758, 373, 89]
+        : [290, 1083, 365, 90];
+  const versus: Rect =
+    variant === "ouro"
+      ? [335, 555, 65, 40]
+      : variant === "prata"
+        ? [335, 883, 65, 40]
+        : [335, 1208, 65, 40];
+  return (
+    <svg
+      className={className}
+      viewBox={normalPortrait ? "0 0 805 1015" : crop.join(" ")}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+      data-original-art={variant}
+    >
+      {holes.length > 0 && (
+        <defs>
+          <clipPath id={`${mask}-fields`}>
+            {holes.map(([x, y, width, height], i) => (
+              <rect key={i} x={x} y={y} width={width} height={height} />
+            ))}
+          </clipPath>
+        </defs>
+      )}
+      {normalPortrait ? (
+        <>
+          {/* Reflow original artwork in slices; only texture/frame strips extend. */}
+          <rect x="12" y="12" width="781" height="991" fill="#080b0f" />
+          {slice([cx, cy, 14, 14], [0, 0, 14, 14], "tl")}
+          {slice([cx + cw - 14, cy, 14, 14], [791, 0, 14, 14], "tr")}
+          {slice([cx, cy + ch - 14, 14, 14], [0, 1001, 14, 14], "bl")}
+          {slice(
+            [cx + cw - 14, cy + ch - 14, 14, 14],
+            [791, 1001, 14, 14],
+            "br",
+          )}
+          {slice([cx + 14, cy, cw - 28, 14], [14, 0, 777, 14], "top")}
+          {slice(
+            [cx + 14, cy + ch - 14, cw - 28, 14],
+            [14, 1001, 777, 14],
+            "bottom",
+          )}
+          {slice([cx, cy + 14, 14, ch - 28], [0, 14, 14, 987], "left")}
+          {slice(
+            [cx + cw - 14, cy + 14, 14, ch - 28],
+            [791, 14, 14, 987],
+            "right",
+          )}
+          {slice([cx + 8, cy + 8, 136, 118], [35, 35, 175, 152], "crest")}
+          {slice([cx + 145, cy + 15, 110, 90], [210, 44, 142, 116], "division")}
+          {slice(strips, [45, 245, 715, 171], "roles")}
+          {slice(
+            [cx + 8, cy + 130, 180, ch - 144],
+            [22, 485, 180, ch - 144],
+            "attacker",
+            true,
+          )}
+          {slice(
+            [cx + cw - 180, cy + 130, 170, ch - 144],
+            [613, 655, 170, ch - 144],
+            "defender",
+            true,
+          )}
+          {slice(versus, [350, 625, 105, 65], "vs", true)}
+        </>
+      ) : (
+        layers
       )}
     </svg>
   );

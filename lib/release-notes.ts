@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.12";
+export const applicationVersion = "1.11.13";
 export const releaseNotes = [
+  {
+    version: "1.11.13",
+    date: "2026-10-29",
+    title: "Cartões Title Fight com dimensões iguais",
+    changes: [
+      "Jogos normais e congelados usam a mesma largura e altura no telemóvel e computador, com a arte original adaptada sem deformar os emblemas ou jogadores.",
+    ],
+  },
   {
     version: "1.11.12",
     date: "2026-10-29",

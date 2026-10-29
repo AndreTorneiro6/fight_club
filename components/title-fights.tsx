@@ -75,6 +75,7 @@ function TitleMatchCard({
         <div className={frozen ? styles.frozenCanvas : styles.canvas}>
           <OriginalTitleArt
             variant={frozen ? "frozen" : code}
+            portrait={!frozen}
             id={c._id}
             className={styles.artwork}
           />

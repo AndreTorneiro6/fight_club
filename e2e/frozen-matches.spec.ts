@@ -53,6 +53,27 @@ test("frozen title and normal challenges share the ice template and thaw after v
     )
       await post({ type: "challenge.respond", challengeId: id, accept: true });
   }
+  const { id: normalTitleId } = await post({
+    type: "admin.challenge.create",
+    challengerId: "player-18",
+    defenderId: "player-17",
+  });
+  await post({
+    type: "challenge.respond",
+    challengeId: normalTitleId,
+    accept: true,
+  });
+  const scheduled = new Date(Date.now() + 2 * 86400000);
+  scheduled.setUTCHours(20, 0, 0, 0);
+  await post({
+    type: "admin.match.update",
+    challengeId: normalTitleId,
+    expectedScheduleState: JSON.stringify(["accepted", null, null]),
+    start: scheduled.toISOString(),
+    courtId: "campo-1",
+    minutes: 90,
+    note: "Equal Title Fight card sizes",
+  });
   for (const [i, id] of games.entries()) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/desafios/${id}`);
@@ -88,6 +109,29 @@ test("frozen title and normal challenges share the ice template and thaw after v
   await expect(title).toContainText("Jogo congelado");
   await page.setViewportSize({ width: 1280, height: 900 });
   await title.screenshot({ path: "/var/tmp/frozen-title-desktop.png" });
+  for (const width of [1280, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    const sizes = await page
+      .locator(
+        `[data-title-match="${games[1]}"], [data-title-match="${normalTitleId}"]`,
+      )
+      .evaluateAll((cards) =>
+        cards.map((card) => {
+          const canvas = card
+            .querySelector("a.challenge-card > div")!
+            .getBoundingClientRect();
+          return { width: canvas.width, height: canvas.height };
+        }),
+      );
+    expect(sizes).toHaveLength(2);
+    expect(Math.abs(sizes[0].width - sizes[1].width)).toBeLessThan(1);
+    expect(Math.abs(sizes[0].height - sizes[1].height)).toBeLessThan(1);
+    expect(sizes[0].width).toBeLessThanOrEqual(520);
+    expect(sizes[0].height / sizes[0].width).toBeCloseTo(1015 / 805, 2);
+    await page
+      .locator(`[data-title-match="${normalTitleId}"]`)
+      .screenshot({ path: `/var/tmp/title-size-normal-${width}.png` });
+  }
   for (const workspace of ["player", "spectator"]) {
     const switched = await page.request.post("/api/auth/workspace", {
       headers: { Origin: "http://localhost:3100" },
