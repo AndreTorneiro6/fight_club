@@ -1,3 +1,9 @@
+## Version 1.11.14 prepared: restore normal sizes, enlarge frozen only — 29 October 2026
+
+- User corrected sizing direction: keep the original wide normal cards and INCREASE the frozen card. Restored normal art component/rendering/CSS from1.11.12, removing1.11.13 portrait slices/reflow and reduced max-width. Sole sizing change against1.11.12 is removing the frozen Title Fight520px max-width so it fills the same page width; frozen artwork retains original portrait proportions rather than stretching it. Exported posters and ordinary frozen challenges unchanged.
+- Local typecheck,481tests/build passed. Browser checks passed: normal original layout, source asset preservation, desktop full width >900px for both normal/frozen, normal Bronze aspect327/704 and frozen1015/805 preserved at1280/390/320px, plus privacy/visibility/thaw. No real league data changes. Next commit/deploy and exact live verification. This correction supersedes the misunderstood1.11.13 sizing change.
+- Preserve unrelated ZIP deletion, Untitled, confidential pentest report, CROMOS plan and cromo templates. No infrastructure changes.
+
 ## Version 1.11.13 LIVE: all Title Fight cards have equal dimensions — 29 October 2026
 
 - Exact live revision `96f8085cdaad973b4a2cd0ba420d1e67f84d5cd0`, package1.11.13. App/worker running same revision with0restarts, apphealthy, publichealthok. GitHub run40903522878 completed successfully, including all hosted checks and Pi deployment; exact live revision and health verified.

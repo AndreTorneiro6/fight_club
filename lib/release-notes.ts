@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.13";
+export const applicationVersion = "1.11.14";
 export const releaseNotes = [
+  {
+    version: "1.11.14",
+    date: "2026-10-29",
+    title: "Tamanho original do Title Fight reposto",
+    changes: [
+      "Ouro, Prata e Bronze recuperam os cartões largos e a disposição original; o congelado aumenta para a mesma largura disponível.",
+    ],
+  },
   {
     version: "1.11.13",
     date: "2026-10-29",

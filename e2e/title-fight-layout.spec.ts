@@ -112,13 +112,9 @@ test("title fight template uses live teams, division filters, collapsible result
         crestAboveFaceoff: crest.top < vs.top,
         filter: getComputedStyle(art).filter,
         source: art.querySelector("image")!.getAttribute("href"),
-        slicesClipped: [...art.querySelectorAll("svg")].every(
-          (slice) => getComputedStyle(slice).overflow === "hidden",
-        ),
       };
     });
     expect(positions.crestAboveFaceoff).toBe(true);
-    expect(positions.slicesClipped).toBe(true);
     expect(positions.filter).toBe("none");
     expect(positions.source).toBe("/title-fight-original-layout.jpeg");
   }
