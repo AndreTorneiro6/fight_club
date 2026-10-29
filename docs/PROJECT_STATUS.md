@@ -1,3 +1,7 @@
+## Clock desktop shortcut trusted — 29 October 2026
+
+- User wanted icon to launch without execute/open prompt. Desktop/screen-clock.desktop was executable but lacked metadata::trusted. Set only this launcher metadata::trusted=true throughandre'ssessionbus, keptchmod755, desktop-file-validatepasses; gio launchopenedclockandprocessconfirmed. Existinglibfmquick_exec=1leftunchanged; no globalexecutionpolicychange. This metadata is hostdesktopstate, notappcode; launcherexecutesexisting~/.local/bin/screen-clock.
+
 ## Pi Desktop button repaired — 29 October 2026 09:43Z
 
 - User could not use Desktop after kiosk profile repair. Root cause: clock_pid() in host ~/.local/share/screen-clock/server.py only matched old browser-profile; /api/desktop returned200 even when no matching process existed. Corrected exact --user-data-dir allowlist for old/new owned kiosk profiles, retained executable+--kiosk validation and origin/host checks, returns409 if no browser. Backup server.py.before-desktop-fix-20261029; service restarted. RealbuttonPOST returned200 and confirmedbrowser81598terminated; grimproveddesktopvisible. Closed orphankeyringdialoggcr-prompter2265 left fromoldbrowser; no keyringcredentialschanged. Leftdesktopopen asuserrequested. Reusableops/pi/fix-clock-desktop.py retainedinsource. FightClub1.11.9/allcontainersuntouched.
