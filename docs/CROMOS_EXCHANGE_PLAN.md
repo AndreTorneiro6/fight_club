@@ -1,6 +1,6 @@
 # Plano final — Caderneta e trocas de cromos da comunidade
 
-Estado: implementação local autorizada em 29 de outubro de 2026 pelo pedido “implement both”. Inclui negociação e trocas de vários cromos desde a primeira versão. Publicação apenas após pedido do utilizador, conforme a fase 6. Ver STICKER-ALBUM.md para operação e validação.
+Estado: implementação local autorizada em 29 de outubro de 2026 pelo pedido “implement both”. Inclui negociação e trocas de vários cromos desde a primeira versão. Publicação privada para administradores autorizada e concluída na versão1.11.17, incluindo frente/verso dos cromos. A abertura a jogadores/espetadores continua dependente de pedido do utilizador, conforme a fase6. Ver STICKER-ALBUM.md para operação e validação.
 
 ## 1. Objetivo e ponto de partida
 

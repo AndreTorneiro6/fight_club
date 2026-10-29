@@ -1,12 +1,12 @@
 # Caderneta e trocas de cromos
 
-Implementação local do [plano acordado](CROMOS_EXCHANGE_PLAN.md), preparada para revisão antes do lançamento. A publicação e a ativação para jogadores continuam pendentes de pedido do utilizador. Os modelos originais dos cromos são preservados; ver [proveniência do layout](CROMOS_LAYOUT.md).
+Versão 1.11.17 publicada no espaço **Administrador**, conforme o [plano acordado](CROMOS_EXCHANGE_PLAN.md) e o pedido de publicação privada. O acesso de jogadores e espetadores permanece desligado; a abertura à comunidade exige novo pedido do utilizador. Os modelos originais dos cromos são preservados; ver [proveniência do layout](CROMOS_LAYOUT.md).
 
 ## Acesso e configuração
 
 A entrada **Caderneta** tem cinco áreas: A minha caderneta, Repetidos, Comunidade, Negociações e Histórico. A entrada destacada mostra saquetas disponíveis e propostas para responder. As notificações abrem a negociação ou mensagem correspondente.
 
-Por defeito, `communityEnabled` e `tradesEnabled` são falsos. A prévia administrativa existente continua disponível. Em Administrador → Caderneta, a configuração versionada permite ativar separadamente saquetas, comunidade e trocas, definir limites (10 exemplares por lado, 5 negociações iniciadas pendentes, 72 horas por versão) e configurar recompensas. Desligar trocas impede novas propostas, contrapropostas e aceitações; permite consultar o histórico, conversar e cancelar. Não existe ativação automática numa atualização.
+Os valores por defeito no código são falsos. Na publicação privada atual, `communityEnabled=false` e `tradesEnabled=true`: apenas os dois administradores podem testar no espaço Administrador. Cada um deve ativar **Mostrar os meus repetidos na comunidade** para aparecer ao outro. A prévia administrativa existente continua disponível. Em Administrador → Caderneta, a configuração versionada permite ativar separadamente saquetas, comunidade e trocas, definir limites (10 exemplares por lado, 5 negociações iniciadas pendentes, 72 horas por versão) e configurar recompensas. Desligar trocas impede novas propostas, contrapropostas e aceitações; permite consultar o histórico, conversar e cancelar. Não existe ativação automática numa atualização.
 
 Uma conta tem um inventário por época, partilhado entre espaços. Espetadores aprovados e ativos podem colecionar e trocar; não originam um cromo próprio no catálogo. Descoberta e novas propostas exigem adesão individual. Pausar propostas retira a pessoa da descoberta sem terminar negociações existentes.
 
