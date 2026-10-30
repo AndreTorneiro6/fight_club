@@ -1,3 +1,10 @@
+## Version1.11.19 LIVE — bettor notices for administrator live-score changes — 30 October 2026
+
+- User clarified notifications ONLY for admin updating provisional scoreboard during match; existing official-result/correction notices retained. Published exact9415dd7d99474ede686e2a9272e49efe27d6c4ff. GitHub41088743245SUCCESS: hosted509tests/typecheck/build/allbrowsergroups and Pi deploy/publichealth. Independent app+worker exactrevision/running/0restarts; apphealthy; package1.11.19; publichealthok. Runtime source verified live-score trigger + outbox freshness guard present.
+- Every actual administrator change to live sets or game scores notifies current active eligible bettors (one per account, spectators included), in-app + push only. Message explicitly provisional and links directly to /apostas?jogo. Identical save sends nothing and keeps version unchanged. Existing final-result and correction notifications unchanged. No bet settlement/ranking/stats/coins effects from live score.
+- Outbox skips old live versions, rescheduled matches, withdrawn bets and finalized matches. Focused34tests and full509tests prove recipients/deduplication/no-op/stale and unauthorized commands; actual Mongo delivery tests prove guards. No real production score/bet/test-notice writes were performed. Feature begins with next genuine admin score change, without retrospective broadcasts.
+- Incremental deployment configuration1.11.18 retained. Keep album/community administrator-only and league reach3 settings unchanged. Both user deployment and live-notification requests complete. Documentation-only handoff follow-up must not redeploy. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential pentest report.
+
 ## Live-score bettor notifications implemented — 30 October 2026
 
 - Latest user clarification is authoritative: notify ONLY when administrator changes live scoreboard DURING match. Preserve official result/correction notifications; do not broaden legacy textual-result settlement. Implementation invokes dedicated bettor notice after validated admin.live-score.save, inside existing Mongo transaction.
