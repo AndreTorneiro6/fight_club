@@ -11,7 +11,7 @@ import {
 } from "./match-vote-outcome";
 import { formatSetScores } from "./set-scores";
 import { editChatMessage } from "./edit-chat-message";
-import type { Actor, Message, State } from "./types";
+import type { Actor, Challenge, Message, State } from "./types";
 import { ensure } from "./rules";
 import {
   discussionTargets,
@@ -488,6 +488,48 @@ function bettingNotice(
   state.notifications.push(notice);
   return notice;
 }
+/** Provisional updates never settle bets or replace official-result notifications. */
+export function notifyMatchVoteLiveScore(
+  state: State,
+  challenge: Challenge,
+  timestamp: number,
+) {
+  const score = challenge.liveScore;
+  if (!score || !isVotingMatch(state, challenge)) return;
+  const recipients = new Set<string>();
+  for (const vote of state.matchVotes ?? []) {
+    if (
+      vote.challengeId !== challenge._id ||
+      vote.withdrawnAt ||
+      recipients.has(vote.userId)
+    )
+      continue;
+    const player = state.players.find(
+      (p) => p._id === vote.playerId && p.userId === vote.userId,
+    );
+    if (!player) continue;
+    recipients.add(vote.userId);
+    const notice = bettingNotice(
+      state,
+      undefined,
+      player._id,
+      "Marcador em direto atualizado",
+      `Jogo #${challenge.number} · Sets (ataque / defesa): ${score.attacker}–${score.defender}.${score.games ? ` Jogos por set: ${formatSetScores(score.games)}.` : ""} Marcador provisório; o resultado oficial ainda não foi confirmado.`,
+      `bet-live:${challenge._id}:${score.scheduledAt}:${score.version}:${vote.userId}`,
+      new Date(timestamp).toISOString(),
+      challenge._id,
+    );
+    if (notice) {
+      notice.deliveryChannels = ["push"];
+      notice.bettingLiveScore = {
+        userId: vote.userId,
+        version: score.version,
+        scheduledAt: score.scheduledAt,
+      };
+    }
+  }
+}
+
 /** Official result changes notify active bettors once per version, including corrections. */
 export function settleMatchVotes(
   state: State,

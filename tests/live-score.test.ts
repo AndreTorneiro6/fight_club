@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execute } from "../lib/engine";
 import { liveScoreFor } from "../lib/live-score";
+import { settleMatchVotes } from "../lib/match-voting";
+import { notificationTarget } from "../lib/notification-link";
 import { todayMatches } from "../lib/result-readiness";
 import {
   collections,
   type State,
   type Challenge,
   type Actor,
+  type Player,
 } from "../lib/types";
 const now = Date.parse("2026-10-28T21:00:00Z");
 const admin: Actor = { userId: "a", playerId: "p", role: "admin" };
@@ -138,4 +141,157 @@ test("today summary uses Lisbon dates, includes finished/pending matches and exc
     todayMatches(games, Date.parse("2026-10-25T12:00:00Z")).map((c) => c._id),
     ["early", "late"],
   );
+});
+
+function bettingFixture() {
+  const s = fixture();
+  s.challenges[0].challengerId = "p3";
+  s.challenges[0].defenderId = "p2";
+  s.challenges[0].officialPublication = {
+    roundId: "round",
+    scheduleId: "schedule",
+    version: 1,
+    publishedAt: new Date(now - 10000).toISOString(),
+  };
+  s.players = [1, 2, 3, 4, 5].map((i) => ({
+    _id: `p${i}`,
+    userId: `u${i}`,
+    name: `Pessoa ${i}`,
+    status: "active",
+    ...(i === 1 ? { spectator: true } : {}),
+    ...(i === 5 ? { status: "suspended" } : {}),
+  })) as Player[];
+  s.matchVotes = [1, 2, 4, 5].map((i) => ({
+    _id: `vote${i}`,
+    userId: `u${i}`,
+    playerId: `p${i}`,
+    challengeId: "c",
+    winnerId: "p3",
+    createdAt: new Date(now - 5000).toISOString(),
+    updatedAt: new Date(now - 5000).toISOString(),
+    lockAt: new Date(now - 1000).toISOString(),
+    ...(i === 4 ? { withdrawnAt: new Date(now - 2000).toISOString() } : {}),
+  }));
+  return s;
+}
+
+test("live score changes notify only active bettors once per account, including spectators and the updating admin", () => {
+  const s = bettingFixture();
+  s.matchVotes!.push({ ...s.matchVotes![0], _id: "duplicate-account" });
+  s.matchVotes!.push({
+    ...s.matchVotes![0],
+    _id: "other-game",
+    playerId: "p3",
+    userId: "u3",
+    challengeId: "other",
+  });
+  const before = structuredClone(s);
+  execute(s, { userId: "u2", playerId: "p2", role: "admin" }, cmd, now);
+  assert.deepEqual(s.notifications.map((n) => n.playerId).sort(), ["p1", "p2"]);
+  for (const notice of s.notifications) {
+    assert.equal(notice.title, "Marcador em direto atualizado");
+    assert.match(notice.body, /1–0/);
+    assert.match(notice.body, /provisório/);
+    assert.deepEqual(notice.deliveryChannels, ["push"]);
+    assert.equal(notice.bettingLiveScore?.version, 1);
+    assert.equal(notificationTarget(notice), "/apostas?jogo=c");
+    assert.equal(notice.bettingResult, undefined);
+  }
+  for (const key of [
+    "players",
+    "matchVotes",
+    "results",
+    "matches",
+    "history",
+    "coinEntries",
+    "predictions",
+  ] as const)
+    assert.deepEqual(s[key], before[key]);
+});
+
+test("saving an unchanged live score sends no notice; real corrections and partial-game changes do, invalid or stale updates do not", () => {
+  const s = bettingFixture();
+  execute(s, admin, { ...cmd, attacker: 0 }, now);
+  assert.equal(s.notifications.length, 0);
+  execute(s, admin, { ...cmd, expectedVersion: 0 }, now + 1);
+  assert.equal(s.notifications.length, 2);
+  execute(s, admin, { ...cmd, expectedVersion: 1 }, now + 2);
+  assert.equal(s.notifications.length, 2);
+  assert.equal(s.challenges[0].liveScore?.version, 1);
+  assert.equal(s.audit.length, 1);
+  const detailed = {
+    ...cmd,
+    expectedVersion: 1,
+    games: [
+      { attacker: 6, defender: 4 },
+      { attacker: 2, defender: 1 },
+    ],
+  };
+  execute(s, admin, detailed, now + 3);
+  assert.equal(s.notifications.length, 4);
+  assert.match(s.notifications.at(-1)!.body, /6-4, 2-1/);
+  execute(
+    s,
+    admin,
+    { ...cmd, expectedVersion: 2, attacker: 0, defender: 1 },
+    now + 4,
+  );
+  assert.equal(s.notifications.length, 6);
+  const before = structuredClone(s);
+  assert.throws(() => execute(s, admin, detailed, now + 5));
+  assert.throws(() =>
+    execute(
+      s,
+      { ...admin, role: "player" },
+      { ...cmd, expectedVersion: 3 },
+      now + 5,
+    ),
+  );
+  assert.throws(() =>
+    execute(
+      s,
+      admin,
+      { ...cmd, expectedVersion: 3, attacker: 2, defender: 2 },
+      now + 5,
+    ),
+  );
+  assert.deepEqual(s, before);
+});
+
+test("live notifications do not settle bets and existing official-result and correction notifications remain separate", () => {
+  const s = bettingFixture();
+  execute(s, admin, cmd, now);
+  assert.ok(s.matchVotes!.every((v) => !v.settledFingerprint));
+  const c = s.challenges[0];
+  c.status = "completed";
+  s.results.push({
+    _id: "result",
+    challengeId: c._id,
+    winnerId: "p3",
+    loserId: "p2",
+    score: "6-4, 6-2",
+    setScores: [
+      { attacker: 6, defender: 4 },
+      { attacker: 6, defender: 2 },
+    ],
+    confirmedAt: new Date(now + 1).toISOString(),
+    seasonId: "season",
+  });
+  settleMatchVotes(s, now + 1, c._id);
+  assert.equal(s.notifications.filter((n) => n.bettingLiveScore).length, 2);
+  assert.equal(s.notifications.filter((n) => n.bettingResult).length, 2);
+  s.results[0].setScores = [
+    { attacker: 6, defender: 3 },
+    { attacker: 6, defender: 2 },
+  ];
+  settleMatchVotes(s, now + 2, c._id);
+  assert.equal(s.notifications.filter((n) => n.bettingResult).length, 4);
+  assert.ok(
+    s.notifications.slice(-2).every((n) => n.title.includes("atualizado")),
+  );
+  const before = structuredClone(s);
+  assert.throws(() =>
+    execute(s, admin, { ...cmd, expectedVersion: 1 }, now + 3),
+  );
+  assert.deepEqual(s, before);
 });

@@ -1,5 +1,6 @@
 import { notificationTarget } from "./notification-link";
 import { isVotingMatch } from "./match-voting-targets";
+import { liveScoreFor } from "./live-score";
 import { responseNoticeIsCurrent } from "./challenge-response-notices";
 import type { CompetitionChallenge } from "./competition-types";
 import {
@@ -412,6 +413,18 @@ export async function dispatchNotifications(
               player?.divisionId) &&
           Date.parse(effectiveOpening) <= Date.now());
       const allowed =
+        (!notification?.bettingLiveScore ||
+          (challenge &&
+            challenge.scheduledAt ===
+              notification.bettingLiveScore.scheduledAt &&
+            liveScoreFor(challenge)?.version ===
+              notification.bettingLiveScore.version &&
+            (await db.collection("matchVotes").findOne({
+              userId: notification.bettingLiveScore.userId,
+              playerId: notification.playerId,
+              challengeId: notification.challengeId,
+              withdrawnAt: null,
+            })))) &&
         (!notification?.bettingResult ||
           (await db.collection("matchVotes").findOne({
             userId: notification.bettingResult.userId,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ensure } from "./rules";
 import type { Actor, State } from "./types";
 import { liveScoreFor, validateLiveScore } from "./live-score";
+import { notifyMatchVoteLiveScore } from "./match-voting";
 const score = z.object({
   attacker: z.number().int().min(0).max(2),
   defender: z.number().int().min(0).max(2),
@@ -48,6 +49,13 @@ export function executeLiveScore(
   );
   validateLiveScore(cmd);
   const previous = c.liveScore;
+  const displayed = liveScoreFor(c, timestamp)!;
+  if (
+    displayed.attacker === cmd.attacker &&
+    displayed.defender === cmd.defender &&
+    JSON.stringify(displayed.games) === JSON.stringify(cmd.games)
+  )
+    return { _id: c._id, version: c.liveScore?.version ?? 0 };
   c.liveScore = {
     attacker: cmd.attacker,
     defender: cmd.defender,
@@ -67,5 +75,6 @@ export function executeLiveScore(
       score: c.liveScore,
     }),
   });
+  notifyMatchVoteLiveScore(s, c, timestamp);
   return { _id: c._id, version: c.liveScore.version };
 }

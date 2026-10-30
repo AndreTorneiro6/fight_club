@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.18";
+export const applicationVersion = "1.11.19";
 export const releaseNotes = [
+  {
+    version: "1.11.19",
+    date: "2026-10-30",
+    title: "Avisos do marcador em direto para apostadores",
+    changes: [
+      "Quando o administrador altera o marcador em direto, quem mantém um palpite nesse jogo recebe um aviso na aplicação e por push, com a pontuação provisória e ligação ao jogo.",
+      "Guardar o mesmo marcador não repete avisos. As notificações do resultado oficial e das suas correções mantêm-se; o marcador em direto não apura palpites nem altera o ranking.",
+    ],
+  },
   {
     version: "1.11.18",
     date: "2026-10-29",

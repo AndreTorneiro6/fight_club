@@ -1,3 +1,16 @@
+## Live-score bettor notifications implemented — 30 October 2026
+
+- Latest user clarification is authoritative: notify ONLY when administrator changes live scoreboard DURING match. Preserve official result/correction notifications; do not broaden legacy textual-result settlement. Implementation invokes dedicated bettor notice after validated admin.live-score.save, inside existing Mongo transaction.
+- Every real sets/game-score change or live correction notifies active eligible existing bettors once per account (including spectators and updating admin if they bet), excluding withdrawn bets/other matches/nonbettors. In-app + push only, provisional wording, direct /apostas?jogo link. Unchanged save is a no-op without version/audit/notice; stale/invalid/nonadmin command rejected before writes. Bets/results/ranking/coins untouched.
+- Delivery rechecks current live version/scheduledAt and active bet; skips superseded score, reschedule, withdrawal or official/final match. Original result and correction pipeline untouched. No production test score/bet/notification created.
+- Focused34tests and full509tests/typecheck/productionbuild pass, including actual Mongo outbox delivery guards and independent live/final/correction notices. Patch1.11.19 ready to publish as follow-up within ongoing authorized deployment request; monitor hosted checks and exact revision/health. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential pentest report and admin-only sticker scope.
+
+## Version1.11.18 LIVE — incremental deployment verified — 30 October 2026
+
+- GitHub40973548463 completed all506tests/typecheck/build/allbrowsergroups and Pi deployment successfully. Exact app+worker revision8b48a86b96af195b6b9439e4fb7eede9594a2a04; package1.11.18, healthy app, bothrunning/0restarts and publichealthok.
+- New BuildKit caches populated (compiler~93MB, npm downloads~277MB), CI compiler cache configured and smaller context applied. Cold first deployment paid dependency install/compiler cost; do not claim a measured warm-release speedup yet. League settings/fixtures and private admin-only sticker activation unchanged.
+- User added request during release verification: notify people who bet when official result changes, retaining all existing notifications. Existing structured-set settlement/correction notices found in match-voting; investigate uncovered correction paths and add focused regression before publishing follow-up.
+
 ## Version1.11.18 incremental deployment prepared — 29 October 2026
 
 - User explicitly requests apply optimizations and deploy pending reach3 validation/preferences. Docker now preserves npm downloads and .next/cache in locked BuildKit caches; hosted CI restores compiler cache across commits/version bumps. Docker context excludes reference app/docs/tests/e2e/private reports; runtime assets and scripts preserved. Retention keeps unused cache for a week rather than one hour. Backup/revision/rollback/health and app+worker-only update unchanged.

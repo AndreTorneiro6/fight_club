@@ -557,6 +557,76 @@ test("outbox commits with events, fans out admins, respects consent, leases work
       (await queue.findOne({ notificationId: "latest-result" }))?.status,
       "sent",
     );
+    // A delayed live score must still belong to the current match and an active bet.
+    await transaction((s) => {
+      const c = s.challenges.find((c) => c._id === "public-betting-game")!;
+      c.scheduledAt = new Date(Date.now() - 1000).toISOString();
+      c.liveScore = {
+        attacker: 1,
+        defender: 0,
+        version: 2,
+        scheduledAt: c.scheduledAt,
+        updatedAt: new Date().toISOString(),
+      };
+      const base = s.notifications.find(
+        (n) => n._id === "betting-outsider-notice",
+      )!;
+      for (const [id, version, scheduledAt] of [
+        ["old-live", 1, c.scheduledAt],
+        ["latest-live", 2, c.scheduledAt],
+        ["rescheduled-live", 2, "2026-01-01T12:00:00Z"],
+      ] as const)
+        s.notifications.push({
+          ...base,
+          _id: id,
+          chatMessageId: undefined,
+          bettingLiveScore: { userId: actor.userId, version, scheduledAt },
+        });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "old-live" }))?.status,
+      "skipped",
+    );
+    assert.equal(
+      (await queue.findOne({ notificationId: "rescheduled-live" }))?.status,
+      "skipped",
+    );
+    assert.equal(
+      (await queue.findOne({ notificationId: "latest-live" }))?.status,
+      "sent",
+    );
+    assert.equal(
+      (await queue.findOne({ notificationId: "latest-live" }))?.path,
+      "/apostas?jogo=public-betting-game",
+    );
+    await transaction((s) => {
+      s.matchVotes!.find((v) => v._id === "settled-vote")!.withdrawnAt =
+        new Date().toISOString();
+      s.notifications.push({
+        ...s.notifications.find((n) => n._id === "latest-live")!,
+        _id: "withdrawn-live",
+      });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "withdrawn-live" }))?.status,
+      "skipped",
+    );
+    await transaction((s) => {
+      delete s.matchVotes!.find((v) => v._id === "settled-vote")!.withdrawnAt;
+      s.challenges.find((c) => c._id === "public-betting-game")!.status =
+        "completed";
+      s.notifications.push({
+        ...s.notifications.find((n) => n._id === "latest-live")!,
+        _id: "finished-live",
+      });
+    });
+    await dispatchNotifications(db, 10, fake, fakePush);
+    assert.equal(
+      (await queue.findOne({ notificationId: "finished-live" }))?.status,
+      "skipped",
+    );
     await transaction((s) => {
       s.settings[0].leagueEmailsEnabled = false;
       s.notifications.push({

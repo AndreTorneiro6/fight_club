@@ -248,6 +248,7 @@ export interface Notification extends Entity {
   stickerTradeId?: string;
   stickerReportId?: string;
   bettingResult?: { userId: string; version: number; fingerprint: string };
+  bettingLiveScore?: { userId: string; version: number; scheduledAt: string };
   bettingNotice?: boolean;
   chatMessageId?: string;
   weeklyChallengeOpening?: {
