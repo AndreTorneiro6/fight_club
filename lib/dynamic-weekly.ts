@@ -298,3 +298,37 @@ export function dynamicTargetReason(
     ? null
     : "Este adversário é necessário para outra dupla. Os papéis foram ajustados para preservar o máximo de jogos da jornada.";
 }
+
+/** Teams whose role the dynamic planner would change if these roles were
+ * published for the division, so the administrator can adjust them first. */
+export function dynamicRoleChanges(
+  s: State,
+  divisionId: string,
+  week: string,
+  assignments: { playerId: string; role: "attack" | "defense" }[],
+) {
+  if (!dynamicWeeklyEnabled(s, divisionId)) return [];
+  const preview: State = {
+    ...s,
+    weeklyRounds: s.weeklyRounds.map((r) =>
+      r.weekStart === week
+        ? { ...r, assignments, dynamicAssignments: undefined }
+        : r,
+    ),
+  };
+  return rankingEntries(s.players, divisionId).flatMap((team) => {
+    const published = assignments.find((a) =>
+      team.members.some((m) => m._id === a.playerId),
+    )?.role;
+    const planned = dynamicRole(preview, team.members[0]._id, week);
+    return published && planned && planned !== published
+      ? [
+          {
+            team: team.members.map((m) => m.name).join(" + "),
+            from: published,
+            to: planned,
+          },
+        ]
+      : [];
+  });
+}

@@ -1,9 +1,13 @@
 "use client";
-import { weeklyPublishedAt } from "@/lib/weekly-publication";
+import {
+  hasUnsavedDivisionRoles,
+  weeklyPublishedAt,
+} from "@/lib/weekly-publication";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
 import { useEffect, useState } from "react";
+import { dynamicRoleChanges } from "@/lib/dynamic-weekly";
 import Link from "next/link";
 import { usesManagedCompetition } from "@/lib/competition-mode";
 import WeeklyOpeningControl from "./weekly-opening-control";
@@ -251,6 +255,12 @@ export function WeeklyRoles({
     round,
     division === "all" ? undefined : division,
   );
+  const unsavedRoleChanges = hasUnsavedDivisionRoles(
+    s.players,
+    roles,
+    round?.assignments ?? [],
+    division,
+  );
   const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
   const ownTeamCommitment = weeklyTeamCommitment(s, me._id);
   const save = async (publish: boolean) => {
@@ -277,6 +287,76 @@ export function WeeklyRoles({
       publish
         ? "Papéis publicados. A abertura mantém a configuração definida pelo administrador."
         : "Rascunho semanal guardado.",
+    );
+  };
+  const divisionAssignments = (divisionId: string) =>
+    players
+      .filter((p) => roles[p._id] && p.divisionId === divisionId)
+      .map((p) => ({ playerId: p._id, role: roles[p._id] }));
+  // Divisions this view can publish one at a time, with the roles the dynamic
+  // planner would change if they were published as they are on screen.
+  const publishable =
+    admin && round
+      ? s.divisions
+          .filter((d) => division === "all" || d._id === division)
+          .map((d) => ({
+            division: d,
+            published: !!weeklyPublishedAt(round, d._id),
+            approved: !!round.divisionPublications?.[d._id]?.approvedAt,
+            changes: weeklyPublishedAt(round, d._id)
+              ? []
+              : dynamicRoleChanges(
+                  s,
+                  d._id,
+                  week,
+                  round.assignments
+                    .filter(
+                      (a) =>
+                        s.players.find((p) => p._id === a.playerId)
+                          ?.divisionId !== d._id,
+                    )
+                    .concat(divisionAssignments(d._id)),
+                ),
+          }))
+      : [];
+  /** Saves on-screen changes, approves and publishes one division in one action. */
+  const publishDivisionNow = async (divisionId: string, name: string) => {
+    if (!round) return;
+    let version = round.version ?? 0;
+    if (
+      hasUnsavedDivisionRoles(s.players, roles, round.assignments, divisionId)
+    ) {
+      const saved = await run(
+        {
+          type: "admin.week.division.save",
+          divisionId,
+          weekStart: week,
+          expectedVersion: version,
+          assignments: divisionAssignments(divisionId),
+        },
+        "",
+      );
+      if (!saved) return;
+      version += 1;
+    }
+    const approved = await run(
+      {
+        type: "admin.week.division.approve",
+        divisionId,
+        weekStart: week,
+        expectedVersion: version,
+      },
+      "",
+    );
+    if (!approved) return;
+    await run(
+      {
+        type: "admin.week.division.publish",
+        divisionId,
+        weekStart: week,
+        expectedVersion: version + 1,
+      },
+      `Papéis de ${name} publicados. A abertura mantém a configuração definida pelo administrador.`,
     );
   };
   return (
@@ -881,18 +961,57 @@ export function WeeklyRoles({
                     round.approvedVersion !== round.version
                   : !round?.divisionPublications?.[division]?.approvedAt) ||
                 weekType !== (round?.weekType ?? "NORMAL") ||
-                JSON.stringify(Object.entries(roles).sort()) !==
-                  JSON.stringify(
-                    (round?.assignments ?? [])
-                      .map((a) => [a.playerId, a.role])
-                      .sort(),
-                  )
+                unsavedRoleChanges
               }
               onClick={() => void save(true)}
             >
               Publicar papéis da semana
             </button>
           </div>
+          {week >= clubWeek().start &&
+            publishable.map(({ division: d, published, approved, changes }) => (
+              <div
+                className="inset stack"
+                key={d._id}
+                aria-label={`Publicar papéis · ${d.name}`}
+              >
+                <strong>
+                  {d.name} ·{" "}
+                  {published ? "Publicado" : approved ? "Aprovado" : "Rascunho"}
+                </strong>
+                {!!changes.length && (
+                  <p role="alert">
+                    Com estes papéis a app vai alterar:{" "}
+                    {changes
+                      .map(
+                        (c) =>
+                          `${c.team} (${c.from === "attack" ? "Ataque" : "Defesa"} → ${c.to === "attack" ? "Ataque" : "Defesa"})`,
+                      )
+                      .join(", ")}
+                    . Os jogadores recebem o papel publicado; ajusta os papéis
+                    para evitar avisos contraditórios.
+                  </p>
+                )}
+                {!published && (
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={() => {
+                      if (
+                        changes.length &&
+                        !window.confirm(
+                          `A app vai alterar ${changes.length} papel(éis) em ${d.name} depois da publicação. Publicar mesmo assim?`,
+                        )
+                      )
+                        return;
+                      void publishDivisionNow(d._id, d.name);
+                    }}
+                  >
+                    Publicar papéis · {d.name}
+                  </button>
+                )}
+              </div>
+            ))}
         </>
       )}
     </section>

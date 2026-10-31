@@ -187,6 +187,43 @@ test("last result selects its division, guides ranking and private papers, then 
         { exact: true },
       ),
     ).toBeVisible();
+    // Another division can be published on its own in one action.
+    const other = state.divisions.find(
+      (d: any) =>
+        d._id !== game.divisionId &&
+        state.players.some(
+          (p: any) => p.divisionId === d._id && p.status === "active",
+        ),
+    );
+    if (other) {
+      page.on("dialog", (dialog) => void dialog.accept());
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto(
+        `/admin?tab=weekly&week=${next.weekStart}&division=${other._id}`,
+      );
+      await page
+        .getByRole("button", {
+          name: `Atualizar papéis · ${other.name}`,
+          exact: true,
+        })
+        .click();
+      const block = page.getByLabel(`Publicar papéis · ${other.name}`, {
+        exact: true,
+      });
+      await block
+        .getByRole("button", {
+          name: `Publicar papéis · ${other.name}`,
+          exact: true,
+        })
+        .click();
+      await expect(block).toContainText(`${other.name} · Publicado`);
+      const after = await read();
+      const round = after.weeklyRounds.find((r: any) => r._id === next._id);
+      expect(round.divisionPublications[other._id].publishedAt).toBeTruthy();
+      expect(round.divisionPublications[game.divisionId].publishedAt).toBe(
+        next.divisionPublications[game.divisionId].publishedAt,
+      );
+    }
   } finally {
     await ctx.close();
   }

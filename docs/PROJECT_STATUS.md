@@ -1,3 +1,10 @@
+## Version1.11.21 — per-division papéis publication + production title rule — 31 October 2026
+
+- Bronze papéis for 2026-11-02 could not be published from Papéis semanais: publish button compared on-screen vs saved roles across ALL divisions, and Ouro's dynamic planner showed Diogo Faria + Nuno Rodrigues (5th) as Defesa vs published Ataque. Fix: hasUnsavedDivisionRoles compares only the selected division. Workaround meanwhile: turnover flow publish.
+- Cause of Ouro switch: titleMaxPosition=3 (2nd/3rd only may challenge 1st) while user's rule is "3 positions" (4th may challenge). Team 2 frozen (Hélder Marques vacation to 2026-11-15). User authorized: PRODUCTION setting changed via validated engine + Mongo transaction at 2026-10-31 19:28 UTC, titleMaxPosition 3→4 (dry run first; verified Diogo/Nuno attack, Ouro max 5 games, no published role changed). No other production writes; no notices sent.
+- New: per-division "Publicar papéis · <Divisão>" block in Papéis semanais (saves if needed, approves, publishes; works in all-divisions view after partial publication); dynamicRoleChanges warning + confirm before publishing roles the planner would change. Title-rule label clarified. Not done: automatic notice when a dynamic switch changes an already-published role (offered).
+- Typecheck, 513 tests, build, e2e round-transition (with new one-click step), weekly-teams, weekly-ranking pass.
+
 ## Version1.11.20 LIVE — weekly ranking per division — 31 October 2026
 
 - Published exact b57bb03724cf6c8d4f0b97220de2ce0c9dc699cb. GitHub41197382158 SUCCESS (checks + Pi deploy); deploy log "Deployed validated revision b57bb03"; public /api/health ok. No production data changed manually. Documentation-only follow-up must not redeploy.

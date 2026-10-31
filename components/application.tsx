@@ -5769,7 +5769,8 @@ const settingLabels: Record<
   relegationCount: "Duplas que descem",
   promotionPlacement: "Posição de entrada dos promovidos",
   relegationPlacement: "Posição de entrada dos despromovidos",
-  titleMaxPosition: "Posição máxima da dupla desafiante",
+  titleMaxPosition:
+    "Desafiar o campeão · última posição permitida (ex.: 4 = as duplas em 2.º, 3.º e 4.º lugar)",
   titleChangesOnWin: "Transferir título se o contender vencer",
   titleAffectsRanking: "Title Fight altera o ranking",
   seasonMonths: "Duração sugerida de época · meses",

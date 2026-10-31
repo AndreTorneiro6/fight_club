@@ -1,6 +1,6 @@
 # Papéis dinâmicos por prioridade
 
-Verificado em 29/10/2026: modo dinâmico ativo em **Ouro, Prata e Bronze**, com alcance **3 em cada divisão**. O valor global continua 2, mas os três valores específicos por divisão têm precedência. A elegibilidade do título continua limitada pela configuração própria (`titleMaxPosition=3`).
+Verificado em 29/10/2026: modo dinâmico ativo em **Ouro, Prata e Bronze**, com alcance **3 em cada divisão**. O valor global continua 2, mas os três valores específicos por divisão têm precedência. A elegibilidade do título continua limitada pela configuração própria: `titleMaxPosition` é a última posição que pode desafiar o 1.º (31/10/2026: 4, ou seja 2.º, 3.º e 4.º).
 
 Em **Admin → Regras da competição**, a distância de cada divisão guarda imediatamente. O motor usa sempre a distância configurada para essa divisão, recalcula os papéis efetivos da semana publicada e atualiza os rascunhos gerados. O plano em cache é invalidado quando mudam a distância, as posições ou os compromissos. Não é necessário alterar o algoritmo quando o alcance muda.
 

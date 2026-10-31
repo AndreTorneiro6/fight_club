@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.20";
+export const applicationVersion = "1.11.21";
 export const releaseNotes = [
+  {
+    version: "1.11.21",
+    date: "2026-10-31",
+    title: "Publicar papéis por divisão num só passo",
+    changes: [
+      "Cada divisão tem o botão Publicar papéis, que guarda, aprova e publica os papéis dessa divisão de uma vez, sem depender das outras.",
+      "Antes de publicar, a app avisa quando os papéis dinâmicos vão alterar o papel de alguma dupla, para evitar avisos contraditórios aos jogadores.",
+      "Uma alteração dinâmica numa divisão já publicada deixou de bloquear a publicação das restantes. A regra do título indica agora claramente a última posição que pode desafiar o campeão.",
+    ],
+  },
   {
     version: "1.11.20",
     date: "2026-10-31",
