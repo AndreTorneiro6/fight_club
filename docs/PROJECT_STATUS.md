@@ -1,3 +1,10 @@
+## Weekly ranking publication per division — 31 October 2026 (local, not deployed)
+
+- User reported Regras set to Saturday 12h but admin ranking panel said "domingo". Cause: hardcoded "ao domingo" text in components/admin-team-ranking.tsx (only hour was read from settings). Scheduler itself already used weeklyRankingDay correctly.
+- User chose "publish per division" with ONE shared day/hour. autoWeeklyRanking now publishes each division separately (skips divisions without active players, already published that week, or with a completed round awaiting the admin close flow); one division no longer blocks the others. Legacy all-division weeklyRankingPublication for the week still suppresses auto.
+- Admin panel shows configured day/hour (or that auto is off), last publication of the selected division, and "PUBLICAR AGORA E NOTIFICAR · <DIVISÃO>" for immediate release. Republishing the same division/week with no new confirmed results is a no-op ({published:false}) and the button is disabled.
+- Typecheck, 510 tests, production build and e2e/weekly-ranking pass. Not committed or deployed yet; needs user request. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential pentest report.
+
 ## Version1.11.19 LIVE — bettor notices for administrator live-score changes — 30 October 2026
 
 - User clarified notifications ONLY for admin updating provisional scoreboard during match; existing official-result/correction notices retained. Published exact9415dd7d99474ede686e2a9272e49efe27d6c4ff. GitHub41088743245SUCCESS: hosted509tests/typecheck/build/allbrowsergroups and Pi deploy/publichealth. Independent app+worker exactrevision/running/0restarts; apphealthy; package1.11.19; publichealthok. Runtime source verified live-score trigger + outbox freshness guard present.

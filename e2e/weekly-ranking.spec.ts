@@ -32,13 +32,17 @@ test("administrator publishes a weekly ranking announcement once and players can
   });
   expect(settings.ok(), await settings.text()).toBe(true);
   await page.goto("/admin?tab=rankings");
+  const divisionId = await page
+    .getByRole("combobox", { name: "Categoria do ranking" })
+    .inputValue();
   const button = page.getByRole("button", {
-    name: "PUBLICAR RANKING SEMANAL E NOTIFICAR",
-    exact: true,
+    name: /^PUBLICAR AGORA E NOTIFICAR · /,
   });
   await expect(button).toBeEnabled();
   await button.click();
-  await expect(page.getByText(/^Última publicação:/)).toBeVisible();
+  await expect(
+    page.getByText(/^Última publicação desta divisão:/),
+  ).toBeVisible();
   await expect(button).toBeDisabled();
   const final = await read(),
     notices = final.notifications.filter(
@@ -62,7 +66,11 @@ test("administrator publishes a weekly ranking announcement once and players can
   );
   const repeat = await page.request.post("/api/league", {
     headers: { Origin: "http://localhost:3100" },
-    data: { type: "admin.ranking.publishWeekly", seasonId: season._id },
+    data: {
+      type: "admin.ranking.publishWeekly",
+      seasonId: season._id,
+      divisionId,
+    },
   });
   expect(repeat.ok()).toBe(true);
   expect(

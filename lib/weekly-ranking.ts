@@ -43,6 +43,17 @@ export function publishWeeklyRanking(
     );
   if (divisionId && divisionRankingPublished(s, seasonId, divisionId, week))
     return { published: false };
+  // Republishing a division with no new confirmed results changes nothing.
+  if (
+    divisionId &&
+    season.divisionRankingPublications?.some(
+      (p) =>
+        p.divisionId === divisionId &&
+        p.weekStart === week &&
+        p.resultSignature === completion!.resultSignature,
+    )
+  )
+    return { published: false };
   if (!divisionId && season.weeklyRankingPublication?.weekStart === week)
     return { published: false };
   const snapshot = s.divisions
@@ -138,22 +149,36 @@ export function autoWeeklyRanking(s: State, timestamp: number) {
       season.start <= local.day &&
       season.end >= local.day,
   )) {
-    if (
-      s.players.some(
+    const week = seasonWeek(s, timestamp);
+    // Older all-division publication for this week already covers every division.
+    if (season.weeklyRankingPublication?.weekStart === week) continue;
+    // Each division is published on its own, so one division never blocks another.
+    for (const division of s.divisions) {
+      const hasPlayers = s.players.some(
         (p) =>
+          p.divisionId === division._id &&
           p.status === "active" &&
           !p.awaitingApproval &&
           !p.registrationRejectedAt,
-      )
-    ) {
-      const week = seasonWeek(s, timestamp);
-      if (
-        s.divisions.some(
-          (d) => divisionRoundCompletion(s, season._id, d._id, week).ready,
-        )
-      )
-        continue;
-      publishWeeklyRanking(s, season._id, "system:weekly-ranking", timestamp);
+      );
+      const alreadyPublished = season.divisionRankingPublications?.some(
+        (p) => p.divisionId === division._id && p.weekStart === week,
+      );
+      // A completed round is published by the administrator in the round-closing flow.
+      const awaitingClose = divisionRoundCompletion(
+        s,
+        season._id,
+        division._id,
+        week,
+      ).ready;
+      if (!hasPlayers || alreadyPublished || awaitingClose) continue;
+      publishWeeklyRanking(
+        s,
+        season._id,
+        "system:weekly-ranking",
+        timestamp,
+        division._id,
+      );
     }
   }
 }

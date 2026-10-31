@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.19";
+export const applicationVersion = "1.11.20";
 export const releaseNotes = [
+  {
+    version: "1.11.20",
+    date: "2026-10-31",
+    title: "Ranking semanal publicado por divisão",
+    changes: [
+      "O ranking semanal é publicado automaticamente para cada divisão no dia e hora definidos em Regras; uma divisão com a jornada por fechar já não impede a publicação das restantes.",
+      "Os administradores podem publicar de imediato o ranking da divisão escolhida e notificar os seus jogadores. O painel mostra o dia configurado e a última publicação dessa divisão.",
+    ],
+  },
   {
     version: "1.11.19",
     date: "2026-10-30",

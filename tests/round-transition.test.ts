@@ -351,10 +351,13 @@ test("scheduled automatic ranking waits for manual completed-round publication a
   result(s, "gold3");
   assert.equal(s.weeklyRounds.length, 1);
   autoWeeklyRanking(s, Date.parse("2026-11-01T20:00:00Z"));
-  assert.equal(
-    s.notifications.some((n) => n.rankingNotice),
-    false,
+  // The completed Ouro round waits for the administrator; Prata is not blocked by it.
+  const notified = new Set(
+    s.notifications
+      .filter((n) => n.rankingNotice)
+      .map((n) => s.players.find((p) => p._id === n.playerId)?.divisionId),
   );
+  assert.deepEqual([...notified], ["silver"]);
 });
 
 test("Mongo replica-set transactions serialize simultaneous rivals and partner requests; private division papers stay private", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "fight-club-padel-league",
-  "version": "1.11.19",
+  "version": "1.11.20",
   "private": true,
   "scripts": {
     "dev": "next dev",

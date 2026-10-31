@@ -431,11 +431,19 @@ test("Sunday ranking publication announces the current ranking once with a saved
   }
   autoWeeklyRanking(s, Date.parse("2026-10-25T20:30:00Z"));
   assert.equal(s.notifications.length, 4);
-  execute(
-    s,
-    admin,
-    { type: "admin.ranking.publishWeekly", seasonId: "season" },
-    Date.parse("2026-10-25T21:00:00Z"),
+  // "Publish now" for the same division with no new results is a no-op.
+  assert.deepEqual(
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.ranking.publishWeekly",
+        seasonId: "season",
+        divisionId: "gold",
+      },
+      Date.parse("2026-10-25T21:00:00Z"),
+    ),
+    { published: false },
   );
   assert.equal(s.notifications.length, 4);
   autoWeeklyRanking(s, Date.parse("2026-11-01T20:00:00Z"));
@@ -485,6 +493,62 @@ test("weekly ranking notices respect Lisbon summer time, configuration, season s
   disabled.settings[0].weeklyRankingHour = 18;
   autoWeeklyRanking(disabled, Date.parse("2026-10-24T18:00:00Z"));
   assert.equal(disabled.notifications.length, 4);
+});
+
+test("Saturday 12h schedule publishes each division separately and the administrator can publish a division immediately", async () => {
+  const { autoWeeklyRanking } = await import("../lib/weekly-ranking");
+  const s = fixture();
+  s.settings[0].weeklyRankingDay = 6;
+  s.settings[0].weeklyRankingHour = 12;
+  s.divisions.push({
+    _id: "silver",
+    code: "prata",
+    name: "Prata",
+    tier: 2,
+    capacity: 8,
+  });
+  s.players.push(
+    ...s.players.slice(0, 2).map((p, i) => ({
+      ...structuredClone(p),
+      _id: `silver${i}`,
+      userId: `silver-user${i}`,
+      name: `Prata ${i}`,
+      divisionId: "silver",
+      position: i + 1,
+      partnerId: "",
+      partner: "",
+    })),
+  );
+  // Admin publishes Prata right away, before the schedule.
+  assert.deepEqual(
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.ranking.publishWeekly",
+        seasonId: "season",
+        divisionId: "silver",
+      },
+      Date.parse("2026-10-23T09:00:00Z"),
+    ),
+    { published: true },
+  );
+  assert.deepEqual(
+    [...new Set(s.notifications.map((n) => n.playerId))].sort(),
+    ["silver0", "silver1"],
+  );
+  // Saturday 11:59 Lisbon (summer time, UTC+1) is still too early.
+  autoWeeklyRanking(s, Date.parse("2026-10-24T10:59:00Z"));
+  assert.equal(s.notifications.length, 2);
+  // Saturday 12:00: only Ouro is published, Prata was already published this week.
+  autoWeeklyRanking(s, Date.parse("2026-10-24T11:00:00Z"));
+  assert.equal(s.notifications.length, 6);
+  assert.deepEqual(
+    s.seasons[0].divisionRankingPublications?.map((p) => p.divisionId).sort(),
+    ["gold", "silver"],
+  );
+  autoWeeklyRanking(s, Date.parse("2026-10-24T15:00:00Z"));
+  assert.equal(s.notifications.length, 6);
 });
 
 function bronzeDraftFixture() {
