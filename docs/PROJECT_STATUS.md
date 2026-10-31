@@ -1,9 +1,14 @@
-## Weekly ranking publication per division — 31 October 2026 (local, not deployed)
+## Version1.11.20 LIVE — weekly ranking per division — 31 October 2026
+
+- Published exact b57bb03724cf6c8d4f0b97220de2ce0c9dc699cb. GitHub41197382158 SUCCESS (checks + Pi deploy); deploy log "Deployed validated revision b57bb03"; public /api/health ok. No production data changed manually. Documentation-only follow-up must not redeploy.
+- User question answered (no code change): "Agendar abertura" and "Contagem decrescente" both show the player countdown once papéis are published; "Manter fechados" shows waiting message.
+
+## Weekly ranking publication per division — 31 October 2026 (shipped in 1.11.20)
 
 - User reported Regras set to Saturday 12h but admin ranking panel said "domingo". Cause: hardcoded "ao domingo" text in components/admin-team-ranking.tsx (only hour was read from settings). Scheduler itself already used weeklyRankingDay correctly.
 - User chose "publish per division" with ONE shared day/hour. autoWeeklyRanking now publishes each division separately (skips divisions without active players, already published that week, or with a completed round awaiting the admin close flow); one division no longer blocks the others. Legacy all-division weeklyRankingPublication for the week still suppresses auto.
 - Admin panel shows configured day/hour (or that auto is off), last publication of the selected division, and "PUBLICAR AGORA E NOTIFICAR · <DIVISÃO>" for immediate release. Republishing the same division/week with no new confirmed results is a no-op ({published:false}) and the button is disabled.
-- Typecheck, 510 tests, production build and e2e/weekly-ranking pass. Not committed or deployed yet; needs user request. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential pentest report.
+- Typecheck, 510 tests, production build and e2e/weekly-ranking pass. Preserve unrelated ZIP deletion/Untitled.jpeg/confidential pentest report.
 
 ## Version1.11.19 LIVE — bettor notices for administrator live-score changes — 30 October 2026
 
