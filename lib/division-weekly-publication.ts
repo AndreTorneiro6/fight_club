@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound } from "./types";
 import { ensure } from "./rules";
 import { rankingEntries } from "./ranking-groups";
-import { weeklyPositionReason } from "./weekly";
+import { weeklyOpeningAt, weeklyPositionReason } from "./weekly";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRankingPublished } from "./round-transition";
 import { challengeDistance } from "./challenge-distance";
@@ -159,6 +159,119 @@ export function publishDivisionPapers(
     action: approve ? "week.division.approved" : "week.division.published",
     createdAt: now,
     details: JSON.stringify({ divisionId, weekStart, version: r.version }),
+  });
+  return { id: r._id };
+}
+
+/** Corrects already-published roles of one division before it opens, while no
+ * challenge exists yet. Only changed players are notified; history is audited. */
+export function correctPublishedDivisionPapers(
+  s: State,
+  divisionId: string,
+  weekStart: string,
+  expectedVersion: number,
+  changes: { playerId: string; role: "attack" | "defense" }[],
+  reason: string,
+  by: string,
+  timestamp: number,
+) {
+  const r = s.weeklyRounds.find((r) => r.weekStart === weekStart);
+  ensure(
+    r && s.divisions.some((d) => d._id === divisionId),
+    "Papéis ou divisão não encontrados.",
+  );
+  ensure(
+    (r.version ?? 0) === expectedVersion,
+    "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+    409,
+  );
+  ensure(
+    weeklyPublishedAt(r, divisionId),
+    "Só é possível corrigir papéis já publicados.",
+  );
+  const opening = weeklyOpeningAt(r, divisionId);
+  ensure(
+    opening === null || !opening || Date.parse(opening) > timestamp,
+    "Os desafios desta divisão já abriram; os papéis não podem ser corrigidos.",
+  );
+  ensure(
+    !s.challenges.some(
+      (c) =>
+        c.divisionId === divisionId &&
+        (c.weekStart ?? clubWeek(c.createdAt).start) === weekStart &&
+        !["cancelled", "refused", "expired"].includes(c.status),
+    ),
+    "Já existem desafios nesta semana; os papéis não podem ser corrigidos.",
+  );
+  ensure(changes.length > 0, "Indica os papéis a corrigir.");
+  for (const change of changes)
+    ensure(
+      s.players.find((p) => p._id === change.playerId)?.divisionId ===
+        divisionId && r.assignments.some((a) => a.playerId === change.playerId),
+      "Jogador sem papel publicado nesta divisão.",
+    );
+  const before = r.assignments.filter((a) =>
+    changes.some((c) => c.playerId === a.playerId),
+  );
+  r.assignments = r.assignments.map(
+    (a) => changes.find((c) => c.playerId === a.playerId) ?? a,
+  );
+  // Each team keeps a single role compatible with its position.
+  for (const team of rankingEntries(s.players, divisionId)) {
+    const roles = team.members
+      .filter(
+        (m) =>
+          m.status === "active" &&
+          !m.awaitingApproval &&
+          !m.registrationRejectedAt,
+      )
+      .map((m) => r.assignments.find((a) => a.playerId === m._id)?.role);
+    if (!roles.length) continue;
+    ensure(
+      roles.every(Boolean) && new Set(roles).size === 1,
+      "Atribui um único papel a todos os membros de cada dupla.",
+    );
+    for (const m of team.members)
+      if (roles[0])
+        ensure(
+          !weeklyPositionReason(s.players, m._id, roles[0]),
+          "Papel incompatível com a posição da dupla.",
+        );
+  }
+  if (r.dynamicAssignments)
+    r.dynamicAssignments = r.dynamicAssignments.map(
+      (a) => changes.find((c) => c.playerId === a.playerId) ?? a,
+    );
+  r.version = (r.version ?? 0) + 1;
+  const now = new Date(timestamp).toISOString();
+  for (const change of changes) {
+    const old = before.find((b) => b.playerId === change.playerId);
+    if (old?.role === change.role) continue;
+    s.notifications.push({
+      _id: randomUUID(),
+      playerId: change.playerId,
+      kind: "challenge",
+      title: "Papel semanal corrigido",
+      body: `Semana de ${weekStart}: o teu papel passou para ${change.role === "attack" ? "Ataque" : "Defesa"}. Consulta os papéis e a abertura dos desafios.`,
+      createdAt: now,
+      read: false,
+      dedupe: `division-papers-correction:${weekStart}:${divisionId}:${r.version}:${change.playerId}`,
+      deliveryChannels: ["push"],
+    });
+  }
+  s.audit.push({
+    _id: randomUUID(),
+    userId: by,
+    action: "week.division.corrected",
+    createdAt: now,
+    details: JSON.stringify({
+      divisionId,
+      weekStart,
+      reason,
+      before,
+      after: changes,
+      version: r.version,
+    }),
   });
   return { id: r._id };
 }

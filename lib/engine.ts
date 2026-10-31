@@ -18,7 +18,10 @@ import { chatMentionTargets } from "./chat-mentions";
 import { editChatMessage } from "./edit-chat-message";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRoundCompletion } from "./round-transition";
-import { publishDivisionPapers } from "./division-weekly-publication";
+import {
+  correctPublishedDivisionPapers,
+  publishDivisionPapers,
+} from "./division-weekly-publication";
 import { challengeDistance } from "./challenge-distance";
 import {
   dynamicWeeklyEnabled,
@@ -265,6 +268,16 @@ export const commandSchema = z.discriminatedUnion("type", [
     divisionId: id,
     weekStart: day,
     expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.correct"),
+    divisionId: id,
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+    changes: z
+      .array(z.object({ playerId: id, role: z.enum(["attack", "defense"]) }))
+      .min(1),
+    reason: text.min(3),
   }),
   z.object({
     type: z.literal("admin.week.division.publish"),
@@ -2035,6 +2048,17 @@ export function execute(
       });
       return { id: r._id };
     }
+    case "admin.week.division.correct":
+      return correctPublishedDivisionPapers(
+        s,
+        cmd.divisionId,
+        cmd.weekStart,
+        cmd.expectedVersion,
+        cmd.changes,
+        cmd.reason,
+        actor.userId,
+        timestamp,
+      );
     case "admin.week.division.approve":
     case "admin.week.division.publish":
       return publishDivisionPapers(

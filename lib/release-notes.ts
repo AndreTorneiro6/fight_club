@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.21";
+export const applicationVersion = "1.11.22";
 export const releaseNotes = [
+  {
+    version: "1.11.22",
+    date: "2026-10-31",
+    title: "Correção de papéis publicados antes da abertura",
+    changes: [
+      "O administrador pode corrigir os papéis já publicados de uma divisão enquanto os desafios ainda não abriram e não existem desafios nessa semana.",
+      "Só os jogadores cujo papel muda recebem o aviso Papel semanal corrigido; a correção fica registada no histórico.",
+    ],
+  },
   {
     version: "1.11.21",
     date: "2026-10-31",

@@ -804,3 +804,94 @@ test("Gold and Silver future proposals follow actual assigned roles without enab
   synchronizeWeeklyRoles(s, first.weekStart, "admin", now);
   assert.equal(first.version, version);
 });
+
+test("administrator corrects published roles of one division before it opens, notifying only changed players", () => {
+  const week = "2026-11-02";
+  const base = fixture();
+  base.weeklyRounds = [
+    {
+      _id: week,
+      weekStart: week,
+      seasonId: "season",
+      version: 3,
+      assignments: [
+        { playerId: "p0", role: "defense" },
+        { playerId: "p1", role: "attack" },
+        { playerId: "p2", role: "defense" },
+        { playerId: "p3", role: "attack" },
+      ],
+      divisionPublications: {
+        gold: { publishedAt: "2026-10-31T19:28:00Z", publishedBy: "admin" },
+      },
+      divisionChallengeOpenings: { gold: "2026-11-01T11:30:00Z" },
+    },
+  ];
+  const at = Date.parse("2026-10-31T20:00:00Z");
+  const swap = {
+    type: "admin.week.division.correct",
+    divisionId: "gold",
+    weekStart: week,
+    expectedVersion: 3,
+    changes: [
+      { playerId: "p1", role: "defense" },
+      { playerId: "p2", role: "attack" },
+    ],
+    reason: "Correção pedida pelo administrador",
+  };
+  const s = structuredClone(base);
+  execute(s, admin, swap, at);
+  assert.deepEqual(
+    s.weeklyRounds[0].assignments.map((a) => a.role),
+    ["defense", "defense", "attack", "attack"],
+  );
+  assert.equal(s.weeklyRounds[0].version, 4);
+  assert.deepEqual(
+    s.notifications.map((n) => [n.playerId, n.title]),
+    [
+      ["p1", "Papel semanal corrigido"],
+      ["p2", "Papel semanal corrigido"],
+    ],
+  );
+  assert.equal(s.audit.at(-1)?.action, "week.division.corrected");
+  // Stale version, opened division, existing challenge and non-admins are refused.
+  assert.throws(
+    () =>
+      execute(
+        structuredClone(base),
+        admin,
+        { ...swap, expectedVersion: 2 },
+        at,
+      ),
+    /Outro administrador/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        structuredClone(base),
+        admin,
+        swap,
+        Date.parse("2026-11-01T11:30:00Z"),
+      ),
+    /já abriram/,
+  );
+  const withChallenge = structuredClone(base);
+  withChallenge.challenges = [
+    {
+      _id: "c",
+      divisionId: "gold",
+      weekStart: week,
+      status: "pending",
+      createdAt: "2026-11-01T12:00:00Z",
+    } as never,
+  ];
+  assert.throws(() => execute(withChallenge, admin, swap, at), /desafios/);
+  assert.throws(
+    () =>
+      execute(structuredClone(base), { ...admin, role: "player" }, swap, at),
+    /administrador|permiss/i,
+  );
+  // Papers that are not published yet use the normal approval flow.
+  const draft = structuredClone(base);
+  delete draft.weeklyRounds[0].divisionPublications;
+  assert.throws(() => execute(draft, admin, swap, at), /já publicados/);
+});
