@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.22";
+export const applicationVersion = "1.11.23";
 export const releaseNotes = [
+  {
+    version: "1.11.23",
+    date: "2026-11-01",
+    title: "Sem confrontos repetidos em semanas seguidas",
+    changes: [
+      "Em todas as divisões, duas duplas que jogaram entre si numa semana não podem voltar a defrontar-se na semana seguinte. Esses adversários deixam de aparecer e os papéis dinâmicos já os excluem.",
+      "Quando um desafio semanal é cancelado, os papéis são recalculados e só as duplas cujo papel muda recebem o aviso. Em caso de empate, a dupla que já lançou desafio nessa semana mantém o ataque.",
+    ],
+  },
   {
     version: "1.11.22",
     date: "2026-10-31",

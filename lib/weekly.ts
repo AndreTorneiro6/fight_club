@@ -9,6 +9,10 @@ import { challengeMemberIds, challengeSide } from "./team-competition";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import type { Challenge, Player, State, WeeklyRound } from "./types";
 import { addClubDays, clubDay, clubWeek } from "./calendar";
+import {
+  CONSECUTIVE_REMATCH_MESSAGE,
+  consecutiveRematch,
+} from "./consecutive-rematch";
 
 export function weeklyPositionReason(
   players: Player[],
@@ -199,6 +203,16 @@ export function weeklyReason(
         ? "Já tens um desafio atribuído nesta semana."
         : "Este defensor já tem um desafio nesta semana.";
   }
+  if (
+    !ignoreId &&
+    consecutiveRematch(
+      s,
+      attackingTeam.map((m) => m._id).sort().join(":"),
+      defendingTeam.map((m) => m._id).sort().join(":"),
+      week,
+    )
+  )
+    return CONSECUTIVE_REMATCH_MESSAGE;
   if (dynamicWeeklyEnabled(s, attacker.divisionId) && !ignoreId) {
     const reason = dynamicTargetReason(s, attacker._id, defender._id, week);
     if (reason) return reason;

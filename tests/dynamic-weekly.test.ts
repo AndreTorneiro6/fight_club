@@ -282,7 +282,8 @@ test("forced pairing blocked by another domain rule leaves the first valid chall
       challengerId: "t11a",
       defenderId: "t9a",
       status: "completed",
-      weekStart: "2026-10-19",
+      // Two weeks back: only the rest-days rule (not the consecutive-rematch rule) blocks 11→9.
+      weekStart: "2026-10-12",
       createdAt: "2026-10-24T12:00:00Z",
       completedAt: "2026-10-24T14:00:00Z",
       challengerPosition: 11,
@@ -586,3 +587,41 @@ for (const code of ["ouro", "prata"] as const) {
     }
   });
 }
+for (const code of ["ouro", "prata", "bronze"] as DivisionCode[])
+  test(`${code}: teams that played last week cannot face each other again this week`, () => {
+    const s = fixture(code, 10, 3);
+    const teamIds = (rank: number) => [`t${rank}a`, `t${rank}b`];
+    s.challenges.push({
+      _id: "last-week",
+      number: 1,
+      seasonId: "season",
+      divisionId: code,
+      challengerId: "t9a",
+      defenderId: "t6a",
+      challengerTeam: teamIds(9).map((playerId) => ({ playerId, name: playerId })),
+      defenderTeam: teamIds(6).map((playerId) => ({ playerId, name: playerId })),
+      status: "completed",
+      weekStart: "2026-10-19",
+      createdAt: "2026-10-18T12:00:00Z",
+      respondBy: "2026-10-20T12:00:00Z",
+      scheduleBy: "2026-10-25T23:59:59Z",
+      playBy: "2026-10-25T23:59:59Z",
+      durationMinutes: 90,
+      titleFight: false,
+    } as State["challenges"][number]);
+    // Neither direction of last week's pairing is offered or accepted.
+    const plan = dynamicWeeklyPlan(s, code, week);
+    const same = (k: string, r: number) => k === teamIds(r).sort().join(":");
+    assert.ok(
+      !plan.eligible.some(
+        (p) =>
+          (same(p.attackerKey, 9) && same(p.defenderKey, 6)) ||
+          (same(p.attackerKey, 6) && same(p.defenderKey, 9)),
+      ),
+    );
+    assert.throws(() => send(s, 9, 6), /semanas seguidas/);
+    assert.equal(s.challenges.length, 1);
+    // Other opponents within reach remain available.
+    send(s, 9, 7);
+    assert.ok(pairing(s, 9, 7));
+  });

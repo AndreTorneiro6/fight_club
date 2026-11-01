@@ -3035,6 +3035,17 @@ export function execute(
         c._id,
       );
       log("challenge.cancelled", { challengeId: c._id, note: cmd.note });
+      // A freed weekly slot can change the best plan; notify teams whose role changes.
+      if (
+        c.weekStart &&
+        !c.competitionRoundId &&
+        dynamicWeeklyEnabled(s, c.divisionId) &&
+        weeklyPublishedAt(
+          s.weeklyRounds.find((r) => r.weekStart === c.weekStart),
+          c.divisionId,
+        )
+      )
+        refreshDynamicRoles(c.divisionId, c.weekStart, c._id);
       break;
     }
     case "slot.add": {

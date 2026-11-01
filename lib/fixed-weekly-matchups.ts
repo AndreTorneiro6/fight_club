@@ -1,3 +1,7 @@
+import {
+  CONSECUTIVE_REMATCH_MESSAGE,
+  consecutiveRematch,
+} from "./consecutive-rematch";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { createHash, randomUUID } from "node:crypto";
 import type { Actor, State } from "./types";
@@ -62,6 +66,10 @@ export function planFixedWeeklyMatchups(s: State, input: FixedWeeklyInput) {
       used.add(b);
       const attacker = teams[Math.max(a, b) - 1],
         defender = teams[Math.min(a, b) - 1];
+      ensure(
+        !consecutiveRematch(s, attacker.id, defender.id, input.weekStart),
+        CONSECUTIVE_REMATCH_MESSAGE,
+      );
       const existing = scoped
         .filter(
           (c) =>

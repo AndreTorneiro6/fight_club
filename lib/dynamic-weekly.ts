@@ -3,6 +3,10 @@ import { rankingEntries } from "./ranking-groups";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
+import {
+  CONSECUTIVE_REMATCH_MESSAGE,
+  consecutiveRematch,
+} from "./consecutive-rematch";
 export function dynamicWeeklyEnabled(s: State, divisionId?: string) {
   return !!(
     s.settings[0].weeklyCompetition &&
@@ -85,7 +89,12 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     for (const d of available) {
       const ar = entries.indexOf(a) + 1,
         dr = entries.indexOf(d) + 1;
-      if (ar > dr && ar - dr <= distance && (dr !== 1 || ar <= title))
+      if (
+        ar > dr &&
+        ar - dr <= distance &&
+        (dr !== 1 || ar <= title) &&
+        !consecutiveRematch(s, a.id, d.id, week)
+      )
         pairs.push({
           attackerId: a.members[0]._id,
           defenderId: d.members[0]._id,
@@ -152,6 +161,11 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
         .find((t) => t.id === key)
         ?.members.some((m) => m._id === r.playerId),
     )?.role;
+  // Teams that already launched a challenge this week (even one later cancelled)
+  // keep attacking when several plans need the same number of role changes.
+  const launched = new Set(
+    challenges.map((c) => challengeTeamKey(c, "attack", s.players)),
+  );
   const choices = new Map<bigint, (typeof edges)[number] | null>(),
     costs = new Map<bigint, number>();
   function minimumChanges(mask: bigint): number {
@@ -171,10 +185,13 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       if (!(mask & bit(j))) continue;
       const remaining = rest & ~bit(j);
       if (1 + best(remaining) !== target) continue;
+      // Role changes dominate (x100); the launched-attacker preference only breaks ties.
       const candidate =
         minimumChanges(remaining) +
-        Number(roleFor(e.attackerKey) === "defense") +
-        Number(roleFor(e.defenderKey) === "attack");
+        100 *
+          (Number(roleFor(e.attackerKey) === "defense") +
+            Number(roleFor(e.defenderKey) === "attack")) +
+        Number(launched.has(e.defenderKey));
       if (candidate < cost || (candidate === cost && choice === null)) {
         cost = candidate;
         choice = e;
@@ -282,6 +299,8 @@ export function dynamicTargetReason(
     return "Adversário fora do limite de posições.";
   if (d === 1 && a > s.settings[0].titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
+  if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
+    return CONSECUTIVE_REMATCH_MESSAGE;
   if (plan.errors.length) return plan.errors[0];
   // The first otherwise valid challenge has regulatory priority, even if it leaves only a partial schedule.
   // Once protected commitments exist, preserve their best achievable remaining coverage.
