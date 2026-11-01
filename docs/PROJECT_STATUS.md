@@ -1,3 +1,8 @@
+## Version1.11.25 LIVE — correct published division roles from the screen — 1 November 2026
+
+- 1.11.24 (48872c4, album notices hidden for players/spectators while closed) and 1.11.25 (967f6fa) deployed; run41307419860 success; app+worker exact 967f6fa, 0 restarts, healthy, public health ok.
+- Papéis semanais: with one division selected, published, challenges closed (opening null/future) and no active challenges that week, role buttons unlock and "Corrigir papéis · <Divisão>" sends admin.week.division.correct (audited reason, notices only to changed players, dynamic-change warning). Bronze 2026-11-02 is ready for the user's manual correction, then reopening.
+
 ## Version1.11.23 LIVE + 1.11.24 deploying — no consecutive rematches; album admin-only — 1 November 2026
 
 - Rule (all divisions): the same two teams cannot meet in consecutive weeks. lib/consecutive-rematch.ts used by dynamic planner edges, weeklyReason (create), dynamicTargetReason and fixed weekly matchups. Planner tie-break keeps a team that already launched a challenge that week in attack; cancelling a weekly challenge now refreshes dynamic roles (notices only when division open). 1.11.23 exact 03b7a17 deployed (run41305477836 success), app+worker healthy.
