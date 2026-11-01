@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.23";
+export const applicationVersion = "1.11.24";
 export const releaseNotes = [
+  {
+    version: "1.11.24",
+    date: "2026-11-01",
+    title: "Caderneta reservada aos administradores",
+    changes: [
+      "Com a comunidade da caderneta desligada, os espaços Jogador e Espetador deixam de mostrar a caderneta e também os avisos de trocas e denúncias de cromos.",
+    ],
+  },
   {
     version: "1.11.23",
     date: "2026-11-01",

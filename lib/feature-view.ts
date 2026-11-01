@@ -101,6 +101,11 @@ export function filterFeatureView(state: State, actor: Actor) {
     state.coinEntries = [];
     state.stickerSettings = [];
     state.stickerRewards = [];
+    // While the album is closed to this account, hide its trade/report notices too.
+    if (!available)
+      state.notifications = state.notifications.filter(
+        (n) => !n.stickerTradeId && !n.stickerReportId,
+      );
   }
 
   state.playerAttributes = (state.playerAttributes ?? []).filter(

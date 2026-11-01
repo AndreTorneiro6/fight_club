@@ -334,3 +334,45 @@ test("album artwork uses stored personal attributes without manufacturing a rati
     /administrador/i,
   );
 });
+test("closing the community hides the album and its notices from players and spectators", async () => {
+  const { filterFeatureView } = await import("../lib/feature-view");
+  const base = fixture();
+  base.players = base.players.map((p) => ({ ...p, partner: "" }));
+  base.settings = [{ prizes: [] } as unknown as State["settings"][number]];
+  configure(base, { communityEnabled: true, tradesEnabled: true });
+  configure(base, { communityEnabled: false, tradesEnabled: true });
+  base.notifications = [
+    {
+      _id: "n1",
+      playerId: "p2",
+      title: "Troca",
+      body: "",
+      read: false,
+      createdAt: "",
+      stickerTradeId: "t1",
+    },
+    {
+      _id: "n2",
+      playerId: "p2",
+      title: "Desafio",
+      body: "",
+      read: false,
+      createdAt: "",
+    },
+  ] as State["notifications"];
+  for (const role of ["player", "spectator"] as const) {
+    const s = structuredClone(base),
+      actor: Actor = { userId: "u2", playerId: "p2", role };
+    filterFeatureView(s, actor);
+    assert.equal(s.stickerAccess?.enabled, false);
+    assert.deepEqual(
+      s.notifications.map((n) => n._id),
+      ["n2"],
+    );
+    assert.throws(() => stickerAlbumView(base, actor, now), /teste privado/);
+  }
+  const s = structuredClone(base);
+  filterFeatureView(s, other);
+  assert.equal(s.stickerAccess?.enabled, true);
+  assert.equal(s.notifications.length, 2);
+});
