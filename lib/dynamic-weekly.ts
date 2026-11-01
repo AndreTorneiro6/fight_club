@@ -1,5 +1,6 @@
 import type { State } from "./types";
 import { rankingEntries } from "./ranking-groups";
+import { effectiveRoles } from "./effective-roles";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
@@ -154,7 +155,7 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     return without(full) < maximum;
   });
   const round = s.weeklyRounds.find((r) => r.weekStart === week);
-  const preferred = round?.dynamicAssignments ?? round?.assignments ?? [];
+  const preferred = round ? effectiveRoles(round) : [];
   const roleFor = (key: string) =>
     preferred.find((r) =>
       entries

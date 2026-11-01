@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.25";
+export const applicationVersion = "1.11.26";
 export const releaseNotes = [
+  {
+    version: "1.11.26",
+    date: "2026-11-01",
+    title: "Papéis da Prata respeitados e correção depois da abertura",
+    changes: [
+      "Uma divisão publicada sozinha (como a Prata) passa a usar os papéis publicados; antes a app podia trocar papéis sem motivo.",
+      "Corrigir papéis funciona também depois da abertura, desde que ainda não haja desafios nessa divisão nessa semana.",
+    ],
+  },
   {
     version: "1.11.25",
     date: "2026-11-01",

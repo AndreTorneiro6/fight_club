@@ -1,4 +1,5 @@
 import { weeklyPublishedAt } from "./weekly-publication";
+import { effectiveRoles } from "./effective-roles";
 import {
   dynamicWeeklyEnabled,
   dynamicRole,
@@ -104,7 +105,7 @@ export function weeklyRole(
     round,
     s.players.find((p) => p._id === playerId)?.divisionId,
   )
-    ? (round!.dynamicAssignments ?? round!.assignments).find(
+    ? effectiveRoles(round!).find(
         (entry) => entry.playerId === playerId,
       )?.role
     : undefined;

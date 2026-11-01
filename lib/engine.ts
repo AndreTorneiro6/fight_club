@@ -17,6 +17,7 @@ import { challengeTeamRanks } from "./challenge-team-ranks";
 import { chatMentionTargets } from "./chat-mentions";
 import { editChatMessage } from "./edit-chat-message";
 import { weeklyPublishedAt } from "./weekly-publication";
+import { effectiveRoles } from "./effective-roles";
 import { divisionRoundCompletion } from "./round-transition";
 import {
   correctPublishedDivisionPapers,
@@ -1653,7 +1654,7 @@ export function execute(
   ) => {
     const finalPlan = dynamicWeeklyPlan(s, divisionId, weekStart);
     const round = s.weeklyRounds.find((r) => r.weekStart === weekStart)!;
-    const beforeRoles = round.dynamicAssignments ?? round.assignments;
+    const beforeRoles = effectiveRoles(round);
     const teamIds = new Set(
       finalPlan.teams.flatMap((t) => t.members.map((m) => m._id)),
     );

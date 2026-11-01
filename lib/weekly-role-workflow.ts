@@ -1,4 +1,5 @@
 import { weeklyPublishedAt } from "./weekly-publication";
+import { effectiveRoles } from "./effective-roles";
 import { challengeMemberIds } from "./team-competition";
 import { challengeDistance } from "./challenge-distance";
 import { seasonWeek } from "./competition-calendar";
@@ -65,7 +66,7 @@ export function effectiveWeeklyRoleAssignments(
   divisionId?: string,
 ) {
   const roles = new Map(
-    (round.dynamicAssignments ?? round.assignments).map((a) => [
+    effectiveRoles(round).map((a) => [
       a.playerId,
       a.role,
     ]),
@@ -110,7 +111,7 @@ export function synchronizeWeeklyRoles(
     round && weeklyPublishedAt(round, divisionId),
     "Escolhe papéis já publicados.",
   );
-  const before = round.dynamicAssignments ?? round.assignments;
+  const before = effectiveRoles(round);
   const after = effectiveWeeklyRoleAssignments(s, round, divisionId);
   if (roleSignature(before) === roleSignature(after)) return { changed: 0 };
   const changed = after.filter(

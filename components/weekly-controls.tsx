@@ -8,6 +8,7 @@ import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
 import { useEffect, useState } from "react";
 import { dynamicRoleChanges } from "@/lib/dynamic-weekly";
+import { effectiveRoles } from "@/lib/effective-roles";
 import Link from "next/link";
 import { usesManagedCompetition } from "@/lib/competition-mode";
 import WeeklyOpeningControl from "./weekly-opening-control";
@@ -58,7 +59,7 @@ function PreviousWeekRole({
   const initial = previous.assignments.find((a) =>
     team.some((m) => m._id === a.playerId),
   )?.role;
-  const final = (previous.dynamicAssignments ?? previous.assignments).find(
+  const final = effectiveRoles(previous).find(
     (a) => team.some((m) => m._id === a.playerId),
   )?.role;
   return (
@@ -255,18 +256,13 @@ export function WeeklyRoles({
     round,
     division === "all" ? undefined : division,
   );
-  // Published roles of one division can still be corrected while its challenges
-  // are closed and nobody has a commitment that week (admin.week.division.correct).
-  const correctionOpening =
-    round && division !== "all" ? weeklyOpeningAt(round, division) : undefined;
+  // Published roles of one division can be corrected while nobody in it has a
+  // challenge that week, even after challenges opened (admin.week.division.correct).
   const correctable =
     admin &&
     division !== "all" &&
     published &&
     week >= clubWeek().start &&
-    (correctionOpening === null ||
-      !correctionOpening ||
-      Date.parse(correctionOpening) > Date.now()) &&
     !s.challenges.some(
       (c) =>
         c.divisionId === division &&
@@ -542,11 +538,11 @@ export function WeeklyRoles({
                             ? "DEFESA"
                             : "Por atribuir"}
                         {" · "}Final:{" "}
-                        {(r.dynamicAssignments ?? r.assignments).find((a) =>
+                        {effectiveRoles(r).find((a) =>
                           t.playerIds.includes(a.playerId),
                         )?.role === "attack"
                           ? "ATAQUE"
-                          : (r.dynamicAssignments ?? r.assignments).find((a) =>
+                          : effectiveRoles(r).find((a) =>
                                 t.playerIds.includes(a.playerId),
                               )?.role === "defense"
                             ? "DEFESA"
@@ -1048,9 +1044,9 @@ export function WeeklyRoles({
                 {published && correctable && d._id === division && (
                   <>
                     <small>
-                      Os desafios de {d.name} estão fechados e não há
-                      compromissos nesta semana: podes corrigir os papéis
-                      publicados.
+                      Ainda não há desafios de {d.name} nesta semana: podes
+                      corrigir os papéis publicados. Só os jogadores com papel
+                      alterado são avisados.
                     </small>
                     <button
                       className="primary"

@@ -625,3 +625,22 @@ for (const code of ["ouro", "prata", "bronze"] as DivisionCode[])
     send(s, 9, 7);
     assert.ok(pairing(s, 9, 7));
   });
+
+test("a division republished alone keeps its published roles when other divisions have effective roles", () => {
+  // Prata 2026-11-02: published roles had a full schedule without rematches, but the
+  // round's effective-role list only held other divisions, so the planner flipped 4 teams.
+  const s = fixture("prata", 12, 3);
+  const published = "DADDAADDDAAA";
+  s.weeklyRounds[0].weekType = "NORMAL";
+  s.weeklyRounds[0].assignments = s.players.map((p, i) => ({
+    playerId: p._id,
+    role: published[Math.floor(i / 2)] === "A" ? "attack" : "defense",
+  }));
+  s.weeklyRounds[0].dynamicAssignments = [{ playerId: "other-division", role: "attack" }];
+  for (let rank = 1; rank <= 12; rank++)
+    assert.equal(
+      weeklyRole(s, `t${rank}a`, now),
+      published[rank - 1] === "A" ? "attack" : "defense",
+      `team ${rank}`,
+    );
+});

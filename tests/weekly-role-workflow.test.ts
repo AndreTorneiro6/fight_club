@@ -805,7 +805,7 @@ test("Gold and Silver future proposals follow actual assigned roles without enab
   assert.equal(first.version, version);
 });
 
-test("administrator corrects published roles of one division before it opens, notifying only changed players", () => {
+test("administrator corrects published roles of one division without challenges, notifying only changed players", () => {
   const week = "2026-11-02";
   const base = fixture();
   base.weeklyRounds = [
@@ -853,7 +853,7 @@ test("administrator corrects published roles of one division before it opens, no
     ],
   );
   assert.equal(s.audit.at(-1)?.action, "week.division.corrected");
-  // Stale version, opened division, existing challenge and non-admins are refused.
+  // Stale version, existing challenge and non-admins are refused.
   assert.throws(
     () =>
       execute(
@@ -864,16 +864,10 @@ test("administrator corrects published roles of one division before it opens, no
       ),
     /Outro administrador/,
   );
-  assert.throws(
-    () =>
-      execute(
-        structuredClone(base),
-        admin,
-        swap,
-        Date.parse("2026-11-01T11:30:00Z"),
-      ),
-    /já abriram/,
-  );
+  // An opened division without challenges can still be corrected.
+  const opened = structuredClone(base);
+  execute(opened, admin, swap, Date.parse("2026-11-01T12:00:00Z"));
+  assert.equal(opened.audit.at(-1)?.action, "week.division.corrected");
   const withChallenge = structuredClone(base);
   withChallenge.challenges = [
     {

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound } from "./types";
 import { ensure } from "./rules";
 import { rankingEntries } from "./ranking-groups";
-import { weeklyOpeningAt, weeklyPositionReason } from "./weekly";
+import { weeklyPositionReason } from "./weekly";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRankingPublished } from "./round-transition";
 import { challengeDistance } from "./challenge-distance";
@@ -188,11 +188,6 @@ export function correctPublishedDivisionPapers(
   ensure(
     weeklyPublishedAt(r, divisionId),
     "Só é possível corrigir papéis já publicados.",
-  );
-  const opening = weeklyOpeningAt(r, divisionId);
-  ensure(
-    opening === null || !opening || Date.parse(opening) > timestamp,
-    "Os desafios desta divisão já abriram; os papéis não podem ser corrigidos.",
   );
   ensure(
     !s.challenges.some(
