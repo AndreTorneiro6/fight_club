@@ -255,6 +255,25 @@ export function WeeklyRoles({
     round,
     division === "all" ? undefined : division,
   );
+  // Published roles of one division can still be corrected while its challenges
+  // are closed and nobody has a commitment that week (admin.week.division.correct).
+  const correctionOpening =
+    round && division !== "all" ? weeklyOpeningAt(round, division) : undefined;
+  const correctable =
+    admin &&
+    division !== "all" &&
+    published &&
+    week >= clubWeek().start &&
+    (correctionOpening === null ||
+      !correctionOpening ||
+      Date.parse(correctionOpening) > Date.now()) &&
+    !s.challenges.some(
+      (c) =>
+        c.divisionId === division &&
+        !c.competitionRoundId &&
+        (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
+        !["cancelled", "refused", "expired"].includes(c.status),
+    );
   const unsavedRoleChanges = hasUnsavedDivisionRoles(
     s.players,
     roles,
@@ -303,22 +322,56 @@ export function WeeklyRoles({
             division: d,
             published: !!weeklyPublishedAt(round, d._id),
             approved: !!round.divisionPublications?.[d._id]?.approvedAt,
-            changes: weeklyPublishedAt(round, d._id)
-              ? []
-              : dynamicRoleChanges(
-                  s,
-                  d._id,
-                  week,
-                  round.assignments
-                    .filter(
-                      (a) =>
-                        s.players.find((p) => p._id === a.playerId)
-                          ?.divisionId !== d._id,
-                    )
-                    .concat(divisionAssignments(d._id)),
-                ),
+            changes:
+              weeklyPublishedAt(round, d._id) &&
+              !(correctable && d._id === division)
+                ? []
+                : dynamicRoleChanges(
+                    s,
+                    d._id,
+                    week,
+                    round.assignments
+                      .filter(
+                        (a) =>
+                          s.players.find((p) => p._id === a.playerId)
+                            ?.divisionId !== d._id,
+                      )
+                      .concat(divisionAssignments(d._id)),
+                  ),
           }))
       : [];
+  /** Corrects the published roles of the selected division before it opens. */
+  const correctDivisionNow = async (divisionId: string, name: string) => {
+    if (!round) return;
+    const changes = divisionAssignments(divisionId);
+    const teamsLeft = rankingEntries(s.players, divisionId).filter((t) =>
+      t.members.some(
+        (m) => players.some((p) => p._id === m._id) && !roles[m._id],
+      ),
+    );
+    if (teamsLeft.length) {
+      window.alert(
+        `Atribui um papel a todas as duplas de ${name} antes de corrigir.`,
+      );
+      return;
+    }
+    const reason = window.prompt(
+      `Motivo da correção dos papéis de ${name} (fica no histórico). Só os jogadores cujo papel muda recebem aviso.`,
+      "Correção manual dos papéis publicados.",
+    );
+    if (!reason || reason.trim().length < 3) return;
+    await run(
+      {
+        type: "admin.week.division.correct",
+        divisionId,
+        weekStart: week,
+        expectedVersion: round.version ?? 0,
+        changes,
+        reason: reason.trim(),
+      },
+      `Papéis de ${name} corrigidos. Abre os desafios quando estiveres pronto.`,
+    );
+  };
   /** Saves on-screen changes, approves and publishes one division in one action. */
   const publishDivisionNow = async (divisionId: string, name: string) => {
     if (!round) return;
@@ -787,7 +840,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!attackReason ||
                       (lockedByChallenge && requiredRole !== "attack") ||
-                      published ||
+                      (published && !correctable) ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("attack")}
@@ -804,7 +857,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!defenseReason ||
                       (lockedByChallenge && requiredRole !== "defense") ||
-                      published ||
+                      (published && !correctable) ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("defense")}
@@ -819,7 +872,7 @@ export function WeeklyRoles({
                       disabled={
                         busy ||
                         lockedByChallenge ||
-                        published ||
+                        (published && !correctable) ||
                         week < clubWeek().start
                       }
                       onClick={remove}
@@ -991,6 +1044,31 @@ export function WeeklyRoles({
                     . Os jogadores recebem o papel publicado; ajusta os papéis
                     para evitar avisos contraditórios.
                   </p>
+                )}
+                {published && correctable && d._id === division && (
+                  <>
+                    <small>
+                      Os desafios de {d.name} estão fechados e não há
+                      compromissos nesta semana: podes corrigir os papéis
+                      publicados.
+                    </small>
+                    <button
+                      className="primary"
+                      disabled={busy || !unsavedRoleChanges}
+                      onClick={() => {
+                        if (
+                          changes.length &&
+                          !window.confirm(
+                            `A app vai alterar ${changes.length} papel(éis) em ${d.name} depois da correção. Corrigir mesmo assim?`,
+                          )
+                        )
+                          return;
+                        void correctDivisionNow(d._id, d.name);
+                      }}
+                    >
+                      Corrigir papéis · {d.name}
+                    </button>
+                  </>
                 )}
                 {!published && (
                   <button

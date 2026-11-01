@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.24";
+export const applicationVersion = "1.11.25";
 export const releaseNotes = [
+  {
+    version: "1.11.25",
+    date: "2026-11-01",
+    title: "Corrigir papéis publicados no ecrã",
+    changes: [
+      "Em Papéis semanais, com uma divisão selecionada, os desafios fechados e sem compromissos nessa semana, o administrador pode voltar a escolher Ataque/Defesa e usar Corrigir papéis. Fica no histórico e só avisa quem muda de papel.",
+    ],
+  },
   {
     version: "1.11.24",
     date: "2026-11-01",
