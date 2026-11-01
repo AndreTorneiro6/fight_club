@@ -1,3 +1,9 @@
+## Version 1.11.26 LIVE — Prata roles fix and correction after opening — 1 November 2026
+
+- Bug: republishing one division (Prata, 12:57) removes that division's entries from `dynamicAssignments`, but the list stayed non-empty (Ouro/Bronze), so `dynamicAssignments ?? assignments` returned no Prata roles. The planner then picked an arbitrary plan and flipped teams 4, 5, 8 and 11. Fix: `lib/effective-roles.ts` merges published roles with per-player dynamic overrides, used by the planner, engine refresh, weekly role, sync and the admin screen.
+- `admin.week.division.correct` and "Corrigir papéis" now work after opening too, as long as the division has no challenges that week.
+- 271b5ea deployed (run 41319542501 success); app+worker exact 271b5ea, healthy; live Prata effective roles now equal the published roles (plan 2→1 5→3 6→4 10→7 11→8 12→9). No production data writes.
+
 ## Version1.11.25 LIVE — correct published division roles from the screen — 1 November 2026
 
 - 1.11.24 (48872c4, album notices hidden for players/spectators while closed) and 1.11.25 (967f6fa) deployed; run41307419860 success; app+worker exact 967f6fa, 0 restarts, healthy, public health ok.
