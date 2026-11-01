@@ -1,3 +1,9 @@
+## Version1.11.23 LIVE + 1.11.24 deploying — no consecutive rematches; album admin-only — 1 November 2026
+
+- Rule (all divisions): the same two teams cannot meet in consecutive weeks. lib/consecutive-rematch.ts used by dynamic planner edges, weeklyReason (create), dynamicTargetReason and fixed weekly matchups. Planner tie-break keeps a team that already launched a challenge that week in attack; cancelling a weekly challenge now refreshes dynamic roles (notices only when division open). 1.11.23 exact 03b7a17 deployed (run41305477836 success), app+worker healthy.
+- Production writes (validated engine + Mongo transactions, user-requested): Bronze week2026-11-02 paused (opening null, operationId bronze-rematch-30-pause-2026-11-01), Bronze #30 (Filipe Queirós+César Pereira vs Roberto Pires+Paulo Foonseca, repeat of #24) cancelled; only the 4 participants + admins notified. NEXT (user): manually correct Bronze roles in Papéis semanais (admin.week.division.correct now allowed: closed + no active challenges) and reopen. Note Camané's team can only attack Hélder Mota's team (rematch), so roles must change.
+- Album: Ivo Tavares had enabled communityEnabled on 2026-10-30. User asked admin-only: stickerSettings season-1 v8→v9 communityEnabled=false (trades, packs, rewards unchanged); verified player denied, admin allowed. 1.11.24 (48872c4) also hides sticker trade/report notifications from players/spectators while closed. Monitor run41306816307.
+
 ## Version1.11.21 — per-division papéis publication + production title rule — 31 October 2026
 
 - Bronze papéis for 2026-11-02 could not be published from Papéis semanais: publish button compared on-screen vs saved roles across ALL divisions, and Ouro's dynamic planner showed Diogo Faria + Nuno Rodrigues (5th) as Defesa vs published Ataque. Fix: hasUnsavedDivisionRoles compares only the selected division. Workaround meanwhile: turnover flow publish.
