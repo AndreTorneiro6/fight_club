@@ -1,3 +1,15 @@
+## Versions 1.13.0 + 1.13.1 LIVE — role history, possible games, admin availability record — 2 November 2026
+
+- 1.13.0 (Papéis semanais, admin only), via `lib/weekly-role-history.ts` and `components/weekly-team-insight.tsx`:
+  - Each team row summarises the last published week: published role → final role. Final = the side the team actually played (`teamRoleHistory`), else its effective role.
+  - A 5-week history lists the opponent and result for each week.
+  - "Jogos possíveis" (`divisionWeekOptions`) shows who the team can attack or be attacked by under the roles on screen, its game in the planner's schedule, and warnings for no possible game or for a role the planner would flip.
+  - The planner and the screen share `weeklyPairAllowed`.
+  - The player "Semana anterior" box now also uses the side actually played.
+- 1.13.1: on a scheduled or approved game, admins (admin workspace only) again see a read-only "Disponibilidade e sugestões das equipas" block (`AdminScheduleRecord` in `components/application.tsx`): each team's slots, common times, and who proposed/confirmed the chosen time. Players still see only the confirmed time. Live has slots for 15 of 23 recent scheduled games.
+- The first 1.13.0 CI run failed on outdated browser checks. Fixed: `dynamic-weekly.spec` checks the new labels, and `weekly-teams.spec` finds admin rows by their own "Ataque: <team>" button, since rows now mention other teams. Final run 41436175904 succeeded; app+worker exact 37334e2, health ok.
+- Local-only notes: `league.spec` (not in CI) has a pre-existing bug (`admin is not defined`, line 386); round-transition e2e fails locally (fixture not seeded) but passes on CI.
+
 ## Version 1.12.0 LIVE — automatic weekly turnover per division — 2 November 2026
 
 - User decisions: per division, once every game has a result (frozen/vacation and postponed games excluded), the ranking publishes automatically, then next week's roles, then challenges open (publish + `divisionOpeningDelays[div]`, default immediately). A division with missing games waits alone; admins get one "Jornada à espera de jogos" alert at weeklyRankingDay/Hour. Switch: Regras · "Fecho automático da jornada" (`settings.autoWeeklyTurnover`, default on). User also said: do NOT touch this week's (2026-11-02) games; nothing in this release changes games.
