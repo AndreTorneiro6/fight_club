@@ -26,6 +26,15 @@ async function command(page: Page, data: unknown) {
   expect(response.ok(), await response.text()).toBe(true);
 }
 
+/** An admin row is found by its own role button: other rows may mention the
+ * same team among their possible opponents. */
+const adminRow = (page: Page, member: string) =>
+  page.locator("[data-weekly-team]").filter({
+    has: page.locator(
+      `button[aria-label^="Ataque: "][aria-label*="${member}"]`,
+    ),
+  });
+
 test("team weekly controls are admin-only, lock on selection and can be cleared before a challenge", async ({
   browser,
 }) => {
@@ -57,7 +66,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     .click();
   const teams = admin.locator("[data-weekly-team]");
   await expect(teams).toHaveCount(22);
-  const attacker = teams.filter({ hasText: "Carlos Pereira" });
+  const attacker = adminRow(admin, "Carlos Pereira");
   await expect(attacker).toContainText("Miguel Silva");
   const attack = attacker.getByRole("button", { name: /^Ataque:/ });
   const defense = attacker.getByRole("button", { name: /^Defesa:/ });
@@ -68,9 +77,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await expect(attack).toBeEnabled();
   await expect(defense).toBeDisabled();
   await expect(
-    teams
-      .filter({ hasText: "João Silva" })
-      .getByRole("button", { name: /^Ataque:/ }),
+    adminRow(admin, "João Silva").getByRole("button", { name: /^Ataque:/ }),
   ).toBeDisabled();
   await attack.click();
   for (let i = 0; i < (await teams.count()); i++) {
@@ -162,14 +169,11 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     .getByRole("button", { name: "Papéis semanais", exact: true })
     .click();
   await expect(
-    admin
-      .locator("[data-weekly-team]")
-      .filter({ hasText: "Carlos Pereira" })
-      .getByRole("button", { name: /^Remover seleção:/ }),
+    adminRow(admin, "Carlos Pereira").getByRole("button", {
+      name: /^Remover seleção:/,
+    }),
   ).toBeDisabled();
-  await expect(
-    admin.locator("[data-weekly-team]").filter({ hasText: "Luís Costa" }),
-  ).toContainText("Papel bloqueado");
+  await expect(adminRow(admin, "Luís Costa")).toContainText("Papel bloqueado");
   await admin
     .getByRole("combobox", { name: "Categoria dos papéis", exact: true })
     .selectOption(saved.players.find((p) => p._id === "player-7")!.divisionId);
@@ -211,9 +215,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await admin
     .getByRole("button", { name: "Papéis semanais", exact: true })
     .click();
-  const previousAttacker = admin
-    .locator("[data-weekly-team]")
-    .filter({ hasText: "Luís Costa" });
+  const previousAttacker = adminRow(admin, "Luís Costa");
   await expect(previousAttacker).toContainText(
     /Jornada de .+: Ataque \(final igual\)/,
   );
