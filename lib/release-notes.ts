@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.13.0";
+export const applicationVersion = "1.13.1";
 export const releaseNotes = [
+  {
+    version: "1.13.1",
+    date: "2026-11-02",
+    title: "Disponibilidade das equipas visível para a administração",
+    changes: [
+      "Depois de o jogo estar marcado e aprovado, a administração volta a ver no calendário do jogo a disponibilidade e as sugestões de horário de cada equipa, os horários em comum e quem propôs e confirmou o horário escolhido. Os jogadores continuam a ver apenas o horário confirmado.",
+    ],
+  },
   {
     version: "1.13.0",
     date: "2026-11-02",

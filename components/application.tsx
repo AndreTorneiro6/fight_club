@@ -160,6 +160,7 @@ import {
   defaultSettings,
   statusLabels,
   type Challenge,
+  type Slot,
   type Player,
   type Settings,
   type View,
@@ -7268,6 +7269,96 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
   );
 }
 
+/** Admin-only, read-only: what each team offered before the game was
+ * scheduled and approved, and how the final time was chosen. */
+function AdminScheduleRecord({
+  s,
+  c,
+  slots,
+  scheduledStart,
+}: {
+  s: View;
+  c: Challenge;
+  slots: Slot[];
+  scheduledStart: string;
+}) {
+  const name = (id: string) => challengeTeamName(c, id, s.players);
+  const person = (id?: string) =>
+    s.players.find((p) => p._id === id)?.name ?? "Administração";
+  const sides = [
+    { id: c.challengerId, label: "Ataque", icon: <Sword size={13} /> },
+    { id: c.defenderId, label: "Defesa", icon: <Shield size={13} /> },
+  ];
+  const common = compatibleStarts(
+    slots.filter((x) => x.playerId === c.challengerId),
+    slots.filter((x) => x.playerId === c.defenderId),
+    c.durationMinutes,
+    s.settings[0].slotStepMinutes,
+    0,
+    Date.parse(c.playBy),
+  );
+  const proposal = c.scheduleProposal;
+  const chosen = (x: Slot) =>
+    Date.parse(x.start) <= Date.parse(scheduledStart) &&
+    Date.parse(scheduledStart) + c.durationMinutes * 60000 <= Date.parse(x.end);
+  return (
+    <details
+      open
+      className="inset stack"
+      aria-label="Disponibilidade e sugestões das equipas"
+    >
+      <summary>
+        Disponibilidade e sugestões das equipas · só administração
+      </summary>
+      {sides.map((side) => {
+        const offered = slots
+          .filter((x) => x.playerId === side.id)
+          .sort((a, b) => a.start.localeCompare(b.start));
+        return (
+          <div className="stack" key={side.id} style={{ gap: 4 }}>
+            <strong className="row" style={{ gap: 6 }}>
+              {side.icon} {side.label} · {name(side.id)}
+            </strong>
+            {offered.length ? (
+              offered.map((x) => (
+                <small key={x._id}>
+                  {fmtDate(x.start)} · {fmtTime(x.start)}–{fmtTime(x.end)}
+                  {x.offeredBy && x.offeredBy !== x.playerId
+                    ? ` · indicada por ${person(x.offeredBy)}`
+                    : ""}
+                  {chosen(x) ? " · inclui o horário marcado" : ""}
+                </small>
+              ))
+            ) : (
+              <small className="muted">Sem disponibilidade indicada.</small>
+            )}
+          </div>
+        );
+      })}
+      <div className="stack" style={{ gap: 4 }}>
+        <strong>Horários em comum</strong>
+        <small>
+          {common.length
+            ? common
+                .slice(0, 12)
+                .map((t) => `${fmtDate(t)} ${fmtTime(t)}`)
+                .join(" · ") +
+              (common.length > 12 ? ` · +${common.length - 12}` : "")
+            : "Nenhum horário em comum entre as propostas."}
+        </small>
+      </div>
+      {proposal && (
+        <small>
+          Horário escolhido: {fmtDate(proposal.start)} ·{" "}
+          {fmtTime(proposal.start)}, proposto por {person(proposal.proposedBy)}.
+          Ataque {proposal.challengerConfirmed ? "confirmou" : "não confirmou"},
+          defesa {proposal.defenderConfirmed ? "confirmou" : "não confirmou"},
+          clube {proposal.clubConfirmed ? "confirmou" : "não confirmou"}.
+        </small>
+      )}
+    </details>
+  );
+}
 function ChallengeCalendar(a: Actions & { c: Challenge }) {
   const { s, c, run, busy, notify } = a,
     admin = s.actor.role === "admin",
@@ -7344,6 +7435,14 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
             </strong>
           </div>
         </div>
+        {admin && (
+          <AdminScheduleRecord
+            s={s}
+            c={c}
+            slots={slots}
+            scheduledStart={start}
+          />
+        )}
       </Section>
     );
   }
