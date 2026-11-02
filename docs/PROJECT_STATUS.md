@@ -1,3 +1,10 @@
+## Version 1.11.27 — no team left without a possible opponent; Bronze 2026-11-02 repaired — 2 November 2026
+
+- Bug: Bronze reopened 2026-11-01 18:00Z; 29 s later #33 9→7 (Filipe Queirós+César Pereira vs Eduardo Pereira+carlos Gonçalves) was accepted under the old "first valid challenge has priority" rule. Team 10 (César Gonçalves Lages+Diogo) could only play 7/8/9 and played 8 the week before (#23), so the week could fit only 4 games and teams 8 and 10 were left without an opponent.
+- Production repair (user-authorized, validated engine + one Mongo transaction, dry run first, backup /backups/fight-club-before-bronze-coverage-repair-20261102.archive.gz): #33 cancelled (no defeat or ranking change), admin created #40 9→8 and the engine forced #41 6→4 and #42 10→7. Untouched: #38 5→2 (schedule_pending) and #39 3→1 (scheduled 2026-11-02 20:00Z, campo-1). Bronze now has 5 games and all 10 teams play. 21 notices, only to affected players and admins.
+- Rule change (user decision): dynamicTargetReason no longer exempts the first challenge, so every challenge must belong to a maximum-coverage plan (all divisions with dynamic roles). The old test was replaced, and a Bronze regression test was added. Commit a451cda LIVE: run 41416492998 success, app+worker exact a451cda healthy, public health ok; Bronze still 5 games after deploy.
+- Known gap, not changed: admin.challenge.assign (re-targeting an existing challenge) skips the consecutive-rematch and coverage checks (weeklyReason ignoreId).
+
 ## Version 1.11.26 LIVE — Prata roles fix and correction after opening — 1 November 2026
 
 - Bug: republishing one division (Prata, 12:57) removes that division's entries from `dynamicAssignments`, but the list stayed non-empty (Ouro/Bronze), so `dynamicAssignments ?? assignments` returned no Prata roles. The planner then picked an arbitrary plan and flipped teams 4, 5, 8 and 11. Fix: `lib/effective-roles.ts` merges published roles with per-player dynamic overrides, used by the planner, engine refresh, weekly role, sync and the admin screen.
