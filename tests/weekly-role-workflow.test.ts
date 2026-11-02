@@ -25,7 +25,11 @@ function fixture(): State {
     collections.map((c) => [c, []]),
   ) as unknown as State;
   s.settings = [
-    { ...structuredClone(defaultSettings), weeklyCompetition: true },
+    {
+      ...structuredClone(defaultSettings),
+      weeklyCompetition: true,
+      autoWeeklyTurnover: false,
+    },
   ];
   s.seasons = [
     {

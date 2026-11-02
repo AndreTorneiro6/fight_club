@@ -9,6 +9,11 @@ import { clubWeek, addClubDays, clubDay } from "./calendar";
 import { rankingEntries } from "./ranking-groups";
 import { ensure } from "./rules";
 import { proposeTeamRoles } from "./role-proposals";
+import { dynamicRole, dynamicWeeklyEnabled } from "./dynamic-weekly";
+import {
+  consecutiveRematchKeys,
+  weeklyTeamAvailable,
+} from "./weekly-pairing-rules";
 export function weeklyTeamSnapshot(s: State) {
   return s.divisions.flatMap((d) =>
     rankingEntries(s.players, d._id).map((t) => ({
@@ -60,17 +65,34 @@ function roleSignature(assignments: WeeklyRound["assignments"]) {
     [...assignments].sort((a, b) => a.playerId.localeCompare(b.playerId)),
   );
 }
+/** True while a division's draft is still exactly what the generator produced
+ * (no administrator edits), so it may be regenerated safely. */
+export function generatedDivisionDraft(
+  s: State,
+  round: WeeklyRound,
+  divisionId: string,
+) {
+  const meta = round.divisionRoleGeneration?.[divisionId];
+  if (!meta) return false;
+  const generated = new Map(
+    (JSON.parse(meta.assignments) as WeeklyRound["assignments"]).map((a) => [
+      a.playerId,
+      a.role,
+    ]),
+  );
+  const current = new Map(round.assignments.map((a) => [a.playerId, a.role]));
+  // Players removed since generation lose their assignment; that is not an edit.
+  const existing = new Set(s.players.map((p) => p._id));
+  return [...divisionPlayerIds(s, round, divisionId)]
+    .filter((id) => existing.has(id))
+    .every((id) => generated.get(id) === current.get(id));
+}
 export function effectiveWeeklyRoleAssignments(
   s: State,
   round: WeeklyRound,
   divisionId?: string,
 ) {
-  const roles = new Map(
-    effectiveRoles(round).map((a) => [
-      a.playerId,
-      a.role,
-    ]),
-  );
+  const roles = new Map(effectiveRoles(round).map((a) => [a.playerId, a.role]));
   const actual = new Map<string, "attack" | "defense">();
   for (const c of s.challenges.filter(
     (c) =>
@@ -174,6 +196,11 @@ export function weeklyRoleGenerationInput(
     ),
     weekType,
     round: 1,
+    // Same availability and rematch rules as the dynamic planner.
+    unavailable: entries
+      .filter((t) => !weeklyTeamAvailable(s, t, week))
+      .map((t) => t.id),
+    forbiddenPairs: consecutiveRematchKeys(s, entries, week),
     previous: Object.fromEntries(
       entries.flatMap((t) => {
         const role = (
@@ -197,14 +224,8 @@ export function refreshGeneratedWeeklyDrafts(s: State, timestamp: number) {
       const current = s.weeklyRounds.find((r) => r._id === round._id)!;
       if (weeklyPublishedAt(current, d._id)) continue;
       const meta = current.divisionRoleGeneration?.[d._id];
-      if (!meta) continue; // Legacy/manual drafts require an explicit admin regeneration once.
-      const ids = divisionPlayerIds(s, current, d._id);
-      if (
-        roleSignature(
-          current.assignments.filter((a) => ids.has(a.playerId)),
-        ) !== meta.assignments
-      )
-        continue;
+      // Legacy/manual drafts and admin edits require an explicit regeneration.
+      if (!meta || !generatedDivisionDraft(s, current, d._id)) continue;
       if (
         JSON.stringify(
           weeklyRoleGenerationInput(
@@ -295,16 +316,44 @@ export function generateWeeklyRoles(
     const input = weeklyRoleGenerationInput(s, weekStart, d._id, weekType);
     const plan = proposeTeamRoles(input);
     warnings.push(...plan.warnings.map((w) => `${d.name}: ${w}`));
-    const generated = rankingEntries(s.players, d._id).flatMap((t) =>
-      t.members
-        .filter(
-          (m) =>
-            m.status === "active" &&
-            !m.awaitingApproval &&
-            !m.registrationRejectedAt,
-        )
-        .map((m) => ({ playerId: m._id, role: plan.roles[t.id] })),
-    );
+    const entries = rankingEntries(s.players, d._id);
+    const build = () =>
+      entries.flatMap((t) =>
+        t.members
+          .filter(
+            (m) =>
+              m.status === "active" &&
+              !m.awaitingApproval &&
+              !m.registrationRejectedAt,
+          )
+          .map((m) => ({ playerId: m._id, role: plan.roles[t.id] })),
+      );
+    let generated = build();
+    // Teams left out of the optimizer's schedule take the role the dynamic
+    // planner would give them, so publishing never triggers a role flip.
+    if (weekType === "NORMAL" && dynamicWeeklyEnabled(s, d._id)) {
+      const others = assignments.filter(
+        (a) => !generated.some((g) => g.playerId === a.playerId),
+      );
+      const preview: State = {
+        ...s,
+        weeklyRounds: [
+          ...s.weeklyRounds.filter((r) => r.weekStart !== weekStart),
+          {
+            ...(existing ?? { _id: weekStart, version: 0 }),
+            weekStart,
+            weekType,
+            assignments: [...others, ...generated],
+            dynamicAssignments: undefined,
+          } as WeeklyRound,
+        ],
+      };
+      for (const t of entries) {
+        const planned = dynamicRole(preview, t.members[0]._id, weekStart);
+        if (planned) plan.roles[t.id] = planned;
+      }
+      generated = build();
+    }
     assignments.push(...generated);
     divisionRoleGeneration[d._id] = {
       input: JSON.stringify(input),

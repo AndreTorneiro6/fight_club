@@ -76,7 +76,13 @@ export function publishDivisionPapers(
   const source = r.divisionTransitions?.[divisionId];
   if (source)
     ensure(
-      divisionRankingPublished(s, r.seasonId!, divisionId, source.previousWeek),
+      divisionRankingPublished(
+        s,
+        r.seasonId!,
+        divisionId,
+        source.previousWeek,
+        timestamp,
+      ),
       "Publica primeiro o ranking semanal desta divisão.",
     );
   const signature = divisionPaperSignature(s, r, divisionId),

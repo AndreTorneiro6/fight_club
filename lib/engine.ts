@@ -53,6 +53,7 @@ import {
   responseWindowText,
 } from "./challenge-response-notices";
 import { autoWeeklyRanking, publishWeeklyRanking } from "./weekly-ranking";
+import { autoWeeklyTurnover } from "./weekly-turnover";
 import { notificationPresentation } from "./notification-presentation";
 import type { Notification } from "./types";
 import {
@@ -169,6 +170,7 @@ export const settingsSchema = z.object({
   autoWeeklyRoles: z.boolean().optional(),
   roleDraftLeadDays: z.number().int().min(0).max(28).optional(),
   autoWeeklyRanking: z.boolean().optional(),
+  autoWeeklyTurnover: z.boolean().optional(),
   weeklyRankingDay: z.number().int().min(0).max(6).optional(),
   weeklyRankingHour: z.number().int().min(0).max(23).optional(),
   requireClubConfirmation: z.boolean().default(true),
@@ -2376,7 +2378,7 @@ export function execute(
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
       if (rules.weeklyCompetition && cmd.weekStart)
         ensure(
-          cmd.weekStart === weeklyChallengeWeek(s, timestamp),
+          cmd.weekStart === weeklyChallengeWeek(s, timestamp, p.divisionId),
           "Os papéis da semana mudaram. Atualiza a página antes de enviar o desafio.",
           409,
         );
@@ -2782,7 +2784,14 @@ export function execute(
         defenderRank !== 1 || attackerRank <= rules.titleMaxPosition,
         "Posição fora das regras do jogo do título.",
       );
-      const weekly = weeklyReason(s, attacker, defender, timestamp, c._id);
+      const weekly = weeklyReason(
+        s,
+        attacker,
+        defender,
+        timestamp,
+        c._id,
+        true,
+      );
       ensure(!weekly, weekly ?? "Papéis semanais inválidos.");
       ensure(
         c.challengerId !== attacker._id || c.defenderId !== defender._id,
@@ -2823,7 +2832,9 @@ export function execute(
       c.challengerPosition = teamPosition(s.players, attacker._id);
       c.positionSnapshotModel = "team";
       c.defenderPosition = teamPosition(s.players, defender._id);
-      c.status = "pending";
+      // A mandatory weekly game stays assigned; only optional challenges need a new acceptance.
+      const mandatory = !!c.mandatoryAssignment && !!c.weekStart;
+      c.status = mandatory ? "accepted" : "pending";
       c.respondBy = new Date(
         Math.min(Date.parse(c.playBy), timestamp + rules.acceptHours * 3600000),
       ).toISOString();
@@ -2836,7 +2847,9 @@ export function execute(
         notify(
           pid,
           "Ataque e defesa atualizados",
-          `${attacker.name} ataca · ${defender.name} defende. É necessária uma nova aceitação.`,
+          mandatory
+            ? `${attacker.name} ataca · ${defender.name} defende. Combinem o horário do jogo.`
+            : `${attacker.name} ataca · ${defender.name} defende. É necessária uma nova aceitação.`,
           c._id,
         );
       log("admin.challenge.assigned", {
@@ -2844,6 +2857,22 @@ export function execute(
         before,
         after: { challengerId: c.challengerId, defenderId: c.defenderId },
       });
+      if (
+        mandatory &&
+        !c.competitionRoundId &&
+        dynamicWeeklyEnabled(s, c.divisionId)
+      )
+        refreshDynamicRoles(c.divisionId, c.weekStart!, c._id);
+      if (mandatory) {
+        synchronizeWeeklyRoles(
+          s,
+          c.weekStart!,
+          actor.userId,
+          timestamp,
+          c.divisionId,
+        );
+        refreshGeneratedWeeklyDrafts(s, timestamp);
+      }
       break;
     }
     case "admin.content.save": {
@@ -4531,9 +4560,12 @@ export function execute(
           c.seasonId,
           c.divisionId,
           c.weekStart,
+          timestamp,
         );
         if (completion.ready) {
+          // With the automatic turnover the worker closes the week (lib/weekly-turnover.ts).
           if (
+            rules.autoWeeklyTurnover === false &&
             completion.hasNextWeek &&
             completion.nextWeek >= clubWeek(timestamp).start
           ) {
@@ -5048,6 +5080,7 @@ export function processDeadlines(
   if (generateRoles) {
     autoWeeklyRoles(s, timestamp);
     autoWeeklyRanking(s, timestamp);
+    autoWeeklyTurnover(s, timestamp);
     notifyWeeklyOpenings(s, timestamp);
   }
   processCompetitionDeadlines(s, timestamp, generateRoles);

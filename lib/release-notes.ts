@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.27";
+export const applicationVersion = "1.12.0";
 export const releaseNotes = [
+  {
+    version: "1.12.0",
+    date: "2026-11-02",
+    title: "Fecho automático da jornada por divisão",
+    changes: [
+      "Quando todos os jogos de uma divisão têm resultado, o ranking é publicado automaticamente, seguido dos papéis da próxima jornada e da abertura dos desafios. Os jogos congelados por férias não bloqueiam a divisão.",
+      "Os papéis gerados respeitam a regra de não repetir o adversário da semana anterior e as férias, e garantem o máximo de jogos sem trocas de papel depois da publicação.",
+      "Uma divisão com jogos em falta espera sozinha; a organização recebe um aviso à hora do ranking semanal. O fecho automático pode ser desligado em Regras.",
+      "A reatribuição de um desafio pela organização respeita as mesmas regras e mantém o jogo obrigatório atribuído.",
+    ],
+  },
   {
     version: "1.11.27",
     date: "2026-11-02",

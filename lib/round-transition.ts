@@ -1,25 +1,33 @@
 import type { State } from "./types";
 import { addClubDays } from "./calendar";
 import { weeklyPublishedAt } from "./weekly-publication";
+import { matchFrozenUntil } from "./match-freeze";
 export function divisionRoundCompletion(
   s: State,
   seasonId: string,
   divisionId: string,
   weekStart: string,
+  timestamp = Date.now(),
 ) {
   const season = s.seasons.find((e) => e._id === seasonId);
   const round = s.weeklyRounds.find(
     (r) =>
       r.weekStart === weekStart && (!r.seasonId || r.seasonId === seasonId),
   );
-  const candidates = s.challenges.filter(
+  const all = s.challenges.filter(
     (c) =>
       c.seasonId === seasonId &&
       c.divisionId === divisionId &&
       c.weekStart === weekStart &&
-      !["cancelled", "refused"].includes(c.status) &&
-      (!c.deferredUntil || c.deferredUntil <= weekStart),
+      !["cancelled", "refused"].includes(c.status),
   );
+  // Postponed or frozen (vacation) games never hold back the rest of the division.
+  const frozen = all.filter(
+    (c) =>
+      (c.deferredUntil && c.deferredUntil > weekStart) ||
+      matchFrozenUntil(s, c, timestamp) !== undefined,
+  );
+  const candidates = all.filter((c) => !frozen.includes(c));
   const games = candidates.filter((c) => c.status !== "expired");
   const completed = games.filter(
     (c) =>
@@ -45,6 +53,8 @@ export function divisionRoundCompletion(
         weekStart >= season.firstCompetitionWeek),
     completed: completed.length,
     total: games.length,
+    pending: games.filter((c) => !completed.includes(c)).map((c) => c._id),
+    frozen: frozen.map((c) => c._id),
     resultSignature,
     nextWeek: addClubDays(weekStart, 7),
     hasNextWeek: !!season && addClubDays(weekStart, 7) <= season.end,
@@ -55,12 +65,14 @@ export function divisionRankingPublished(
   seasonId: string,
   divisionId: string,
   weekStart: string,
+  timestamp = Date.now(),
 ) {
   const completion = divisionRoundCompletion(
     s,
     seasonId,
     divisionId,
     weekStart,
+    timestamp,
   );
   return (
     completion.ready &&

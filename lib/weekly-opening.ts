@@ -56,7 +56,13 @@ export function scheduleWeeklyOpening(
         "Publica primeiro os papéis desta divisão.",
       );
       ensure(
-        divisionRankingPublished(s, r.seasonId!, d, source.previousWeek),
+        divisionRankingPublished(
+          s,
+          r.seasonId!,
+          d,
+          source.previousWeek,
+          timestamp,
+        ),
         "Publica primeiro o ranking semanal desta divisão.",
       );
     }

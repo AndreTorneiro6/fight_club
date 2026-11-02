@@ -13,6 +13,7 @@ import { rankingEntries } from "@/lib/ranking-groups";
 import { weeklyOpeningAt } from "@/lib/weekly";
 import WeeklyOpeningControl from "./weekly-opening-control";
 import RankingExport from "./ranking-export";
+import WeeklyTurnoverStatus from "./weekly-turnover-status";
 export default function AdminRoundTransition({
   s,
   run,
@@ -53,10 +54,13 @@ export default function AdminRoundTransition({
   if (!division || !completion?.ready)
     return (
       <section className="panel stack">
+        <WeeklyTurnoverStatus s={s} />
         <h2>Preparar próxima jornada</h2>
         <p>
           Disponível quando todos os jogos da divisão tiverem resultado
-          validado. Os adiamentos autorizados para outra semana ficam de fora.
+          validado. Os adiamentos autorizados e os jogos congelados ficam de
+          fora. Com o fecho automático ligado, este passo manual só é preciso
+          quando o sistema pede revisão.
         </p>
         {candidates.map((c) => (
           <button
@@ -84,6 +88,7 @@ export default function AdminRoundTransition({
     teams = rankingEntries(s.players, divisionId);
   return (
     <section className="panel stack" aria-label="Preparar próxima jornada">
+      <WeeklyTurnoverStatus s={s} />
       <div>
         <div className="eyebrow gold">FECHO DA JORNADA · {division.name}</div>
         <h2>

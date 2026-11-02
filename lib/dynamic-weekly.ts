@@ -4,6 +4,7 @@ import { effectiveRoles } from "./effective-roles";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
+import { weeklyTeamAvailable } from "./weekly-pairing-rules";
 import {
   CONSECUTIVE_REMATCH_MESSAGE,
   consecutiveRematch,
@@ -68,21 +69,7 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     });
   }
   const available = entries.filter(
-    (t) =>
-      !occupied.has(t.id) &&
-      t.members.every(
-        (p) =>
-          p.status === "active" &&
-          !p.awaitingApproval &&
-          !p.registrationRejectedAt &&
-          !s.exceptions.some(
-            (e) =>
-              e.playerId === p._id &&
-              e.vacation &&
-              e.from <= week &&
-              e.to >= clubWeek(week).end,
-          ),
-      ),
+    (t) => !occupied.has(t.id) && weeklyTeamAvailable(s, t, week),
   );
   const distance = challengeDistance(s, divisionId),
     title = s.settings[0].titleMaxPosition;

@@ -105,9 +105,7 @@ export function weeklyRole(
     round,
     s.players.find((p) => p._id === playerId)?.divisionId,
   )
-    ? effectiveRoles(round!).find(
-        (entry) => entry.playerId === playerId,
-      )?.role
+    ? effectiveRoles(round!).find((entry) => entry.playerId === playerId)?.role
     : undefined;
 }
 export function weeklyReason(
@@ -116,6 +114,7 @@ export function weeklyReason(
   defender: Player,
   now = Date.now(),
   ignoreId?: string,
+  reassign = false,
 ) {
   const attackingTeam = teamMembers(s.players, attacker._id);
   const defendingTeam = teamMembers(s.players, defender._id);
@@ -204,18 +203,35 @@ export function weeklyReason(
         ? "Já tens um desafio atribuído nesta semana."
         : "Este defensor já tem um desafio nesta semana.";
   }
+  // A new challenge, or an admin reassignment (`reassign`), must respect the
+  // rematch and coverage rules; responding to an existing one is not re-judged.
+  const check = !ignoreId || reassign;
   if (
-    !ignoreId &&
+    check &&
     consecutiveRematch(
       s,
-      attackingTeam.map((m) => m._id).sort().join(":"),
-      defendingTeam.map((m) => m._id).sort().join(":"),
+      attackingTeam
+        .map((m) => m._id)
+        .sort()
+        .join(":"),
+      defendingTeam
+        .map((m) => m._id)
+        .sort()
+        .join(":"),
       week,
     )
   )
     return CONSECUTIVE_REMATCH_MESSAGE;
-  if (dynamicWeeklyEnabled(s, attacker.divisionId) && !ignoreId) {
-    const reason = dynamicTargetReason(s, attacker._id, defender._id, week);
+  if (check && dynamicWeeklyEnabled(s, attacker.divisionId)) {
+    const others = ignoreId
+      ? { ...s, challenges: s.challenges.filter((c) => c._id !== ignoreId) }
+      : s;
+    const reason = dynamicTargetReason(
+      others,
+      attacker._id,
+      defender._id,
+      week,
+    );
     if (reason) return reason;
   }
   return null;

@@ -15,6 +15,8 @@ export async function seedRoundTransitionTest() {
       weeklyDynamicRoles: false,
       autoWeeklyRanking: false,
       autoWeeklyRoles: false,
+      // This e2e covers the manual fallback; the automatic turnover is unit-tested.
+      autoWeeklyTurnover: false,
     };
     // A real paired player account can check its own calendar and published roles.
     const a = s.players.find((p) => p._id === "player-7")!,

@@ -373,8 +373,8 @@ test("a first challenge that would make complete coverage impossible is refused"
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
 });
 
-test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play 7 after last week's 10→8", () => {
-  const s = fixture();
+/** Live Bronze pairings of the previous week (26 Oct), shifted one week back. */
+function bronzeLastWeek(s: State) {
   const previousWeek = "2026-10-19";
   s.challenges = [
     [2, 1],
@@ -402,6 +402,11 @@ test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play
     scheduleBy: "2026-10-25T12:00:00Z",
     playBy: "2026-10-25T23:59:59Z",
   }));
+}
+
+test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play 7 after last week's 10→8", () => {
+  const s = fixture();
+  bronzeLastWeek(s);
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
   assert.throws(() => send(s, 9, 7), /necessário para outra dupla/);
   send(s, 9, 8);
@@ -424,6 +429,32 @@ test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play
     new Set(live.flatMap((c) => [c.challengerTeamId, c.defenderTeamId])).size,
     10,
   );
+});
+
+test("an admin reassignment cannot create last week's rematch and leaves the mandatory game assigned", () => {
+  const s = fixture();
+  bronzeLastWeek(s);
+  const { id } = send(s, 9, 8);
+  const admin: Actor = { role: "admin", playerId: "admin", userId: "admin" };
+  // 9 met 6 last week.
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.challenge.assign",
+          challengeId: id,
+          challengerId: "t9a",
+          defenderId: "t6a",
+        },
+        now,
+      ),
+    /semanas seguidas/,
+  );
+  const c = s.challenges.find((c) => c._id === id)!;
+  assert.equal(c.status, "accepted");
+  assert.equal(c.defenderId, "t8a");
 });
 
 test("normal weeks retain feasible published role preferences while forced pairings still update both partners", () => {

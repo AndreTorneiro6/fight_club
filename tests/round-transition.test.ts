@@ -29,6 +29,8 @@ function fixture() {
     {
       ...structuredClone(defaultSettings),
       weeklyCompetition: true,
+      // These tests cover the manual (switched-off) turnover flow.
+      autoWeeklyTurnover: false,
       autoWeeklyRanking: true,
     },
   ];

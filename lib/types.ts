@@ -112,6 +112,9 @@ export interface Settings extends Entity {
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
   autoWeeklyRanking?: boolean;
+  /** Close each division's week automatically once all its games are done:
+   * publish the ranking, then the validated roles, then open challenges. */
+  autoWeeklyTurnover?: boolean;
   weeklyRankingDay?: number;
   weeklyRankingHour?: number;
   requireClubConfirmation: boolean;
@@ -583,6 +586,7 @@ export const defaultSettings: Settings = {
   autoWeeklyRoles: true,
   roleDraftLeadDays: 7,
   autoWeeklyRanking: true,
+  autoWeeklyTurnover: true,
   weeklyRankingDay: 0,
   weeklyRankingHour: 20,
   requireClubConfirmation: true,

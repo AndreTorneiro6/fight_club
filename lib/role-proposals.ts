@@ -18,6 +18,8 @@ export function proposeTeamRoles(input: {
   history?: CompetitionMeeting[];
   previous?: TeamRoles;
   unavailable?: string[];
+  /** Pairs that may not meet this week (e.g. they met the week before). */
+  forbiddenPairs?: string[];
 }) {
   const roles: TeamRoles = {},
     warnings: string[] = [];
@@ -33,6 +35,7 @@ export function proposeTeamRoles(input: {
     round: input.round,
     history: input.history ?? [],
     unavailable: input.unavailable,
+    forbiddenPairs: input.forbiddenPairs,
     rolePreferences: Object.fromEntries(
       Object.entries(input.previous ?? {}).map(([id, role]) => [
         id,
@@ -53,7 +56,10 @@ export function proposeTeamRoles(input: {
           : input.previous?.[t.id] === "attack"
             ? "defense"
             : "attack";
-    if (result.unmatched.includes(t.id))
+    if (
+      result.unmatched.includes(t.id) &&
+      !input.unavailable?.includes(t.id)
+    )
       warnings.push(
         `Dupla ${t.rank}: sem combinação completa; rever adversários/ausências.`,
       );

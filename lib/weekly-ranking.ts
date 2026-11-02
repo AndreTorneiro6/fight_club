@@ -34,14 +34,17 @@ export function publishWeeklyRanking(
     "Divisão inválida.",
   );
   const completion = divisionId
-    ? divisionRoundCompletion(s, seasonId, divisionId, week)
+    ? divisionRoundCompletion(s, seasonId, divisionId, week, timestamp)
     : undefined;
   if (requestedWeek)
     ensure(
       completion?.ready,
       "Existem jogos desta divisão com resultado por validar.",
     );
-  if (divisionId && divisionRankingPublished(s, seasonId, divisionId, week))
+  if (
+    divisionId &&
+    divisionRankingPublished(s, seasonId, divisionId, week, timestamp)
+  )
     return { published: false };
   // Republishing a division with no new confirmed results changes nothing.
   if (
@@ -134,6 +137,10 @@ export function publishWeeklyRanking(
 export function autoWeeklyRanking(s: State, timestamp: number) {
   const settings = s.settings[0];
   if (settings.autoWeeklyRanking === false) return;
+  // With the automatic turnover each division publishes once its games are
+  // done (lib/weekly-turnover.ts); unfinished divisions only alert admins.
+  if (settings.weeklyCompetition && settings.autoWeeklyTurnover !== false)
+    return;
   const local = wallTime(timestamp),
     day = new Date(`${local.day}T12:00:00Z`).getUTCDay();
   if (
