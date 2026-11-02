@@ -269,16 +269,23 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
   expect(JSON.parse(after.divisionRoleGeneration.bronze.input).distance).toBe(
     3,
   );
+  // Admin rows summarise the last published week and keep a role history.
   await expect(
     page
       .locator("#weekly-role-assignment")
-      .getByText(/^Inicial:/)
+      .getByText(/^Jornada de .+: (Ataque|Defesa|—)/)
       .first(),
   ).toBeVisible();
+  const history = page
+    .locator("#weekly-role-assignment")
+    .locator('[aria-label="Histórico de papéis"]')
+    .first();
+  await expect(history).toBeAttached();
+  await expect(history).toContainText(/inicial .* final/);
   await expect(
     page
       .locator("#weekly-role-assignment")
-      .getByText(/^Final:/)
+      .getByLabel("Jogos possíveis")
       .first(),
   ).toBeVisible();
   expect(after.publishedAt).toBeUndefined();

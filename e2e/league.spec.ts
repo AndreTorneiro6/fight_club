@@ -555,6 +555,14 @@ test("admin sees weekly calendar on existing challenges and players see why new 
   await expect(
     admin.getByLabel("Dia para consultar", { exact: true }),
   ).toHaveCount(0);
+  // Admins keep a read-only record of each team's availability and suggestions.
+  const record = admin.getByLabel("Disponibilidade e sugestões das equipas", {
+    exact: true,
+  });
+  await expect(record).toBeVisible();
+  await expect(record).toContainText("Ataque ·");
+  await expect(record).toContainText("Defesa ·");
+  await expect(record).toContainText("inclui o horário marcado");
   expect(
     await admin.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
