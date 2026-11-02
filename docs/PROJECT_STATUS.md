@@ -1,3 +1,11 @@
+## Version 1.14.0 LIVE — teams on vacation stay in the schedule — 2 November 2026
+
+- Cause: the user asked why Nuno Rodrigues (Ouro 5th, Diogo Faria + Nuno) could not challenge Hélder Marques (2nd, vacation 24 Oct–15 Nov). The planner excluded teams with a full-week vacation, which contradicted the UI text "Jogadores de férias podem receber desafios e jogar após o regresso". The refusal also showed the misleading "necessário para outra dupla".
+- User decision: allow challenging teams on vacation (general rule); the game stays frozen until the team returns (existing `weeklyWindow` deferral).
+- Code: `weeklyTeamUnavailableReason` (`lib/weekly-pairing-rules.ts`) excludes only inactive teams and teams at `maxActiveChallenges` from earlier weeks (frozen games count). `dynamicTargetReason` returns that reason. The admin screen shows "De férias até …".
+- Deploy: run 41442844883 success; app+worker exact 02c54e9, health ok.
+- Live verification: Nuno → Hélder is now allowed. Ouro 11-02 can reach 6 games, and its only remaining option is 5→2. The 11-09 draft regenerated automatically at 12:32Z with no Ouro problem. Games of 11-02 unchanged; no game created for Nuno (the team sends the challenge). Hélder's team will then have two frozen games (#19 Title Fight and this one).
+
 ## Versions 1.13.0 + 1.13.1 LIVE — role history, possible games, admin availability record — 2 November 2026
 
 - 1.13.0 (Papéis semanais, admin only), via `lib/weekly-role-history.ts` and `components/weekly-team-insight.tsx`:
