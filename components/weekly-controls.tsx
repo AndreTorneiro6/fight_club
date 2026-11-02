@@ -14,6 +14,11 @@ import { usesManagedCompetition } from "@/lib/competition-mode";
 import WeeklyOpeningControl from "./weekly-opening-control";
 import RoundChallengeCoverage from "./round-challenge-coverage";
 import RankingExport from "./ranking-export";
+import WeeklyTeamInsight from "./weekly-team-insight";
+import {
+  divisionWeekOptions,
+  teamRoleHistory,
+} from "@/lib/weekly-role-history";
 import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
@@ -56,12 +61,10 @@ function PreviousWeekRole({
       : role === "defense"
         ? "DEFESA"
         : "Por atribuir";
-  const initial = previous.assignments.find((a) =>
-    team.some((m) => m._id === a.playerId),
-  )?.role;
-  const final = effectiveRoles(previous).find(
-    (a) => team.some((m) => m._id === a.playerId),
-  )?.role;
+  // Final = the side the team actually played (or its effective role without a game).
+  const last = teamRoleHistory(s, team, week, 1)[0];
+  if (last?.week !== previous.weekStart) return null;
+  const { initial, final } = last;
   return (
     <span className="stack" style={{ gap: 4, fontSize: 11 }}>
       <span className="muted">Semana anterior</span>
@@ -255,6 +258,14 @@ export function WeeklyRoles({
   const published = !!weeklyPublishedAt(
     round,
     division === "all" ? undefined : division,
+  );
+  // Admin: each team's possible games under the roles on screen, per division.
+  const weekOptions = new Map(
+    admin
+      ? s.divisions
+          .filter((d) => division === "all" || division === d._id)
+          .flatMap((d) => [...divisionWeekOptions(s, d._id, week, roles)])
+      : [],
   );
   // Published roles of one division can be corrected while nobody in it has a
   // challenge that week, even after challenges opened (admin.week.division.correct).
@@ -812,7 +823,16 @@ export function WeeklyRoles({
                           : "Por atribuir"}
                   </span>
                 )}
-                <PreviousWeekRole s={s} team={members} week={week} />
+                {admin ? (
+                  <WeeklyTeamInsight
+                    s={s}
+                    team={members}
+                    week={week}
+                    options={weekOptions.get(entry.id)}
+                  />
+                ) : (
+                  <PreviousWeekRole s={s} team={members} week={week} />
+                )}
                 {(attackReason || defenseReason) && (
                   <small>
                     {[attackReason, defenseReason].filter(Boolean).join(" ")}

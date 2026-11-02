@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.12.0";
+export const applicationVersion = "1.13.0";
 export const releaseNotes = [
+  {
+    version: "1.13.0",
+    date: "2026-11-02",
+    title: "Papéis semanais com histórico e jogos possíveis",
+    changes: [
+      "Em Papéis semanais, cada dupla mostra o papel publicado e o papel final da jornada anterior (o lado em que realmente jogou), com o adversário e o resultado.",
+      "O histórico das últimas cinco jornadas fica disponível em cada dupla.",
+      "Ao atribuir papéis, cada dupla mostra quem pode atacar ou por quem pode ser atacada, o jogo previsto no plano e um aviso quando fica sem jogo possível ou quando o planeador mudaria o seu papel.",
+    ],
+  },
   {
     version: "1.12.0",
     date: "2026-11-02",

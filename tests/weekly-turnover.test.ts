@@ -14,6 +14,10 @@ import { consecutiveRematch } from "../lib/consecutive-rematch";
 import { weeklyRolesProblem } from "../lib/weekly-roles-check";
 import { rankingEntries } from "../lib/ranking-groups";
 import {
+  divisionWeekOptions,
+  teamRoleHistory,
+} from "../lib/weekly-role-history";
+import {
   generatedDivisionDraft,
   weeklyRoleGenerationInput,
 } from "../lib/weekly-role-workflow";
@@ -330,4 +334,51 @@ test("switching the automation off keeps the manual flow", () => {
   processDeadlines(s, now);
   assert.equal(weeklyPublishedAt(nextRound(s), "bronze"), undefined);
   assert.ok(!divisionRankingPublished(s, "season", "bronze", week, now));
+});
+
+test("role history shows the published role, the side actually played and the result", () => {
+  const s = fixture();
+  for (const c of [...s.challenges]) complete(s, c._id);
+  // Team 2 was published in defence but ended up attacking team 1.
+  for (const a of s.weeklyRounds[0].assignments)
+    if (a.playerId.startsWith("b2")) a.role = "defense";
+  processDeadlines(s, now);
+  const team = s.players.filter((p) => p._id.startsWith("b2"));
+  const [last] = teamRoleHistory(s, team, next);
+  assert.equal(last.week, week);
+  assert.equal(last.initial, "defense");
+  assert.equal(last.final, "attack");
+  assert.equal(last.game?.opponent, "b1a + b1b");
+  assert.equal(last.game?.outcome, "loss");
+});
+
+test("possible games follow the chosen roles and never offer last week's opponent", () => {
+  const s = fixture();
+  for (const c of [...s.challenges]) complete(s, c._id);
+  const options = divisionWeekOptions(s, "bronze", next, {});
+  const team = (rank: number) =>
+    rankingEntries(s.players, "bronze")[rank - 1].id;
+  // 10 played 9 last week: with reach 3 it can only attack 7 or 8.
+  assert.deepEqual(
+    options.get(team(10))!.attack.map((t) => t.rank),
+    [7, 8],
+  );
+  assert.ok(!options.get(team(2))!.attack.some((t) => t.rank === 1));
+  // With the published roles every team has a planned game and nobody would flip.
+  processDeadlines(s, now);
+  const roles = Object.fromEntries(
+    nextRound(s)!.assignments.map((a) => [a.playerId, a.role]),
+  );
+  const planned = divisionWeekOptions(s, "bronze", next, roles);
+  for (const [, o] of planned) {
+    assert.ok(o.committed || o.planned);
+    assert.equal(o.plannerRole, undefined);
+  }
+  // Two attackers cannot be offered to each other.
+  const attackersOnly = Object.fromEntries(
+    s.players.map((p) => [p._id, "attack" as const]),
+  );
+  const none = divisionWeekOptions(s, "bronze", next, attackersOnly);
+  assert.equal(none.get(team(5))!.attack.length, 0);
+  assert.equal(none.get(team(5))!.defense.length, 0);
 });

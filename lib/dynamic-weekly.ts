@@ -4,7 +4,7 @@ import { effectiveRoles } from "./effective-roles";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
-import { weeklyTeamAvailable } from "./weekly-pairing-rules";
+import { weeklyPairAllowed, weeklyTeamAvailable } from "./weekly-pairing-rules";
 import {
   CONSECUTIVE_REMATCH_MESSAGE,
   consecutiveRematch,
@@ -71,18 +71,9 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
   const available = entries.filter(
     (t) => !occupied.has(t.id) && weeklyTeamAvailable(s, t, week),
   );
-  const distance = challengeDistance(s, divisionId),
-    title = s.settings[0].titleMaxPosition;
   for (const a of available)
     for (const d of available) {
-      const ar = entries.indexOf(a) + 1,
-        dr = entries.indexOf(d) + 1;
-      if (
-        ar > dr &&
-        ar - dr <= distance &&
-        (dr !== 1 || ar <= title) &&
-        !consecutiveRematch(s, a.id, d.id, week)
-      )
+      if (weeklyPairAllowed(s, divisionId, entries, a, d, week))
         pairs.push({
           attackerId: a.members[0]._id,
           defenderId: d.members[0]._id,

@@ -2,6 +2,7 @@ import type { State } from "./types";
 import type { RankingEntry } from "./ranking-groups";
 import { clubWeek } from "./calendar";
 import { consecutiveRematch } from "./consecutive-rematch";
+import { challengeDistance } from "./challenge-distance";
 
 /** Rules shared by the weekly role generator and the dynamic planner, so the
  * roles we publish always admit the schedule the planner will enforce. */
@@ -20,6 +21,26 @@ export function weeklyTeamAvailable(
         (e) =>
           e.playerId === p._id && e.vacation && e.from <= week && e.to >= end,
       ),
+  );
+}
+
+/** Whether `attacker` may challenge `defender` this week: reach, title rule
+ * and no rematch of last week. Ranks are 1-based positions in `entries`. */
+export function weeklyPairAllowed(
+  s: State,
+  divisionId: string,
+  entries: RankingEntry[],
+  attacker: RankingEntry,
+  defender: RankingEntry,
+  week: string,
+) {
+  const ar = entries.indexOf(attacker) + 1,
+    dr = entries.indexOf(defender) + 1;
+  return (
+    ar > dr &&
+    ar - dr <= challengeDistance(s, divisionId) &&
+    (dr !== 1 || ar <= s.settings[0].titleMaxPosition) &&
+    !consecutiveRematch(s, attacker.id, defender.id, week)
   );
 }
 
