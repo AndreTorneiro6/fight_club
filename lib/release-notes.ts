@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.13.1";
+export const applicationVersion = "1.14.0";
 export const releaseNotes = [
+  {
+    version: "1.14.0",
+    date: "2026-11-02",
+    title: "Duplas de férias podem ser desafiadas",
+    changes: [
+      "Uma dupla com um jogador de férias continua na jornada: pode ser desafiada e o jogo fica congelado até ao regresso, como já indicava o ecrã de Papéis semanais.",
+      "Uma dupla que já tem o máximo de desafios ativos de semanas anteriores fica fora da jornada, com o motivo explicado.",
+      "A mensagem de recusa passa a indicar o motivo real quando a dupla adversária não está disponível.",
+    ],
+  },
   {
     version: "1.13.1",
     date: "2026-11-02",

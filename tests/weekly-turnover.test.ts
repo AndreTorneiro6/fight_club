@@ -193,7 +193,7 @@ test("a finished division publishes its ranking, rematch-free roles and opens ch
   assert.equal(s.challenges.length, 5);
 });
 
-test("the role generator receives last week's pairs as forbidden and vacation teams as unavailable", () => {
+test("the role generator forbids last week's pairs and keeps vacation teams in the schedule", () => {
   const s = fixture();
   s.exceptions.push({
     _id: "away",
@@ -205,7 +205,8 @@ test("the role generator receives last week's pairs as forbidden and vacation te
   const input = weeklyRoleGenerationInput(s, next, "bronze", "NORMAL");
   assert.equal(input.forbiddenPairs.length, 5);
   assert.ok(input.forbiddenPairs.includes("b1a:b1b:b2a:b2b"));
-  assert.deepEqual(input.unavailable, ["b3a:b3b"]);
+  // A vacation only freezes the game until the team returns.
+  assert.deepEqual(input.unavailable, []);
 });
 
 test("running the worker again publishes nothing twice", () => {

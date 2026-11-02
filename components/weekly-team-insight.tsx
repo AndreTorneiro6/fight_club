@@ -77,9 +77,15 @@ export default function WeeklyTeamInsight({
       )}
       {options && (
         <div className="stack" style={{ gap: 2 }} aria-label="Jogos possíveis">
+          {options.vacationUntil && (
+            <span className="muted">
+              De férias até {day(options.vacationUntil)}: pode jogar, mas o jogo
+              fica congelado até ao regresso.
+            </span>
+          )}
           {!options.available ? (
             <span className="muted">
-              Indisponível toda a semana (férias ou conta inativa).
+              {options.unavailableReason ?? "Indisponível nesta jornada."}
             </span>
           ) : options.committed ? (
             <span>

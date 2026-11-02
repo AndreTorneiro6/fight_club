@@ -191,26 +191,55 @@ test("unpublished or unopened weekly roles cannot initiate dynamic assignment", 
   assert.throws(() => send(s, 9, 6), /abertura/);
   assert.equal(s.challenges.length, 0);
 });
-test("full-week approved absence reduces coverage without fabricated matches or forfeits", () => {
+test("a team on vacation all week can still be challenged; the game stays frozen until it returns", () => {
   const s = fixture();
   s.exceptions = [
     {
       _id: "absence",
-      playerId: "t10b",
-      from: week,
+      playerId: "t2b",
+      from: "2026-10-24",
       to: "2026-11-01",
-      note: "Ausência aprovada",
+      note: "Férias",
       vacation: true,
     },
   ];
   const p = dynamicWeeklyPlan(s, "bronze", week);
-  assert.equal(p.maximumMatches, 4);
-  assert.ok(
-    p.eligible.every(
-      (e) => e.attackerKey !== "t10a:t10b" && e.defenderKey !== "t10a:t10b",
-    ),
-  );
+  assert.equal(p.maximumMatches, 5);
+  const target = p.eligible.find((e) => e.defenderKey === "t2a:t2b");
+  assert.ok(target);
+  const { id } = send(s, Number(target.attackerId.match(/^t(\d+)/)![1]), 2);
+  const c = s.challenges.find((c) => c._id === id)!;
+  assert.equal(c.status, "accepted");
+  assert.ok(c.deferredUntil && c.deferredUntil > "2026-11-01");
   assert.equal(s.results.length, 0);
+});
+
+test("a team at the active-challenge limit from earlier weeks is left out with a clear reason", () => {
+  const s = fixture();
+  s.settings[0].maxActiveChallenges = 2;
+  s.challenges = [1, 2].map((d, i) => ({
+    _id: `frozen-${i}`,
+    number: i + 1,
+    seasonId: "season",
+    divisionId: "bronze",
+    challengerId: "t3a",
+    defenderId: `t${d}a`,
+    challengerTeamId: "t3a:t3b",
+    defenderTeamId: `t${d}a:t${d}b`,
+    status: "accepted" as const,
+    weekStart: "2026-10-12",
+    deferredUntil: "2026-11-09",
+    createdAt: "2026-10-12T12:00:00Z",
+    challengerPosition: 3,
+    defenderPosition: d,
+    durationMinutes: 90,
+    respondBy: "2026-10-14T12:00:00Z",
+    scheduleBy: "2026-11-15T22:59:59Z",
+    playBy: "2026-11-15T22:59:59Z",
+  }));
+  const p = dynamicWeeklyPlan(s, "bronze", week);
+  assert.equal(p.maximumMatches, 4);
+  assert.throws(() => send(s, 5, 3), /máximo de desafios ativos/);
 });
 test("existing accepted and scheduled fixtures are immutable even when configuration distance changes", () => {
   const s = fixture();

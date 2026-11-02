@@ -4,7 +4,11 @@ import { effectiveRoles } from "./effective-roles";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
-import { weeklyPairAllowed, weeklyTeamAvailable } from "./weekly-pairing-rules";
+import {
+  weeklyPairAllowed,
+  weeklyTeamAvailable,
+  weeklyTeamUnavailableReason,
+} from "./weekly-pairing-rules";
 import {
   CONSECUTIVE_REMATCH_MESSAGE,
   consecutiveRematch,
@@ -280,6 +284,10 @@ export function dynamicTargetReason(
     return "Posição fora das regras do jogo do título.";
   if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
     return CONSECUTIVE_REMATCH_MESSAGE;
+  const unavailable =
+    weeklyTeamUnavailableReason(s, plan.teams[a - 1], week) ??
+    weeklyTeamUnavailableReason(s, plan.teams[d - 1], week);
+  if (unavailable) return unavailable;
   if (plan.errors.length) return plan.errors[0];
   // Every challenge, the first one included, must keep the most games possible,
   // so no team is left without an opponent it could have had.

@@ -5,7 +5,12 @@ import { effectiveRoles } from "./effective-roles";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { challengeMemberIds } from "./team-competition";
 import { rankingEntries, type RankingEntry } from "./ranking-groups";
-import { weeklyPairAllowed, weeklyTeamAvailable } from "./weekly-pairing-rules";
+import {
+  weeklyPairAllowed,
+  weeklyTeamAvailable,
+  weeklyTeamUnavailableReason,
+  weeklyTeamVacationUntil,
+} from "./weekly-pairing-rules";
 import { dynamicWeeklyEnabled, dynamicWeeklyPlan } from "./dynamic-weekly";
 
 type Role = "attack" | "defense";
@@ -99,6 +104,10 @@ export function teamRoleHistory(
 export type TeamWeekOptions = {
   rank: number;
   available: boolean;
+  /** Why the team is out of this week's schedule. */
+  unavailableReason?: string;
+  /** Last vacation day overlapping the week: its game stays frozen until then. */
+  vacationUntil?: string;
   /** Opponents this team could attack (defenders under the current roles). */
   attack: { rank: number; name: string }[];
   /** Opponents that could attack this team (attackers under the current roles). */
@@ -222,6 +231,9 @@ export function divisionWeekOptions(
         {
           rank: rank(t),
           available: weeklyTeamAvailable(s, t, week),
+          unavailableReason:
+            weeklyTeamUnavailableReason(s, t, week) ?? undefined,
+          vacationUntil: weeklyTeamVacationUntil(s, t, week),
           attack: attack.map((d) => ({ rank: rank(d), name: name(d) })),
           defense: defense.map((a) => ({ rank: rank(a), name: name(a) })),
           committed: committed.get(t.id),
