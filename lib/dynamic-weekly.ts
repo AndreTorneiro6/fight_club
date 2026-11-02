@@ -303,9 +303,8 @@ export function dynamicTargetReason(
   if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
     return CONSECUTIVE_REMATCH_MESSAGE;
   if (plan.errors.length) return plan.errors[0];
-  // The first otherwise valid challenge has regulatory priority, even if it leaves only a partial schedule.
-  // Once protected commitments exist, preserve their best achievable remaining coverage.
-  if (!plan.fixed.length) return null;
+  // Every challenge, the first one included, must keep the most games possible,
+  // so no team is left without an opponent it could have had.
   return plan.eligible.some(
     (e) =>
       plan.teams

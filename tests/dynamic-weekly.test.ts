@@ -365,23 +365,65 @@ test("Bronze supports its current ten-team structure with a single-member team w
   assert.equal(pairing(s, 10, 7)?.challengerTeam?.length, 1);
 });
 
-test("the first otherwise valid challenge keeps priority even when complete coverage becomes impossible, with an admin warning", () => {
+test("a first challenge that would make complete coverage impossible is refused", () => {
   const s = fixture();
-  const first = send(s, 3, 2);
+  assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
+  assert.throws(() => send(s, 3, 2), /necessário para outra dupla/);
+  assert.equal(s.challenges.length, 0);
+  assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
+});
+
+test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play 7 after last week's 10→8", () => {
+  const s = fixture();
+  const previousWeek = "2026-10-19";
+  s.challenges = [
+    [2, 1],
+    [7, 5],
+    [3, 4],
+    [10, 8],
+    [6, 9],
+  ].map(([a, d], i) => ({
+    _id: `previous-${i}`,
+    number: i + 1,
+    seasonId: "season",
+    divisionId: "bronze",
+    challengerId: `t${a}a`,
+    defenderId: `t${d}a`,
+    challengerTeamId: [`t${a}a`, `t${a}b`].sort().join(":"),
+    defenderTeamId: [`t${d}a`, `t${d}b`].sort().join(":"),
+    status: "completed" as const,
+    weekStart: previousWeek,
+    createdAt: "2026-10-19T12:00:00Z",
+    completedAt: "2026-10-22T14:00:00Z",
+    challengerPosition: a,
+    defenderPosition: d,
+    durationMinutes: 90,
+    respondBy: "2026-10-20T12:00:00Z",
+    scheduleBy: "2026-10-25T12:00:00Z",
+    playBy: "2026-10-25T23:59:59Z",
+  }));
+  assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
+  assert.throws(() => send(s, 9, 7), /necessário para outra dupla/);
+  send(s, 9, 8);
+  for (
+    let i = 0;
+    i < 5 && dynamicWeeklyPlan(s, "bronze", week).eligible[0];
+    i++
+  ) {
+    const next = dynamicWeeklyPlan(s, "bronze", week).eligible[0];
+    send(
+      s,
+      Number(next.attackerId.match(/^t(\d+)/)![1]),
+      Number(next.defenderId.match(/^t(\d+)/)![1]),
+    );
+  }
+  const live = s.challenges.filter((c) => c.weekStart === week);
+  assert.equal(live.length, 5);
+  assert.ok(pairing(s, 10, 7));
   assert.equal(
-    s.challenges.find((c) => c._id === first.id)?.status,
-    "accepted",
+    new Set(live.flatMap((c) => [c.challengerTeamId, c.defenderTeamId])).size,
+    10,
   );
-  assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 4);
-  assert.ok(
-    s.notifications.some(
-      (n) =>
-        n.playerId === "__admins__" &&
-        n.title === "Jornada com duplas sem adversário",
-    ),
-  );
-  assert.equal(s.results.length, 0);
-  assert.equal(s.matches.length, 0);
 });
 
 test("normal weeks retain feasible published role preferences while forced pairings still update both partners", () => {
@@ -598,8 +640,14 @@ for (const code of ["ouro", "prata", "bronze"] as DivisionCode[])
       divisionId: code,
       challengerId: "t9a",
       defenderId: "t6a",
-      challengerTeam: teamIds(9).map((playerId) => ({ playerId, name: playerId })),
-      defenderTeam: teamIds(6).map((playerId) => ({ playerId, name: playerId })),
+      challengerTeam: teamIds(9).map((playerId) => ({
+        playerId,
+        name: playerId,
+      })),
+      defenderTeam: teamIds(6).map((playerId) => ({
+        playerId,
+        name: playerId,
+      })),
       status: "completed",
       weekStart: "2026-10-19",
       createdAt: "2026-10-18T12:00:00Z",
@@ -636,7 +684,9 @@ test("a division republished alone keeps its published roles when other division
     playerId: p._id,
     role: published[Math.floor(i / 2)] === "A" ? "attack" : "defense",
   }));
-  s.weeklyRounds[0].dynamicAssignments = [{ playerId: "other-division", role: "attack" }];
+  s.weeklyRounds[0].dynamicAssignments = [
+    { playerId: "other-division", role: "attack" },
+  ];
   for (let rank = 1; rank <= 12; rank++)
     assert.equal(
       weeklyRole(s, `t${rank}a`, now),

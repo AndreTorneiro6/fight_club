@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.11.26";
+export const applicationVersion = "1.11.27";
 export const releaseNotes = [
+  {
+    version: "1.11.27",
+    date: "2026-11-02",
+    title: "Nenhuma dupla fica sem adversário possível",
+    changes: [
+      "Todos os desafios da jornada, incluindo o primeiro, só são aceites se mantiverem o máximo de jogos possível. Um desafio que deixaria outra dupla sem adversário é recusado com explicação.",
+    ],
+  },
   {
     version: "1.11.26",
     date: "2026-11-01",
