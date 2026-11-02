@@ -147,6 +147,7 @@ import {
 } from "lucide-react";
 import {
   activeChallenges,
+  limitChallenges,
   canRefuse,
   challengeReason,
   compatibleStarts,
@@ -2005,7 +2006,7 @@ function Challenges(a: Actions) {
       ),
     }))
     .filter((entry) => entry.target);
-  const active = activeChallenges(s, p._id, Date.now());
+  const active = limitChallenges(s, p, Date.now());
   const challengeWeek = weeklyChallengeWeek(s, Date.now(), p.divisionId);
   const publishedWeek = s.weeklyRounds.find(
     (r) => r.weekStart === challengeWeek && weeklyPublishedAt(r, p.divisionId),

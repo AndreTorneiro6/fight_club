@@ -4,13 +4,14 @@ import { clubWeek } from "./calendar";
 import { consecutiveRematch } from "./consecutive-rematch";
 import { challengeDistance } from "./challenge-distance";
 import { challengeMemberIds } from "./team-competition";
+import { onHoldForWeek } from "./rules";
 
 const finished = new Set(["completed", "cancelled", "refused", "expired"]);
 
 /** Why a team cannot take part in `week`'s schedule, or null.
  * A vacation does not exclude a team: it can be challenged and the game stays
- * frozen until it returns. The active-challenge limit does, because games
- * frozen from earlier weeks still count towards it. */
+ * frozen until it returns. The active-challenge limit does, counting games
+ * from earlier weeks that can still be played during `week`. */
 export function weeklyTeamUnavailableReason(
   s: State,
   team: RankingEntry,
@@ -31,6 +32,7 @@ export function weeklyTeamUnavailableReason(
       !c.competitionRoundId &&
       !finished.has(c.status) &&
       (c.weekStart ?? clubWeek(c.createdAt).start) !== week &&
+      !onHoldForWeek(s, c, week) &&
       (["attack", "defense"] as const).some((side) =>
         challengeMemberIds(c, side, s.players).some((id) => ids.has(id)),
       ),

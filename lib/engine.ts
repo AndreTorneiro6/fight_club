@@ -105,6 +105,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   activeChallenges,
+  limitChallenges,
   LeagueError,
   canRefuse,
   challengeReason,
@@ -2407,7 +2408,7 @@ export function execute(
         );
         for (const x of [p, d])
           ensure(
-            activeChallenges(s, x._id, timestamp).length <
+            limitChallenges(s, x, timestamp).length <
               rules.maxActiveChallenges,
             "Limite de desafios simultâneos atingido.",
           );
@@ -2799,7 +2800,7 @@ export function execute(
       );
       for (const p of [attacker, defender])
         ensure(
-          activeChallenges(s, p._id, timestamp).filter((x) => x._id !== c._id)
+          limitChallenges(s, p, timestamp).filter((x) => x._id !== c._id)
             .length < rules.maxActiveChallenges,
           "Limite de desafios simultâneos atingido.",
         );

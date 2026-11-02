@@ -214,10 +214,8 @@ test("a team on vacation all week can still be challenged; the game stays frozen
   assert.equal(s.results.length, 0);
 });
 
-test("a team at the active-challenge limit from earlier weeks is left out with a clear reason", () => {
-  const s = fixture();
-  s.settings[0].maxActiveChallenges = 2;
-  s.challenges = [1, 2].map((d, i) => ({
+function earlierGames(deferredUntil?: string) {
+  return [1, 2].map((d, i) => ({
     _id: `frozen-${i}`,
     number: i + 1,
     seasonId: "season",
@@ -228,7 +226,7 @@ test("a team at the active-challenge limit from earlier weeks is left out with a
     defenderTeamId: `t${d}a:t${d}b`,
     status: "accepted" as const,
     weekStart: "2026-10-12",
-    deferredUntil: "2026-11-09",
+    deferredUntil,
     createdAt: "2026-10-12T12:00:00Z",
     challengerPosition: 3,
     defenderPosition: d,
@@ -237,9 +235,27 @@ test("a team at the active-challenge limit from earlier weeks is left out with a
     scheduleBy: "2026-11-15T22:59:59Z",
     playBy: "2026-11-15T22:59:59Z",
   }));
+}
+test("a team at the active-challenge limit from earlier weeks is left out with a clear reason", () => {
+  const s = fixture();
+  s.settings[0].maxActiveChallenges = 2;
+  // Open games from an earlier week that can still be played now.
+  s.challenges = earlierGames();
   const p = dynamicWeeklyPlan(s, "bronze", week);
   assert.equal(p.maximumMatches, 4);
   assert.throws(() => send(s, 5, 3), /máximo de desafios ativos/);
+});
+test("games on hold for the whole week do not use up a team's active-challenge slots", () => {
+  const s = fixture();
+  s.settings[0].maxActiveChallenges = 2;
+  s.challenges = earlierGames("2026-11-09");
+  const p = dynamicWeeklyPlan(s, "bronze", week);
+  assert.equal(p.maximumMatches, 5);
+  const target = p.eligible.find((e) => e.defenderKey === "t3a:t3b");
+  assert.ok(target);
+  const attacker = Number(target.attackerId.match(/^t(\d+)/)![1]);
+  send(s, attacker, 3);
+  assert.ok(pairing(s, attacker, 3));
 });
 test("existing accepted and scheduled fixtures are immutable even when configuration distance changes", () => {
   const s = fixture();

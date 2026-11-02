@@ -2,10 +2,12 @@ import { challengeDistance } from "./challenge-distance";
 import {
   challengeSide,
   challengeMemberIds,
+  challengeParticipants,
   teamPosition,
 } from "./team-competition";
+import { clubWeek } from "./calendar";
 import { rankingEntries, teamMembers } from "./ranking-groups";
-import { weeklyReason } from "./weekly";
+import { weeklyChallengeWeek, weeklyReason } from "./weekly";
 import type { Challenge, Player, Settings, Slot, State } from "./types";
 
 export class LeagueError extends Error {
@@ -52,6 +54,26 @@ export function activeChallenges(s: State, id: string, now: number) {
     (c) => involves(c, id, s.players) && !terminal.has(effectiveStatus(c, now)),
   );
 }
+/** Whether a game cannot be played at all during `week`: it is deferred past
+ * the week, or a player is on vacation for the whole week. Such games do not
+ * use up a team's active-challenge slots for that week. */
+export function onHoldForWeek(s: State, c: Challenge, week: string) {
+  const { start, end } = clubWeek(week);
+  if (c.deferredUntil && c.deferredUntil > end) return true;
+  const ids = challengeParticipants(c, s.players);
+  return s.exceptions.some(
+    (e) =>
+      e.vacation && ids.includes(e.playerId) && e.from <= start && e.to >= end,
+  );
+}
+/** Active games that count towards `maxActiveChallenges`. In the weekly
+ * competition, games on hold for the whole challenge week do not count. */
+export function limitChallenges(s: State, player: Player, now: number) {
+  const active = activeChallenges(s, player._id, now);
+  if (!s.settings[0].weeklyCompetition) return active;
+  const week = weeklyChallengeWeek(s, now, player.divisionId);
+  return active.filter((c) => !onHoldForWeek(s, c, week));
+}
 export function challengeReason(
   s: State,
   me: Player,
@@ -81,13 +103,13 @@ export function challengeReason(
   if (title && aRank > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
-    activeChallenges(s, me._id, now).filter(
+    limitChallenges(s, me, now).filter(
       (c) =>
         !rules.weeklyCompetition ||
         c.status !== "pending" ||
         challengeSide(c, me._id, s.players) === "attack",
     ).length >= rules.maxActiveChallenges ||
-    activeChallenges(s, defender._id, now).filter(
+    limitChallenges(s, defender, now).filter(
       (c) => !rules.weeklyCompetition || c.status !== "pending",
     ).length >= rules.maxActiveChallenges
   )

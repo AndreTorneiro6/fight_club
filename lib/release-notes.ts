@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.14.0";
+export const applicationVersion = "1.14.1";
 export const releaseNotes = [
+  {
+    version: "1.14.1",
+    date: "2026-11-02",
+    title: "Jogos congelados não ocupam vagas na jornada",
+    changes: [
+      "Um jogo que não pode ser disputado em nenhum dia da semana (adiado para depois da semana ou com um jogador de férias a semana toda) deixa de contar para o limite de desafios ativos dessa semana. A dupla continua a poder ter um jogo na jornada, que fica congelado até ao regresso.",
+    ],
+  },
   {
     version: "1.14.0",
     date: "2026-11-02",
