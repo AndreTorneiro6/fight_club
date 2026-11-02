@@ -1,3 +1,8 @@
+## Version 1.14.1 LIVE — games on hold all week don't use weekly slots — 2 November 2026
+
+- Weekly competition: a game that can't be played on any day of the challenge week (deferred past it, or a player on vacation the whole week) no longer counts towards `maxActiveChallenges` for that week (`onHoldForWeek` / `limitChallenges` in `lib/rules.ts`; used by the planner, challengeReason, admin create and assign).
+- Live check (deploy run 41456596523, commit 7b07614): Hélder Marques' team is available for Ouro 9 Nov (options 2→1, 4→2, 5→2), Ouro 9 Nov max 6 games, draft regenerated 14:12Z with no problem; Ouro 2 Nov games #25–#29 unchanged.
+
 ## Version 1.14.0 LIVE — teams on vacation stay in the schedule — 2 November 2026
 
 - Cause: the user asked why Nuno Rodrigues (Ouro 5th, Diogo Faria + Nuno) could not challenge Hélder Marques (2nd, vacation 24 Oct–15 Nov). The planner excluded teams with a full-week vacation, which contradicted the UI text "Jogadores de férias podem receber desafios e jogar após o regresso". The refusal also showed the misleading "necessário para outra dupla".
