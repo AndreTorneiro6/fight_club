@@ -227,21 +227,6 @@ export const commandSchema = z.discriminatedUnion("type", [
     reason: text.min(10),
   }),
   z.object({
-    type: z.literal("admin.week.manualRoles.set"),
-    weekStart: day,
-    divisionId: id,
-    expectedVersion: z.number().int().min(0),
-    enabled: z.boolean(),
-    reason: text.min(3),
-  }),
-  z.object({
-    type: z.literal("admin.challenge.setRoles"),
-    challengeId: id,
-    challengerRole: z.enum(["attack", "defense"]),
-    defenderRole: z.enum(["attack", "defense"]),
-    reason: text.min(3),
-  }),
-  z.object({
     type: z.literal("admin.challenges.reconciliation.preview"),
     seasonId: id,
     weekStart: day,
@@ -349,6 +334,12 @@ export const commandSchema = z.discriminatedUnion("type", [
     winnerId: id,
     setScores: setScoresSchema.optional(),
     score: short.default(""),
+  }),
+  z.object({
+    type: z.literal("admin.result.setWinner"),
+    challengeId: id,
+    winnerId: id,
+    reason: text.min(3),
   }),
   z.object({
     type: z.literal("notifications.preferences"),
@@ -2100,74 +2091,6 @@ export function execute(
         timestamp,
         cmd.divisionId,
       );
-    case "admin.week.manualRoles.set": {
-      const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
-      ensure(r, "Papéis semanais não encontrados.", 404);
-      ensure(
-        s.divisions.some((d) => d._id === cmd.divisionId),
-        "Divisão inválida.",
-      );
-      ensure(
-        (r.version ?? 0) === cmd.expectedVersion,
-        "Outro administrador alterou os papéis. Atualiza antes de continuar.",
-        409,
-      );
-      ensure(
-        typeof cmd.reason === "string" && cmd.reason.trim().length >= 3,
-        "Indica o motivo da alteração.",
-      );
-      r.manualRoles = { ...r.manualRoles, [cmd.divisionId]: cmd.enabled };
-      r.version = (r.version ?? 0) + 1;
-      const now = new Date(timestamp).toISOString();
-      s.audit.push({
-        _id: randomUUID(),
-        userId: actor.userId,
-        action: cmd.enabled ? "week.manualRoles.enabled" : "week.manualRoles.disabled",
-        createdAt: now,
-        details: JSON.stringify({
-          weekStart: cmd.weekStart,
-          divisionId: cmd.divisionId,
-          enabled: cmd.enabled,
-          reason: cmd.reason.trim(),
-          version: r.version,
-        }),
-      });
-      return { ok: true, version: r.version };
-    }
-    case "admin.challenge.setRoles": {
-      const c = challenge(cmd.challengeId);
-      ensure(actor.role === "admin", "Apenas administradores podem definir papéis personalizados.", 403);
-      const round = s.weeklyRounds.find((r) => r.weekStart === c.weekStart);
-      ensure(round, "Semana não encontrada.", 404);
-      const manualEnabled = round.manualRoles?.[c.divisionId];
-      ensure(manualEnabled, "Modo manual não está ativado para esta divisão/semana.", 400);
-      ensure(
-        typeof cmd.reason === "string" && cmd.reason.trim().length >= 3,
-        "Indica o motivo da alteração.",
-      );
-      c.customRoles = {
-        challengerRole: cmd.challengerRole,
-        defenderRole: cmd.defenderRole,
-      };
-      const now = new Date(timestamp).toISOString();
-      s.audit.push({
-        _id: randomUUID(),
-        userId: actor.userId,
-        action: "challenge.customRoles.set",
-        createdAt: now,
-        details: JSON.stringify({
-          challengeId: c._id,
-          challengerRole: cmd.challengerRole,
-          defenderRole: cmd.defenderRole,
-          reason: cmd.reason.trim(),
-        }),
-      });
-      // Notify participants
-      for (const pid of challengeParticipants(c, s.players)) {
-        notify(pid, "Papéis do jogo atualizados", cmd.reason, c._id);
-      }
-      return { ok: true };
-    }
     case "admin.week.generate": {
       const old = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
       ensure(
@@ -4699,6 +4622,29 @@ export function execute(
         }
       }
       break;
+    }
+    case "admin.result.setWinner": {
+      const c = challenge(cmd.challengeId);
+      ensure(
+        ["pending", "accepted", "schedule_pending", "scheduled", "result_pending", "disputed"].includes(c.status),
+        "O desafio não está num estado que permita definir vencedor.",
+      );
+      ensure(
+        [c.challengerId, c.defenderId].includes(cmd.winnerId),
+        "Vencedor inválido.",
+      );
+      ensure(
+        typeof cmd.reason === "string" && cmd.reason.trim().length >= 3,
+        "Indica o motivo da definição do vencedor (mínimo 3 caracteres).",
+      );
+      // Apply result without set scores - just winner
+      applyResult(c, cmd.winnerId, "", undefined);
+      log("admin.result.winnerSet", {
+        challengeId: c._id,
+        winnerId: cmd.winnerId,
+        reason: cmd.reason.trim(),
+      });
+      return { ok: true };
     }
     case "admin.result.correct": {
       const c = challenge(cmd.challengeId),

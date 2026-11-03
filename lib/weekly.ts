@@ -1,4 +1,4 @@
-import { weeklyPublishedAt, manualRolesEnabled } from "./weekly-publication";
+import { weeklyPublishedAt } from "./weekly-publication";
 import { effectiveRoles } from "./effective-roles";
 import {
   dynamicWeeklyEnabled,
@@ -109,7 +109,7 @@ export function weeklyRole(
     : undefined;
 }
 
-/** Get the effective role for a player in a challenge, considering manual overrides. */
+/** Get the effective role for a player in a challenge. */
 function getEffectiveRoleForChallenge(
   s: State,
   challengeId: string,
@@ -118,16 +118,7 @@ function getEffectiveRoleForChallenge(
   now: number,
   isAttacker: boolean,
 ): "attack" | "defense" | undefined {
-  const challenge = s.challenges.find((c) => c._id === challengeId);
-  const round = s.weeklyRounds.find((r) => r.weekStart === week);
-  const divisionId = s.players.find((p) => p._id === playerId)?.divisionId;
-  
-  // Check if manual roles are enabled and this challenge has custom roles
-  if (challenge?.customRoles && round && divisionId && manualRolesEnabled(round, divisionId)) {
-    return isAttacker ? challenge.customRoles.challengerRole : challenge.customRoles.defenderRole;
-  }
-  
-  // Fall back to weekly published role
+  // Use weekly published role
   return weeklyRole(s, playerId, now, week);
 }
 

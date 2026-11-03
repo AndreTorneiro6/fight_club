@@ -35,11 +35,3 @@ export function hasUnsavedDivisionRoles(
   return JSON.stringify(onScreen) !== JSON.stringify(saved);
 }
 
-/** Returns true if manual role overrides are enabled for the given division in this round. */
-export function manualRolesEnabled(
-  round: WeeklyRound | undefined,
-  divisionId?: string,
-): boolean {
-  if (!round || !divisionId) return false;
-  return !!round.manualRoles?.[divisionId];
-}

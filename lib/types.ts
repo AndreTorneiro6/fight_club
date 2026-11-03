@@ -204,9 +204,6 @@ export interface Challenge extends Entity {
   completedAt?: string;
   titleFight?: boolean;
   expiredFrom?: ChallengeStatus;
-  /** Manual role override for this challenge (when weekly round has manualRoles enabled).
-   * If set, these roles take precedence over the weekly published roles for this challenge. */
-  customRoles?: { challengerRole: "attack" | "defense"; defenderRole: "attack" | "defense" };
 }
 export interface ScheduleProposal {
   _id: string;
@@ -400,8 +397,6 @@ export interface WeeklyRound extends Entity {
     { input: string; assignments: string }
   >;
   divisionOpeningDelays?: Record<string, number>;
-  /** Per-division flag: when true, weekly roles can be overridden per challenge. */
-  manualRoles?: Record<string, boolean>;
   dynamicAssignments?: { playerId: string; role: "attack" | "defense" }[];
   challengesOpenAt?: string;
   /** null holds this division until an administrator opens it. */
