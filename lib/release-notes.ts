@@ -1,6 +1,17 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.14.1";
+export const applicationVersion = "1.15.0";
 export const releaseNotes = [
+  {
+    version: "1.15.0",
+    date: "2026-11-03",
+    title: "Modo manual de papéis semanais por jogo",
+    changes: [
+      "Os papéis semanais podem ser colocados em modo manual mesmo depois de publicados: o administrador ativa o modo manual por divisão/semana e passa a poder alterar Ataque/Defesa por jogo individual.",
+      "Em Intervenção administrativa no detalhe do desafio, aparece um seletor de papéis personalizados quando o modo manual está ativo. Permite trocar quem ataca e quem defende sem cancelar o jogo.",
+      "Jogos desmarcados voltam ao estado 'por marcar' no resumo (A marcar / A confirmar horário), evitando esquecimentos. Cancelar e voltar a marcar jogos individuais continua a funcionar sem ter de relançar a jornada inteira.",
+      "Inclui botão 'Modo manual (alterar papéis por jogo)' em Papéis semanais por divisão, com registo de auditoria e notificações aos jogadores afetados.",
+    ],
+  },
   {
     version: "1.14.1",
     date: "2026-11-02",
