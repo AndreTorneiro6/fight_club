@@ -210,6 +210,7 @@ export function WeeklyRoles({
   const [division, setDivision] = useState(
     admin ? (initialDivision ?? "all") : me.divisionId,
   );
+  const [editMode, setEditMode] = useState(false);
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(
     round?.assignments.map((entry) => ({
@@ -821,6 +822,8 @@ export function WeeklyRoles({
               for (const member of activeMembers) delete next[member._id];
               return next;
             });
+          const manualMode = editMode || (round ? manualRolesEnabled(round, division) : false);
+          const canEditPublished = manualMode;
           const assign = (value: "attack" | "defense") =>
             setRoles((previous) => ({
               ...previous,
@@ -913,7 +916,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!attackReason ||
                       (lockedByChallenge && requiredRole !== "attack") ||
-                      (published && !correctable) ||
+                      (published && !correctable && !canEditPublished) ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("attack")}
@@ -930,7 +933,7 @@ export function WeeklyRoles({
                       !!role ||
                       !!defenseReason ||
                       (lockedByChallenge && requiredRole !== "defense") ||
-                      (published && !correctable) ||
+                      (published && !correctable && !canEditPublished) ||
                       week < clubWeek().start
                     }
                     onClick={() => assign("defense")}
@@ -945,7 +948,7 @@ export function WeeklyRoles({
                       disabled={
                         busy ||
                         lockedByChallenge ||
-                        (published && !correctable) ||
+                        (published && !correctable && !canEditPublished) ||
                         week < clubWeek().start
                       }
                       onClick={remove}
@@ -1075,6 +1078,13 @@ export function WeeklyRoles({
               onClick={() => void save(false)}
             >
               Guardar rascunho
+            </button>
+            <button
+              className={editMode ? "primary" : ""}
+              disabled={busy || week < clubWeek().start}
+              onClick={() => setEditMode((prev) => !prev)}
+            >
+              {editMode ? "Cancelar edição" : "Editar papéis"}
             </button>
             <button
               className="primary"
