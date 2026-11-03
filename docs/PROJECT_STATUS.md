@@ -1,3 +1,9 @@
+## Version 1.16.0 — winner without result + manual roles cleanup — 3 November 2026
+
+- New: `admin.result.setWinner` command — admins can now set the winner of a match without entering set scores. Requires a validation sentence (minimum 3 characters, similar to game deletion). Updates ranking, statistics, and history automatically. UI: new "Definir vencedor sem resultado" button in admin challenge view with winner selection and required reason field.
+- Removed: manual weekly roles per game feature (added in 1.15.0). Removed `admin.week.manualRoles.set` and `admin.challenge.setRoles` commands, `manualRolesEnabled` function, `customRoles` from Challenge, `manualRoles` from WeeklyRound, and custom roles UI from admin challenge screen. Normal weekly roles workflow (edit per team → approve → publish) unchanged.
+- Typecheck, 533 tests, and production build pass.
+
 ## Version 1.14.1 LIVE — games on hold all week don't use weekly slots — 2 November 2026
 
 - Weekly competition: a game that can't be played on any day of the challenge week (deferred past it, or a player on vacation the whole week) no longer counts towards `maxActiveChallenges` for that week (`onHoldForWeek` / `limitChallenges` in `lib/rules.ts`; used by the planner, challengeReason, admin create and assign).
