@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.15.0";
+export const applicationVersion = "1.16.0";
 export const releaseNotes = [
+  {
+    version: "1.16.0",
+    date: "2026-11-03",
+    title: "Vencedor sem resultado com frase de validação",
+    changes: [
+      "O administrador pode definir o vencedor de um jogo sem introduzir os sets, bastando escrever uma frase de validação (igual à exclusão de jogos).",
+      "Remove o modo manual de papéis semanais por jogo (versão 1.15.0): a atribuição de Ataque/Defesa volta a ser apenas pela publicação dinâmica ou aprovada pelo admin.",
+      "Simplifica a intervenção administrativa: sem seletor de papéis personalizados por jogo, mantendo apenas o registo de resultado oficial ou vencedor sem resultado.",
+    ],
+  },
   {
     version: "1.15.0",
     date: "2026-11-03",
