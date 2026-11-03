@@ -1,4 +1,4 @@
-import { weeklyPublishedAt } from "./weekly-publication";
+import { weeklyPublishedAt, manualRolesEnabled } from "./weekly-publication";
 import { effectiveRoles } from "./effective-roles";
 import {
   dynamicWeeklyEnabled,
@@ -108,6 +108,29 @@ export function weeklyRole(
     ? effectiveRoles(round!).find((entry) => entry.playerId === playerId)?.role
     : undefined;
 }
+
+/** Get the effective role for a player in a challenge, considering manual overrides. */
+function getEffectiveRoleForChallenge(
+  s: State,
+  challengeId: string,
+  playerId: string,
+  week: string,
+  now: number,
+  isAttacker: boolean,
+): "attack" | "defense" | undefined {
+  const challenge = s.challenges.find((c) => c._id === challengeId);
+  const round = s.weeklyRounds.find((r) => r.weekStart === week);
+  const divisionId = s.players.find((p) => p._id === playerId)?.divisionId;
+  
+  // Check if manual roles are enabled and this challenge has custom roles
+  if (challenge?.customRoles && round && divisionId && manualRolesEnabled(round, divisionId)) {
+    return isAttacker ? challenge.customRoles.challengerRole : challenge.customRoles.defenderRole;
+  }
+  
+  // Fall back to weekly published role
+  return weeklyRole(s, playerId, now, week);
+}
+
 export function weeklyReason(
   s: State,
   attacker: Player,
@@ -144,20 +167,23 @@ export function weeklyReason(
     return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
   const open = selected.weekType === "OPEN_ATTACK";
   if (!open) {
-    if (weeklyRole(s, attacker._id, now, week) !== "attack")
+    const attackerRole = getEffectiveRoleForChallenge(s, ignoreId ?? "", attacker._id, week, now, true);
+    const defenderRole = getEffectiveRoleForChallenge(s, ignoreId ?? "", defender._id, week, now, false);
+    
+    if (attackerRole !== "attack")
       return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
-    if (weeklyRole(s, defender._id, now, week) !== "defense")
+    if (defenderRole !== "defense")
       return "Este jogador não está em defesa esta semana.";
     if (
       attackingTeam.some(
         (member) =>
           member.status === "active" &&
-          weeklyRole(s, member._id, now, week) !== "attack",
+          getEffectiveRoleForChallenge(s, ignoreId ?? "", member._id, week, now, true) !== "attack",
       ) ||
       defendingTeam.some(
         (member) =>
           member.status === "active" &&
-          weeklyRole(s, member._id, now, week) !== "defense",
+          getEffectiveRoleForChallenge(s, ignoreId ?? "", member._id, week, now, false) !== "defense",
       )
     )
       return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";

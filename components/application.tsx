@@ -10,7 +10,7 @@ import { matchOrder, matchStart } from "@/lib/match-order";
 import { canRecordOfficialResult } from "@/lib/result-readiness";
 import ChallengeChat from "./challenge-chat";
 import MatchCalendarActions from "./match-calendar-actions";
-import { weeklyPublishedAt } from "@/lib/weekly-publication";
+import { weeklyPublishedAt, manualRolesEnabled } from "@/lib/weekly-publication";
 import AdminRoundTransition from "./admin-round-transition";
 import {
   teamPosition,
@@ -2870,6 +2870,76 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
             Atribuir ataque / defesa
           </button>
         )}
+        {/* Custom roles setting when manual mode is enabled */}
+        {(() => {
+          const round = s.weeklyRounds.find((r) => r.weekStart === c.weekStart);
+          const manualEnabled = round && manualRolesEnabled(round, c.divisionId);
+          if (!manualEnabled || c.titleFight) return null;
+          return (
+            <div className="inset stack space-top" style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 12 }}>
+              <strong>Papéis personalizados para este jogo (modo manual ativo)</strong>
+              <small style={{ color: "var(--color-muted)" }}>
+                O modo manual está ativo para esta divisão/semana. Defina os papéis para este jogo específico.
+              </small>
+              <div className="form-grid">
+                <label>
+                  Papel do desafiante ({challengeTeamName(c, c.challengerId, s.players)})
+                  <select
+                    defaultValue={c.customRoles?.challengerRole ?? ""}
+                    onChange={(e) => {
+                      void run(
+                        {
+                          type: "admin.challenge.setRoles",
+                          challengeId: c._id,
+                          challengerRole: e.target.value,
+                          defenderRole: c.customRoles?.defenderRole ?? (e.target.value === "attack" ? "defense" : "attack"),
+                          reason: "Alteração manual do papel do desafiante",
+                        },
+                        "Papel do desafiante atualizado.",
+                      );
+                    }}
+                    disabled={busy}
+                  >
+                    <option value="">Selecionar</option>
+                    <option value="attack">Ataque</option>
+                    <option value="defense">Defesa</option>
+                  </select>
+                </label>
+                <label>
+                  Papel do desafiado ({challengeTeamName(c, c.defenderId, s.players)})
+                  <select
+                    defaultValue={c.customRoles?.defenderRole ?? ""}
+                    onChange={(e) => {
+                      void run(
+                        {
+                          type: "admin.challenge.setRoles",
+                          challengeId: c._id,
+                          challengerRole: c.customRoles?.challengerRole ?? (e.target.value === "attack" ? "defense" : "attack"),
+                          defenderRole: e.target.value,
+                          reason: "Alteração manual do papel do desafiado",
+                        },
+                        "Papel do desafiado atualizado.",
+                      );
+                    }}
+                    disabled={busy}
+                  >
+                    <option value="">Selecionar</option>
+                    <option value="attack">Ataque</option>
+                    <option value="defense">Defesa</option>
+                  </select>
+                </label>
+              </div>
+              {c.customRoles && (
+                <p className="success" style={{ fontSize: 12 }}>
+                  Papéis personalizados ativos: Desafiante ={" "}
+                  {c.customRoles.challengerRole === "attack" ? "Ataque" : "Defesa"}{" "}
+                  · Desafiado ={" "}
+                  {c.customRoles.defenderRole === "attack" ? "Ataque" : "Defesa"}
+                </p>
+              )}
+            </div>
+          );
+        })()}
         <div className="stack">
           <p style={{ fontSize: 12 }}>
             Cada intervenção fica registada no histórico.

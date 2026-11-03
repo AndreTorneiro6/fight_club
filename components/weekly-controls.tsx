@@ -1,6 +1,7 @@
 "use client";
 import {
   hasUnsavedDivisionRoles,
+  manualRolesEnabled,
   weeklyPublishedAt,
 } from "@/lib/weekly-publication";
 import { challengeDistance } from "@/lib/challenge-distance";
@@ -501,6 +502,33 @@ export function WeeklyRoles({
               <option value="OPEN_ATTACK">SEMANA DE ATAQUE LIVRE</option>
             </select>
           </label>
+          {admin && division !== "all" && round && (
+            <label>
+              Modo manual (alterar papéis por jogo)
+              <input
+                type="checkbox"
+                checked={manualRolesEnabled(round, division)}
+                disabled={busy || week < clubWeek().start}
+                onChange={(e) => {
+                  void run(
+                    {
+                      type: "admin.week.manualRoles.set",
+                      weekStart: week,
+                      divisionId: division,
+                      expectedVersion: round.version ?? 0,
+                      enabled: e.target.checked,
+                      reason: e.target.checked
+                        ? "Ativar modo manual para alterar papéis por jogo"
+                        : "Desativar modo manual",
+                    },
+                    e.target.checked
+                      ? "Modo manual ativado — pode alterar papéis por jogo"
+                      : "Modo manual desativado",
+                  );
+                }}
+              />
+            </label>
+          )}
           {round?.warnings?.map((w) => (
             <small key={w}>{w}</small>
           ))}
@@ -626,20 +654,49 @@ export function WeeklyRoles({
           </p>
         )}
       {admin && (
-        <label>
-          Categoria dos papéis
-          <select
-            value={division}
-            onChange={(event) => setDivision(event.target.value)}
-          >
-            <option value="all">Todas as categorias</option>
-            {s.divisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label>
+            Categoria dos papéis
+            <select
+              value={division}
+              onChange={(event) => setDivision(event.target.value)}
+            >
+              <option value="all">Todas as categorias</option>
+              {s.divisions.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {division !== "all" && round && (
+            <label>
+              Modo manual (alterar papéis por jogo)
+              <input
+                type="checkbox"
+                checked={manualRolesEnabled(round, division)}
+                disabled={busy || week < clubWeek().start}
+                onChange={(e) => {
+                  void run(
+                    {
+                      type: "admin.week.manualRoles.set",
+                      weekStart: week,
+                      divisionId: division,
+                      expectedVersion: round.version ?? 0,
+                      enabled: e.target.checked,
+                      reason: e.target.checked
+                        ? "Ativar modo manual para alterar papéis por jogo"
+                        : "Desativar modo manual",
+                    },
+                    e.target.checked
+                      ? "Modo manual ativado — pode alterar papéis por jogo"
+                      : "Modo manual desativado",
+                  );
+                }}
+              />
+            </label>
+          )}
+        </>
       )}
       {admin && division !== "all" && (
         <p className="inset">
