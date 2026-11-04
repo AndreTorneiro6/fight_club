@@ -114,7 +114,11 @@ test("administrator projection preserves competition proposals for review", () =
   const state = fixture(),
     before = structuredClone(state);
   filterFeatureView(state, { ...actor, role: "admin" });
-  assert.deepEqual(state, { ...before, matchVoteSummaries: [], stickerAccess: { enabled: true, remainingPacks: 0 } });
+  assert.deepEqual(state, {
+    ...before,
+    matchVoteSummaries: [],
+    stickerAccess: { enabled: true, remainingPacks: 0 },
+  });
 });
 
 test("an approved schedule without publication cannot become public by setting its status alone", () => {
@@ -122,4 +126,36 @@ test("an approved schedule without publication cannot become public by setting i
   delete state.competitionSchedules![2].publishedAt;
   filterFeatureView(state, actor);
   assert.deepEqual(state.competitionSchedules, []);
+});
+
+test("manual week pair drafts are private while the division's manual mode can be displayed", () => {
+  const s = fixture();
+  s.weeklyRounds = [
+    {
+      _id: "future",
+      weekStart: "2026-11-16",
+      assignments: [],
+      manualMatchmaking: { ouro: true },
+      manualMatchups: {
+        ouro: {
+          version: 1,
+          pairs: [
+            {
+              id: "pair",
+              challengerId: "p3",
+              defenderId: "p1",
+              challengerTeamKey: "p3",
+              defenderTeamKey: "p1",
+            },
+          ],
+        },
+      },
+    },
+  ];
+  const admin = structuredClone(s);
+  filterFeatureView(s, actor);
+  assert.equal(s.weeklyRounds[0].manualMatchups, undefined);
+  assert.equal(s.weeklyRounds[0].manualMatchmaking?.ouro, true);
+  filterFeatureView(admin, { ...actor, role: "admin" });
+  assert.equal(admin.weeklyRounds[0].manualMatchups?.ouro.pairs.length, 1);
 });

@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.17.0";
+export const applicationVersion = "1.18.0";
 export const releaseNotes = [
+  {
+    version: "1.18.0",
+    date: "2026-11-04",
+    title: "Preparar confrontos de qualquer semana da época",
+    changes: [
+      "O planeamento manual permite selecionar qualquer semana atual ou futura da época, com a próxima semana selecionada por defeito. O modo de confrontos aplica-se só à divisão e semana escolhidas.",
+      "Os pares ficam guardados em rascunhos privados até publicar. Podes preparar várias semanas sem criar desafios ativos ou avisar os jogadores. Ao publicar, o sistema revalida todos os pares e cria os jogos em conjunto; se uma validação falhar, o rascunho mantém-se.",
+      "Jogos publicados de semanas futuras não consomem vagas ativas de semanas anteriores. As férias e os prazos são calculados pela semana escolhida.",
+    ],
+  },
   {
     version: "1.17.0",
     date: "2026-11-04",

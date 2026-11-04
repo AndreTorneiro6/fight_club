@@ -1,3 +1,7 @@
+import {
+  validateManualWeek,
+  manualPairingReason,
+} from "./manual-week-matchups";
 import { usesManagedCompetition } from "./competition-mode";
 import {
   adminMatchmakingEnabled,
@@ -211,8 +215,30 @@ export const settingsSchema = z.object({
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("admin.division.matchmaking.set"),
+    weekStart: day.optional(),
     divisionId: id,
     manual: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("admin.week.matchup.add"),
+    weekStart: day,
+    divisionId: id,
+    challengerId: id,
+    defenderId: id,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("admin.week.matchup.remove"),
+    weekStart: day,
+    divisionId: id,
+    pairId: id,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
+    type: z.literal("admin.week.matchups.publish"),
+    weekStart: day,
+    divisionId: id,
+    expectedVersion: z.number().int().min(0),
   }),
   z.object({
     type: z.literal("admin.challenge.distance.set"),
@@ -1781,6 +1807,24 @@ export function execute(
         !usesManagedCompetition(s, cmd.divisionId),
         "Usa Competição e jornadas para esta divisão.",
       );
+      if (cmd.weekStart) {
+        validateManualWeek(s, cmd.weekStart, timestamp);
+        const round =
+          s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart) ??
+          generateWeeklyRoles(s, cmd.weekStart, actor.userId, timestamp);
+        const before = round.manualMatchmaking?.[cmd.divisionId];
+        round.manualMatchmaking = {
+          ...round.manualMatchmaking,
+          [cmd.divisionId]: cmd.manual,
+        };
+        log("admin.division.matchmaking.changed", {
+          divisionId: cmd.divisionId,
+          weekStart: cmd.weekStart,
+          before,
+          manual: cmd.manual,
+        });
+        break;
+      }
       const before = rules.manualMatchmakingDivisionIds ?? [];
       const after = cmd.manual
         ? [...new Set([...before, cmd.divisionId])]
@@ -1793,6 +1837,130 @@ export function execute(
         before,
         after,
       });
+      break;
+    }
+    case "admin.week.matchup.add":
+    case "admin.week.matchup.remove":
+    case "admin.week.matchups.publish": {
+      validateManualWeek(s, cmd.weekStart, timestamp);
+      ensure(
+        s.divisions.some((d) => d._id === cmd.divisionId) &&
+          !usesManagedCompetition(s, cmd.divisionId),
+        "Divisão inválida para este planeamento.",
+      );
+      ensure(
+        adminMatchmakingEnabled(s, cmd.divisionId, cmd.weekStart),
+        "Ativa o modo de administração para esta divisão e semana.",
+      );
+      const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      ensure(round, "Ativa o modo desta semana antes de preparar os jogos.");
+      const plan = round.manualMatchups?.[cmd.divisionId] ?? {
+        version: 0,
+        pairs: [],
+      };
+      ensure(
+        plan.version === cmd.expectedVersion,
+        "O rascunho mudou. Atualiza antes de continuar.",
+        409,
+      );
+      if (cmd.type === "admin.week.matchup.add") {
+        const reason = manualPairingReason(
+          s,
+          cmd.divisionId,
+          cmd.weekStart,
+          cmd.challengerId,
+          cmd.defenderId,
+        );
+        ensure(!reason, reason ?? "Confronto inválido.");
+        const teams = rankingEntries(s.players, cmd.divisionId);
+        const pair = {
+          id: uid(),
+          challengerId: cmd.challengerId,
+          defenderId: cmd.defenderId,
+          challengerTeamKey: teams.find((t) =>
+            t.members.some((p) => p._id === cmd.challengerId),
+          )!.id,
+          defenderTeamKey: teams.find((t) =>
+            t.members.some((p) => p._id === cmd.defenderId),
+          )!.id,
+        };
+        round.manualMatchups = {
+          ...round.manualMatchups,
+          [cmd.divisionId]: {
+            version: plan.version + 1,
+            pairs: [...plan.pairs, pair],
+          },
+        };
+        log("admin.week.matchup.added", { ...cmd, pair });
+      } else if (cmd.type === "admin.week.matchup.remove") {
+        const pair = plan.pairs.find((p) => p.id === cmd.pairId);
+        ensure(
+          pair && !pair.challengeId,
+          "Só podes remover pares ainda não publicados. Gere os jogos publicados no detalhe do desafio.",
+        );
+        round.manualMatchups = {
+          ...round.manualMatchups,
+          [cmd.divisionId]: {
+            version: plan.version + 1,
+            pairs: plan.pairs.filter((p) => p.id !== cmd.pairId),
+          },
+        };
+        log("admin.week.matchup.removed", { ...cmd, pair });
+      } else {
+        const pending = plan.pairs.filter((p) => !p.challengeId);
+        if (!pending.length)
+          return {
+            ok: true,
+            ids: plan.pairs.flatMap((p) =>
+              p.challengeId ? [p.challengeId] : [],
+            ),
+          };
+        const working = structuredClone(s);
+        const saved = working.weeklyRounds.find(
+          (r) => r.weekStart === cmd.weekStart,
+        )!.manualMatchups![cmd.divisionId];
+        for (const pair of saved.pairs.filter((p) => !p.challengeId)) {
+          const teams = rankingEntries(working.players, cmd.divisionId);
+          ensure(
+            teams.find((t) =>
+              t.members.some((p) => p._id === pair.challengerId),
+            )?.id === pair.challengerTeamKey &&
+              teams.find((t) =>
+                t.members.some((p) => p._id === pair.defenderId),
+              )?.id === pair.defenderTeamKey,
+            "Uma dupla mudou desde o rascunho. Remove e volta a escolher esse confronto.",
+            409,
+          );
+          const reason = manualPairingReason(
+            working,
+            cmd.divisionId,
+            cmd.weekStart,
+            pair.challengerId,
+            pair.defenderId,
+            pair.id,
+          );
+          ensure(!reason, reason ?? "Confronto inválido.");
+          const result = execute(
+            working,
+            actor,
+            {
+              type: "admin.challenge.create",
+              weekStart: cmd.weekStart,
+              challengerId: pair.challengerId,
+              defenderId: pair.defenderId,
+            },
+            timestamp,
+          ) as { id: string };
+          pair.challengeId = result.id;
+        }
+        saved.version++;
+        Object.assign(s, working);
+        log("admin.week.matchups.published", {
+          weekStart: cmd.weekStart,
+          divisionId: cmd.divisionId,
+          ids: saved.pairs.map((p) => p.challengeId),
+        });
+      }
       break;
     }
     case "admin.challenge.distance.set": {
@@ -1815,7 +1983,13 @@ export function execute(
         ...rules.divisionChallengeDistances,
         [cmd.divisionId]: cmd.distance,
       };
-      if (dynamicWeeklyEnabled(s, cmd.divisionId)) {
+      if (
+        dynamicWeeklyEnabled(
+          s,
+          cmd.divisionId,
+          weeklyChallengeWeek(s, timestamp, cmd.divisionId),
+        )
+      ) {
         const week = weeklyChallengeWeek(s, timestamp, cmd.divisionId),
           round = s.weeklyRounds.find((r) => r.weekStart === week);
         if (weeklyPublishedAt(round, cmd.divisionId))
@@ -2252,6 +2426,7 @@ export function execute(
           (c.weekStart ?? clubWeek(c.createdAt).start) === cmd.weekStart &&
           !["cancelled", "refused", "expired"].includes(c.status),
       )) {
+        if (adminMatchmakingEnabled(s, c.divisionId, cmd.weekStart)) continue;
         ensure(
           cmd.assignments.find((entry) => entry.playerId === c.challengerId)
             ?.role === "attack" &&
@@ -2423,7 +2598,10 @@ export function execute(
             : me(),
         d = player(cmd.defenderId);
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
-      const manual = adminMatchmakingEnabled(s, p.divisionId);
+      const requestedWeek =
+        cmd.weekStart ?? weeklyChallengeWeek(s, timestamp, p.divisionId);
+      const manual = adminMatchmakingEnabled(s, p.divisionId, requestedWeek);
+      if (manual) validateManualWeek(s, requestedWeek, timestamp);
       if (manual)
         ensure(
           cmd.type === "admin.challenge.create" &&
@@ -2431,16 +2609,25 @@ export function execute(
           ADMIN_MATCHMAKING_MESSAGE,
           403,
         );
-      if (rules.weeklyCompetition && cmd.weekStart)
+      if (rules.weeklyCompetition && cmd.weekStart && !manual)
         ensure(
           cmd.weekStart === weeklyChallengeWeek(s, timestamp, p.divisionId),
           "Os papéis da semana mudaram. Atualiza a página antes de enviar o desafio.",
           409,
         );
-      const weekly = weeklyReason(s, p, d, timestamp);
+      const weekly = weeklyReason(
+        s,
+        p,
+        d,
+        timestamp,
+        undefined,
+        false,
+        requestedWeek,
+        manual,
+      );
       ensure(!weekly, weekly ?? "Desafio semanal inválido.");
       const window = rules.weeklyCompetition
-        ? weeklyWindow(s, [p._id, d._id], timestamp)
+        ? weeklyWindow(s, [p._id, d._id], timestamp, requestedWeek)
         : null;
       if (
         [
@@ -2456,6 +2643,7 @@ export function execute(
           timestamp,
           titleFight,
           cmd.type === "admin.challenge.create",
+          requestedWeek,
         );
         ensure(!reason, reason ?? "Desafio inválido.");
       } else {
@@ -2710,7 +2898,10 @@ export function execute(
           initialSlots: cmd.initialSlots,
         },
       );
-      if (c.mandatoryAssignment && dynamicWeeklyEnabled(s, c.divisionId)) {
+      if (
+        c.mandatoryAssignment &&
+        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
+      ) {
         const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
         for (const forced of plan.forced) {
           const latest = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
@@ -2799,13 +2990,19 @@ export function execute(
         });
       }
       if (c.mandatoryAssignment && c.weekStart) {
-        synchronizeWeeklyRoles(
-          s,
-          c.weekStart,
-          actor.userId,
-          timestamp,
-          c.divisionId,
-        );
+        if (
+          weeklyPublishedAt(
+            s.weeklyRounds.find((r) => r.weekStart === c.weekStart),
+            c.divisionId,
+          )
+        )
+          synchronizeWeeklyRoles(
+            s,
+            c.weekStart,
+            actor.userId,
+            timestamp,
+            c.divisionId,
+          );
         refreshGeneratedWeeklyDrafts(s, timestamp);
       }
       return { id: c._id };
@@ -2855,6 +3052,8 @@ export function execute(
         timestamp,
         c._id,
         true,
+        c.weekStart,
+        adminMatchmakingEnabled(s, c.divisionId, c.weekStart),
       );
       ensure(!weekly, weekly ?? "Papéis semanais inválidos.");
       ensure(
@@ -2898,7 +3097,8 @@ export function execute(
       c.defenderPosition = teamPosition(s.players, defender._id);
       // A mandatory weekly game stays assigned; only optional challenges need a new acceptance.
       const mandatory =
-        (!!c.mandatoryAssignment || adminMatchmakingEnabled(s, c.divisionId)) &&
+        (!!c.mandatoryAssignment ||
+          adminMatchmakingEnabled(s, c.divisionId, c.weekStart)) &&
         !!c.weekStart;
       if (mandatory) c.mandatoryAssignment = true;
       c.status = mandatory ? "accepted" : "pending";
@@ -2927,17 +3127,23 @@ export function execute(
       if (
         mandatory &&
         !c.competitionRoundId &&
-        dynamicWeeklyEnabled(s, c.divisionId)
+        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
       )
         refreshDynamicRoles(c.divisionId, c.weekStart!, c._id);
       if (mandatory) {
-        synchronizeWeeklyRoles(
-          s,
-          c.weekStart!,
-          actor.userId,
-          timestamp,
-          c.divisionId,
-        );
+        if (
+          weeklyPublishedAt(
+            s.weeklyRounds.find((r) => r.weekStart === c.weekStart),
+            c.divisionId,
+          )
+        )
+          synchronizeWeeklyRoles(
+            s,
+            c.weekStart!,
+            actor.userId,
+            timestamp,
+            c.divisionId,
+          );
         refreshGeneratedWeeklyDrafts(s, timestamp);
       }
       break;
@@ -3136,7 +3342,7 @@ export function execute(
       if (
         c.weekStart &&
         !c.competitionRoundId &&
-        dynamicWeeklyEnabled(s, c.divisionId) &&
+        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
         weeklyPublishedAt(
           s.weeklyRounds.find((r) => r.weekStart === c.weekStart),
           c.divisionId,
@@ -4274,7 +4480,7 @@ export function execute(
               !c.competitionRoundId &&
               (!cmd.settings.weeklyDynamicDivisionIds ||
                 cmd.settings.weeklyDynamicDivisionIds.includes(c.divisionId)) &&
-              !dynamicWeeklyEnabled(s, c.divisionId) &&
+              !dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
               c.status === "pending" &&
               Date.parse(c.respondBy) > timestamp,
           ),

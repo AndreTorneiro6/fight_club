@@ -8,6 +8,7 @@ import {
   type DivisionCode,
 } from "../lib/types";
 import { execute } from "../lib/engine";
+import { limitChallenges } from "../lib/rules";
 import { weeklyRole } from "../lib/weekly";
 import { dynamicWeeklyPlan, dynamicWeeklyEnabled } from "../lib/dynamic-weekly";
 import { challengeDistance } from "../lib/challenge-distance";
@@ -885,4 +886,206 @@ test("manual match assignment is mandatory even when player challenges normally 
   assert.equal(s.challenges.length, 1);
   assert.equal(s.challenges[0].status, "accepted");
   assert.equal(s.challenges[0].mandatoryAssignment, true);
+});
+
+test("future manual drafts are week-specific, consume no active slots and publish before role opening", () => {
+  const s = fixture("ouro", 12);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const future = "2026-11-16";
+  const original = structuredClone(s.weeklyRounds[0]);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.division.matchmaking.set",
+      divisionId: "ouro",
+      weekStart: future,
+      manual: true,
+    },
+    now,
+  );
+  assert.equal(dynamicWeeklyEnabled(s, "ouro", week), true);
+  assert.equal(dynamicWeeklyEnabled(s, "ouro", future), false);
+  const add = {
+    type: "admin.week.matchup.add",
+    divisionId: "ouro",
+    weekStart: future,
+    challengerId: "t4a",
+    defenderId: "t2a",
+    expectedVersion: 0,
+  };
+  const notices = s.notifications.length;
+  execute(s, admin, add, now);
+  assert.equal(s.challenges.length, 0);
+  assert.equal(s.notifications.length, notices);
+  assert.deepEqual(
+    s.weeklyRounds.find((r) => r.weekStart === week),
+    original,
+  );
+  assert.throws(() => execute(s, admin, add, now), /rascunho mudou/);
+  const round = s.weeklyRounds.find((r) => r.weekStart === future)!;
+  assert.equal(round.publishedAt, undefined);
+  s.exceptions.push({
+    _id: "vacation",
+    playerId: "t4a",
+    from: "2026-10-24",
+    to: "2026-11-01",
+    vacation: true,
+    note: "Férias",
+  });
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart: future,
+      expectedVersion: 1,
+    },
+    now,
+  );
+  assert.equal(s.challenges.length, 1);
+  const c = s.challenges[0];
+  assert.equal(c.weekStart, future);
+  assert.equal(c.status, "accepted");
+  assert.equal(c.deferredUntil, undefined);
+  assert.equal(c.playBy, "2026-11-22T23:59:59.999Z");
+  // Publishing a future game must not consume the current week's active slots.
+  assert.equal(
+    limitChallenges(
+      s,
+      s.players.find((p) => p._id === "t4a")!,
+      now,
+      week,
+    ).length,
+    0,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart: future,
+      expectedVersion: 2,
+    },
+    now,
+  );
+  assert.equal(s.challenges.length, 1);
+});
+
+test("publishing future pair drafts is atomic and keeps the draft if another participant becomes inactive", () => {
+  const s = fixture("ouro", 12);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const future = "2026-11-23";
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.division.matchmaking.set",
+      divisionId: "ouro",
+      weekStart: future,
+      manual: true,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.add",
+      divisionId: "ouro",
+      weekStart: future,
+      challengerId: "t4a",
+      defenderId: "t2a",
+      expectedVersion: 0,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.add",
+      divisionId: "ouro",
+      weekStart: future,
+      challengerId: "t6a",
+      defenderId: "t5a",
+      expectedVersion: 1,
+    },
+    now,
+  );
+  s.players.find((p) => p._id === "t6a")!.status = "suspended";
+  const before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.week.matchups.publish",
+          divisionId: "ouro",
+          weekStart: future,
+          expectedVersion: 2,
+        },
+        now,
+      ),
+    /ativas/,
+  );
+  assert.deepEqual(s, before);
+});
+
+test("separate future drafts reject consecutive rematches and removing an unpublished pair releases its teams", () => {
+  const s = fixture("ouro", 12),
+    admin: Actor = { ...actor(1), role: "admin" };
+  for (const weekStart of ["2026-11-09", "2026-11-16"])
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.division.matchmaking.set",
+        divisionId: "ouro",
+        weekStart,
+        manual: true,
+      },
+      now,
+    );
+  const command = {
+    type: "admin.week.matchup.add",
+    divisionId: "ouro",
+    challengerId: "t4a",
+    defenderId: "t2a",
+    expectedVersion: 0,
+  };
+  execute(s, admin, { ...command, weekStart: "2026-11-09" }, now);
+  assert.throws(
+    () => execute(s, admin, { ...command, weekStart: "2026-11-16" }, now),
+    /consecutivas/,
+  );
+  const pair = s.weeklyRounds.find((r) => r.weekStart === "2026-11-09")!
+    .manualMatchups!.ouro.pairs[0];
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.remove",
+      divisionId: "ouro",
+      weekStart: "2026-11-09",
+      pairId: pair.id,
+      expectedVersion: 1,
+    },
+    now,
+  );
+  execute(s, admin, { ...command, weekStart: "2026-11-16" }, now);
+  assert.equal(s.challenges.length, 0);
+  assert.equal(
+    s.weeklyRounds.find((r) => r.weekStart === "2026-11-09")!.manualMatchups!
+      .ouro.pairs.length,
+    0,
+  );
+  assert.equal(
+    s.weeklyRounds.find((r) => r.weekStart === "2026-11-16")!.manualMatchups!
+      .ouro.pairs.length,
+    1,
+  );
 });

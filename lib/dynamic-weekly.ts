@@ -14,12 +14,16 @@ import {
   CONSECUTIVE_REMATCH_MESSAGE,
   consecutiveRematch,
 } from "./consecutive-rematch";
-export function dynamicWeeklyEnabled(s: State, divisionId?: string) {
+export function dynamicWeeklyEnabled(
+  s: State,
+  divisionId?: string,
+  week?: string,
+) {
   return !!(
     s.settings[0].weeklyCompetition &&
     s.settings[0].weeklyMandatoryChallenges &&
     s.settings[0].weeklyDynamicRoles &&
-    (!divisionId || !adminMatchmakingEnabled(s, divisionId)) &&
+    (!divisionId || !adminMatchmakingEnabled(s, divisionId, week)) &&
     (!s.settings[0].weeklyDynamicDivisionIds ||
       (divisionId
         ? s.settings[0].weeklyDynamicDivisionIds.includes(divisionId)
@@ -314,7 +318,7 @@ export function dynamicRoleChanges(
   week: string,
   assignments: { playerId: string; role: "attack" | "defense" }[],
 ) {
-  if (!dynamicWeeklyEnabled(s, divisionId)) return [];
+  if (!dynamicWeeklyEnabled(s, divisionId, week)) return [];
   const preview: State = {
     ...s,
     weeklyRounds: s.weeklyRounds.map((r) =>

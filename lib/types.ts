@@ -379,7 +379,21 @@ export interface RegistrationLink extends Entity {
   active: boolean;
   createdAt: string;
 }
+export interface ManualWeekMatchup {
+  id: string;
+  challengerId: string;
+  defenderId: string;
+  challengerTeamKey: string;
+  defenderTeamKey: string;
+  challengeId?: string;
+}
 export interface WeeklyRound extends Entity {
+  manualMatchmaking?: Record<string, boolean>;
+  manualMatchups?: Record<
+    string,
+    { version: number; pairs: ManualWeekMatchup[] }
+  >;
+
   divisionTransitions?: Record<
     string,
     { previousWeek: string; preparedAt: string }

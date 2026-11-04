@@ -331,7 +331,7 @@ export function generateWeeklyRoles(
     let generated = build();
     // Teams left out of the optimizer's schedule take the role the dynamic
     // planner would give them, so publishing never triggers a role flip.
-    if (weekType === "NORMAL" && dynamicWeeklyEnabled(s, d._id)) {
+    if (weekType === "NORMAL" && dynamicWeeklyEnabled(s, d._id, weekStart)) {
       const others = assignments.filter(
         (a) => !generated.some((g) => g.playerId === a.playerId),
       );

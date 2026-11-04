@@ -3,6 +3,10 @@ import {
   adminMatchmakingEnabled,
   ADMIN_MATCHMAKING_MESSAGE,
 } from "@/lib/weekly-matchmaking-mode";
+import {
+  manualMatchmakingWeeks,
+  manualPairingReason,
+} from "@/lib/manual-week-matchups";
 import { notificationTarget } from "@/lib/notification-link";
 import { matchFrozenUntil } from "@/lib/match-freeze";
 import { OriginalTitleArt } from "./original-title-art";
@@ -4724,11 +4728,16 @@ function AdminDivisionMatchmaking(a: Actions) {
   const divisions = s.divisions.filter(
     (d) => !usesManagedCompetition(s, d._id),
   );
+  const weeks = manualMatchmakingWeeks(s);
   const [division, setDivision] = useState(divisions[0]?._id ?? "");
+  const [week, setWeek] = useState(weeks[1] ?? weeks[0] ?? "");
   const [assigning, setAssigning] = useState(false);
-  if (!s.settings[0].weeklyCompetition || !divisions.length) return null;
-  const manual = adminMatchmakingEnabled(s, division);
-  const week = weeklyChallengeWeek(s, Date.now(), division);
+  if (!s.settings[0].weeklyCompetition || !divisions.length || !weeks.length)
+    return null;
+  const manual = adminMatchmakingEnabled(s, division, week);
+  const plan = s.weeklyRounds.find((r) => r.weekStart === week)
+    ?.manualMatchups?.[division] ?? { version: 0, pairs: [] };
+  const draft = plan.pairs.filter((p) => !p.challengeId);
   const games = s.challenges.filter(
     (c) =>
       c.divisionId === division &&
@@ -4745,11 +4754,36 @@ function AdminDivisionMatchmaking(a: Actions) {
     ),
   );
   const free = teams.filter(
-    (t) => !games.some((c) => involves(c, t.members[0]._id, s.players)),
+    (t) =>
+      !games.some((c) => involves(c, t.members[0]._id, s.players)) &&
+      !draft.some((p) =>
+        t.members.some(
+          (m) => m._id === p.challengerId || m._id === p.defenderId,
+        ),
+      ),
   );
+  const name = (id: string) => teamName(s.players, id);
   return (
     <Section title="Definir jogos por divisão">
       <div className="stack">
+        <label>
+          Semana dos jogos a definir
+          <select
+            value={week}
+            disabled={busy}
+            onChange={(e) => {
+              setWeek(e.target.value);
+              setAssigning(false);
+            }}
+          >
+            {weeks.map((w) => (
+              <option key={w} value={w}>
+                Semana de {w}
+                {w === weeks[0] ? " · atual" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           Divisão dos jogos
           <select
@@ -4777,9 +4811,10 @@ function AdminDivisionMatchmaking(a: Actions) {
                 {
                   type: "admin.division.matchmaking.set",
                   divisionId: division,
+                  weekStart: week,
                   manual: e.target.value === "admin",
                 },
-                "Modo de confrontos atualizado. Os jogos existentes mantêm-se.",
+                "Modo atualizado apenas para a divisão e semana escolhidas.",
               )
             }
           >
@@ -4791,21 +4826,19 @@ function AdminDivisionMatchmaking(a: Actions) {
         </label>
         <p>
           {manual
-            ? "Só os administradores escolhem as duplas. Não são criados confrontos extra pelo algoritmo; os jogadores combinam o horário após a atribuição."
-            : "Os jogadores enviam desafios e o algoritmo aplica as regras de emparelhamento configuradas."}
+            ? "Prepara os pares em rascunho e publica quando estiverem prontos. Só a publicação cria os desafios e avisa as duplas para combinar o horário."
+            : "Os jogadores e o algoritmo seguem as regras atuais nesta divisão e semana. Podes preparar qualquer semana futura da época em modo de administração."}
         </p>
         <small>
-          Jornada de {week} · {games.length} jogos definidos · {free.length}{" "}
-          duplas sem jogo. Os jogos existentes não são alterados ao mudar o
-          modo.
+          Jornada de {week} · {games.length} jogos publicados · {draft.length}{" "}
+          pares em rascunho · {free.length} duplas sem jogo.
         </small>
         {manual && (
           <>
             <p>
-              Continuam a aplicar-se a distância no ranking, as regras do
-              título, os limites semanais e a proibição de repetir adversários
-              com jogos pendentes. Os papéis publicados não limitam a escolha
-              das duplas.
+              As regras de ranking, título e repetição mantêm-se. Os limites
+              ativos e a composição das duplas são novamente validados ao
+              publicar. Outras semanas não são alteradas.
             </p>
             <button
               className="primary"
@@ -4814,6 +4847,49 @@ function AdminDivisionMatchmaking(a: Actions) {
             >
               Definir jogo
             </button>
+            {draft.map((pair) => (
+              <div key={pair.id} className="inset row between wrap">
+                <span>
+                  {name(pair.challengerId)} × {name(pair.defenderId)} · Rascunho
+                </span>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      {
+                        type: "admin.week.matchup.remove",
+                        weekStart: week,
+                        divisionId: division,
+                        pairId: pair.id,
+                        expectedVersion: plan.version,
+                      },
+                      "Par removido do rascunho.",
+                    )
+                  }
+                >
+                  Remover par
+                </button>
+              </div>
+            ))}
+            {draft.length > 0 && (
+              <button
+                disabled={busy}
+                className="primary"
+                onClick={() =>
+                  void run(
+                    {
+                      type: "admin.week.matchups.publish",
+                      weekStart: week,
+                      divisionId: division,
+                      expectedVersion: plan.version,
+                    },
+                    "Jogos publicados. As duplas foram notificadas.",
+                  )
+                }
+              >
+                Publicar jogos desta semana
+              </button>
+            )}
             {free.length > 0 && (
               <details>
                 <summary>Duplas sem jogo nesta jornada</summary>
@@ -4826,18 +4902,19 @@ function AdminDivisionMatchmaking(a: Actions) {
                 </ul>
               </details>
             )}
-            {games.map((c) => (
-              <Link key={c._id} href={"/desafios/" + c._id}>
-                #{c.number} · {challengeTeamName(c, c.challengerId, s.players)}{" "}
-                × {challengeTeamName(c, c.defenderId, s.players)}
-              </Link>
-            ))}
           </>
         )}
+        {games.map((c) => (
+          <Link key={c._id} href={"/desafios/" + c._id}>
+            #{c.number} · {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
+            {challengeTeamName(c, c.defenderId, s.players)}
+          </Link>
+        ))}
         {assigning && (
           <AssignmentDialog
             {...a}
             initialDivision={division}
+            draftWeekStart={week}
             close={() => setAssigning(false)}
           />
         )}
@@ -7041,7 +7118,12 @@ function ChallengeComposer(
 }
 
 function AssignmentDialog(
-  a: Actions & { close: () => void; c?: Challenge; initialDivision?: string },
+  a: Actions & {
+    close: () => void;
+    c?: Challenge;
+    initialDivision?: string;
+    draftWeekStart?: string;
+  },
 ) {
   const { s, run, busy, close, c } = a,
     router = useRouter(),
@@ -7060,17 +7142,23 @@ function AssignmentDialog(
   const attackerIds = teamMembers(s.players, attacker).map(
     (member) => member._id,
   );
-  const manual = adminMatchmakingEnabled(s, division);
+  const manual = adminMatchmakingEnabled(
+    s,
+    division,
+    a.draftWeekStart ?? c?.weekStart,
+  );
   const reason =
     !c && attacker && defender
-      ? challengeReason(
-          s,
-          s.players.find((p) => p._id === attacker)!,
-          s.players.find((p) => p._id === defender)!,
-          Date.now(),
-          false,
-          true,
-        )
+      ? a.draftWeekStart
+        ? manualPairingReason(s, division, a.draftWeekStart, attacker, defender)
+        : challengeReason(
+            s,
+            s.players.find((p) => p._id === attacker)!,
+            s.players.find((p) => p._id === defender)!,
+            Date.now(),
+            false,
+            true,
+          )
       : null;
   return (
     <Modal
@@ -7082,14 +7170,26 @@ function AssignmentDialog(
           e.preventDefault();
           const result = await run(
             {
-              type: c ? "admin.challenge.assign" : "admin.challenge.create",
+              type: a.draftWeekStart
+                ? "admin.week.matchup.add"
+                : c
+                  ? "admin.challenge.assign"
+                  : "admin.challenge.create",
+              weekStart: a.draftWeekStart,
+              divisionId: division,
+              expectedVersion: a.draftWeekStart
+                ? (s.weeklyRounds.find((r) => r.weekStart === a.draftWeekStart)
+                    ?.manualMatchups?.[division]?.version ?? 0)
+                : undefined,
               challengeId: c?._id,
               challengerId: attacker,
               defenderId: defender,
             },
-            c
-              ? "Papéis atualizados. O defensor recebe um novo pedido de aceitação."
-              : "Desafio atribuído. Jogadores notificados.",
+            a.draftWeekStart
+              ? "Confronto guardado no rascunho. Publica os jogos quando estiverem prontos."
+              : c
+                ? "Papéis atualizados. O defensor recebe um novo pedido de aceitação."
+                : "Desafio atribuído. Jogadores notificados.",
           );
           if (result) {
             close();
@@ -7098,9 +7198,11 @@ function AssignmentDialog(
         }}
       >
         <p style={{ fontSize: 12 }}>
-          {manual
-            ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
-            : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}
+          {a.draftWeekStart
+            ? `Escolhe as duplas para a semana de ${a.draftWeekStart}. O par fica em rascunho até publicares os jogos.`
+            : manual
+              ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
+              : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}
         </p>
         <label>
           Divisão do confronto
@@ -7197,7 +7299,11 @@ function AssignmentDialog(
         >
           <Sword size={15} />
           <Shield size={15} />
-          {manual ? "Definir jogo e notificar duplas" : "Guardar atribuição"}
+          {a.draftWeekStart
+            ? "Guardar par no rascunho"
+            : manual
+              ? "Definir jogo e notificar duplas"
+              : "Guardar atribuição"}
         </button>
         {reason && (
           <p className="error" role="status">

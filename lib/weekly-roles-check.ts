@@ -7,7 +7,10 @@ import { dynamicRoleChanges, dynamicWeeklyEnabled } from "./dynamic-weekly";
 export function weeklyRolesProblem(s: State, divisionId: string, week: string) {
   const round = s.weeklyRounds.find((r) => r.weekStart === week);
   if (!round) return "Não existem papéis para esta semana.";
-  if (round.weekType === "OPEN_ATTACK" || !dynamicWeeklyEnabled(s, divisionId))
+  if (
+    round.weekType === "OPEN_ATTACK" ||
+    !dynamicWeeklyEnabled(s, divisionId, week)
+  )
     return null;
   const ids = new Set(
     rankingEntries(s.players, divisionId).flatMap((t) =>

@@ -12,6 +12,8 @@ import type { Actor, State } from "./types";
 
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
+  if (actor.role !== "admin")
+    for (const round of state.weeklyRounds) delete round.manualMatchups;
   filterTeamSpaceView(state, actor);
   const season = state.seasons.find((season) => season.status === "active");
   const album = state.stickerSettings?.find(

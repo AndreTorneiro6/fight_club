@@ -88,14 +88,12 @@ test("admin chooses a division's matches without player challenges or forced ext
   const teams = rankingEntries(s.players, "ouro");
   const existing = s.challenges.filter((c: any) => c.divisionId === "ouro");
   await page.goto("/admin?tab=challenges");
-  const panel = page
-    .locator("section.panel")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Definir jogos por divisão",
-        exact: true,
-      }),
-    });
+  const panel = page.locator("section.panel").filter({
+    has: page.getByRole("heading", {
+      name: "Definir jogos por divisão",
+      exact: true,
+    }),
+  });
   await panel.getByLabel("Divisão dos jogos").selectOption("ouro");
   await panel.getByLabel("Quem define os confrontos").selectOption("admin");
   await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
@@ -122,11 +120,29 @@ test("admin chooses a division's matches without player challenges or forced ext
     .selectOption(teams[1].members[0]._id);
   await modal
     .getByRole("button", {
-      name: "Definir jogo e notificar duplas",
+      name: "Guardar par no rascunho",
       exact: true,
     })
     .click();
   await expect(modal).toHaveCount(0);
+  const draftState = await read();
+  expect(
+    draftState.challenges.filter((c: any) => c.divisionId === "ouro"),
+  ).toHaveLength(existing.length);
+  expect(
+    draftState.weeklyRounds.find((r: any) => r.weekStart === week)
+      .manualMatchups.ouro.pairs,
+  ).toHaveLength(1);
+  await panel
+    .getByRole("button", { name: "Publicar jogos desta semana", exact: true })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await read()).challenges.filter((c: any) => c.divisionId === "ouro")
+          .length,
+    )
+    .toBe(existing.length + 1);
   const after = await read();
   const assigned = after.challenges.filter((c: any) => c.divisionId === "ouro");
   expect(assigned).toHaveLength(existing.length + 1);
@@ -136,7 +152,11 @@ test("admin chooses a division's matches without player challenges or forced ext
   expect(game.status).toBe("accepted");
   expect(game.mandatoryAssignment).toBe(true);
   expect(game.origin.kind).toBe("admin");
-  expect(after.settings[0].manualMatchmakingDivisionIds).toEqual(["ouro"]);
+  expect(
+    after.weeklyRounds.find((r: any) => r.weekStart === week).manualMatchmaking
+      .ouro,
+  ).toBe(true);
+  expect(after.settings[0].manualMatchmakingDivisionIds ?? []).toEqual([]);
   const context = await browser.newContext();
   try {
     const player = await context.newPage();
@@ -165,4 +185,57 @@ test("admin chooses a division's matches without player challenges or forced ext
   expect(
     (await read()).challenges.filter((c: any) => c.divisionId === "ouro"),
   ).toEqual(assigned);
+});
+
+test("admins can save separate drafts several weeks ahead before papers or challenges open", async ({
+  page,
+}) => {
+  await login(page, "admin@fightclub.local", true);
+  const read = async () => (await page.request.get("/api/league")).json();
+  const before = await read();
+  const teams = rankingEntries(before.players, "ouro");
+  await page.goto("/admin?tab=challenges");
+  const panel = page
+    .locator("section.panel")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Definir jogos por divisão",
+        exact: true,
+      }),
+    });
+  const weeks = [
+    addClubDays(clubWeek().start, 14),
+    addClubDays(clubWeek().start, 21),
+  ];
+  for (const [i, week] of weeks.entries()) {
+    await panel.getByLabel("Semana dos jogos a definir").selectOption(week);
+    await panel.getByLabel("Quem define os confrontos").selectOption("admin");
+    await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
+      "admin",
+    );
+    await panel
+      .getByRole("button", { name: "Definir jogo", exact: true })
+      .click();
+    const modal = page.getByRole("dialog", { name: "Definir jogo da divisão" });
+    await modal
+      .getByLabel("Jogador em ataque")
+      .selectOption(teams[i === 0 ? 2 : 5].members[0]._id);
+    await modal
+      .getByLabel("Jogador em defesa")
+      .selectOption(teams[i === 0 ? 0 : 4].members[0]._id);
+    await modal
+      .getByRole("button", { name: "Guardar par no rascunho", exact: true })
+      .click();
+    await expect(modal).toHaveCount(0);
+    await expect(panel.getByText(/1 pares em rascunho/)).toBeVisible();
+  }
+  const after = await read();
+  expect(after.challenges).toEqual(before.challenges);
+  for (const week of weeks) {
+    const round = after.weeklyRounds.find((r: any) => r.weekStart === week);
+    expect(round.manualMatchups.ouro.pairs).toHaveLength(1);
+    expect(round.manualMatchups.ouro.pairs[0].challengeId).toBeUndefined();
+  }
+  await panel.getByLabel("Semana dos jogos a definir").selectOption(weeks[0]);
+  await expect(panel.getByText(/1 pares em rascunho/)).toBeVisible();
 });

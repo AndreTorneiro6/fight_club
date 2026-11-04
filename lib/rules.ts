@@ -72,11 +72,18 @@ export function onHoldForWeek(s: State, c: Challenge, week: string) {
 }
 /** Active games that count towards `maxActiveChallenges`. In the weekly
  * competition, games on hold for the whole challenge week do not count. */
-export function limitChallenges(s: State, player: Player, now: number) {
+export function limitChallenges(
+  s: State,
+  player: Player,
+  now: number,
+  requestedWeek?: string,
+) {
   const active = activeChallenges(s, player._id, now);
   if (!s.settings[0].weeklyCompetition) return active;
-  const week = weeklyChallengeWeek(s, now, player.divisionId);
-  return active.filter((c) => !onHoldForWeek(s, c, week));
+  const week = requestedWeek ?? weeklyChallengeWeek(s, now, player.divisionId);
+  return active.filter(
+    (c) => (!c.weekStart || c.weekStart <= week) && !onHoldForWeek(s, c, week),
+  );
 }
 export function challengeReason(
   s: State,
@@ -85,13 +92,24 @@ export function challengeReason(
   now = Date.now(),
   title = false,
   administrative = false,
+  requestedWeek?: string,
 ): string | null {
   if (me.spectator || defender.spectator)
     return "Os espetadores não participam em desafios.";
   const rules = s.settings[0];
-  if (!administrative && adminMatchmakingEnabled(s, me.divisionId))
-    return ADMIN_MATCHMAKING_MESSAGE;
-  const weekly = weeklyReason(s, me, defender, now);
+  const week = requestedWeek ?? weeklyChallengeWeek(s, now, me.divisionId);
+  const manual = adminMatchmakingEnabled(s, me.divisionId, week);
+  if (!administrative && manual) return ADMIN_MATCHMAKING_MESSAGE;
+  const weekly = weeklyReason(
+    s,
+    me,
+    defender,
+    now,
+    undefined,
+    false,
+    week,
+    administrative && manual,
+  );
   if (weekly) return weekly;
   if (teamMembers(s.players, me._id).some((m) => m._id === defender._id))
     return "Não podes desafiar-te a ti próprio.";
@@ -110,13 +128,13 @@ export function challengeReason(
   if (title && aRank > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
-    limitChallenges(s, me, now).filter(
+    limitChallenges(s, me, now, week).filter(
       (c) =>
         !rules.weeklyCompetition ||
         c.status !== "pending" ||
         challengeSide(c, me._id, s.players) === "attack",
     ).length >= rules.maxActiveChallenges ||
-    limitChallenges(s, defender, now).filter(
+    limitChallenges(s, defender, now, week).filter(
       (c) => !rules.weeklyCompetition || c.status !== "pending",
     ).length >= rules.maxActiveChallenges
   )

@@ -170,7 +170,7 @@ export function divisionWeekOptions(
   // Planner schedule for the roles on screen.
   const planned = new Map<string, TeamWeekOptions["planned"]>();
   const plannerRoles = new Map<string, Role>();
-  if (dynamicWeeklyEnabled(s, divisionId)) {
+  if (dynamicWeeklyEnabled(s, divisionId, week)) {
     const ids = new Set(entries.flatMap((t) => t.members.map((m) => m._id)));
     const existing = s.weeklyRounds.find((r) => r.weekStart === week);
     const assignments = [

@@ -590,7 +590,11 @@ export async function view(
             },
       );
     s.weeklyRounds = s.weeklyRounds
-      .filter((round) => weeklyPublishedAt(round))
+      .filter(
+        (round) =>
+          weeklyPublishedAt(round) ||
+          Object.values(round.manualMatchmaking ?? {}).some(Boolean),
+      )
       .map((round) => ({
         ...round,
         assignments: round.assignments.filter((a) =>
@@ -621,6 +625,7 @@ export async function view(
         warnings: undefined,
         divisionTransitions: undefined,
         divisionRoleGeneration: undefined,
+        manualMatchups: undefined,
         divisionPublications: round.divisionPublications
           ? Object.fromEntries(
               Object.entries(round.divisionPublications)

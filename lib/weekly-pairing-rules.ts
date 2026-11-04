@@ -31,7 +31,7 @@ export function weeklyTeamUnavailableReason(
     (c) =>
       !c.competitionRoundId &&
       !finished.has(c.status) &&
-      (c.weekStart ?? clubWeek(c.createdAt).start) !== week &&
+      (c.weekStart ?? clubWeek(c.createdAt).start) < week &&
       !onHoldForWeek(s, c, week) &&
       (["attack", "defense"] as const).some((side) =>
         challengeMemberIds(c, side, s.players).some((id) => ids.has(id)),

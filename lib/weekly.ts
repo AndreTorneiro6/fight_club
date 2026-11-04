@@ -95,6 +95,7 @@ export function weeklyRole(
     dynamicWeeklyEnabled(
       s,
       s.players.find((p) => p._id === playerId)?.divisionId,
+      weekStart,
     )
   )
     return (
@@ -130,6 +131,8 @@ export function weeklyReason(
   now = Date.now(),
   ignoreId?: string,
   reassign = false,
+  requestedWeek?: string,
+  administrativePreparation = false,
 ) {
   const attackingTeam = teamMembers(s.players, attacker._id);
   const defendingTeam = teamMembers(s.players, defender._id);
@@ -140,25 +143,24 @@ export function weeklyReason(
     return "Não podes desafiar a tua própria equipa.";
   if (!s.settings[0].weeklyCompetition) return null;
   const week =
+    requestedWeek ??
     (ignoreId
       ? s.challenges.find((c) => c._id === ignoreId)?.weekStart
-      : undefined) ?? weeklyChallengeWeek(s, now, attacker.divisionId);
-  if (
-    !s.weeklyRounds.some(
-      (round) =>
-        round.weekStart === week &&
-        weeklyPublishedAt(round, attacker.divisionId),
-    )
-  )
-    return "A aguardar a publicação dos papéis semanais pelo administrador.";
-  const selected = s.weeklyRounds.find((r) => r.weekStart === week)!;
-  const opensAt = weeklyOpeningAt(selected, attacker.divisionId);
-  if (opensAt === null)
-    return "Os desafios desta divisão aguardam abertura pelo administrador.";
-  if (opensAt && Date.parse(opensAt) > now)
-    return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
-  const open = selected.weekType === "OPEN_ATTACK";
-  if (!open && !adminMatchmakingEnabled(s, attacker.divisionId)) {
+      : undefined) ??
+    weeklyChallengeWeek(s, now, attacker.divisionId);
+  const manual = adminMatchmakingEnabled(s, attacker.divisionId, week);
+  const selected = s.weeklyRounds.find((r) => r.weekStart === week);
+  if (!(manual && administrativePreparation)) {
+    if (!weeklyPublishedAt(selected, attacker.divisionId))
+      return "A aguardar a publicação dos papéis semanais pelo administrador.";
+    const opensAt = weeklyOpeningAt(selected!, attacker.divisionId);
+    if (opensAt === null)
+      return "Os desafios desta divisão aguardam abertura pelo administrador.";
+    if (opensAt && Date.parse(opensAt) > now)
+      return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
+  }
+  const open = selected?.weekType === "OPEN_ATTACK";
+  if (!open && !manual) {
     const attackerRole = getEffectiveRoleForChallenge(
       s,
       ignoreId ?? "",
@@ -268,7 +270,7 @@ export function weeklyReason(
     )
   )
     return CONSECUTIVE_REMATCH_MESSAGE;
-  if (check && dynamicWeeklyEnabled(s, attacker.divisionId)) {
+  if (check && dynamicWeeklyEnabled(s, attacker.divisionId, week)) {
     const others = ignoreId
       ? { ...s, challenges: s.challenges.filter((c) => c._id !== ignoreId) }
       : s;
@@ -309,7 +311,7 @@ export function weeklyWindow(
         ids.includes(entry.playerId) &&
         entry.vacation &&
         entry.from <= bound &&
-        entry.to >= clubDay(now),
+        entry.to >= [clubDay(now), week.start].sort().at(-1)!,
     );
     const last = relevant
       .map((entry) => entry.to)
