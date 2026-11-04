@@ -1,7 +1,7 @@
 ## Version 1.16.4 — betting week filters — 4 November 2026
 
-- Local: Central de Apostas defaults to Esta semana, with Anteriores and Próximas filters in addition to existing status/division filters. Uses Lisbon Monday–Sunday weeks and scheduled playing date (including postponements), falling back to original round/creation for undated published games. Deep links still open old games and select their period. Live score, predictions and settlement unchanged.
-- Validation: typecheck, 538 tests, build, player-betting (2 browser checks: existing voting/chat and new period/deep-link/mobile test), official-betting-results (2 checks) pass. Browser suites run in separate demo instances because they mutate the same demo rankings. Deployment pending; no production league data manually changed.
+- LIVE: Central de Apostas defaults to Esta semana, with Anteriores and Próximas filters in addition to existing status/division filters. Uses Lisbon Monday–Sunday weeks and scheduled playing date (including postponements), falling back to original round/creation for undated published games. Deep links still open old games and select their period. Live score, predictions and settlement unchanged.
+- Validation: typecheck, 538 tests, build, player-betting (2 browser checks: existing voting/chat and new period/deep-link/mobile test), official-betting-results (2 checks) pass. Browser suites run in separate demo instances because they mutate the same demo rankings. Deployed exact dd203a36d40cfb099cfc942d9521bd0ff8da8295 via successful run 41849260398; full CI passed. App and worker match, version 1.16.4, healthy, zero restarts, public health ok. No production league data manually changed.
 
 ## Version 1.16.3 — official result from kickoff, live scores preserved — 4 November 2026
 
