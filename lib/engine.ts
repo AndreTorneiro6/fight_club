@@ -438,6 +438,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("admin.match.update"),
     challengeId: id,
+    postpone: z.boolean().optional(),
     expectedScheduleState: z.string().max(2000).optional(),
     start: date,
     courtId: id,
@@ -2414,8 +2415,7 @@ export function execute(
         );
         for (const x of [p, d])
           ensure(
-            limitChallenges(s, x, timestamp).length <
-              rules.maxActiveChallenges,
+            limitChallenges(s, x, timestamp).length < rules.maxActiveChallenges,
             "Limite de desafios simultâneos atingido.",
           );
         ensure(
@@ -4482,7 +4482,8 @@ export function execute(
       return { deleted: true, notificationIds, rankingReview, championReview };
     }
     case "admin.match.update": {
-      const c = challenge(cmd.challengeId);
+      const stored = challenge(cmd.challengeId);
+      const c = structuredClone(stored);
       ensure(
         ["accepted", "scheduled", "schedule_pending", "completed"].includes(
           c.status,
@@ -4502,6 +4503,21 @@ export function execute(
         "O desafio ou horário foi alterado. Atualiza antes de confirmar.",
         409,
       );
+      const before = structuredClone(c);
+      if (cmd.postpone) {
+        ensure(c.status !== "completed", "Não podes adiar um jogo concluído.");
+        ensure(Date.parse(cmd.start) > timestamp, "Escolhe um horário futuro.");
+        season();
+        c.deferredUntil = clubDay(cmd.start);
+        c.postponementReason = cmd.note;
+        const deadline = clubWeek(cmd.start).endsAt;
+        c.scheduleBy = new Date(
+          Math.max(Date.parse(c.scheduleBy), Date.parse(deadline)),
+        ).toISOString();
+        c.playBy = new Date(
+          Math.max(Date.parse(c.playBy), Date.parse(deadline)),
+        ).toISOString();
+      }
       if (direct) {
         season();
         ensure(
@@ -4515,7 +4531,6 @@ export function execute(
             "Os participantes devem estar ativos na divisão do desafio.",
           );
       }
-      const before = structuredClone(c);
       schedule(
         c,
         cmd.start,
@@ -4526,13 +4541,16 @@ export function execute(
         c.status === "completed",
       );
       delete c.scheduleProposal;
-      if (direct) closeIncompatibleQueue(c);
+      Object.assign(stored, c);
+      delete stored.scheduleProposal;
+      if (direct) closeIncompatibleQueue(stored);
       log("admin.match.updated", {
         challengeId: c._id,
         before,
         after: { ...c },
         note: cmd.note,
         directScheduling: direct,
+        postponed: cmd.postpone ?? false,
         playerTimeConfirmationRequired: direct ? false : undefined,
       });
       break;
@@ -4626,7 +4644,14 @@ export function execute(
     case "admin.result.setWinner": {
       const c = challenge(cmd.challengeId);
       ensure(
-        ["pending", "accepted", "schedule_pending", "scheduled", "result_pending", "disputed"].includes(c.status),
+        [
+          "pending",
+          "accepted",
+          "schedule_pending",
+          "scheduled",
+          "result_pending",
+          "disputed",
+        ].includes(c.status),
         "O desafio não está num estado que permita definir vencedor.",
       );
       ensure(

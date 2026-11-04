@@ -1,3 +1,9 @@
+## Version 1.16.1 — admin date postponement and winner-only form — 4 November 2026
+
+- Local implementation: Editar jogo has an explicit “Adiar por lesão ou outro impedimento” checkbox. Admin chooses date/time/court and required reason; the validated engine keeps weekStart, sets deferredUntil and postponementReason, extends deadlines to the selected week, replaces the reservation and preserves conflict/availability checks, notifications and audit. Frozen notice distinguishes admin postponement from vacations. No production game changed; not deployed.
+- Fixed a second “Declarar vencedor” form in AdminChallenge that still required sets: it now submits admin.result.setWinner with winner and mandatory reason. Clarified normal score-entry timing text. Regression verifies winner-only completion of an unscheduled challenge, authorization and required reason. Live package was read-only verified at 1.16.0; these fixes remain local.
+- Validation: typecheck, 536 tests and production build pass. Regression tests cover moving an existing reservation to a later week without changing its origin and preserving state when postponement validation fails.
+
 ## Version 1.16.0 — winner without result + manual roles cleanup — 3 November 2026
 
 - New: `admin.result.setWinner` command — admins can now set the winner of a match without entering set scores. Requires a validation sentence (minimum 3 characters, similar to game deletion). Updates ranking, statistics, and history automatically. UI: new "Definir vencedor sem resultado" button in admin challenge view with winner selection and required reason field.

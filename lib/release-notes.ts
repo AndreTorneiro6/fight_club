@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.16.0";
+export const applicationVersion = "1.16.1";
 export const releaseNotes = [
+  {
+    version: "1.16.1",
+    date: "2026-11-04",
+    title: "Adiamento de jogos e vencedor sem sets",
+    changes: [
+      "A ação Declarar vencedor na intervenção administrativa deixa de exigir sets: basta escolher o vencedor e indicar um motivo, mesmo sem marcação do jogo.",
+      "Em Editar jogo, o administrador pode adiar por lesão ou outro impedimento para uma data escolhida, mantendo a jornada original, prolongando o prazo e registando o motivo. O jogo fica congelado até à nova data.",
+    ],
+  },
   {
     version: "1.16.0",
     date: "2026-11-03",

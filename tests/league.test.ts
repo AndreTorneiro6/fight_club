@@ -3458,3 +3458,27 @@ test("all challenge chat messages restrict delivery to push, including admin and
     );
   }
 });
+
+test("admin declares a winner without scheduling or entering any scores", () => {
+  const s = fixture();
+  execute(s, actor(8), { type: "challenge.create", defenderId: "p6" }, time);
+  const c = s.challenges[0];
+  const command = {
+    type: "admin.result.setWinner",
+    challengeId: c._id,
+    winnerId: "p8",
+    reason: "Lesão confirmada",
+  };
+  assert.throws(() => execute(s, actor(8), command, time), /administradores/);
+  assert.throws(() =>
+    execute(s, actor(1, "admin"), { ...command, reason: "" }, time),
+  );
+  execute(s, actor(1, "admin"), command, time);
+  assert.equal(c.status, "completed");
+  assert.equal(c.scheduledAt, undefined);
+  assert.equal(c.winnerId, "p8");
+  assert.equal(s.results[0].score, "");
+  assert.equal(s.results[0].setScores, undefined);
+  assert.equal(s.players[7].wins, 1);
+  assert(s.audit.some((a) => a.action === "admin.result.winnerSet"));
+});

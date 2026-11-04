@@ -14,8 +14,10 @@ export function FrozenMatchNotice({ s, c }: { s: View; c: Challenge }) {
         <span className="sr-only">Jogo congelado</span>
       </span>
       <small>
-        Adiado por férias · disponível a partir de{" "}
-        {fmtDate(`${until}T12:00:00Z`)}
+        {c.postponementReason
+          ? "Adiado pelo administrador"
+          : "Adiado por férias"}{" "}
+        · disponível a partir de {fmtDate(`${until}T12:00:00Z`)}
       </small>
     </div>
   );

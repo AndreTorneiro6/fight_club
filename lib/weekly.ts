@@ -310,7 +310,9 @@ export function weeklyBookingReason(
   if (c.weekStart && !c.deferredUntil && week !== c.weekStart)
     return "O jogo deve realizar-se na semana do desafio.";
   if (c.deferredUntil && clubDay(start) < c.deferredUntil)
-    return "Marca o jogo após o regresso de férias dos jogadores.";
+    return c.postponementReason
+      ? "Marca o jogo a partir da data de disponibilidade."
+      : "Marca o jogo após o regresso de férias dos jogadores.";
   if (
     s.matches.some(
       (match) =>

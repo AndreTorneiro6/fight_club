@@ -580,3 +580,59 @@ test("direct scheduling does not bypass pending opponent assignment or approved 
     /revisão aprovada/,
   );
 });
+
+test("admin postponement keeps the original week and extends scheduling deadlines", () => {
+  const s = assignedFixture();
+  const c = s.challenges[0];
+  const week = c.weekStart;
+  const command = {
+    ...directCommand(s),
+    start: "2026-11-03T19:00:00Z",
+    postpone: true,
+    note: "Lesão de um jogador",
+  };
+  assert.throws(
+    () => execute(s, admin, { ...command, postpone: false }, now),
+    /semana/,
+  );
+  execute(s, admin, directCommand(s), now);
+  execute(
+    s,
+    admin,
+    {
+      ...command,
+      expectedScheduleState: directCommand(s).expectedScheduleState,
+    },
+    now,
+  );
+  assert.equal(c.weekStart, week);
+  assert.equal(c.deferredUntil, "2026-11-03");
+  assert.equal(c.postponementReason, command.note);
+  assert.equal(c.scheduledAt, command.start);
+  assert(Date.parse(c.playBy) > Date.parse(command.start));
+  assert.equal(s.matches.length, 1);
+  assert(s.audit.some((a) => a.action === "admin.match.updated"));
+});
+
+test("failed postponement leaves the existing schedule and deadlines unchanged", () => {
+  const s = assignedFixture();
+  const c = s.challenges[0];
+  const before = structuredClone(c);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          ...directCommand(s),
+          start: "2026-11-03T19:00:00Z",
+          postpone: true,
+          courtId: "missing",
+        },
+        now,
+      ),
+    /Campo/,
+  );
+  assert.deepEqual(c, before);
+  assert.equal(s.matches.length, 0);
+});

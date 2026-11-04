@@ -2919,11 +2919,9 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                   e.preventDefault();
                   await run(
                     {
-                      type: "admin.resolve",
+                      type: "admin.result.setWinner",
                       challengeId: c._id,
-                      action: "winner",
                       ...Object.fromEntries(new FormData(e.currentTarget)),
-                      setScores: setScoresFromForm(e.currentTarget),
                     },
                     "Resultado resolvido.",
                   );
@@ -2948,10 +2946,18 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                     ))}
                   </select>
                 </label>
-                <SetScoreFields challenge={c} />
+                <label>
+                  Motivo da definição do vencedor
+                  <textarea
+                    name="reason"
+                    required
+                    minLength={3}
+                    maxLength={2000}
+                  />
+                </label>
                 <p>
-                  O vencedor tem de corresponder aos sets. Uma vitória da defesa
-                  mantém as posições.
+                  Define o vencedor sem introduzir sets, mesmo que o jogo ainda
+                  não esteja marcado.
                 </p>
                 <button
                   disabled={busy || terminal.has(c.status)}
@@ -4157,6 +4163,7 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
                   type: "admin.match.update",
                   challengeId: c._id,
                   expectedScheduleState,
+                  postpone: data.has("postpone"),
                   start: new Date(String(data.get("start"))).toISOString(),
                   courtId: data.get("courtId"),
                   minutes: Number(data.get("minutes")),
@@ -4213,6 +4220,17 @@ function AdminMatchActions(a: Actions & { c: Challenge }) {
                 required
               />
             </label>
+            {c.status !== "completed" && (
+              <label className="check">
+                <input type="checkbox" name="postpone" />
+                Adiar por lesão ou outro impedimento
+                <small>
+                  Permite escolher outra semana, mantendo a jornada original. O
+                  jogo fica congelado até à data escolhida e o prazo é
+                  prolongado.
+                </small>
+              </label>
+            )}
             <label>
               {direct ? "Nota da marcação" : "Motivo da alteração"}
               <textarea
@@ -4274,7 +4292,7 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
       )}
       {!completed && !ready && (
         <small>
-          Disponível após o fim do jogo
+          O registo de resultado por sets fica disponível após o fim do jogo
           {c.scheduledAt
             ? ` · ${fmtDate(c.scheduledAt)} às ${fmtTime(new Date(Date.parse(c.scheduledAt) + c.durationMinutes * 60000).toISOString())}`
             : ""}

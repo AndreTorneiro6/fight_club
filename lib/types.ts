@@ -177,6 +177,7 @@ export interface Challenge extends Entity {
   defenderTeam?: { playerId: string; name: string }[];
   weekStart?: string;
   deferredUntil?: string;
+  postponementReason?: string;
   scheduleProposal?: ScheduleProposal;
   number: number;
   seasonId: string;
