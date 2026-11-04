@@ -1,4 +1,8 @@
 "use client";
+import {
+  adminMatchmakingEnabled,
+  ADMIN_MATCHMAKING_MESSAGE,
+} from "@/lib/weekly-matchmaking-mode";
 import { notificationTarget } from "@/lib/notification-link";
 import { matchFrozenUntil } from "@/lib/match-freeze";
 import { OriginalTitleArt } from "./original-title-art";
@@ -2024,6 +2028,9 @@ function Challenges(a: Actions) {
       : "";
   const ownTeamCommitment = weeklyTeamCommitment(s, p._id);
   const blockedReason =
+    (adminMatchmakingEnabled(s, p.divisionId)
+      ? ADMIN_MATCHMAKING_MESSAGE
+      : "") ||
     openingBlock ||
     (ownTeamCommitment ? weeklyTeamCommitmentMessage(ownTeamCommitment) : "") ||
     (s.settings[0].weeklyCompetition && !weeklyRole(s, p._id)
@@ -2061,7 +2068,8 @@ function Challenges(a: Actions) {
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
-          ) : ownTeamCommitment ||
+          ) : adminMatchmakingEnabled(s, p.divisionId) ||
+            ownTeamCommitment ||
             (s.settings[0].weeklyCompetition &&
               (weeklyRole(s, p._id) !== "attack" || !!openingBlock)) ? null : (
             <a
@@ -4711,6 +4719,133 @@ function AdminResults(a: Actions) {
   );
 }
 
+function AdminDivisionMatchmaking(a: Actions) {
+  const { s, run, busy } = a;
+  const divisions = s.divisions.filter(
+    (d) => !usesManagedCompetition(s, d._id),
+  );
+  const [division, setDivision] = useState(divisions[0]?._id ?? "");
+  const [assigning, setAssigning] = useState(false);
+  if (!s.settings[0].weeklyCompetition || !divisions.length) return null;
+  const manual = adminMatchmakingEnabled(s, division);
+  const week = weeklyChallengeWeek(s, Date.now(), division);
+  const games = s.challenges.filter(
+    (c) =>
+      c.divisionId === division &&
+      !c.competitionRoundId &&
+      c.weekStart === week &&
+      !["cancelled", "refused", "expired"].includes(c.status),
+  );
+  const teams = rankingEntries(s.players, division).filter((t) =>
+    t.members.every(
+      (p) =>
+        p.status === "active" &&
+        !p.awaitingApproval &&
+        !p.registrationRejectedAt,
+    ),
+  );
+  const free = teams.filter(
+    (t) => !games.some((c) => involves(c, t.members[0]._id, s.players)),
+  );
+  return (
+    <Section title="Definir jogos por divisão">
+      <div className="stack">
+        <label>
+          Divisão dos jogos
+          <select
+            value={division}
+            disabled={busy}
+            onChange={(e) => {
+              setDivision(e.target.value);
+              setAssigning(false);
+            }}
+          >
+            {divisions.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Quem define os confrontos
+          <select
+            value={manual ? "admin" : "standard"}
+            disabled={busy}
+            onChange={(e) =>
+              void run(
+                {
+                  type: "admin.division.matchmaking.set",
+                  divisionId: division,
+                  manual: e.target.value === "admin",
+                },
+                "Modo de confrontos atualizado. Os jogos existentes mantêm-se.",
+              )
+            }
+          >
+            <option value="standard">
+              Jogadores e algoritmo · regras atuais
+            </option>
+            <option value="admin">Administração define os jogos</option>
+          </select>
+        </label>
+        <p>
+          {manual
+            ? "Só os administradores escolhem as duplas. Não são criados confrontos extra pelo algoritmo; os jogadores combinam o horário após a atribuição."
+            : "Os jogadores enviam desafios e o algoritmo aplica as regras de emparelhamento configuradas."}
+        </p>
+        <small>
+          Jornada de {week} · {games.length} jogos definidos · {free.length}{" "}
+          duplas sem jogo. Os jogos existentes não são alterados ao mudar o
+          modo.
+        </small>
+        {manual && (
+          <>
+            <p>
+              Continuam a aplicar-se a distância no ranking, as regras do
+              título, os limites semanais e a proibição de repetir adversários
+              com jogos pendentes. Os papéis publicados não limitam a escolha
+              das duplas.
+            </p>
+            <button
+              className="primary"
+              disabled={busy || free.length < 2}
+              onClick={() => setAssigning(true)}
+            >
+              Definir jogo
+            </button>
+            {free.length > 0 && (
+              <details>
+                <summary>Duplas sem jogo nesta jornada</summary>
+                <ul>
+                  {free.map((t) => (
+                    <li key={t.id}>
+                      {t.members.map((p) => p.name).join(" + ")}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {games.map((c) => (
+              <Link key={c._id} href={"/desafios/" + c._id}>
+                #{c.number} · {challengeTeamName(c, c.challengerId, s.players)}{" "}
+                × {challengeTeamName(c, c.defenderId, s.players)}
+              </Link>
+            ))}
+          </>
+        )}
+        {assigning && (
+          <AssignmentDialog
+            {...a}
+            initialDivision={division}
+            close={() => setAssigning(false)}
+          />
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function AdminChallenges(a: Actions) {
   const { s } = a,
     [division, setDivision] = useState("all"),
@@ -4798,6 +4933,7 @@ function AdminChallenges(a: Actions) {
       className="stack"
       aria-label="Filtros dos desafios administrativos"
     >
+      <AdminDivisionMatchmaking {...a} />
       <div className="panel stack admin-challenge-filters">
         <div className="form-grid">
           <label>
@@ -5867,6 +6003,7 @@ const settingLabels: Record<
     | "contentVersion"
     | "divisionChallengeDistances"
     | "weeklyDynamicDivisionIds"
+    | "manualMatchmakingDivisionIds"
   >,
   string
 > = {
@@ -6903,10 +7040,14 @@ function ChallengeComposer(
   );
 }
 
-function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
+function AssignmentDialog(
+  a: Actions & { close: () => void; c?: Challenge; initialDivision?: string },
+) {
   const { s, run, busy, close, c } = a,
     router = useRouter(),
-    [division, setDivision] = useState(c?.divisionId ?? s.divisions[0]._id),
+    [division, setDivision] = useState(
+      c?.divisionId ?? a.initialDivision ?? s.divisions[0]._id,
+    ),
     [attacker, setAttacker] = useState(c?.challengerId ?? ""),
     [defender, setDefender] = useState(c?.defenderId ?? "");
   const teams = rankingEntries(s.players, division).filter((entry) =>
@@ -6919,8 +7060,23 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
   const attackerIds = teamMembers(s.players, attacker).map(
     (member) => member._id,
   );
+  const manual = adminMatchmakingEnabled(s, division);
+  const reason =
+    !c && attacker && defender
+      ? challengeReason(
+          s,
+          s.players.find((p) => p._id === attacker)!,
+          s.players.find((p) => p._id === defender)!,
+          Date.now(),
+          false,
+          true,
+        )
+      : null;
   return (
-    <Modal title="Atribuir ataque e defesa" close={close}>
+    <Modal
+      title={manual ? "Definir jogo da divisão" : "Atribuir ataque e defesa"}
+      close={close}
+    >
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -6942,8 +7098,9 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
         }}
       >
         <p style={{ fontSize: 12 }}>
-          Define quem ataca e quem defende neste desafio. A intervenção fica no
-          histórico. Os dois jogadores recebem uma notificação.
+          {manual
+            ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
+            : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}
         </p>
         <label>
           Divisão do confronto
@@ -7034,13 +7191,19 @@ function AssignmentDialog(a: Actions & { close: () => void; c?: Challenge }) {
             busy ||
             !attacker ||
             !defender ||
+            !!reason ||
             (c?.challengerId === attacker && c?.defenderId === defender)
           }
         >
           <Sword size={15} />
           <Shield size={15} />
-          Guardar atribuição
+          {manual ? "Definir jogo e notificar duplas" : "Guardar atribuição"}
         </button>
+        {reason && (
+          <p className="error" role="status">
+            {reason}
+          </p>
+        )}
       </form>
     </Modal>
   );

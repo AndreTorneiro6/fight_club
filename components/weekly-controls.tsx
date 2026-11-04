@@ -1,5 +1,9 @@
 "use client";
 import {
+  adminMatchmakingEnabled,
+  ADMIN_MATCHMAKING_MESSAGE,
+} from "@/lib/weekly-matchmaking-mode";
+import {
   hasUnsavedDivisionRoles,
   weeklyPublishedAt,
 } from "@/lib/weekly-publication";
@@ -435,6 +439,13 @@ export function WeeklyRoles({
               ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
               : "OS MEUS DESAFIOS"}
       </h2>
+      {admin ? (
+        <Link className="button" href="/admin?tab=challenges">
+          Definir jogos por divisão
+        </Link>
+      ) : adminMatchmakingEnabled(s, me.divisionId) ? (
+        <p role="status">{ADMIN_MATCHMAKING_MESSAGE}</p>
+      ) : null}
       {admin && s.divisions.some((d) => usesManagedCompetition(s, d._id)) && (
         <p>
           As jornadas oficiais têm papéis próprios por liga.{" "}

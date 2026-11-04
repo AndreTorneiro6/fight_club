@@ -3,7 +3,7 @@ import type { RankingEntry } from "./ranking-groups";
 import { clubWeek } from "./calendar";
 import { consecutiveRematch } from "./consecutive-rematch";
 import { challengeDistance } from "./challenge-distance";
-import { challengeMemberIds } from "./team-competition";
+import { challengeMemberIds, challengeTeamKey } from "./team-competition";
 import { onHoldForWeek } from "./rules";
 
 const finished = new Set(["completed", "cancelled", "refused", "expired"]);
@@ -86,6 +86,19 @@ export function weeklyPairAllowed(
     dr = entries.indexOf(defender) + 1;
   return (
     ar > dr &&
+    !s.challenges.some((c) => {
+      if (
+        finished.has(c.status) ||
+        (c.weekStart ?? clubWeek(c.createdAt).start) === week
+      )
+        return false;
+      const attack = challengeTeamKey(c, "attack", s.players);
+      const defense = challengeTeamKey(c, "defense", s.players);
+      return (
+        (attack === attacker.id && defense === defender.id) ||
+        (attack === defender.id && defense === attacker.id)
+      );
+    }) &&
     ar - dr <= challengeDistance(s, divisionId) &&
     (dr !== 1 || ar <= s.settings[0].titleMaxPosition) &&
     !consecutiveRematch(s, attacker.id, defender.id, week)

@@ -1,3 +1,4 @@
+import { adminMatchmakingEnabled } from "./weekly-matchmaking-mode";
 import type { State } from "./types";
 import { rankingEntries } from "./ranking-groups";
 import { effectiveRoles } from "./effective-roles";
@@ -18,6 +19,7 @@ export function dynamicWeeklyEnabled(s: State, divisionId?: string) {
     s.settings[0].weeklyCompetition &&
     s.settings[0].weeklyMandatoryChallenges &&
     s.settings[0].weeklyDynamicRoles &&
+    (!divisionId || !adminMatchmakingEnabled(s, divisionId)) &&
     (!s.settings[0].weeklyDynamicDivisionIds ||
       (divisionId
         ? s.settings[0].weeklyDynamicDivisionIds.includes(divisionId)

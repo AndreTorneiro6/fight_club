@@ -1,3 +1,4 @@
+import { adminMatchmakingEnabled } from "./weekly-matchmaking-mode";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { effectiveRoles } from "./effective-roles";
 import {
@@ -157,10 +158,24 @@ export function weeklyReason(
   if (opensAt && Date.parse(opensAt) > now)
     return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
   const open = selected.weekType === "OPEN_ATTACK";
-  if (!open) {
-    const attackerRole = getEffectiveRoleForChallenge(s, ignoreId ?? "", attacker._id, week, now, true);
-    const defenderRole = getEffectiveRoleForChallenge(s, ignoreId ?? "", defender._id, week, now, false);
-    
+  if (!open && !adminMatchmakingEnabled(s, attacker.divisionId)) {
+    const attackerRole = getEffectiveRoleForChallenge(
+      s,
+      ignoreId ?? "",
+      attacker._id,
+      week,
+      now,
+      true,
+    );
+    const defenderRole = getEffectiveRoleForChallenge(
+      s,
+      ignoreId ?? "",
+      defender._id,
+      week,
+      now,
+      false,
+    );
+
     if (attackerRole !== "attack")
       return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
     if (defenderRole !== "defense")
@@ -169,12 +184,26 @@ export function weeklyReason(
       attackingTeam.some(
         (member) =>
           member.status === "active" &&
-          getEffectiveRoleForChallenge(s, ignoreId ?? "", member._id, week, now, true) !== "attack",
+          getEffectiveRoleForChallenge(
+            s,
+            ignoreId ?? "",
+            member._id,
+            week,
+            now,
+            true,
+          ) !== "attack",
       ) ||
       defendingTeam.some(
         (member) =>
           member.status === "active" &&
-          getEffectiveRoleForChallenge(s, ignoreId ?? "", member._id, week, now, false) !== "defense",
+          getEffectiveRoleForChallenge(
+            s,
+            ignoreId ?? "",
+            member._id,
+            week,
+            now,
+            false,
+          ) !== "defense",
       )
     )
       return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";

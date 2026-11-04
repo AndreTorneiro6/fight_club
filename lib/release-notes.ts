@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.16.4";
+export const applicationVersion = "1.17.0";
 export const releaseNotes = [
+  {
+    version: "1.17.0",
+    date: "2026-11-04",
+    title: "Confrontos definidos pela administração por divisão",
+    changes: [
+      "Em Administração → Desafios, cada divisão pode ficar em modo Administração define os jogos. O clube escolhe as duplas e os jogadores combinam apenas o horário; o algoritmo não cria confrontos adicionais. As regras de ranking, título, repetição e limites mantêm-se.",
+      "As divisões continuam no modo atual até o administrador alterar a opção. Mudar de modo preserva os jogos existentes e fica registado na auditoria.",
+      "O planeador deixa de sugerir um adversário com quem já existe um jogo pendente de uma semana anterior, mesmo que esse jogo esteja congelado.",
+    ],
+  },
   {
     version: "1.16.4",
     date: "2026-11-04",

@@ -1,3 +1,8 @@
+import { usesManagedCompetition } from "./competition-mode";
+import {
+  adminMatchmakingEnabled,
+  ADMIN_MATCHMAKING_MESSAGE,
+} from "./weekly-matchmaking-mode";
 import { reconcileStickerTrades } from "./sticker-trading";
 import { executeTeamSpace } from "./team-space-command";
 import { canRecordOfficialResult } from "./result-readiness";
@@ -166,6 +171,7 @@ export const settingsSchema = z.object({
   weeklyMandatoryChallenges: z.boolean().optional(),
   weeklyDynamicRoles: z.boolean().optional(),
   weeklyDynamicDivisionIds: z.array(z.string()).max(10).optional(),
+  manualMatchmakingDivisionIds: z.array(id).max(10).optional(),
   divisionChallengeDistances: z
     .record(z.string(), z.number().int().min(1).max(100))
     .optional(),
@@ -203,6 +209,11 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.division.matchmaking.set"),
+    divisionId: id,
+    manual: z.boolean(),
+  }),
   z.object({
     type: z.literal("admin.challenge.distance.set"),
     divisionId: id,
@@ -1757,6 +1768,33 @@ export function execute(
     );
 
   switch (cmd.type) {
+    case "admin.division.matchmaking.set": {
+      ensure(
+        s.divisions.some((d) => d._id === cmd.divisionId),
+        "Divisão inválida.",
+      );
+      ensure(
+        rules.weeklyCompetition,
+        "Ativa a competição semanal antes de definir o modo de confrontos.",
+      );
+      ensure(
+        !usesManagedCompetition(s, cmd.divisionId),
+        "Usa Competição e jornadas para esta divisão.",
+      );
+      const before = rules.manualMatchmakingDivisionIds ?? [];
+      const after = cmd.manual
+        ? [...new Set([...before, cmd.divisionId])]
+        : before.filter((id) => id !== cmd.divisionId);
+      if (JSON.stringify(before) === JSON.stringify(after)) break;
+      rules.manualMatchmakingDivisionIds = after;
+      log("admin.division.matchmaking.changed", {
+        divisionId: cmd.divisionId,
+        manual: cmd.manual,
+        before,
+        after,
+      });
+      break;
+    }
     case "admin.challenge.distance.set": {
       ensure(
         s.divisions.some((d) => d._id === cmd.divisionId),
@@ -2385,6 +2423,14 @@ export function execute(
             : me(),
         d = player(cmd.defenderId);
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
+      const manual = adminMatchmakingEnabled(s, p.divisionId);
+      if (manual)
+        ensure(
+          cmd.type === "admin.challenge.create" &&
+            actor.userId !== "system:weekly-matchmaking",
+          ADMIN_MATCHMAKING_MESSAGE,
+          403,
+        );
       if (rules.weeklyCompetition && cmd.weekStart)
         ensure(
           cmd.weekStart === weeklyChallengeWeek(s, timestamp, p.divisionId),
@@ -2403,7 +2449,14 @@ export function execute(
           "admin.challenge.assign",
         ].includes(cmd.type)
       ) {
-        const reason = challengeReason(s, p, d, timestamp, titleFight);
+        const reason = challengeReason(
+          s,
+          p,
+          d,
+          timestamp,
+          titleFight,
+          cmd.type === "admin.challenge.create",
+        );
         ensure(!reason, reason ?? "Desafio inválido.");
       } else {
         ensure(
@@ -2547,7 +2600,10 @@ export function execute(
           );
         }
       }
-      if (rules.weeklyCompetition && rules.weeklyMandatoryChallenges) {
+      if (
+        rules.weeklyCompetition &&
+        (rules.weeklyMandatoryChallenges || manual)
+      ) {
         // Include the candidate only in the priority projection until all guards pass.
         const priority = weeklyChallengePriority(
           { ...s, challenges: [...s.challenges, c] },
@@ -2841,7 +2897,10 @@ export function execute(
       c.positionSnapshotModel = "team";
       c.defenderPosition = teamPosition(s.players, defender._id);
       // A mandatory weekly game stays assigned; only optional challenges need a new acceptance.
-      const mandatory = !!c.mandatoryAssignment && !!c.weekStart;
+      const mandatory =
+        (!!c.mandatoryAssignment || adminMatchmakingEnabled(s, c.divisionId)) &&
+        !!c.weekStart;
+      if (mandatory) c.mandatoryAssignment = true;
       c.status = mandatory ? "accepted" : "pending";
       c.respondBy = new Date(
         Math.min(Date.parse(c.playBy), timestamp + rules.acceptHours * 3600000),
@@ -4190,6 +4249,15 @@ export function execute(
             cmd.settings.weeklyMandatoryChallenges),
         "Os papéis dinâmicos exigem competição semanal e desafios obrigatórios.",
       );
+      if (cmd.settings.manualMatchmakingDivisionIds)
+        ensure(
+          new Set(cmd.settings.manualMatchmakingDivisionIds).size ===
+            cmd.settings.manualMatchmakingDivisionIds.length &&
+            cmd.settings.manualMatchmakingDivisionIds.every((id) =>
+              s.divisions.some((d) => d._id === id),
+            ),
+          "Divisões de confrontos manuais inválidas.",
+        );
       if (cmd.settings.weeklyDynamicDivisionIds)
         ensure(
           new Set(cmd.settings.weeklyDynamicDivisionIds).size ===

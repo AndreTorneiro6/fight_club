@@ -1,3 +1,10 @@
+## Version 1.17.0 — per-division admin matchmaking — 4 November 2026
+
+- Local: Administração → Desafios → Definir jogos por divisão has a per-division choice of the existing player/algorithm workflow or Administração define os jogos. Default stays unchanged. Manual divisions block player/system challenge creation, skip dynamic forced pairings and weekly role restrictions for admin pair choices; ranking distance, title, rematch, active limits, week publication/opening, scheduling and transaction/audit rules remain. Admin assignments become accepted mandatory games; players arrange the time. Existing games survive mode changes. Weekly papers link to the new tool and player screens explain the mode.
+- Planner fix: weeklyPairAllowed excludes an unresolved pairing from another week, aligning the planner with the engine's existing duplicate guard. This fixes a read-only live finding where the 9 Nov plan offered Hélder vs Tiago although #19 is pending.
+- Live read-only context at 4 Nov 22:20Z: Hélder Marques + Mário Ferreira have #19 (Hélder→Tiago, week 26 Oct) and #43 (Nuno→Hélder, week 2 Nov), both accepted and deferred until 16 Nov, vacation through 15 Nov. Max active = 2; fully deferred games do not consume slots in week 9–15 Nov. #43 was successfully created by a player on 3 Nov 17:53Z; earlier rejected requests are not reconstructible from its audit. No production game/settings manually changed.
+- Validation: typecheck, 541 tests, build, and dynamic-weekly + manual-matchmaking browser flow pass (mode toggle, one chosen game, player denial, no extra forced games, return to standard preserving matches, mobile width). Deployment pending.
+
 ## Version 1.16.4 — betting week filters — 4 November 2026
 
 - LIVE: Central de Apostas defaults to Esta semana, with Anteriores and Próximas filters in addition to existing status/division filters. Uses Lisbon Monday–Sunday weeks and scheduled playing date (including postponements), falling back to original round/creation for undated published games. Deep links still open old games and select their period. Live score, predictions and settlement unchanged.

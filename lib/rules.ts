@@ -1,3 +1,7 @@
+import {
+  adminMatchmakingEnabled,
+  ADMIN_MATCHMAKING_MESSAGE,
+} from "./weekly-matchmaking-mode";
 import { challengeDistance } from "./challenge-distance";
 import {
   challengeSide,
@@ -80,10 +84,13 @@ export function challengeReason(
   defender: Player,
   now = Date.now(),
   title = false,
+  administrative = false,
 ): string | null {
   if (me.spectator || defender.spectator)
     return "Os espetadores não participam em desafios.";
   const rules = s.settings[0];
+  if (!administrative && adminMatchmakingEnabled(s, me.divisionId))
+    return ADMIN_MATCHMAKING_MESSAGE;
   const weekly = weeklyReason(s, me, defender, now);
   if (weekly) return weekly;
   if (teamMembers(s.players, me._id).some((m) => m._id === defender._id))

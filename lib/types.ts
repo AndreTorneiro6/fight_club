@@ -108,6 +108,7 @@ export interface Settings extends Entity {
   weeklyMandatoryChallenges?: boolean;
   weeklyDynamicRoles?: boolean;
   weeklyDynamicDivisionIds?: string[];
+  manualMatchmakingDivisionIds?: string[];
   divisionChallengeDistances?: Record<string, number>;
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;

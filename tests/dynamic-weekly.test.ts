@@ -9,7 +9,7 @@ import {
 } from "../lib/types";
 import { execute } from "../lib/engine";
 import { weeklyRole } from "../lib/weekly";
-import { dynamicWeeklyPlan } from "../lib/dynamic-weekly";
+import { dynamicWeeklyPlan, dynamicWeeklyEnabled } from "../lib/dynamic-weekly";
 import { challengeDistance } from "../lib/challenge-distance";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
@@ -769,4 +769,120 @@ test("a division republished alone keeps its published roles when other division
       published[rank - 1] === "A" ? "attack" : "defense",
       `team ${rank}`,
     );
+});
+
+test("per-division admin matchmaking blocks players and the system, assigns only the chosen game and preserves existing games when disabled", () => {
+  const s = fixture("ouro", 12);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const mode = {
+    type: "admin.division.matchmaking.set",
+    divisionId: "ouro",
+    manual: true,
+  };
+  assert.throws(() => execute(s, actor(4), mode, now), /administradores/);
+  assert.throws(
+    () => execute(s, admin, { ...mode, divisionId: "missing" }, now),
+    /Divisão/,
+  );
+  execute(s, admin, mode, now);
+  assert.equal(dynamicWeeklyEnabled(s, "ouro"), false);
+  assert.equal(dynamicWeeklyEnabled(s, "prata"), true);
+  assert(
+    s.audit.some((a) => a.action === "admin.division.matchmaking.changed"),
+  );
+  assert.throws(() => send(s, 4, 2), /administração/);
+  const command = {
+    type: "admin.challenge.create",
+    challengerId: "t4a",
+    defenderId: "t2a",
+    weekStart: week,
+  };
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...admin, userId: "system:weekly-matchmaking" },
+        command,
+        now,
+      ),
+    /administração/,
+  );
+  // The admin chooses a pairing regardless of the published attack/defense role.
+  s.weeklyRounds[0].weekType = "NORMAL";
+  s.weeklyRounds[0].assignments = s.players.map((p) => ({
+    playerId: p._id,
+    role: p._id.startsWith("t1") ? "defense" : "attack",
+  }));
+  execute(s, admin, command, now);
+  assert.equal(s.challenges.length, 1);
+  assert.equal(s.challenges[0].status, "accepted");
+  assert.equal(s.challenges[0].mandatoryAssignment, true);
+  assert.equal(s.challenges[0].origin?.kind, "admin");
+  assert.equal(s.matches.length, 0);
+  assert.equal(s.results.length, 0);
+  assert.throws(
+    () => execute(s, admin, { ...command, challengerId: "t5a" }, now),
+    /nesta semana/,
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        { ...command, challengerId: "t8a", defenderId: "t1a" },
+        now,
+      ),
+    /limite de posições/,
+  );
+  const before = structuredClone(s.challenges);
+  execute(s, admin, { ...mode, manual: false }, now);
+  assert.equal(dynamicWeeklyEnabled(s, "ouro"), true);
+  assert.deepEqual(s.challenges, before);
+});
+
+test("the planner never offers the same unresolved pairing from an earlier frozen week", () => {
+  const s = fixture("ouro", 12);
+  send(s, 4, 2);
+  const old = structuredClone(pairing(s, 3, 1)!);
+  old.weekStart = "2026-10-12";
+  old.deferredUntil = "2026-11-02";
+  s.challenges = [old];
+  const offered = () =>
+    dynamicWeeklyPlan(s, "ouro", week).eligible.some(
+      (p) => p.attackerKey === "t3a:t3b" && p.defenderKey === "t1a:t1b",
+    );
+  assert.equal(offered(), false);
+  old.status = "completed";
+  assert.equal(offered(), true);
+});
+
+test("manual match assignment is mandatory even when player challenges normally require acceptance", () => {
+  const s = fixture("ouro", 12);
+  s.settings[0].weeklyMandatoryChallenges = false;
+  s.settings[0].weeklyDynamicRoles = false;
+  const admin: Actor = { ...actor(1), role: "admin" };
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.division.matchmaking.set",
+      divisionId: "ouro",
+      manual: true,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.challenge.create",
+      challengerId: "t4a",
+      defenderId: "t2a",
+      weekStart: week,
+    },
+    now,
+  );
+  assert.equal(s.challenges.length, 1);
+  assert.equal(s.challenges[0].status, "accepted");
+  assert.equal(s.challenges[0].mandatoryAssignment, true);
 });
