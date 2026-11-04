@@ -80,17 +80,24 @@ test("admin records sets; waiting bets show official outcome and correction noti
     await player.clock.runFor(1100);
     await central.getByRole("button", { name: /^A aguardar/ }).click();
     await expect(card).toContainText("A aguardar confirmação do resultado");
-    // Keep this settlement scenario scored; winner-only administration is tested below.
-    await post({
-      type: "admin.resolve",
-      challengeId: id,
-      action: "winner",
-      winnerId: "player-1",
-      setScores: [
-        { attacker: 1, defender: 6 },
-        { attacker: 4, defender: 6 },
-      ],
+    await page.goto(`/desafios/${id}`);
+    const scoredForm = page.getByRole("form", {
+      name: "Registar resultado com sets",
+      exact: true,
     });
+    await scoredForm
+      .getByLabel("Vencedor pelo resultado")
+      .selectOption("player-1");
+    await scoredForm.getByLabel("1.º set ATAQUE", { exact: true }).fill("1");
+    await scoredForm.getByLabel("1.º set DEFESA", { exact: true }).fill("6");
+    await scoredForm.getByLabel("2.º set ATAQUE", { exact: true }).fill("4");
+    await scoredForm.getByLabel("2.º set DEFESA", { exact: true }).fill("6");
+    await scoredForm
+      .getByRole("button", { name: "Guardar resultado com sets", exact: true })
+      .click();
+    await expect(
+      page.getByText("Resultado registado com sets.", { exact: true }),
+    ).toBeVisible();
     const after = await (await page.request.get("/api/league")).json();
     expect(after.players.map((p: any) => [p._id, p.position])).toEqual(
       before.players.map((p: any) => [p._id, p.position]),
@@ -165,14 +172,12 @@ test("admin declares a winner through the intervention form without a schedule o
   expect(response.ok(), await response.text()).toBeTruthy();
   const { id } = await response.json();
   await page.goto(`/desafios/${id}`);
-  const intervention = page
-    .locator("section.panel")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Intervenção administrativa",
-        exact: true,
-      }),
-    });
+  const intervention = page.locator("section.panel").filter({
+    has: page.getByRole("heading", {
+      name: "Intervenção administrativa",
+      exact: true,
+    }),
+  });
   await intervention
     .getByLabel("Declarar vencedor", { exact: true })
     .selectOption("player-3");

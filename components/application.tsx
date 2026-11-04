@@ -2915,6 +2915,45 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
           {c.status !== "completed" && (
             <>
               <form
+                aria-label="Registar resultado com sets"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await run(
+                    {
+                      type: "admin.resolve",
+                      challengeId: c._id,
+                      action: "winner",
+                      ...Object.fromEntries(new FormData(e.currentTarget)),
+                      setScores: setScoresFromForm(e.currentTarget),
+                    },
+                    "Resultado registado com sets.",
+                  );
+                }}
+              >
+                <h3>Registar resultado com sets</h3>
+                <label>
+                  Vencedor pelo resultado
+                  <select name="winnerId" required defaultValue="">
+                    <option value="" disabled>
+                      Escolher vencedor
+                    </option>
+                    {[c.challengerId, c.defenderId].map((pid) => (
+                      <option value={pid} key={pid}>
+                        {challengeTeamName(c, pid, s.players)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SetScoreFields challenge={c} />
+                <p>O vencedor deve corresponder aos sets introduzidos.</p>
+                <button
+                  disabled={busy || terminal.has(c.status)}
+                  className="primary"
+                >
+                  Guardar resultado com sets
+                </button>
+              </form>
+              <form
                 onSubmit={async (e) => {
                   e.preventDefault();
                   await run(
@@ -2927,6 +2966,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
                   );
                 }}
               >
+                <h3>Definir vencedor sem resultado</h3>
                 <label>
                   Declarar vencedor
                   <select

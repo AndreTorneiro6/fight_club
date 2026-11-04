@@ -1,3 +1,8 @@
+## Version 1.16.2 — restore scored result alongside winner-only — 4 November 2026
+
+- AdminChallenge now offers two separate forms: “Registar resultado com sets” (existing validated admin.resolve winner command with sets) and “Definir vencedor sem resultado” (admin.result.setWinner with required reason). The previous change replaced the older scored intervention form; this release restores it while keeping winner-only and date postponement.
+- Validation: typecheck, 536 tests, build, and both official-betting-results browser checks pass. The scored settlement test uses the restored UI; winner-only UI test remains unscheduled with no sets. Deployment pending; no production game manually changed.
+
 ## Version 1.16.1 — admin date postponement and winner-only form — 4 November 2026
 
 - LIVE: Editar jogo has an explicit “Adiar por lesão ou outro impedimento” checkbox. Admin chooses date/time/court and required reason; the validated engine keeps weekStart, sets deferredUntil and postponementReason, extends deadlines to the selected week, replaces the reservation and preserves conflict/availability checks, notifications and audit. Frozen notice distinguishes admin postponement from vacations. No production game changed manually. Deployed release 1.16.1, exact revision 20011f92a0984a27f8b122bd0b17ae91d8590845 via successful run 41811605816; app and worker match, app healthy, both zero restarts.

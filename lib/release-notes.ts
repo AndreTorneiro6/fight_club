@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.16.1";
+export const applicationVersion = "1.16.2";
 export const releaseNotes = [
+  {
+    version: "1.16.2",
+    date: "2026-11-04",
+    title: "Resultado com sets e vencedor sem resultado",
+    changes: [
+      "A intervenção administrativa oferece as duas opções em separado: registar o resultado com sets ou definir apenas o vencedor com motivo obrigatório. Mantém o adiamento para uma data escolhida.",
+    ],
+  },
   {
     version: "1.16.1",
     date: "2026-11-04",
