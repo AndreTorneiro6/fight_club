@@ -80,26 +80,17 @@ test("admin records sets; waiting bets show official outcome and correction noti
     await player.clock.runFor(1100);
     await central.getByRole("button", { name: /^A aguardar/ }).click();
     await expect(card).toContainText("A aguardar confirmação do resultado");
-    await page.goto(`/desafios/${id}`);
-    const intervention = page.locator("section.panel").filter({
-      has: page.getByRole("heading", {
-        name: "Intervenção administrativa",
-        exact: true,
-      }),
+    // Keep this settlement scenario scored; winner-only administration is tested below.
+    await post({
+      type: "admin.resolve",
+      challengeId: id,
+      action: "winner",
+      winnerId: "player-1",
+      setScores: [
+        { attacker: 1, defender: 6 },
+        { attacker: 4, defender: 6 },
+      ],
     });
-    await intervention
-      .getByLabel("Declarar vencedor", { exact: true })
-      .selectOption("player-1");
-    await intervention.getByLabel("1.º set ATAQUE", { exact: true }).fill("1");
-    await intervention.getByLabel("1.º set DEFESA", { exact: true }).fill("6");
-    await intervention.getByLabel("2.º set ATAQUE", { exact: true }).fill("4");
-    await intervention.getByLabel("2.º set DEFESA", { exact: true }).fill("6");
-    await intervention
-      .getByRole("button", { name: "Confirmar vencedor", exact: true })
-      .click();
-    await expect(
-      page.getByText("Resultado resolvido.", { exact: true }),
-    ).toBeVisible();
     const after = await (await page.request.get("/api/league")).json();
     expect(after.players.map((p: any) => [p._id, p.position])).toEqual(
       before.players.map((p: any) => [p._id, p.position]),
@@ -157,4 +148,48 @@ test("admin records sets; waiting bets show official outcome and correction noti
   } finally {
     await context.close();
   }
+});
+
+test("admin declares a winner through the intervention form without a schedule or sets", async ({
+  page,
+}) => {
+  await login(page, "admin@fightclub.local", true);
+  const response = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.challenge.create",
+      challengerId: "player-4",
+      defenderId: "player-3",
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const { id } = await response.json();
+  await page.goto(`/desafios/${id}`);
+  const intervention = page
+    .locator("section.panel")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Intervenção administrativa",
+        exact: true,
+      }),
+    });
+  await intervention
+    .getByLabel("Declarar vencedor", { exact: true })
+    .selectOption("player-3");
+  await intervention
+    .getByLabel("Motivo da definição do vencedor")
+    .fill("Lesão confirmada pela administração");
+  await intervention
+    .getByRole("button", { name: "Confirmar vencedor", exact: true })
+    .click();
+  await expect(
+    page.getByText("Resultado resolvido.", { exact: true }),
+  ).toBeVisible();
+  const state = await (await page.request.get("/api/league")).json();
+  const challenge = state.challenges.find((c: any) => c._id === id);
+  expect(challenge.status).toBe("completed");
+  expect(challenge.scheduledAt).toBeUndefined();
+  expect(challenge.winnerId).toBe("player-3");
+  expect(challenge.score).toBe("");
+  expect(challenge.setScores ?? null).toBeNull();
 });

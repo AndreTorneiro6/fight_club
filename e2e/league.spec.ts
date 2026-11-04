@@ -177,10 +177,9 @@ test("desktop and mobile league flows with isolated player/admin sessions", asyn
   await admin
     .locator("#winner-" + challengePath.split("/").pop())
     .selectOption("player-7");
-  for (const i of [1, 2]) {
-    await admin.getByLabel(`${i}.º set ATAQUE`, { exact: true }).fill("6");
-    await admin.getByLabel(`${i}.º set DEFESA`, { exact: true }).fill("4");
-  }
+  await admin
+    .getByLabel("Motivo da definição do vencedor")
+    .fill("Desistência confirmada pelo clube");
   await admin
     .getByRole("button", { name: "Confirmar vencedor", exact: true })
     .click();
