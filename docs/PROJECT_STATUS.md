@@ -1,7 +1,7 @@
 ## Version 1.16.2 — restore scored result alongside winner-only — 4 November 2026
 
 - AdminChallenge now offers two separate forms: “Registar resultado com sets” (existing validated admin.resolve winner command with sets) and “Definir vencedor sem resultado” (admin.result.setWinner with required reason). The previous change replaced the older scored intervention form; this release restores it while keeping winner-only and date postponement.
-- Validation: typecheck, 536 tests, build, and both official-betting-results browser checks pass. The scored settlement test uses the restored UI; winner-only UI test remains unscheduled with no sets. Deployment pending; no production game manually changed.
+- Validation: typecheck, 536 tests, build, and both official-betting-results browser checks pass. The scored settlement test uses the restored UI; winner-only UI test remains unscheduled with no sets. Deployed exact 6dac30e36cf95dfb46857a30e385443ea6b4b9d0 via successful run 41824325802 (full CI including both result UI flows); app and worker match, version 1.16.2, healthy, zero restarts, public health ok. No production game manually changed.
 
 ## Version 1.16.1 — admin date postponement and winner-only form — 4 November 2026
 
