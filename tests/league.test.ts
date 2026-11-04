@@ -3482,3 +3482,26 @@ test("admin declares a winner without scheduling or entering any scores", () => 
   assert.equal(s.players[7].wins, 1);
   assert(s.audit.some((a) => a.action === "admin.result.winnerSet"));
 });
+
+test("admin can record the official result exactly at match start while future games stay locked", () => {
+  const s = fixture(),
+    c = schedule(s);
+  const start = Date.parse(c.scheduledAt!);
+  const command = {
+    type: "admin.result.record",
+    challengeId: c._id,
+    winnerId: c.defenderId,
+    setScores: [
+      { attacker: 4, defender: 6 },
+      { attacker: 3, defender: 6 },
+    ],
+  };
+  assert.throws(
+    () => execute(s, actor(1, "admin"), command, start - 1),
+    /começar/,
+  );
+  assert.equal(c.status, "scheduled");
+  execute(s, actor(1, "admin"), command, start);
+  assert.equal(c.status, "completed");
+  assert.equal(s.results[0].score, "4-6, 3-6");
+});

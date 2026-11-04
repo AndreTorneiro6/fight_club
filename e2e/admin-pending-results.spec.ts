@@ -97,7 +97,7 @@ test("overview follows game start and end without reload, then removes the task 
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Registar resultado", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await page
     .getByRole("button", { name: "Atualizar marcador (opcional)", exact: true })
     .click();

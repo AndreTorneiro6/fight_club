@@ -1,5 +1,6 @@
 import { reconcileStickerTrades } from "./sticker-trading";
 import { executeTeamSpace } from "./team-space-command";
+import { canRecordOfficialResult } from "./result-readiness";
 import { executeLiveScore } from "./live-score-command";
 import { executeChampionHistory } from "./champion-history";
 import { executeClubPhotos } from "./club-photos";
@@ -4568,9 +4569,8 @@ export function execute(
         "O jogo não está disponível para registo de resultado.",
       );
       ensure(
-        c.scheduledAt &&
-          Date.parse(c.scheduledAt) + c.durationMinutes * 60000 <= timestamp,
-        "Regista o resultado depois do jogo terminar.",
+        canRecordOfficialResult(c, timestamp),
+        "Regista o resultado depois do jogo começar.",
       );
       applyResult(c, cmd.winnerId, cmd.score, cmd.setScores);
       log("admin.result.recorded", {

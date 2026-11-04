@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.16.2";
+export const applicationVersion = "1.16.3";
 export const releaseNotes = [
+  {
+    version: "1.16.3",
+    date: "2026-11-04",
+    title: "Resultado disponível desde o início do jogo",
+    changes: [
+      "O registo oficial de resultado fica disponível a partir da hora de início, sem esperar pelo fim da reserva. O marcador provisório continua disponível durante o jogo e atualiza as Apostas; só a confirmação oficial liquida as apostas e altera o ranking.",
+    ],
+  },
   {
     version: "1.16.2",
     date: "2026-11-04",

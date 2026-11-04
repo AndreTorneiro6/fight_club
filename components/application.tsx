@@ -4332,9 +4332,10 @@ function AdminResultButton(a: Actions & { c: Challenge }) {
       )}
       {!completed && !ready && (
         <small>
-          O registo de resultado por sets fica disponível após o fim do jogo
+          O registo de resultado por sets fica disponível a partir do início do
+          jogo
           {c.scheduledAt
-            ? ` · ${fmtDate(c.scheduledAt)} às ${fmtTime(new Date(Date.parse(c.scheduledAt) + c.durationMinutes * 60000).toISOString())}`
+            ? ` · ${fmtDate(c.scheduledAt)} às ${fmtTime(c.scheduledAt)}`
             : ""}
           .
         </small>

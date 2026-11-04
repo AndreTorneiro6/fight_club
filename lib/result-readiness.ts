@@ -11,7 +11,7 @@ function matchWindow(c: Challenge) {
   if (!Number.isFinite(start)) return;
   return { start, end: start + c.durationMinutes * 60000 };
 }
-/** Started matches need administrative follow-up before their result becomes actionable. */
+/** Started matches remain in progress until the booked end or official result. */
 export function isMatchInProgress(c: Challenge, now = Date.now()) {
   const window = matchWindow(c);
   return (
@@ -21,13 +21,13 @@ export function isMatchInProgress(c: Challenge, now = Date.now()) {
     now < window.end
   );
 }
-/** A scheduled game is actionable after its full booked duration, even without a player report. */
+/** Administrators can record an official result from the scheduled start. */
 export function canRecordOfficialResult(c: Challenge, now = Date.now()) {
   const window = matchWindow(c);
   return (
     ["scheduled", "result_pending", "disputed"].includes(c.status) &&
     !!window &&
-    window.end <= now
+    window.start <= now
   );
 }
 /** The next boundary is derived from the booking; no MongoDB status transition is required. */

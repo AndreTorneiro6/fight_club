@@ -83,7 +83,10 @@ export default function AdminOverview({
     ),
     ongoing = s.challenges.filter((c) => isMatchInProgress(c, now)),
     results = s.challenges.filter(
-      (c) => c.status !== "disputed" && canRecordOfficialResult(c, now),
+      (c) =>
+        c.status !== "disputed" &&
+        !isMatchInProgress(c, now) &&
+        canRecordOfficialResult(c, now),
     ),
     disputes = s.challenges.filter((c) => c.status === "disputed"),
     overdue = s.challenges.filter(
@@ -472,10 +475,10 @@ export default function AdminOverview({
                   ? "Resultado oficial"
                   : c.status === "disputed"
                     ? "Disputa"
-                    : canRecordOfficialResult(c, now)
-                      ? "Resultado por registar"
-                      : isMatchInProgress(c, now)
-                        ? "Em curso"
+                    : isMatchInProgress(c, now)
+                      ? "Em curso"
+                      : canRecordOfficialResult(c, now)
+                        ? "Resultado por registar"
                         : "Agendado"}
               </span>
               {c.status === "completed" ? (

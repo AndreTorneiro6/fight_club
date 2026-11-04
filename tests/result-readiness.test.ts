@@ -6,14 +6,16 @@ import {
   nextMatchTransition,
 } from "../lib/result-readiness";
 import type { Challenge } from "../lib/types";
-test("scheduled games become actionable at their end, without a player result report", () => {
+test("scheduled games become actionable exactly at start, without a player result report", () => {
   const start = Date.parse("2026-10-27T20:00:00Z");
   const c = {
     status: "scheduled",
     scheduledAt: new Date(start).toISOString(),
     durationMinutes: 90,
   } as Challenge;
-  assert.equal(canRecordOfficialResult(c, start + 89 * 60000), false);
+  assert.equal(canRecordOfficialResult(c, start - 1), false);
+  assert.equal(canRecordOfficialResult(c, start), true);
+  assert.equal(canRecordOfficialResult(c, start + 89 * 60000), true);
   assert.equal(canRecordOfficialResult(c, start + 90 * 60000), true);
   assert.equal(
     canRecordOfficialResult(
@@ -59,7 +61,7 @@ test("a scheduled game enters follow-up exactly at start and leaves at the resul
   assert.equal(isMatchInProgress(c, start - 1), false);
   assert.equal(isMatchInProgress(c, start), true);
   assert.equal(isMatchInProgress(c, start + 89 * 60000), true);
-  assert.equal(canRecordOfficialResult(c, start), false);
+  assert.equal(canRecordOfficialResult(c, start), true);
   assert.equal(isMatchInProgress(c, start + 90 * 60000), false);
   assert.equal(canRecordOfficialResult(c, start + 90 * 60000), true);
   for (const status of [
