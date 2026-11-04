@@ -1,8 +1,8 @@
 ## Version 1.16.3 — official result from kickoff, live scores preserved — 4 November 2026
 
-- Local: canRecordOfficialResult and admin.result.record now unlock at the scheduled start instead of the booked end. Future games remain locked; timing guidance shows kickoff. Overview retains separate ongoing/result tasks without counting a match twice.
+- LIVE: canRecordOfficialResult and admin.result.record now unlock at the scheduled start instead of the booked end. Future games remain locked; timing guidance shows kickoff. Overview retains separate ongoing/result tasks without counting a match twice.
 - LiveMatchScoreEditor was not removed: “Atualizar marcador (opcional)” remains available from kickoff until official completion and broadcasts provisional scores to Apostas. The browser check verifies both the enabled official result button at kickoff and live set/game updates on another player's Apostas page, without creating an official result or changing rankings.
-- Validation: typecheck, 537 tests, build, official-betting-results (2 browser checks), admin-pending-results (with DEMO_TEST_ROUND_TRANSITION=1) pass. Deployment pending; no production game manually changed.
+- Validation: typecheck, 537 tests, build, official-betting-results (2 browser checks), admin-pending-results (with DEMO_TEST_ROUND_TRANSITION=1) pass. Deployed exact d9eb3926888d35035cfb8b39b91f26576dbd5321 via successful run 41827916710; full CI passed including kickoff/live score browser check. App and worker match, 1.16.3, healthy, zero restarts, public health ok. No production game manually changed.
 
 ## Version 1.16.2 — restore scored result alongside winner-only — 4 November 2026
 
