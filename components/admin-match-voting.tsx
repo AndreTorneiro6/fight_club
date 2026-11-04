@@ -15,6 +15,8 @@ import { isTitleMatch } from "@/lib/title-matches";
 import { challengeTeamName } from "@/lib/team-competition";
 import {
   isVotingMatch,
+  votingPeriod,
+  type VotingPeriod,
   matchVotingCutoff,
   defaultMatchVotingSettings,
   votingCountdown,
@@ -35,27 +37,31 @@ export default function AdminMatchVoting({
   connection?: "connecting" | "live" | "reconnecting";
 }) {
   const [division, setDivision] = useState("all"),
+    [period, setPeriod] = useState<VotingPeriod>("current"),
     [group, setGroup] = useState<"open" | "mine" | "waiting" | "result">(
       "open",
     ),
     [selected, setSelected] = useState<string>(),
     [clock, setClock] = useState(Date.now());
   useEffect(() => {
-    setSelected(
-      new URLSearchParams(window.location.search).get("jogo") ?? undefined,
-    );
+    const selectedId =
+      new URLSearchParams(window.location.search).get("jogo") ?? undefined;
+    setSelected(selectedId);
+    const linked = s.challenges.find((c) => c._id === selectedId);
+    if (linked) setPeriod(votingPeriod(linked));
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const games = s.challenges
+  const allGames = s.challenges
     .filter(
       (c) =>
         isVotingMatch(s, c) &&
         (division === "all" || c.divisionId === division),
     )
     .sort(matchOrder(clock));
-  const game = games.find((c) => c._id === selected);
+  const games = allGames.filter((c) => votingPeriod(c, clock) === period);
+  const game = allGames.find((c) => c._id === selected);
   function votingState(c: View["challenges"][number]) {
     const stored = (s.matchVotes ?? []).find(
       (v) => v.challengeId === c._id && v.userId === s.actor.userId,
@@ -89,6 +95,31 @@ export default function AdminMatchVoting({
         <div className="row between wrap">
           <h2>Central de Apostas</h2>
           <span className="badge">Um palpite por pessoa</span>
+        </div>
+        <div
+          className={`tabs ${styles.groups}`}
+          role="group"
+          aria-label="Semana das apostas"
+        >
+          {(
+            [
+              ["current", "Esta semana"],
+              ["past", "Anteriores"],
+              ["future", "Próximas"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              aria-pressed={period === id}
+              className={period === id ? "active" : ""}
+              onClick={() => {
+                setPeriod(id);
+                setSelected(undefined);
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <div
           className={`tabs ${styles.groups}`}
@@ -192,12 +223,12 @@ export default function AdminMatchVoting({
           {!grouped[group].length && (
             <p className="panel">
               {group === "mine"
-                ? "Ainda não tens palpites guardados nesta divisão. Escolhe um jogo em Abertas para participar."
+                ? "Ainda não tens palpites guardados neste período e divisão. Escolhe um jogo em Abertas para participar."
                 : group === "open"
-                  ? "Não existem apostas abertas nesta divisão."
+                  ? "Não existem apostas abertas neste período e divisão."
                   : group === "waiting"
-                    ? "Não existem jogos a aguardar resultado nesta divisão."
-                    : "Não existem resultados oficiais nesta divisão."}
+                    ? "Não existem jogos a aguardar resultado neste período e divisão."
+                    : "Não existem resultados oficiais neste período e divisão."}
             </p>
           )}
         </div>

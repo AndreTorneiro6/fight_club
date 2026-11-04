@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.16.3";
+export const applicationVersion = "1.16.4";
 export const releaseNotes = [
+  {
+    version: "1.16.4",
+    date: "2026-11-04",
+    title: "Apostas por semana",
+    changes: [
+      "A Central de Apostas abre nos jogos desta semana. Os filtros Anteriores e Próximas separam os jogos antigos e futuros, mantendo os estados de apostas, a divisão, os palpites e os marcadores em direto. Os jogos adiados aparecem na semana da data marcada.",
+    ],
+  },
   {
     version: "1.16.3",
     date: "2026-11-04",

@@ -11,7 +11,7 @@ import {
   type Challenge,
   type Actor,
 } from "../lib/types";
-import { isVotingMatch } from "../lib/match-voting-targets";
+import { isVotingMatch, votingPeriod } from "../lib/match-voting-targets";
 const at = Date.parse("2026-11-02T12:00:00Z");
 const admin: Actor = { userId: "u1", playerId: "p1", role: "admin" };
 function fixture() {
@@ -939,4 +939,32 @@ test("submitting one game's result never backfills another game's bettors", asyn
   assert.equal(s.notifications.filter((n) => n.bettingResult).length, 1);
   assert.equal(s.notifications[0].challengeId, first._id);
   assert.equal(s.matchVotes[1].settledFingerprint, undefined);
+});
+
+test("betting week uses Lisbon playing dates and separates postponed, previous and future rounds", () => {
+  const c = fixture().challenges[0];
+  assert.equal(votingPeriod(c, at), "current");
+  assert.equal(
+    votingPeriod({ ...c, scheduledAt: "2026-10-31T19:00:00Z" }, at),
+    "past",
+  );
+  assert.equal(
+    votingPeriod(
+      { ...c, weekStart: "2026-10-26", scheduledAt: "2026-11-09T19:00:00Z" },
+      at,
+    ),
+    "future",
+  );
+  assert.equal(
+    votingPeriod({ ...c, scheduledAt: undefined, weekStart: "2026-11-02" }, at),
+    "current",
+  );
+  // In summer, UTC Sunday 23:30 is already Monday in Lisbon.
+  assert.equal(
+    votingPeriod(
+      { ...c, scheduledAt: "2026-07-05T23:30:00Z" },
+      Date.parse("2026-07-06T12:00:00Z"),
+    ),
+    "current",
+  );
 });

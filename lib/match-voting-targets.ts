@@ -1,3 +1,5 @@
+import { clubWeek } from "./calendar";
+import { matchStart } from "./match-order";
 import { predictionCutoff } from "./prediction-cutoff";
 import type { State } from "./types";
 import type { ChatMention } from "./chat-mentions";
@@ -70,4 +72,18 @@ export function votingCountdown(cutoff: string, now: number) {
   const hours = Math.floor(seconds / 3600),
     minutes = Math.floor((seconds % 3600) / 60);
   return `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+export type VotingPeriod = "current" | "past" | "future";
+/** Postponements belong to their playing week; undated published games use their round. */
+export function votingPeriod(
+  challenge: State["challenges"][number],
+  now = Date.now(),
+): VotingPeriod {
+  const date =
+    matchStart(challenge) ?? challenge.weekStart ?? challenge.createdAt;
+  if (!date || !Number.isFinite(Date.parse(date))) return "current";
+  const week = clubWeek(date).start;
+  const current = clubWeek(now).start;
+  return week < current ? "past" : week > current ? "future" : "current";
 }

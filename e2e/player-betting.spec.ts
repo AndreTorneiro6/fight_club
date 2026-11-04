@@ -224,3 +224,81 @@ test("players predict and chat, receive targeted notices, and tap the launch ann
     await context.close();
   }
 });
+
+test("bets default to this week, separate older and future games, and preserve old notification links", async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date("2026-11-04T12:00:00Z") });
+  await page.route("**/api/league", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    const data = await response.json();
+    const dates = [
+      "2026-11-04T19:00:00Z",
+      "2026-10-28T19:00:00Z",
+      "2026-11-11T19:00:00Z",
+    ];
+    data.challenges = dates.map((date, i) => ({
+      _id: `week-filter-${i}`,
+      number: 900 + i,
+      challengerId: "player-2",
+      defenderId: "player-1",
+      divisionId: "ouro",
+      seasonId: data.seasons[0]._id,
+      status: "scheduled",
+      scheduledAt: date,
+      createdAt: "2026-10-20T12:00:00Z",
+      weekStart: "2026-10-26",
+      playBy: "2026-11-30T23:59:59Z",
+      durationMinutes: 90,
+    }));
+    data.matches = data.challenges.map((c: any) => ({
+      _id: `booking-${c._id}`,
+      challengeId: c._id,
+      start: c.scheduledAt,
+      end: new Date(Date.parse(c.scheduledAt) + 90 * 60000).toISOString(),
+      seasonId: c.seasonId,
+    }));
+    data.matchVotes = [];
+    data.results = [];
+    await route.fulfill({ response, json: data });
+  });
+  await login(page, "adversario@fightclub.local");
+  await page.goto("/apostas");
+  const central = page.getByRole("region", {
+    name: "Central de Apostas",
+    exact: true,
+  });
+  const card = (number: number) =>
+    central.getByRole("article", {
+      name: `Votação do jogo ${number}`,
+      exact: true,
+    });
+  await expect(
+    central.getByRole("button", { name: "Esta semana", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(card(900)).toBeVisible();
+  await expect(card(901)).toHaveCount(0);
+  await expect(card(902)).toHaveCount(0);
+  await central
+    .getByRole("button", { name: "Anteriores", exact: true })
+    .click();
+  await central.getByRole("button", { name: /^A aguardar/ }).click();
+  await expect(card(901)).toBeVisible();
+  await expect(card(900)).toHaveCount(0);
+  await central.getByRole("button", { name: "Próximas", exact: true }).click();
+  await central.getByRole("button", { name: /^Abertas/ }).click();
+  await expect(card(902)).toBeVisible();
+  await expect(card(900)).toHaveCount(0);
+  await page.goto("/apostas?jogo=week-filter-1");
+  await expect(card(901)).toBeVisible();
+  await expect(
+    central.getByRole("button", { name: "Anteriores", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

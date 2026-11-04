@@ -1,3 +1,8 @@
+## Version 1.16.4 — betting week filters — 4 November 2026
+
+- Local: Central de Apostas defaults to Esta semana, with Anteriores and Próximas filters in addition to existing status/division filters. Uses Lisbon Monday–Sunday weeks and scheduled playing date (including postponements), falling back to original round/creation for undated published games. Deep links still open old games and select their period. Live score, predictions and settlement unchanged.
+- Validation: typecheck, 538 tests, build, player-betting (2 browser checks: existing voting/chat and new period/deep-link/mobile test), official-betting-results (2 checks) pass. Browser suites run in separate demo instances because they mutate the same demo rankings. Deployment pending; no production league data manually changed.
+
 ## Version 1.16.3 — official result from kickoff, live scores preserved — 4 November 2026
 
 - LIVE: canRecordOfficialResult and admin.result.record now unlock at the scheduled start instead of the booked end. Future games remain locked; timing guidance shows kickoff. Overview retains separate ongoing/result tasks without counting a match twice.
