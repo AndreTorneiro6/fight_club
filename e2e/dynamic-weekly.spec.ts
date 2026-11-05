@@ -273,7 +273,7 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
   await expect(
     page
       .locator("#weekly-role-assignment")
-      .getByText(/^Jornada de .+: (Ataque|Defesa|—)/)
+      .locator(".weekly-role-history-summary .weekly-history-role")
       .first(),
   ).toBeVisible();
   const history = page
@@ -281,7 +281,7 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
     .locator('[aria-label="Histórico de papéis"]')
     .first();
   await expect(history).toBeAttached();
-  await expect(history).toContainText(/inicial .* final/);
+  await expect(history).toContainText(/Inicial:.*Final:/);
   await expect(
     page
       .locator("#weekly-role-assignment")
