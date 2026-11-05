@@ -3111,3 +3111,16 @@ body::before {
   .admin-week-game { flex-direction: column; align-items: stretch; }
   .admin-week-game > .button { align-self: flex-start; }
 }
+
+/* Published weekly-role history: text labels accompany every colour. */
+.weekly-role-history-summary { line-height: 2; }
+.weekly-role-history-summary > span { margin-right: 6px; }
+.weekly-history-week { color: var(--gold); font-weight: 700; }
+.weekly-history-role { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; border-radius: 6px; font-size: 11px; line-height: 1.6; }
+.weekly-history-role.attack { color: #f7cc73; background: #d6a33318; }
+.weekly-history-role.defense { color: #8bd5ff; background: #399ed018; }
+.weekly-history-role.unassigned { color: var(--muted); }
+.weekly-role-history-list { list-style: none; display: grid; gap: 6px; margin: 8px 0 0; padding: 0; }
+.weekly-role-history-list > li { padding: 10px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 6px; }
+html[data-theme] .inset.weekly-role-history-latest, .weekly-role-history-latest { border: 1px solid var(--gold); background: #d6a3330d; border-radius: 8px; }
+.weekly-history-latest-label { color: var(--gold); font-weight: 700; }

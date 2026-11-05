@@ -1,3 +1,12 @@
+## Version 1.19.1 — week-type access and clearer role history — 5 November 2026
+
+- LOCAL, NOT DEPLOYED: Gerir semana shows the current week type with its global scope, replacing an always-disabled per-division selector. Alterar tipo de semana opens the existing Papéis semanais view for that exact week with all divisions selected; a return link preserves the original division.
+- LOCAL: Papéis history uses season-relative Semana 1/2/3 numbering via the existing matchdayNumber logic. Latest published team history highlights its week and final role (gold Ataque / blue Defesa), with initial/final and game details preserved. Global history highlights its newest entry and final roles; dates remain in titles. A synthetic browser history now explicitly belongs to its fixture season and asserts Semana 2.
+- LOCAL: Weekly workspace disables context controls while route navigation is pending, preventing rapid week/division changes from restoring the previous selection.
+- Past weeks and weeks with any published division retain the existing lock and now explain it. No domain commands or publication rules changed. Current standard admin path remains Mais ferramentas → Papéis semanais → Todas as categorias → Tipo de semana, then Guardar rascunho before publication.
+- Validation: typecheck, 545 tests, production build, admin-week-workspace + weekly-teams browser checks (2 passed), including access to enabled global week type and return context. Live remains v1.19.0 at 9c80b6d6a3ab87538c573bccc641b3e5d87f0b29.
+- User also asked about mixing admin mandatory assignments and player challenges. No mixed-mode feature implemented: manual matchmaking still blocks player/system challenge creation for that division/week. Standard admin creation can coexist with players subject to weekly mode, roles, priority and limits; mandatory status depends on weeklyMandatoryChallenges. Discuss/implement an explicit mixed mode if requested.
+
 ## Version 1.19.0 — unified admin weekly workspace — 5 November 2026
 
 - LIVE: Admin → Gerir semana is a primary navigation item and overview shortcut. One week/division context covers Papéis, Jogos obrigatórios, Agendar jogos, Resultados e correções. URL query parameters preserve the context across refresh and game-detail return links. Existing admin tools remain accessible.

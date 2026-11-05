@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import type { Player, View } from "@/lib/types";
 import {
   teamRoleHistory,
@@ -44,32 +45,59 @@ export default function WeeklyTeamInsight({
   return (
     <div className="stack" style={{ gap: 6, fontSize: 12 }}>
       {history.length > 0 && (
-        <details open={false}>
-          <summary>
-            Jornada de {day(history[0].week)}: {roleLabel(history[0].initial)}
-            {history[0].final !== history[0].initial
-              ? ` → final ${roleLabel(history[0].final)}`
-              : " (final igual)"}
+        <details className="weekly-role-history" open={false}>
+          <summary className="weekly-role-history-summary">
+            <span className="weekly-history-week" title={day(history[0].week)}>
+              {matchdayWeekLabel(s, history[0].week)}
+            </span>
+            <span
+              className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
+            >
+              Último papel: {roleLabel(history[0].final)}
+            </span>
+            <small>Mais recente</small>
           </summary>
           <ol
             aria-label="Histórico de papéis"
-            className="stack"
-            style={{ gap: 2, margin: "4px 0 0", paddingLeft: 18 }}
+            className="weekly-role-history-list"
           >
-            {history.map((h) => (
-              <li key={h.week}>
-                <strong>{day(h.week)}</strong> · inicial {roleLabel(h.initial)}{" "}
-                · final <strong>{roleLabel(h.final)}</strong>
-                {h.final !== h.initial ? " (alterado)" : ""}
-                {h.game
-                  ? ` · #${h.game.number} vs ${h.game.opponent} · ${
-                      h.game.outcome === "win"
-                        ? "vitória"
-                        : h.game.outcome === "loss"
-                          ? "derrota"
-                          : (status[h.game.status] ?? h.game.status)
-                    }`
-                  : " · sem jogo"}
+            {history.map((h, index) => (
+              <li
+                key={h.week}
+                className={
+                  index === 0 ? "weekly-role-history-latest" : undefined
+                }
+              >
+                <div className="row wrap">
+                  <strong className="weekly-history-week" title={day(h.week)}>
+                    {matchdayWeekLabel(s, h.week)}
+                  </strong>
+                  {index === 0 && (
+                    <small className="weekly-history-latest-label">
+                      Mais recente
+                    </small>
+                  )}
+                </div>
+                <div className="row wrap">
+                  <span>Inicial: {roleLabel(h.initial)}</span>
+                  <strong
+                    className={`weekly-history-role ${h.final ?? "unassigned"}`}
+                  >
+                    Final: {roleLabel(h.final)}
+                  </strong>
+                  {h.final !== h.initial && <small>Alterado</small>}
+                </div>
+                <small>
+                  {h.game
+                    ? `#${h.game.number} vs ${h.game.opponent} · ${
+                        h.game.outcome === "win"
+                          ? "vitória"
+                          : h.game.outcome === "loss"
+                            ? "derrota"
+                            : (status[h.game.status] ?? h.game.status)
+                      }`
+                    : "Sem jogo"}
+                </small>
               </li>
             ))}
           </ol>

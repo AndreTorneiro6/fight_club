@@ -138,3 +138,9 @@ export function matchdayNumber(state: State, week: string) {
     ) + 1,
   );
 }
+
+/** Season-relative week label, shared by competition history views. */
+export function matchdayWeekLabel(state: State, week: string) {
+  const number = matchdayNumber(state, week);
+  return number === undefined ? `Semana de ${week}` : `Semana ${number}`;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -41,6 +41,7 @@ export default function AdminWeekWorkspace({
 }) {
   const params = useSearchParams();
   const router = useRouter();
+  const [navigating, startNavigation] = useTransition();
   const weeks = [
     ...new Set([
       ...manualMatchmakingWeeks(s),
@@ -65,7 +66,7 @@ export default function AdminWeekWorkspace({
       task,
       ...values,
     });
-    router.replace(`/admin?${next}`, { scroll: false });
+    startNavigation(() => router.replace(`/admin?${next}`, { scroll: false }));
   };
   if (!division)
     return <p className="panel">Cria uma divisão para preparar a semana.</p>;
@@ -113,7 +114,7 @@ export default function AdminWeekWorkspace({
             <select
               aria-label="Semana a gerir"
               value={week}
-              disabled={busy}
+              disabled={busy || navigating}
               onChange={(e) => update({ week: e.target.value })}
             >
               {weeks.map((w) => (
@@ -129,7 +130,7 @@ export default function AdminWeekWorkspace({
             <select
               aria-label="Divisão a gerir"
               value={division._id}
-              disabled={busy}
+              disabled={busy || navigating}
               onChange={(e) => update({ division: e.target.value })}
             >
               {s.divisions.map((d) => (
@@ -152,7 +153,7 @@ export default function AdminWeekWorkspace({
         {tasks.map(([id, label, Icon], index) => (
           <button
             key={id}
-            disabled={busy}
+            disabled={busy || navigating}
             className={task === id ? "primary" : ""}
             aria-current={task === id ? "step" : undefined}
             onClick={() => update({ task: id })}

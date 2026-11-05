@@ -63,6 +63,18 @@ test("weekly workspace preserves context across tasks, reload and game managemen
     }),
   ).toBeVisible();
   await expect(page.getByLabel("Categoria dos papéis")).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Alterar tipo de semana", exact: true })
+    .click();
+  const weekType = page.getByLabel("Tipo de semana");
+  await expect(weekType).toBeEnabled();
+  await weekType.selectOption("OPEN_ATTACK");
+  await expect(weekType).toHaveValue("OPEN_ATTACK");
+  await expect(page).toHaveURL(new RegExp(`week=${week}.*division=all`));
+  await page.getByRole("link", { name: "Voltar à gestão da semana" }).click();
+  await expect(page.getByLabel("Divisão a gerir", { exact: true })).toHaveValue(
+    game.divisionId,
+  );
   const defense = page.getByRole("button", { name: /^Defesa:/ }).first();
   await defense.click();
   await steps.getByRole("button", { name: /Agendar jogos/ }).click();

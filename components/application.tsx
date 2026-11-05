@@ -4032,14 +4032,24 @@ function Admin(a: Actions) {
           )}
         />
       ) : tab === "weekly" ? (
-        <WeeklyRoles
-          key={`${searchParams.get("week")}:${searchParams.get("division")}`}
-          s={s}
-          run={a.run}
-          busy={a.busy}
-          initialWeek={searchParams.get("week") ?? undefined}
-          initialDivision={searchParams.get("division") ?? undefined}
-        />
+        <div className="stack">
+          {searchParams.get("returnDivision") && (
+            <Link
+              className="button"
+              href={`/admin?tab=week&task=roles&week=${encodeURIComponent(searchParams.get("week") ?? "")}&division=${encodeURIComponent(searchParams.get("returnDivision") ?? "")}`}
+            >
+              ← Voltar à gestão da semana
+            </Link>
+          )}
+          <WeeklyRoles
+            key={`${searchParams.get("week")}:${searchParams.get("division")}`}
+            s={s}
+            run={a.run}
+            busy={a.busy}
+            initialWeek={searchParams.get("week") ?? undefined}
+            initialDivision={searchParams.get("division") ?? undefined}
+          />
+        </div>
       ) : tab === "registration" ? (
         <AdminRegistration {...a} />
       ) : tab === "players" ? (

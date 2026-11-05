@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.0";
+export const applicationVersion = "1.19.1";
 export const releaseNotes = [
+  {
+    version: "1.19.1",
+    date: "2026-11-05",
+    title: "Tipo de semana e histórico dos papéis mais claros",
+    changes: [
+      "Gerir semana explica que Normal ou Ataque livre se aplica a todas as divisões e permite abrir diretamente a configuração global da semana escolhida, com regresso à divisão anterior.",
+      "Semanas passadas ou com papéis publicados mostram o motivo do bloqueio em vez de um seletor desativado sem explicação.",
+      "O histórico dos papéis identifica as semanas pelo número na época, destaca a semana mais recente e diferencia Ataque e Defesa com cores no papel final. A data continua disponível ao passar sobre a semana.",
+    ],
+  },
   {
     version: "1.19.0",
     date: "2026-11-05",

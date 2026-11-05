@@ -7,6 +7,7 @@ import {
   hasUnsavedDivisionRoles,
   weeklyPublishedAt,
 } from "@/lib/weekly-publication";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
@@ -511,22 +512,51 @@ export function WeeklyRoles({
               · {new Date(round.generatedAt).toLocaleString("pt-PT")}
             </small>
           )}
-          <label>
-            Tipo de semana
-            <select
-              value={weekType}
-              disabled={
-                busy ||
-                !!weeklyPublishedAt(round) ||
-                division !== "all" ||
-                week < clubWeek().start
-              }
-              onChange={(e) => setWeekType(e.target.value as typeof weekType)}
-            >
-              <option value="NORMAL">Normal</option>
-              <option value="OPEN_ATTACK">SEMANA DE ATAQUE LIVRE</option>
-            </select>
-          </label>
+          {lockedContext ? (
+            <div className="inset stack">
+              <strong>
+                Tipo de semana:{" "}
+                {weekType === "OPEN_ATTACK" ? "Ataque livre" : "Normal"}
+              </strong>
+              <small>
+                Esta configuração aplica-se a todas as divisões da semana.
+              </small>
+              {week < clubWeek().start ? (
+                <small>
+                  O tipo de uma semana passada não pode ser alterado.
+                </small>
+              ) : weeklyPublishedAt(round) ? (
+                <small>
+                  O tipo fica bloqueado quando os papéis de uma divisão são
+                  publicados.
+                </small>
+              ) : (
+                <Link
+                  className="button small"
+                  href={`/admin?tab=weekly&week=${week}&division=all&returnDivision=${encodeURIComponent(division)}`}
+                >
+                  Alterar tipo de semana
+                </Link>
+              )}
+            </div>
+          ) : (
+            <label>
+              Tipo de semana
+              <select
+                value={weekType}
+                disabled={
+                  busy ||
+                  !!weeklyPublishedAt(round) ||
+                  division !== "all" ||
+                  week < clubWeek().start
+                }
+                onChange={(e) => setWeekType(e.target.value as typeof weekType)}
+              >
+                <option value="NORMAL">Normal</option>
+                <option value="OPEN_ATTACK">SEMANA DE ATAQUE LIVRE</option>
+              </select>
+            </label>
+          )}
           {round?.warnings?.map((w) => (
             <small key={w}>{w}</small>
           ))}
@@ -537,10 +567,18 @@ export function WeeklyRoles({
                 (r) => r.weekStart < week && (!first || r.weekStart >= first),
               )
               .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
-              .map((r) => (
-                <div className="inset stack" key={r._id}>
-                  <button onClick={() => setWeek(r.weekStart)}>
-                    Semana de {r.weekStart} ·{" "}
+              .map((r, index) => (
+                <div
+                  className={`inset stack ${index === 0 ? "weekly-role-history-latest" : ""}`}
+                  key={r._id}
+                >
+                  <button
+                    className={index === 0 ? "weekly-history-week" : undefined}
+                    title={r.weekStart}
+                    onClick={() => setWeek(r.weekStart)}
+                  >
+                    {matchdayWeekLabel(s, r.weekStart)}
+                    {index === 0 ? " · Mais recente" : ""} ·{" "}
                     {weeklyPublishedAt(
                       r,
                       division === "all" ? undefined : division,
@@ -574,16 +612,21 @@ export function WeeklyRoles({
                               )?.role === "defense"
                             ? "DEFESA"
                             : "Por atribuir"}
-                        {" · "}Final:{" "}
-                        {effectiveRoles(r).find((a) =>
-                          t.playerIds.includes(a.playerId),
-                        )?.role === "attack"
-                          ? "ATAQUE"
-                          : effectiveRoles(r).find((a) =>
-                                t.playerIds.includes(a.playerId),
-                              )?.role === "defense"
-                            ? "DEFESA"
-                            : "Por atribuir"}
+                        {" · "}
+                        <strong
+                          className={`weekly-history-role ${effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
+                        >
+                          Final:{" "}
+                          {effectiveRoles(r).find((a) =>
+                            t.playerIds.includes(a.playerId),
+                          )?.role === "attack"
+                            ? "ATAQUE"
+                            : effectiveRoles(r).find((a) =>
+                                  t.playerIds.includes(a.playerId),
+                                )?.role === "defense"
+                              ? "DEFESA"
+                              : "Por atribuir"}
+                        </strong>
                       </small>
                     ))}
                 </div>

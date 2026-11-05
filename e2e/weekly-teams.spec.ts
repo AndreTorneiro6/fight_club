@@ -194,6 +194,12 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   const withHistory: View = await (
     await admin.request.get("/api/league")
   ).json();
+  // Anchor the synthetic previous week inside this fixture's competition season.
+  withHistory.seasons[0].start = addClubDays(
+    saved.weeklyRounds[0].weekStart,
+    -14,
+  );
+  withHistory.seasons[0].firstCompetitionWeek = withHistory.seasons[0].start;
   withHistory.weeklyRounds.push({
     _id: "previous-week",
     weekStart: addClubDays(saved.weeklyRounds[0].weekStart, -7),
@@ -211,12 +217,31 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await admin.reload();
   await openAdminSection(admin, "Papéis semanais");
   const previousAttacker = adminRow(admin, "Luís Costa");
-  await expect(previousAttacker).toContainText(
-    /Jornada de .+: Ataque \(final igual\)/,
+  const history = previousAttacker.locator(".weekly-role-history");
+  await expect(history.locator("summary")).toContainText("Semana 2");
+  await expect(
+    history.locator("summary .weekly-history-role.attack"),
+  ).toHaveText("Último papel: Ataque");
+  await history.locator("summary").click();
+  await expect(history.locator("li").first()).toHaveClass(
+    "weekly-role-history-latest",
   );
+  await expect(history.locator("li").first()).toContainText("Mais recente");
+  await expect(
+    history.locator("li").first().locator(".weekly-history-role.attack"),
+  ).toHaveText("Final: Ataque");
   await expect(
     previousAttacker.getByRole("button", { name: /^Defesa:/ }),
   ).toHaveAttribute("aria-pressed", "true");
+  await admin.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await admin.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await previousAttacker.screenshot({
+    path: "test-results/weekly-role-history-mobile.png",
+  });
   await adminContext.close();
   await playerContext.close();
 });
