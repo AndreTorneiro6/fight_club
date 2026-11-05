@@ -6,10 +6,10 @@ import { adminGroups as groups } from "@/lib/admin-sections";
 
 const primary = [
   ["summary", "Resumo"],
+  ["week", "Gerir semana"],
   ["games", "Jogos"],
   ["challenges", "Desafios"],
   ["results", "Resultados"],
-  ["weekly", "Papéis semanais"],
   ["players", "Jogadores"],
 ] as const;
 const primaryIds = new Set<string>(primary.map(([id]) => id));

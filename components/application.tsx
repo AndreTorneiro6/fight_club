@@ -37,6 +37,7 @@ import { isTitleMatch } from "@/lib/title-matches";
 import ChallengeOriginLabel from "./challenge-origin";
 import { challengeOrigin, challengeOriginLabels } from "@/lib/challenge-origin";
 import AdminOverview from "./admin-overview";
+import AdminWeekWorkspace from "./admin-week-workspace";
 import ChallengeOpeningCountdown from "./challenge-opening-countdown";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { initialAgendaWeek } from "@/lib/game-agenda";
@@ -2871,8 +2872,25 @@ function WeeklySuggestions({ s, run, c, busy }: Actions & { c: Challenge }) {
 function AdminChallenge(a: Actions & { c: Challenge }) {
   const { s, run, c, busy } = a;
   const [assign, setAssign] = useState(false);
+  const context = useSearchParams();
+  const returnWeek = context.get("week");
+  const backQuery = new URLSearchParams({
+    tab: "week",
+    week: returnWeek ?? "",
+    division: context.get("division") ?? c.divisionId,
+    task: context.get("task") === "schedule" ? "schedule" : "manage",
+  });
   return (
-    <>
+    <div
+      id="admin-match-management"
+      className="stack"
+      style={{ scrollMarginTop: 90 }}
+    >
+      {returnWeek && (
+        <Link className="button" href={`/admin?${backQuery}`}>
+          ← Voltar à gestão da semana
+        </Link>
+      )}
       <Section title="Intervenção administrativa">
         <AdminMatchActions {...a} c={c} />
         {["pending", "accepted"].includes(c.status) && !c.titleFight && (
@@ -3092,7 +3110,7 @@ function AdminChallenge(a: Actions & { c: Challenge }) {
         </div>
       </Section>
       {assign && <AssignmentDialog {...a} close={() => setAssign(false)} />}
-    </>
+    </div>
   );
 }
 function Games(a: Actions) {
@@ -3990,6 +4008,29 @@ function Admin(a: Actions) {
         <AdminPayments s={s} run={a.run} busy={a.busy} />
       ) : tab === "partners" ? (
         <AdminPartners {...a} />
+      ) : tab === "week" ? (
+        <AdminWeekWorkspace
+          s={s}
+          busy={a.busy}
+          renderRoles={(week, division) => (
+            <WeeklyRoles
+              key={`${week}:${division}`}
+              s={s}
+              run={a.run}
+              busy={a.busy}
+              initialWeek={week}
+              initialDivision={division}
+              lockedContext
+            />
+          )}
+          renderMatchmaking={(week, division) => (
+            <AdminDivisionMatchmaking
+              {...a}
+              key={`${week}:${division}`}
+              context={{ week, division }}
+            />
+          )}
+        />
       ) : tab === "weekly" ? (
         <WeeklyRoles
           key={`${searchParams.get("week")}:${searchParams.get("division")}`}
@@ -4723,15 +4764,31 @@ function AdminResults(a: Actions) {
   );
 }
 
-function AdminDivisionMatchmaking(a: Actions) {
+function AdminDivisionMatchmaking(
+  a: Actions & { context?: { week: string; division: string } },
+) {
   const { s, run, busy } = a;
   const divisions = s.divisions.filter(
     (d) => !usesManagedCompetition(s, d._id),
   );
   const weeks = manualMatchmakingWeeks(s);
-  const [division, setDivision] = useState(divisions[0]?._id ?? "");
-  const [week, setWeek] = useState(weeks[1] ?? weeks[0] ?? "");
+  const [division, setDivision] = useState(
+    a.context?.division ?? divisions[0]?._id ?? "",
+  );
+  const [week, setWeek] = useState(
+    a.context?.week ?? weeks[1] ?? weeks[0] ?? "",
+  );
   const [assigning, setAssigning] = useState(false);
+  if (
+    a.context &&
+    (!weeks.includes(week) || !divisions.some((d) => d._id === division))
+  )
+    return (
+      <p className="panel">
+        O planeamento manual está disponível para semanas atuais ou futuras das
+        divisões semanais.
+      </p>
+    );
   if (!s.settings[0].weeklyCompetition || !divisions.length || !weeks.length)
     return null;
   const manual = adminMatchmakingEnabled(s, division, week);
@@ -4766,41 +4823,45 @@ function AdminDivisionMatchmaking(a: Actions) {
   return (
     <Section title="Definir jogos por divisão">
       <div className="stack">
-        <label>
-          Semana dos jogos a definir
-          <select
-            value={week}
-            disabled={busy}
-            onChange={(e) => {
-              setWeek(e.target.value);
-              setAssigning(false);
-            }}
-          >
-            {weeks.map((w) => (
-              <option key={w} value={w}>
-                Semana de {w}
-                {w === weeks[0] ? " · atual" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Divisão dos jogos
-          <select
-            value={division}
-            disabled={busy}
-            onChange={(e) => {
-              setDivision(e.target.value);
-              setAssigning(false);
-            }}
-          >
-            {divisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!a.context && (
+          <>
+            <label>
+              Semana dos jogos a definir
+              <select
+                value={week}
+                disabled={busy}
+                onChange={(e) => {
+                  setWeek(e.target.value);
+                  setAssigning(false);
+                }}
+              >
+                {weeks.map((w) => (
+                  <option key={w} value={w}>
+                    Semana de {w}
+                    {w === weeks[0] ? " · atual" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Divisão dos jogos
+              <select
+                value={division}
+                disabled={busy}
+                onChange={(e) => {
+                  setDivision(e.target.value);
+                  setAssigning(false);
+                }}
+              >
+                {divisions.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
         <label>
           Quem define os confrontos
           <select
@@ -4845,7 +4906,7 @@ function AdminDivisionMatchmaking(a: Actions) {
               disabled={busy || free.length < 2}
               onClick={() => setAssigning(true)}
             >
-              Definir jogo
+              {a.context ? "Adicionar par ao rascunho" : "Definir jogo"}
             </button>
             {draft.map((pair) => (
               <div key={pair.id} className="inset row between wrap">
@@ -4887,7 +4948,9 @@ function AdminDivisionMatchmaking(a: Actions) {
                   )
                 }
               >
-                Publicar jogos desta semana
+                {a.context
+                  ? "Publicar jogos obrigatórios"
+                  : "Publicar jogos desta semana"}
               </button>
             )}
             {free.length > 0 && (

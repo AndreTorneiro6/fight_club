@@ -189,6 +189,7 @@ export function WeeklyRoles({
   onChallenge,
   initialWeek,
   initialDivision,
+  lockedContext = false,
 }: {
   s: View;
   run: (command: unknown, message?: string) => Promise<any>;
@@ -196,6 +197,7 @@ export function WeeklyRoles({
   onChallenge?: (player: Player) => void;
   initialWeek?: string;
   initialDivision?: string;
+  lockedContext?: boolean;
 }) {
   const admin = s.actor.role === "admin";
   const me = s.players.find((p) => p._id === s.actor.playerId)!;
@@ -439,13 +441,23 @@ export function WeeklyRoles({
               ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
               : "OS MEUS DESAFIOS"}
       </h2>
-      {admin ? (
-        <Link className="button" href="/admin?tab=challenges">
+      {admin && !lockedContext ? (
+        <Link
+          className="button"
+          href={`/admin?tab=week&task=mandatory&week=${week}&division=${division === "all" ? (s.divisions[0]?._id ?? "") : division}`}
+        >
           Definir jogos por divisão
         </Link>
-      ) : adminMatchmakingEnabled(s, me.divisionId) ? (
+      ) : !admin && adminMatchmakingEnabled(s, me.divisionId) ? (
         <p role="status">{ADMIN_MATCHMAKING_MESSAGE}</p>
       ) : null}
+      {admin && lockedContext && (
+        <p className="inset">
+          Gera uma proposta, revê o ataque e a defesa de cada dupla e usa
+          «Publicar papéis» no fim. Para preparar sem avisar os jogadores,
+          guarda o rascunho.
+        </p>
+      )}
       {admin && s.divisions.some((d) => usesManagedCompetition(s, d._id)) && (
         <p>
           As jornadas oficiais têm papéis próprios por liga.{" "}
@@ -456,7 +468,9 @@ export function WeeklyRoles({
         </p>
       )}
       {admin ? (
-        <WeekNavigation week={week} onChange={setWeek} minWeek={first} />
+        !lockedContext && (
+          <WeekNavigation week={week} onChange={setWeek} minWeek={first} />
+        )
       ) : (
         <p>
           Semana dos jogos: {week} · Ranking:{" "}
@@ -637,7 +651,7 @@ export function WeeklyRoles({
             organização será notificada.
           </p>
         )}
-      {admin && (
+      {admin && !lockedContext && (
         <>
           <label>
             Categoria dos papéis
@@ -986,78 +1000,84 @@ export function WeeklyRoles({
                 ? "Gerar papéis automaticamente"
                 : `Atualizar papéis · ${s.divisions.find((d) => d._id === division)?.name}`}
             </button>
-            <button
-              disabled={busy || published || week < clubWeek().start}
-              onClick={async () => {
-                const assignments = players
-                  .filter(
-                    (p) =>
-                      roles[p._id] &&
-                      (division === "all" || p.divisionId === division),
-                  )
-                  .map((p) => ({ playerId: p._id, role: roles[p._id] }));
-                const saved = await run(
-                  {
-                    type:
-                      division === "all"
-                        ? "admin.week.save"
-                        : "admin.week.division.save",
-                    divisionId: division === "all" ? undefined : division,
-                    weekStart: week,
-                    expectedVersion: round?.version ?? 0,
-                    weekType,
-                    assignments,
-                    publish: false,
-                  },
-                  "Rascunho guardado",
-                );
-                if (saved)
-                  await run(
+            {!lockedContext && (
+              <button
+                disabled={busy || published || week < clubWeek().start}
+                onClick={async () => {
+                  const assignments = players
+                    .filter(
+                      (p) =>
+                        roles[p._id] &&
+                        (division === "all" || p.divisionId === division),
+                    )
+                    .map((p) => ({ playerId: p._id, role: roles[p._id] }));
+                  const saved = await run(
                     {
                       type:
                         division === "all"
-                          ? "admin.week.approve"
-                          : "admin.week.division.approve",
+                          ? "admin.week.save"
+                          : "admin.week.division.save",
                       divisionId: division === "all" ? undefined : division,
                       weekStart: week,
-                      expectedVersion: (round?.version ?? 0) + 1,
+                      expectedVersion: round?.version ?? 0,
+                      weekType,
+                      assignments,
+                      publish: false,
                     },
-                    "Papéis aprovados; aguardam publicação",
+                    "Rascunho guardado",
                   );
-              }}
-            >
-              Aprovar papéis da semana
-            </button>
+                  if (saved)
+                    await run(
+                      {
+                        type:
+                          division === "all"
+                            ? "admin.week.approve"
+                            : "admin.week.division.approve",
+                        divisionId: division === "all" ? undefined : division,
+                        weekStart: week,
+                        expectedVersion: (round?.version ?? 0) + 1,
+                      },
+                      "Papéis aprovados; aguardam publicação",
+                    );
+                }}
+              >
+                Aprovar papéis da semana
+              </button>
+            )}
             <button
               disabled={busy || published || week < clubWeek().start}
               onClick={() => void save(false)}
             >
               Guardar rascunho
             </button>
-            <button
-              className={editMode ? "primary" : ""}
-              disabled={busy || week < clubWeek().start}
-              onClick={() => setEditMode((prev) => !prev)}
-            >
-              {editMode ? "Cancelar edição" : "Editar papéis"}
-            </button>
-            <button
-              className="primary"
-              disabled={
-                busy ||
-                published ||
-                week < clubWeek().start ||
-                (division === "all"
-                  ? !round?.approvedAt ||
-                    round.approvedVersion !== round.version
-                  : !round?.divisionPublications?.[division]?.approvedAt) ||
-                weekType !== (round?.weekType ?? "NORMAL") ||
-                unsavedRoleChanges
-              }
-              onClick={() => void save(true)}
-            >
-              Publicar papéis da semana
-            </button>
+            {(!lockedContext || published) && (
+              <button
+                className={editMode ? "primary" : ""}
+                disabled={busy || week < clubWeek().start}
+                onClick={() => setEditMode((prev) => !prev)}
+              >
+                {editMode ? "Cancelar edição" : "Editar papéis"}
+              </button>
+            )}
+            {!lockedContext && (
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  published ||
+                  week < clubWeek().start ||
+                  (division === "all"
+                    ? !round?.approvedAt ||
+                      round.approvedVersion !== round.version
+                    : !round?.divisionPublications?.[division]?.approvedAt) ||
+                  weekType !== (round?.weekType ?? "NORMAL") ||
+                  unsavedRoleChanges
+                }
+                onClick={() => void save(true)}
+              >
+                Publicar papéis da semana
+              </button>
+            )}
           </div>
           {week >= clubWeek().start &&
             publishable.map(({ division: d, published, approved, changes }) => (

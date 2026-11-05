@@ -1,3 +1,11 @@
+## Version 1.19.0 — unified admin weekly workspace — 5 November 2026
+
+- LOCAL, NOT DEPLOYED: Admin → Gerir semana is a primary navigation item and overview shortcut. One week/division context covers Papéis, Jogos obrigatórios, Agendar jogos, Resultados e correções. URL query parameters preserve the context across refresh and game-detail return links. Existing admin tools remain accessible.
+- Weekly roles reuse the existing component with locked shared context. The hub hides duplicate approval/publication controls and uses the existing division save → approve → publish flow. Unsubmitted role selections survive switching tasks within the same context; changing week/division or refreshing resets unsaved selections. Mandatory pair drafts/publication reuse the validated existing commands. No engine/ranking rules changed.
+- Games are grouped by their competition week (including postponed games in their original week); scheduling shows accepted/schedule-pending games without a date, and corrections shows all selected-week games. Detail links open administrative controls and provide a return to the selected week/division/task.
+- Validation: typecheck, 545 unit/integration tests, production build; admin-week-workspace + manual-matchmaking browser group: 3 passed. Covers context persistence, no duplicate selectors, unsaved roles surviving task changes, mobile overflow, game-detail return, zero navigation writes, and existing mandatory draft/publication flows. Screenshot: test-results/admin-week-mobile.png (ignored artifact).
+- Production last checked this session: v1.18.0, app and worker revision 01edd46f5a84f47bc6a1e9617109c363061b2db4; app healthy, public health ok. No production changes made.
+
 ## Version 1.18.0 — future-week manual drafts — 4 November 2026
 
 - LIVE: Admin → Desafios → Definir jogos por divisão now selects any current/future week in the active season, defaulting to next week. Mode is stored per week/division in WeeklyRound.manualMatchmaking; the legacy global setting remains compatible. Other weeks keep their own mode. Draft pairs/version/saved roster keys live in WeeklyRound.manualMatchups and are private to administrators.

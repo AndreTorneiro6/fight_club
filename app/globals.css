@@ -3086,3 +3086,28 @@ body::before {
 .album-entry span { display: grid; gap: 3px; }
 .album-entry strong { font-size: 13px; }
 .album-entry small { color: var(--muted); font-size: 11px; }
+
+/* Weekly administration workspace */
+.admin-week-entry { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.admin-week-entry p { margin-bottom: 0; }
+.admin-week-entry > .button { flex-shrink: 0; }
+.admin-week-context h2 { margin: 6px 0; }
+.admin-week-context p { margin: 0; }
+.admin-week-facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-week-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.admin-week-steps button { display: flex; align-items: flex-start; text-align: left; gap: 10px; padding: 16px; min-width: 0; }
+.admin-week-steps button > svg { flex-shrink: 0; margin-top: 3px; }
+.admin-week-steps button > span { display: grid; gap: 5px; min-width: 0; }
+.admin-week-steps small { font-size: 11px; opacity: .8; }
+.admin-week-steps button.primary small, .admin-week-steps button.primary strong { color: inherit; opacity: 1; }
+.admin-week-steps strong { font-size: 13px; overflow-wrap: anywhere; }
+.admin-week-game { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.admin-week-game > .stack { min-width: 0; gap: 6px; overflow-wrap: anywhere; }
+.admin-week-game > .button { flex-shrink: 0; }
+@media (max-width: 700px) {
+  .admin-week-entry { align-items: flex-start; flex-direction: column; }
+  .admin-week-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .admin-week-steps button { padding: 12px; gap: 8px; }
+  .admin-week-game { flex-direction: column; align-items: stretch; }
+  .admin-week-game > .button { align-self: flex-start; }
+}

@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.18.0";
+export const applicationVersion = "1.19.0";
 export const releaseNotes = [
+  {
+    version: "1.19.0",
+    date: "2026-11-05",
+    title: "Gestão semanal num só espaço",
+    changes: [
+      "Gerir semana reúne papéis, jogos obrigatórios, agendamento, resultados e correções, com uma única seleção de semana e divisão.",
+      "O resumo e a navegação dão acesso direto à gestão semanal. As tarefas mostram os papéis publicados, os pares em rascunho e os jogos por agendar ou resolver.",
+      "Ao abrir um jogo a partir da gestão semanal, podes voltar à mesma semana, divisão e tarefa. Os rascunhos, publicações e intervenções mantêm as validações e o histórico existentes.",
+    ],
+  },
   {
     version: "1.18.0",
     date: "2026-11-04",

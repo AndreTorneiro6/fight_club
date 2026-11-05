@@ -184,6 +184,18 @@ export default function AdminOverview({
     );
   return (
     <div className="admin-overview">
+      <section className="panel admin-week-entry">
+        <div>
+          <div className="eyebrow gold">ORGANIZAR A COMPETIÇÃO</div>
+          <h2>A semana começa aqui</h2>
+          <p className="muted">
+            Papéis, jogos obrigatórios, agendamento e correções num só espaço.
+          </p>
+        </div>
+        <Link className="button primary" href="/admin?tab=week">
+          Gerir semana <ArrowRight size={16} />
+        </Link>
+      </section>
       <section
         className="panel admin-league-stats"
         aria-labelledby="admin-stats-title"
