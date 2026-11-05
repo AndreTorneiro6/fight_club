@@ -118,9 +118,7 @@ test("weekly template exports all divisions and individual posters with the chos
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await page
-    .getByRole("button", { name: "Papéis semanais", exact: true })
-    .click();
+  await openAdminSection(page, "Papéis semanais");
   const choice = page
     .locator('button[aria-label^="Defesa:"]:not([disabled])')
     .first();

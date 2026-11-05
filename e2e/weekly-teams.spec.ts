@@ -1,3 +1,4 @@
+import { openAdminSection } from "./workspace-helper";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { addClubDays } from "../lib/calendar";
@@ -61,9 +62,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     .getByRole("dialog")
     .getByRole("button", { name: "Saltar visita" })
     .click();
-  await admin
-    .getByRole("button", { name: "Papéis semanais", exact: true })
-    .click();
+  await openAdminSection(admin, "Papéis semanais");
   const teams = admin.locator("[data-weekly-team]");
   await expect(teams).toHaveCount(22);
   const attacker = adminRow(admin, "Carlos Pereira");
@@ -165,9 +164,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   expect(forbidden.status()).toBe(403);
   await command(player, { type: "challenge.create", defenderId: "player-5" });
   await admin.reload();
-  await admin
-    .getByRole("button", { name: "Papéis semanais", exact: true })
-    .click();
+  await openAdminSection(admin, "Papéis semanais");
   await expect(
     adminRow(admin, "Carlos Pereira").getByRole("button", {
       name: /^Remover seleção:/,
@@ -212,9 +209,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
     else await route.continue();
   });
   await admin.reload();
-  await admin
-    .getByRole("button", { name: "Papéis semanais", exact: true })
-    .click();
+  await openAdminSection(admin, "Papéis semanais");
   const previousAttacker = adminRow(admin, "Luís Costa");
   await expect(previousAttacker).toContainText(
     /Jornada de .+: Ataque \(final igual\)/,
