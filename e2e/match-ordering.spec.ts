@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { votingPeriod } from "../lib/match-voting-targets";
 import { enterAdminWorkspace } from "./workspace-helper";
 
 test("games use nearest-first order across player/admin lists, Title Fight and betting; player court calendar is hidden", async ({
@@ -93,6 +94,16 @@ test("games use nearest-first order across player/admin lists, Title Fight and b
     .click();
   await expectCards(page);
   await page.goto("/apostas");
+  const period = votingPeriod(
+    final.challenges.find((c: any) => c._id === ids[0]),
+  );
+  await page
+    .getByRole("region", { name: "Central de Apostas", exact: true })
+    .getByRole("button", {
+      name: period === "future" ? "Próximas" : "Esta semana",
+      exact: true,
+    })
+    .click();
   await expect
     .poll(async () => {
       const labels = await page
