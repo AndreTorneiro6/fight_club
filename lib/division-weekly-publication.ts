@@ -276,3 +276,94 @@ export function correctPublishedDivisionPapers(
   });
   return { id: r._id };
 }
+
+/** Withdraw an unintended automatic publication only while it has no games.
+ * Keep assignments as a private draft and preserve the original in the audit. */
+export function withdrawAutomaticDivisionPapers(
+  s: State,
+  divisionId: string,
+  weekStart: string,
+  expectedVersion: number,
+  reason: string,
+  by: string,
+  timestamp: number,
+) {
+  const r = s.weeklyRounds.find((r) => r.weekStart === weekStart);
+  ensure(
+    r && s.divisions.some((d) => d._id === divisionId),
+    "Papéis ou divisão não encontrados.",
+  );
+  ensure(
+    r.version === expectedVersion,
+    "A jornada foi alterada. Atualiza antes de continuar.",
+    409,
+  );
+  ensure(
+    weekStart >= clubWeek(timestamp).start,
+    "Escolhe uma semana atual ou futura.",
+  );
+  const publication = r.divisionPublications?.[divisionId];
+  ensure(
+    publication?.publishedAt &&
+      publication.publishedBy === "system:weekly-turnover",
+    "Só é possível retirar uma publicação automática.",
+  );
+  ensure(reason.trim().length >= 10, "Indica o motivo da reposição.");
+  ensure(
+    !s.challenges.some(
+      (c) =>
+        c.divisionId === divisionId &&
+        (c.weekStart ?? clubWeek(c.createdAt).start) === weekStart &&
+        !["cancelled", "refused", "expired"].includes(c.status),
+    ),
+    "Já existem desafios nesta semana; é necessária revisão administrativa.",
+    409,
+  );
+  const before = structuredClone(r);
+  const playerIds = new Set([
+    ...s.players.filter((p) => p.divisionId === divisionId).map((p) => p._id),
+    ...(r.teamSnapshot ?? [])
+      .filter((t) => t.divisionId === divisionId)
+      .flatMap((t) => t.playerIds),
+  ]);
+  const notices = s.notifications.filter(
+    (n) =>
+      n.dedupe?.startsWith(`division-papers:${weekStart}:${divisionId}:`) ||
+      (n.weeklyChallengeOpening?.weekStart === weekStart &&
+        n.weeklyChallengeOpening.divisionId === divisionId),
+  );
+  const notificationIds = notices.map((n) => n._id);
+  const removed = new Set(notificationIds);
+  s.notifications = s.notifications.filter((n) => !removed.has(n._id));
+  delete r.divisionPublications![divisionId];
+  delete r.publishedAt;
+  delete r.publishedBy;
+  delete r.approvedAt;
+  delete r.approvedBy;
+  delete r.approvedVersion;
+  delete r.approvalSnapshot;
+  r.divisionChallengeOpenings = {
+    ...r.divisionChallengeOpenings,
+    [divisionId]: null,
+  };
+  if (r.divisionOpeningDelays) delete r.divisionOpeningDelays[divisionId];
+  r.dynamicAssignments = r.dynamicAssignments?.filter(
+    (a) => !playerIds.has(a.playerId),
+  );
+  r.version = (r.version ?? 0) + 1;
+  s.audit.push({
+    _id: randomUUID(),
+    userId: by,
+    action: "week.division.automatic-publication.withdrawn",
+    createdAt: new Date(timestamp).toISOString(),
+    details: JSON.stringify({
+      divisionId,
+      weekStart,
+      reason,
+      before,
+      notices,
+      version: r.version,
+    }),
+  });
+  return { notificationIds, version: r.version };
+}

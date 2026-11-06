@@ -31,6 +31,7 @@ import { effectiveRoles } from "./effective-roles";
 import { divisionRoundCompletion } from "./round-transition";
 import {
   correctPublishedDivisionPapers,
+  withdrawAutomaticDivisionPapers,
   publishDivisionPapers,
 } from "./division-weekly-publication";
 import { challengeDistance } from "./challenge-distance";
@@ -295,6 +296,13 @@ export const commandSchema = z.discriminatedUnion("type", [
     seasonId: id,
     divisionId: id.optional(),
     weekStart: day.optional(),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.withdrawAutomatic"),
+    divisionId: id,
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+    reason: text.min(10),
   }),
   z.object({
     type: z.literal("admin.week.division.save"),
@@ -2203,6 +2211,16 @@ export function execute(
         cmd.weekStart,
       );
     }
+    case "admin.week.division.withdrawAutomatic":
+      return withdrawAutomaticDivisionPapers(
+        s,
+        cmd.divisionId,
+        cmd.weekStart,
+        cmd.expectedVersion,
+        cmd.reason,
+        actor.userId,
+        timestamp,
+      );
     case "admin.week.division.save": {
       const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
       ensure(

@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.1";
+export const applicationVersion = "1.19.2";
 export const releaseNotes = [
+  {
+    version: "1.19.2",
+    date: "2026-11-06",
+    title: "Ranking automático com gestão semanal pelo administrador",
+    changes: [
+      "Quando uma divisão termina os jogos, apenas o ranking é publicado automaticamente. Os papéis ficam em rascunho para revisão, aprovação e publicação pelo administrador, que decide a abertura dos desafios.",
+      "O resumo da jornada e as regras explicam a responsabilidade do administrador pelas próximas etapas.",
+    ],
+  },
   {
     version: "1.19.1",
     date: "2026-11-05",

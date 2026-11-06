@@ -7,16 +7,7 @@ import {
   divisionRoundCompletion,
 } from "./round-transition";
 import { publishWeeklyRanking } from "./weekly-ranking";
-import {
-  generateWeeklyRoles,
-  generatedDivisionDraft,
-} from "./weekly-role-workflow";
-import { publishDivisionPapers } from "./division-weekly-publication";
-import { weeklyPublishedAt } from "./weekly-publication";
-import { weeklyRolesProblem } from "./weekly-roles-check";
-
 const SYSTEM = "system:weekly-turnover";
-const ended = new Set(["cancelled", "refused", "expired"]);
 
 function adminAlert(
   s: State,
@@ -62,9 +53,8 @@ function attempt(s: State, step: (draft: State) => void) {
   return null;
 }
 
-/** Closes each division's week on its own as soon as all its games are done
- * (frozen games excluded): ranking first, then validated roles, then opening.
- * Never creates, cancels or changes a game. */
+/** Publishes each finished division's ranking (frozen games excluded).
+ * Roles, approval, publication and opening remain administrator actions. */
 export function autoWeeklyTurnover(s: State, timestamp: number) {
   const settings = s.settings[0];
   if (!settings?.weeklyCompetition || settings.autoWeeklyTurnover === false)
@@ -83,29 +73,9 @@ export function autoWeeklyTurnover(s: State, timestamp: number) {
         week,
         timestamp,
       );
-      const next = completion.nextWeek;
-      if (!completion.ready || !completion.hasNextWeek || next < current)
-        continue;
-      if (
-        weeklyPublishedAt(
-          s.weeklyRounds.find((r) => r.weekStart === next),
-          d,
-        )
-      )
-        continue;
-      // Anything already played or committed for next week is an admin case.
-      if (
-        s.challenges.some(
-          (c) =>
-            c.divisionId === d &&
-            !c.competitionRoundId &&
-            c.weekStart === next &&
-            !ended.has(c.status),
-        )
-      )
-        continue;
+      if (!completion.ready) continue;
 
-      // 1. Ranking of the finished week.
+      // Only the ranking is automatic.
       if (!divisionRankingPublished(s, season._id, d, week, timestamp)) {
         const error = attempt(s, (draft) => {
           publishWeeklyRanking(draft, season._id, SYSTEM, timestamp, d, week);
@@ -127,73 +97,6 @@ export function autoWeeklyTurnover(s: State, timestamp: number) {
           continue;
         }
       }
-
-      // 2–4. Roles for next week (regenerated with the final ranking and this
-      // week's opponents), then publication and opening.
-      const error = attempt(s, (draft) => {
-        let round = draft.weeklyRounds.find((r) => r.weekStart === next);
-        if (!round) round = generateWeeklyRoles(draft, next, SYSTEM, timestamp);
-        else if (generatedDivisionDraft(draft, round, d))
-          round = generateWeeklyRoles(draft, next, SYSTEM, timestamp, d);
-        round.divisionTransitions = {
-          ...round.divisionTransitions,
-          [d]: {
-            previousWeek: week,
-            preparedAt: new Date(timestamp).toISOString(),
-          },
-        };
-        const problem = weeklyRolesProblem(draft, d, next);
-        if (problem) throw new LeagueError(problem);
-        publishDivisionPapers(
-          draft,
-          d,
-          next,
-          round.version ?? 0,
-          true,
-          SYSTEM,
-          timestamp,
-        );
-        publishDivisionPapers(
-          draft,
-          d,
-          next,
-          round.version ?? 0,
-          false,
-          SYSTEM,
-          timestamp,
-        );
-        const minutes = round.divisionOpeningDelays?.[d] ?? 0;
-        const opensAt = new Date(
-          Math.min(
-            timestamp + minutes * 60000,
-            Date.parse(clubWeek(next).endsAt),
-          ),
-        ).toISOString();
-        round.divisionChallengeOpenings = {
-          ...round.divisionChallengeOpenings,
-          [d]: opensAt,
-        };
-        log(
-          draft,
-          "week.auto-turnover.published",
-          {
-            divisionId: d,
-            previousWeek: week,
-            weekStart: next,
-            opensAt,
-            version: round.version,
-          },
-          timestamp,
-        );
-      });
-      if (error)
-        adminAlert(
-          s,
-          "Papéis da próxima jornada por rever",
-          `${division.name}, semana de ${next}: o ranking foi publicado, mas os papéis não foram publicados automaticamente. ${error} Revê-os em Papéis semanais.`,
-          `auto-turnover:roles:${next}:${d}:${error}`,
-          timestamp,
-        );
     }
   }
   const local = wallTime(timestamp),

@@ -508,7 +508,7 @@ export default function AdminOverview({
           >
             <h2>Preparar próxima jornada</h2>
             <p className="muted">
-              Publica o ranking, revê os papéis e ativa a abertura.
+              Confirma o ranking, revê e publica os papéis e decide a abertura.
             </p>
             <div className="stack">{handoffLinks}</div>
           </section>

@@ -6168,7 +6168,7 @@ const settingLabels: Record<
   roleDraftLeadDays: "Antecedência dos rascunhos de papéis · dias",
   autoWeeklyRanking: "Publicar e notificar o resumo do ranking automaticamente",
   autoWeeklyTurnover:
-    "Fecho automático da jornada · ranking, papéis e abertura assim que a divisão termina os jogos",
+    "Publicar ranking assim que a divisão termina os jogos · papéis e abertura pelo administrador",
   weeklyRankingDay: "Dia do resumo semanal do ranking",
   weeklyRankingHour: "Hora do resumo semanal · Portugal · 0–23",
   requireClubConfirmation: "Exigir confirmação do clube e campo",

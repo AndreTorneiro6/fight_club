@@ -6,12 +6,10 @@ import {
   type Challenge,
   type State,
 } from "../lib/types";
-import { processDeadlines } from "../lib/engine";
+import { execute, processDeadlines } from "../lib/engine";
+import { publishDivisionPapers } from "../lib/division-weekly-publication";
 import { weeklyPublishedAt } from "../lib/weekly-publication";
 import { divisionRankingPublished } from "../lib/round-transition";
-import { dynamicWeeklyPlan } from "../lib/dynamic-weekly";
-import { consecutiveRematch } from "../lib/consecutive-rematch";
-import { weeklyRolesProblem } from "../lib/weekly-roles-check";
 import { rankingEntries } from "../lib/ranking-groups";
 import {
   divisionWeekOptions,
@@ -19,6 +17,7 @@ import {
 } from "../lib/weekly-role-history";
 import {
   generatedDivisionDraft,
+  generateWeeklyRoles,
   weeklyRoleGenerationInput,
 } from "../lib/weekly-role-workflow";
 
@@ -162,35 +161,50 @@ function complete(s: State, id: string) {
 const nextRound = (s: State) =>
   s.weeklyRounds.find((r) => r.weekStart === next);
 
-test("a finished division publishes its ranking, rematch-free roles and opens challenges without an admin", () => {
+test("a finished division publishes only its ranking and leaves papers and opening to the admin", () => {
   const s = fixture();
   for (const c of [...s.challenges]) complete(s, c._id);
   processDeadlines(s, now);
   assert.ok(divisionRankingPublished(s, "season", "bronze", week, now));
   const r = nextRound(s)!;
-  assert.ok(weeklyPublishedAt(r, "bronze"));
-  assert.equal(
-    r.divisionChallengeOpenings?.bronze,
-    new Date(now).toISOString(),
-  );
-  assert.equal(weeklyRolesProblem(s, "bronze", next), null);
-  const plan = dynamicWeeklyPlan(s, "bronze", next);
-  // Last week's five pairs are blocked, yet every team still has a game.
-  assert.equal(plan.maximumMatches, 5);
-  const teams = rankingEntries(s.players, "bronze");
-  for (const p of plan.canonical)
-    assert.equal(
-      consecutiveRematch(s, p.attackerKey, p.defenderKey, next),
-      false,
-    );
-  assert.equal(teams.length, 10);
-  // Players are told about their role; nothing about games of the finished week changed.
+  assert.equal(weeklyPublishedAt(r, "bronze"), undefined);
+  assert.equal(r.divisionChallengeOpenings?.bronze, undefined);
+  assert.equal(r.challengesOpenAt, undefined);
+  assert.equal(r.divisionPublications?.bronze?.approvedAt, undefined);
+  assert.equal(s.notifications.filter((n) => n.rankingNotice).length, 20);
   assert.equal(
     s.notifications.filter((n) => n.title === "Papel semanal publicado").length,
-    20,
+    0,
   );
+  assert.ok(!s.audit.some((a) => a.action === "week.auto-turnover.published"));
   assert.ok(s.challenges.every((c) => c.status === "completed"));
   assert.equal(s.challenges.length, 5);
+});
+
+test("ranking publication preserves admin drafts, approvals and opening plans exactly", () => {
+  const s = fixture();
+  s.settings[0].autoWeeklyRoles = false;
+  generateWeeklyRoles(s, next, "admin", now);
+  const r = nextRound(s)!;
+  r.divisionChallengeOpenings = { bronze: null };
+  r.divisionOpeningDelays = { bronze: 120 };
+  r.divisionPublications = {
+    bronze: { approvedAt: new Date(now).toISOString(), approvedBy: "admin" },
+  };
+  const before = structuredClone(r);
+  for (const c of [...s.challenges]) complete(s, c._id);
+  processDeadlines(s, now);
+  assert.ok(divisionRankingPublished(s, "season", "bronze", week, now));
+  assert.deepEqual(nextRound(s), before);
+});
+
+test("the final week publishes its ranking even without a following competition week", () => {
+  const s = fixture();
+  s.seasons[0].end = "2026-11-01";
+  for (const c of [...s.challenges]) complete(s, c._id);
+  processDeadlines(s, now);
+  assert.ok(divisionRankingPublished(s, "season", "bronze", week, now));
+  assert.equal(nextRound(s), undefined);
 });
 
 test("the role generator forbids last week's pairs and keeps vacation teams in the schedule", () => {
@@ -232,7 +246,8 @@ test("a division with a game still to play waits alone and admins are alerted on
     complete(s, c._id);
   processDeadlines(s, now);
   const r = nextRound(s)!;
-  assert.ok(weeklyPublishedAt(r, "prata"));
+  assert.ok(divisionRankingPublished(s, "season", "prata", week, now));
+  assert.equal(weeklyPublishedAt(r, "prata"), undefined);
   assert.equal(weeklyPublishedAt(r, "bronze"), undefined);
   assert.equal(
     divisionRankingPublished(s, "season", "bronze", week, now),
@@ -250,7 +265,10 @@ test("a division with a game still to play waits alone and admins are alerted on
   assert.match(alerts[0].body, /#5/);
   complete(s, "bronze-10-9");
   processDeadlines(s, sunday + 120000);
-  assert.ok(weeklyPublishedAt(nextRound(s), "bronze"));
+  assert.ok(
+    divisionRankingPublished(s, "season", "bronze", week, sunday + 120000),
+  );
+  assert.equal(weeklyPublishedAt(nextRound(s), "bronze"), undefined);
 });
 
 test("a game frozen by a vacation does not hold the division back", () => {
@@ -269,11 +287,11 @@ test("a game frozen by a vacation does not hold the division back", () => {
   } as State["exceptions"][number]);
   processDeadlines(s, now);
   assert.ok(divisionRankingPublished(s, "season", "bronze", week, now));
-  assert.ok(weeklyPublishedAt(nextRound(s), "bronze"));
+  assert.equal(weeklyPublishedAt(nextRound(s), "bronze"), undefined);
   assert.equal(frozen.status, "accepted");
 });
 
-test("roles edited by an admin are kept, and roles the planner would flip are not published", () => {
+test("roles edited by an admin stay private after the ranking is published", () => {
   const s = fixture();
   for (const c of s.challenges.filter((c) => c._id !== "bronze-10-9"))
     complete(s, c._id);
@@ -294,11 +312,7 @@ test("roles edited by an admin are kept, and roles the planner would flip are no
     "attack",
   );
   assert.ok(
-    s.notifications.some(
-      (n) =>
-        n.playerId === "__admins__" &&
-        n.title === "Papéis da próxima jornada por rever",
-    ),
+    !s.notifications.some((n) => n.title === "Papel semanal publicado"),
   );
 });
 
@@ -325,7 +339,7 @@ test("a player deleted after the draft was generated does not turn the draft int
   assert.ok(generatedDivisionDraft(s, r, "bronze"));
   complete(s, "bronze-10-9");
   processDeadlines(s, now + 60000);
-  assert.ok(weeklyPublishedAt(nextRound(s), "bronze"));
+  assert.equal(weeklyPublishedAt(nextRound(s), "bronze"), undefined);
 });
 
 test("switching the automation off keeps the manual flow", () => {
@@ -365,8 +379,8 @@ test("possible games follow the chosen roles and never offer last week's opponen
     [7, 8],
   );
   assert.ok(!options.get(team(2))!.attack.some((t) => t.rank === 1));
-  // With the published roles every team has a planned game and nobody would flip.
-  processDeadlines(s, now);
+  // The admin can generate roles with a planned game for every team.
+  generateWeeklyRoles(s, next, "admin", now);
   const roles = Object.fromEntries(
     nextRound(s)!.assignments.map((a) => [a.playerId, a.role]),
   );
@@ -382,4 +396,97 @@ test("possible games follow the chosen roles and never offer last week's opponen
   const none = divisionWeekOptions(s, "bronze", next, attackersOnly);
   assert.equal(none.get(team(5))!.attack.length, 0);
   assert.equal(none.get(team(5))!.defense.length, 0);
+});
+
+function unintendedPublication() {
+  const s = fixture();
+  for (const c of [...s.challenges]) complete(s, c._id);
+  processDeadlines(s, now);
+  const r = nextRound(s)!;
+  publishDivisionPapers(
+    s,
+    "bronze",
+    next,
+    r.version!,
+    true,
+    "system:weekly-turnover",
+    now,
+  );
+  publishDivisionPapers(
+    s,
+    "bronze",
+    next,
+    r.version!,
+    false,
+    "system:weekly-turnover",
+    now,
+  );
+  r.divisionChallengeOpenings = { bronze: new Date(now).toISOString() };
+  return s;
+}
+const admin = { userId: "admin", playerId: "admin", role: "admin" as const };
+const withdrawal = (s: State) => ({
+  type: "admin.week.division.withdrawAutomatic",
+  divisionId: "bronze",
+  weekStart: next,
+  expectedVersion: nextRound(s)!.version,
+  reason:
+    "Only rankings should be automatic, as requested by the administrator",
+});
+
+test("withdrawing automatic papers restores a private draft and keeps the ranking and games", () => {
+  const s = unintendedPublication();
+  const before = structuredClone(s);
+  const r = nextRound(s)!;
+  r.divisionPublications!.prata = {
+    publishedAt: new Date(now).toISOString(),
+    publishedBy: "admin",
+  };
+  r.divisionChallengeOpenings!.prata = new Date(now).toISOString();
+  const result = execute(s, admin, withdrawal(s), now) as {
+    notificationIds: string[];
+  };
+  assert.equal(weeklyPublishedAt(r, "bronze"), undefined);
+  assert.ok(weeklyPublishedAt(r, "prata"));
+  assert.equal(r.divisionChallengeOpenings!.bronze, null);
+  assert.equal(r.divisionChallengeOpenings!.prata, new Date(now).toISOString());
+  assert.deepEqual(r.assignments, nextRound(before)!.assignments);
+  assert.deepEqual(s.seasons, before.seasons);
+  assert.deepEqual(s.challenges, before.challenges);
+  assert.equal(result.notificationIds.length, 20);
+  assert.equal(s.notifications.filter((n) => n.rankingNotice).length, 20);
+  assert.equal(
+    s.notifications.filter((n) => n.title === "Papel semanal publicado").length,
+    0,
+  );
+  processDeadlines(s, now + 60000);
+  assert.equal(weeklyPublishedAt(nextRound(s), "bronze"), undefined);
+  assert.equal(nextRound(s)!.divisionChallengeOpenings!.bronze, null);
+});
+
+test("withdrawing papers rejects players, stale versions, manual publications and existing games", () => {
+  for (const scenario of ["player", "stale", "manual", "game"] as const) {
+    const s = unintendedPublication();
+    const cmd = withdrawal(s);
+    if (scenario === "stale") cmd.expectedVersion!--;
+    if (scenario === "manual")
+      nextRound(s)!.divisionPublications!.bronze.publishedBy = "admin";
+    if (scenario === "game")
+      s.challenges.push({
+        ...s.challenges[0],
+        _id: "next-game",
+        weekStart: next,
+        status: "accepted",
+      });
+    const before = structuredClone(s);
+    assert.throws(() =>
+      execute(
+        s,
+        scenario === "player" ? { ...admin, role: "player" } : admin,
+        cmd,
+        now,
+      ),
+    );
+    assert.deepEqual(s, before);
+  }
 });

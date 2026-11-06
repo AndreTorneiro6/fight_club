@@ -59,8 +59,8 @@ export default function AdminRoundTransition({
         <p>
           Disponível quando todos os jogos da divisão tiverem resultado
           validado. Os adiamentos autorizados e os jogos congelados ficam de
-          fora. Com o fecho automático ligado, este passo manual só é preciso
-          quando o sistema pede revisão.
+          fora. O sistema publica apenas o ranking; o administrador revê e
+          publica os papéis e decide a abertura dos desafios.
         </p>
         {candidates.map((c) => (
           <button

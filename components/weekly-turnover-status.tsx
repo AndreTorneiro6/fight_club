@@ -7,7 +7,6 @@ import {
 } from "@/lib/round-transition";
 import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import { weeklyOpeningAt } from "@/lib/weekly";
-import { weeklyRolesProblem } from "@/lib/weekly-roles-check";
 
 const lisbon = (iso: string) =>
   new Date(iso).toLocaleString("pt-PT", {
@@ -77,15 +76,10 @@ export default function WeeklyTurnoverStatus({ s }: { s: View }) {
           state: "A publicar ranking",
           detail: `Semana de ${week} concluída. O sistema publica dentro de 1 minuto.${frozen}`,
         };
-      const problem = next
-        ? weeklyRolesProblem(s, d._id, completion.nextWeek)
-        : null;
       return {
         d,
-        state: problem ? "Papéis por rever" : "A publicar papéis",
-        detail:
-          problem ??
-          `Ranking publicado. Papéis da semana de ${completion.nextWeek} a publicar dentro de 1 minuto.`,
+        state: "A aguardar administrador",
+        detail: `Ranking publicado. O administrador revê e publica os papéis da semana de ${completion.nextWeek} e decide quando abrir os desafios.`,
       };
     }
     return {
@@ -99,9 +93,9 @@ export default function WeeklyTurnoverStatus({ s }: { s: View }) {
       <div>
         <div className="eyebrow gold">FECHO AUTOMÁTICO DA JORNADA</div>
         <p>
-          Cada divisão avança sozinha quando todos os seus jogos têm resultado:
-          publica o ranking, os papéis validados (sem repetições da semana
-          anterior) e abre os desafios.
+          O ranking de cada divisão é publicado automaticamente quando todos os
+          seus jogos têm resultado. A revisão e publicação dos papéis e a
+          abertura dos desafios ficam a cargo do administrador.
         </p>
       </div>
       {rows.map((r) => (

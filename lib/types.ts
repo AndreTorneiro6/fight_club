@@ -113,8 +113,8 @@ export interface Settings extends Entity {
   autoWeeklyRoles?: boolean;
   roleDraftLeadDays?: number;
   autoWeeklyRanking?: boolean;
-  /** Close each division's week automatically once all its games are done:
-   * publish the ranking, then the validated roles, then open challenges. */
+  /** Publish each division's ranking once its games are done.
+   * Weekly papers and challenge opening remain administrator actions. */
   autoWeeklyTurnover?: boolean;
   weeklyRankingDay?: number;
   weeklyRankingHour?: number;
