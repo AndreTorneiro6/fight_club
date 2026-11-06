@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { votingPeriod } from "../lib/match-voting-targets";
 async function login(page: Page, email: string) {
   await page.goto("/auth");
   await page.getByLabel("Email", { exact: true }).fill(email);
@@ -139,7 +140,23 @@ test("both admins preview spectator; only admin assignment enables spectators, w
     name: "Central de Apostas",
     exact: true,
   });
-  const card = central.getByRole("article").first();
+  // The seeded game is three days ahead and can belong to the next week.
+  const votingGame = spectatorState.challenges.find(
+    (c: any) =>
+      c.status === "scheduled" && Date.parse(c.scheduledAt) > Date.now(),
+  );
+  expect(votingGame).toBeTruthy();
+  const period = votingPeriod(votingGame);
+  await central
+    .getByRole("button", {
+      name: period === "future" ? "Próximas" : "Esta semana",
+      exact: true,
+    })
+    .click();
+  const card = central.getByRole("article", {
+    name: `Votação do jogo ${votingGame.number}`,
+    exact: true,
+  });
   await card
     .getByRole("button", { name: "Prever resultado", exact: true })
     .click();
