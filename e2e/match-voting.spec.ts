@@ -1,3 +1,4 @@
+import { selectBettingWeek } from "./betting-helper";
 import { test, expect } from "@playwright/test";
 import {
   enterAdminWorkspace,
@@ -59,6 +60,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
   ).toHaveValue("60");
   const state = await (await page.request.get("/api/league")).json(),
     challenge = state.challenges.find((c: any) => c._id === game.id);
+  await selectBettingWeek(page, challenge);
   const card = central.getByRole("article", {
     name: `Votação do jogo ${challenge.number}`,
     exact: true,
@@ -183,6 +185,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
   try {
     const observer = await observerContext.newPage();
     await observer.goto("/admin?tab=voting");
+    await selectBettingWeek(observer, challenge);
     await observer
       .getByRole("article", {
         name: `Votação do jogo ${challenge.number}`,
@@ -215,6 +218,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
       chat.getByText("Resposta pelo telemóvel", { exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await observer.reload();
+    await selectBettingWeek(observer, challenge);
     await observer
       .getByRole("article", {
         name: `Votação do jogo ${challenge.number}`,
@@ -327,6 +331,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
     ),
   ).toBe(true);
   await page.reload();
+  await selectBettingWeek(page, challenge);
   await expect(
     central.getByRole("article", {
       name: `Votação do jogo ${challenge.number}`,
@@ -334,6 +339,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
   ).toContainText("O teu palpite");
   await page.clock.install({ time: new Date(start.getTime() + 86400000) });
   await page.clock.runFor(1100);
+  await selectBettingWeek(page, challenge);
   await expect(card).toHaveCount(0);
   await mineGroup.click();
   await expect(card).toContainText("A aguardar resultado");
@@ -352,6 +358,7 @@ test("central shares one prediction across workspaces and keeps configuration ad
   expect(playerState.matchVotes).toHaveLength(1);
   expect(playerState.matchDiscussionMessages.length).toBeGreaterThan(0);
   await page.goto("/apostas");
+  await selectBettingWeek(page, challenge);
   await expect(central).toBeVisible();
   await expect(
     central.getByLabel("Fechar votação antes do jogo", { exact: true }),

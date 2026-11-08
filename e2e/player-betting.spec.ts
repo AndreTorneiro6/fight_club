@@ -1,3 +1,4 @@
+import { selectBettingWeek } from "./betting-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { enterAdminWorkspace } from "./workspace-helper";
 
@@ -67,6 +68,7 @@ test("players predict and chat, receive targeted notices, and tap the launch ann
     ).toHaveCount(0);
     const state = await (await player.request.get("/api/league")).json();
     const match = state.challenges.find((c: any) => c._id === game.id);
+    await selectBettingWeek(player, match);
     const card = central.getByRole("article", {
       name: `Votação do jogo ${match.number}`,
       exact: true,

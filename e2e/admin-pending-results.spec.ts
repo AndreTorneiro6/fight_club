@@ -48,12 +48,22 @@ test("overview follows game start and end without reload, then removes the task 
   await page.clock.pauseAt(new Date(start - 1000));
   await expect(task).toHaveCount(0);
   await expect(ongoing).toHaveCount(0);
-  await expect(panel.locator(":scope > .row .badge")).toHaveText("0 pendentes");
+  const weeklyTasks = panel.locator("a.admin-task");
+  await expect(weeklyTasks.first()).toBeVisible();
+  const weeklyCount = (
+    await weeklyTasks.locator(".admin-task-count").allTextContents()
+  ).reduce((sum, count) => sum + Number(count), 0);
+  expect(weeklyCount).toBeGreaterThan(0);
+  await expect(panel.locator(":scope > .row .badge")).toHaveText(
+    `${weeklyCount} pendentes`,
+  );
   await page.clock.runFor(1001);
   await expect(ongoing).toBeVisible();
   await expect(ongoing.locator(".admin-task-count")).toHaveText("1");
   await expect(task).toHaveCount(0);
-  await expect(panel.locator(":scope > .row .badge")).toHaveText("1 pendentes");
+  await expect(panel.locator(":scope > .row .badge")).toHaveText(
+    `${weeklyCount + 1} pendentes`,
+  );
   await expect(
     panel
       .getByRole("link")
@@ -148,7 +158,9 @@ test("overview follows game start and end without reload, then removes the task 
   await expect(ongoing).toHaveCount(0);
   await expect(task).toBeVisible();
   await expect(task.locator(".admin-task-count")).toHaveText("1");
-  await expect(panel.locator(":scope > .row .badge")).toHaveText("1 pendentes");
+  await expect(panel.locator(":scope > .row .badge")).toHaveText(
+    `${weeklyCount + 1} pendentes`,
+  );
   const gameLink = panel
     .locator(".admin-next-actions")
     .filter({ has: page.getByRole("heading", { name: "Confrontos a rever" }) })
@@ -185,6 +197,7 @@ test("overview follows game start and end without reload, then removes the task 
   await page.goto("/admin");
   await expect(task).toHaveCount(0);
   await expect(ongoing).toHaveCount(0);
+  await expect(weeklyTasks.first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "/var/tmp/fc-admin-pending-results-mobile.png",

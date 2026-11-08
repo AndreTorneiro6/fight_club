@@ -1,3 +1,4 @@
+import { selectBettingWeek } from "./betting-helper";
 import { test, expect, type Page } from "@playwright/test";
 import { enterAdminWorkspace } from "./workspace-helper";
 async function login(page: Page, email: string, admin = false) {
@@ -69,6 +70,7 @@ test("admin records sets; waiting bets show official outcome and correction noti
       name: "Central de Apostas",
       exact: true,
     });
+    await selectBettingWeek(player, c);
     const card = central.getByRole("article", {
       name: `Votação do jogo ${c.number}`,
       exact: true,
@@ -78,6 +80,7 @@ test("admin records sets; waiting bets show official outcome and correction noti
       time: new Date(start.getTime() - 15 * 60000),
     });
     await player.clock.runFor(1100);
+    await selectBettingWeek(player, c);
     await central.getByRole("button", { name: /^A aguardar/ }).click();
     await expect(card).toContainText("A aguardar confirmação do resultado");
     await page.goto(`/desafios/${id}`);
