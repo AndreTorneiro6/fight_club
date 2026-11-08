@@ -1,4 +1,5 @@
 "use client";
+import { adminWeekTasks } from "@/lib/admin-week-tasks";
 import { LiveMatchScore } from "./live-match-score";
 import { todayMatches } from "@/lib/result-readiness";
 import { matchOrder } from "@/lib/match-order";
@@ -95,7 +96,13 @@ export default function AdminOverview({
         effectiveStatus(c) === "expired" &&
         !club.some((p) => p._id === c._id),
     ),
-    tasks = [
+    tasks: {
+      label: string;
+      count: number;
+      detail: string;
+      action?: () => void;
+      href?: string;
+    }[] = [
       {
         label: "Jogos por confirmar",
         count: club.length,
@@ -130,6 +137,7 @@ export default function AdminOverview({
           "Revê estes confrontos e decide se é necessário prolongar o prazo.",
         action: () => onSelect("challenges"),
       },
+      ...adminWeekTasks(s, now),
       {
         label: "Inscrições por aprovar",
         count: pending,
@@ -244,24 +252,36 @@ export default function AdminOverview({
             </span>
           </div>
           <p className="muted">
-            Acompanhamento dos jogos e decisões da organização.
+            Jogos, decisões da organização e preparação da semana atual e da
+            próxima.
           </p>
           {tasks.length ? (
             <div className="admin-task-list">
-              {tasks.map((task) => (
-                <button
-                  className="admin-task"
-                  key={task.label}
-                  onClick={task.action}
-                >
-                  <span className="admin-task-count">{task.count}</span>
-                  <span className="admin-task-copy">
-                    <strong>{task.label}</strong>
-                    <small>{task.detail}</small>
-                  </span>
-                  <ArrowRight size={18} />
-                </button>
-              ))}
+              {tasks.map((task) => {
+                const content = (
+                  <>
+                    <span className="admin-task-count">{task.count}</span>
+                    <span className="admin-task-copy">
+                      <strong>{task.label}</strong>
+                      <small>{task.detail}</small>
+                    </span>
+                    <ArrowRight size={18} />
+                  </>
+                );
+                return task.href ? (
+                  <Link className="button admin-task" key={task.href} href={task.href}>
+                    {content}
+                  </Link>
+                ) : (
+                  <button
+                    className="admin-task"
+                    key={task.label}
+                    onClick={task.action}
+                  >
+                    {content}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="admin-all-clear">
@@ -269,8 +289,8 @@ export default function AdminOverview({
               <div>
                 <strong>Sem decisões pendentes</strong>
                 <p>
-                  As confirmações, resultados, disputas e inscrições estão em
-                  dia.
+                  As confirmações, resultados, disputas, inscrições e a
+                  preparação semanal estão em dia.
                 </p>
               </div>
             </div>

@@ -2,6 +2,7 @@ import {
   canRecordOfficialResult,
   isMatchInProgress,
 } from "../lib/result-readiness";
+import { adminWeekTasks } from "../lib/admin-week-tasks";
 import { applicationVersion, releaseNotes } from "../lib/release-notes";
 import { weeklyChallengeWeek } from "../lib/weekly";
 import { effectiveStatus } from "../lib/rules";
@@ -53,6 +54,7 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
   ).toHaveCount(0);
   const state = await (await page.request.get("/api/league")).json();
   const count =
+    adminWeekTasks(state).reduce((n, task) => n + task.count, 0) +
     state.players.filter(
       (p: any) => p.awaitingApproval && !p.registrationRejectedAt,
     ).length +
@@ -213,6 +215,8 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
     await tools.click();
     await page.screenshot({ path: `/var/tmp/admin-compact-${width}.png` });
   }
+  // The fixture game can fall next week; its deep link selects that period.
+  await page.goto(`/admin?tab=voting&jogo=${assignment.id}`);
   const timer = page.getByRole("timer").first();
   await expect(timer).toBeVisible();
   const initialTimer = await timer.innerText();

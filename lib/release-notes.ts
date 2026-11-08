@@ -4,10 +4,11 @@ export const releaseNotes = [
   {
     version: "1.19.3",
     date: "2026-11-08",
-    title: "Jogos adiados preservam a jornada de origem",
+    title: "Jogos adiados e tarefas da próxima semana no Resumo",
     changes: [
       "Em Ouro, Prata e Bronze, um jogo adiado de outra jornada não impede criar ou receber o desafio da nova semana, mesmo quando a recuperação já está marcada nessa semana.",
       "A recuperação e o jogo regular podem ser agendados na mesma semana, em horários compatíveis. Mantêm-se um desafio por jornada, os limites de jogos ativos e a proteção contra sobreposição de jogadores e campos.",
+      "O Resumo inclui as tarefas da semana atual e da próxima por divisão: preparar, aprovar ou publicar papéis, abrir desafios, publicar jogos obrigatórios em rascunho e agendar jogos, com acesso direto ao contexto certo.",
     ],
   },
   {

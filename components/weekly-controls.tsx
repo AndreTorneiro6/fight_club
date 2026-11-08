@@ -642,8 +642,9 @@ export function WeeklyRoles({
       )}
       {admin && round && (
         <WeeklyOpeningControl
-          key={`opening:${round._id}:${round.version}`}
+          key={`opening:${round._id}:${round.version}:${division}`}
           round={round}
+          initialDivision={division === "all" ? undefined : division}
           divisions={s.divisions}
           run={run}
           busy={busy}

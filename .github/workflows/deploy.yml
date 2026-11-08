@@ -68,6 +68,11 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      - name: Check current and next-week tasks in the admin overview
+        run: npx playwright test e2e/admin-week-tasks.spec.ts
+        env:
+          TMPDIR: ${{ runner.temp }}
+
       - name: Check spectator assignment, both admin previews and spectator predictions
         run: npx playwright test e2e/spectator.spec.ts
         env:
