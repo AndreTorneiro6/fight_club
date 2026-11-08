@@ -1,3 +1,10 @@
+## Version 1.19.3 — postponed recoveries preserve the original weekly allowance — 8 November 2026
+
+- USER REQUEST: apply the same postponed/frozen-game rule to all divisions, now and in future weeks. A recovery from an older competition week must not consume the new week's regular challenge allowance merely because it is scheduled in that week.
+- Fixed both shared legacy weekly guards in lib/weekly.ts: challenge creation ignores other competition weeks even when their playing dates fall in the requested week; booking enforces one game per original competition week (weekStart, or creation week for legacy records), rather than one per calendar playing week. Ouro/Prata/Bronze share the fix. Existing same-week assignments, pending-opponent/rematch rules, active-game cap, absence dates and player/court overlap checks remain enforced. No league data needs migration or rewriting.
+- Regression coverage: 15 new tests across all divisions exercise issuing and receiving via partners, actual engine creation/acceptance and booking, recovery-first and regular-first order, player/court overlap rejection, active limits, unresolved rematches and same-origin duplicates booked on different weeks. Renamed the pre-existing scheduling test to describe its same-origin fixture accurately.
+- Validation: typecheck, all 564 tests and production build pass; dynamic-weekly + manual-matchmaking + admin-week-workspace browser group: 5 passed. Deployment and read-only Prata verification pending.
+
 ## Version 1.19.2 — ranking only automatic; administrator controls papers/opening — 6 November 2026
 
 - USER CORRECTION: only the division ranking should publish automatically after all eligible games have official results. Weekly roles approval/publication and challenge opening are administrator decisions. This supersedes the erroneous 1.12.0 interpretation below. Private automatic role drafts remain available; they are never published by the turnover worker.

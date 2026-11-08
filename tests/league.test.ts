@@ -1890,7 +1890,7 @@ test("vacation players can be challenged and their weekly game is deferred until
   assert.equal(c.scheduleProposal?.start, "2026-10-26T19:00:00Z");
 });
 
-test("weekly scheduling rejects a second game even when deferred challenges came from different weeks", () => {
+test("weekly scheduling rejects a second game from the same competition week", () => {
   const s = fixture(),
     c = schedule(s);
   const other = create(s, 7, 5);

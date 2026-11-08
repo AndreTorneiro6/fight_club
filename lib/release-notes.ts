@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.2";
+export const applicationVersion = "1.19.3";
 export const releaseNotes = [
+  {
+    version: "1.19.3",
+    date: "2026-11-08",
+    title: "Jogos adiados preservam a jornada de origem",
+    changes: [
+      "Em Ouro, Prata e Bronze, um jogo adiado de outra jornada não impede criar ou receber o desafio da nova semana, mesmo quando a recuperação já está marcada nessa semana.",
+      "A recuperação e o jogo regular podem ser agendados na mesma semana, em horários compatíveis. Mantêm-se um desafio por jornada, os limites de jogos ativos e a proteção contra sobreposição de jogadores e campos.",
+    ],
+  },
   {
     version: "1.19.2",
     date: "2026-11-06",

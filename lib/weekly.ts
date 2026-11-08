@@ -222,6 +222,7 @@ export function weeklyReason(
           s.challenges.some(
             (c) =>
               c._id === match.challengeId &&
+              (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
               c._id !== ignoreId &&
               !!challengeSide(c, p._id, s.players) &&
               !["cancelled", "refused", "expired"].includes(c.status),
@@ -344,14 +345,18 @@ export function weeklyBookingReason(
     return c.postponementReason
       ? "Marca o jogo a partir da data de disponibilidade."
       : "Marca o jogo após o regresso de férias dos jogadores.";
+  // Recoveries keep their original competition week. The engine separately
+  // rejects overlapping player/court bookings, even across different weeks.
+  const competitionWeek = c.weekStart ?? clubWeek(c.createdAt).start;
   if (
     s.matches.some(
       (match) =>
         match.challengeId !== c._id &&
-        clubWeek(match.start).start === week &&
         s.challenges.some(
           (other) =>
             other._id === match.challengeId &&
+            (other.weekStart ?? clubWeek(other.createdAt).start) ===
+              competitionWeek &&
             !["cancelled", "refused", "expired"].includes(other.status) &&
             teamIds.some((id) =>
               [other.challengerId, other.defenderId].includes(id),
@@ -359,7 +364,7 @@ export function weeklyBookingReason(
         ),
     )
   )
-    return "Um dos jogadores já tem um jogo nessa semana. O limite é um jogo por semana.";
+    return "Um dos jogadores já tem um jogo dessa jornada. O limite é um jogo por semana de competição.";
   return null;
 }
 
