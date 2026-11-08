@@ -185,11 +185,13 @@ test("admin and player competition calendars share the configured first week and
   await expect(
     page.getByRole("button", { name: "Semana anterior", exact: true }),
   ).toBeDisabled();
+  // Workspace selection is idempotent; tolerate only transient ECONNRESETs.
   const r = await page.request.post("/api/auth/workspace", {
+    maxRetries: 2,
     headers: { Origin: "http://localhost:3100" },
     data: { workspace: "player" },
   });
-  expect(r.ok()).toBe(true);
+  expect(r.ok(), await r.text()).toBe(true);
   await page.goto("/jogos");
   await expect(
     page.getByRole("button", { name: "Semana anterior", exact: true }),
