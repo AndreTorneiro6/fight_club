@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   writeFileSync,
@@ -12,7 +13,11 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 const revision = "a".repeat(40),
   image = `fightclub:git-${"a".repeat(40)}`;
-function run(failure = "", branch = "refs/heads/deploy") {
+function run(
+  failure = "",
+  branch = "refs/heads/deploy",
+  context: Record<string, string | undefined> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), "fightclub-deployment-"));
   const source = join(root, "checkout");
   mkdirSync(source);
@@ -64,10 +69,14 @@ if(args[0]==='compose'&&process.env.DEPLOY_TEST_FAIL==='up'&&process.env.FIGHT_C
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         FIGHT_CLUB_DEPLOY_DIR: root,
+        GITHUB_ACTIONS: "true",
+        GITHUB_JOB: "deploy",
+        GITHUB_RUN_ID: "123456",
         GITHUB_REF: branch,
         GITHUB_SHA: revision,
         DEPLOY_TEST_FAIL: failure,
         DEPLOY_TEST_REVISION: revision,
+        ...context,
       },
     },
   );
@@ -144,6 +153,32 @@ test("wrong revisions, branches and dirty checkouts are rejected before producti
       assert.equal(
         readFileSync(join(check.root, ".deployed-revision"), "utf8"),
         "previous\n",
+      );
+    } finally {
+      check.cleanup();
+    }
+  }
+});
+
+test("manual runs and non-deployment Actions jobs are rejected before Docker or production writes", () => {
+  for (const context of [
+    { GITHUB_ACTIONS: "", GITHUB_JOB: "", GITHUB_RUN_ID: "" },
+    { GITHUB_ACTIONS: "false" },
+    { GITHUB_JOB: "checks" },
+    { GITHUB_RUN_ID: "" },
+  ]) {
+    const check = run("", "refs/heads/deploy", context);
+    try {
+      assert.equal(check.result.status, 64);
+      assert.match(check.result.stderr, /GitHub Actions deploy job/);
+      assert.equal(existsSync(join(check.root, "calls")), false);
+      assert.equal(
+        readFileSync(join(check.root, ".deployed-revision"), "utf8"),
+        "previous\n",
+      );
+      assert.equal(
+        readFileSync(join(check.root, ".env.production"), "utf8"),
+        "UNCHANGED_SECRET=keep-this-private\nFIGHT_CLUB_APP_IMAGE=prior-image\n",
       );
     } finally {
       check.cleanup();

@@ -8,6 +8,8 @@
 
 ## Deployment preference
 
+- Only the `deploy` branch may deploy to the RPi, exclusively through the GitHub Actions `deploy` job after its required checks pass. `main` and pull requests may validate but must not deploy. Do not deploy manually over SSH, fabricate Actions environment variables, cancel checks to deploy around them, or bypass the workflow after a failure. Fix/retry failed checks and wait for the authorized deployment workflow.
+
 - The user requests incremental deployments to reduce release time: reuse cached build layers and unchanged dependencies/assets, and update only affected application services. Avoid unnecessary clean builds, dependency reinstalls or infrastructure restarts.
 - Keep each release consistent and traceable to its validated revision, with health checks and rollback. Compiled application changes still require a coherent production build; do not patch individual files into a running compiled release.
 - Documentation/test-only changes do not require a production deployment. Prefer patch version increments for compatible fixes; use the appropriate minor/major version for feature or breaking releases.

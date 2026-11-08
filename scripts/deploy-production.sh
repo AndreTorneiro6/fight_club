@@ -2,6 +2,7 @@
 # Executed on the Pi by the dedicated repo-scoped GitHub Actions runner.
 set -Eeuo pipefail
 umask 077
+[[ "${GITHUB_ACTIONS:-}" == true && "${GITHUB_JOB:-}" == deploy && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]] || { echo 'Production deployment must run through the GitHub Actions deploy job; manual execution is not allowed.' >&2; exit 64; }
 [[ "${GITHUB_REF:-}" == refs/heads/deploy ]] || { echo 'Only the deploy branch can update production.' >&2; exit 64; }
 revision="${GITHUB_SHA:-}"
 [[ "$revision" =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid Git revision.' >&2; exit 64; }

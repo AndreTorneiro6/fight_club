@@ -1,3 +1,9 @@
+## Deployment policy correction — 8 November 2026
+
+- USER REQUIREMENT: only the deploy branch deploys to the RPi, through GitHub Actions after checks pass. Main/PRs validate only. Manual SSH deployments (including emulated Actions variables) and cancelling validation to bypass it are forbidden. This supersedes the direct deployment procedure used in the historical entries below.
+- Recorded the rule in AGENTS.md. The deployment script now rejects runs without the Actions deploy-job context before any Docker call or production write; existing deploy-branch, clean checkout/revision, backup, health and rollback checks remain.
+- Guard regression covers manual invocation, non-deployment Actions jobs and missing run context. Shell syntax, typecheck, all 570 tests and production build pass locally. No application version bump or manual production action. User explicitly requested these guard changes on the deploy branch; push there and let its Actions workflow validate/deploy normally.
+
 ## Version 1.19.3 — original-week recoveries and upcoming weekly tasks — 8 November 2026
 
 - USER REQUEST: apply the same postponed/frozen-game rule to all divisions, now and in future weeks. A recovery from an older competition week must not consume the new week's regular challenge allowance merely because it is scheduled in that week.
