@@ -1,3 +1,10 @@
+## Version 1.19.4 — preserve keyboard focus while editing modal forms — 10 November 2026
+
+- User reported prize names accepting one character and then focusing Fechar. Reproduced through actual sequential keyboard input in the sponsor/prize browser test; a space could then activate the focused close button.
+- Shared Modal focus/trap effect depended on the inline close callback, so every form state update cleaned up/restored focus and reinitialized it on the close button. The focus/body-lock/keyboard listener now follow the mounted dialog lifetime; a separately synchronized ref keeps Escape using the latest close callback. Other modal forms benefit from the same correction. No domain/write rules changed.
+- Browser regression types the prize name with realistic key timing and checks description focus after every character, then validates Shift+Tab/Tab wrapping, publish, Escape and restoration to Editar prémios. The regression fails on the old build and passes with the fix.
+- Local validation: typecheck, 570 tests, production build and sponsors/prizes browser check pass. Use TMPDIR=/var/tmp locally for Mongo-backed tests; the RAM-backed /tmp was crowded and caused disposable Mongo startup errors. Tests pass using disk-backed temporary files. Production deployment must proceed only through deploy-branch Actions; pending below.
+
 ## Deployment policy correction — 8 November 2026
 
 - VERIFIED LIVE THROUGH ACTIONS: run 42504692584 passed the complete checks job (570 tests, typecheck, build and all browser checks) and the deploy job. RPi app/worker both run exact deploy-branch revision 8c48ef58b319181e43a17f5e9bc8287760146c7b, v1.19.3; app healthy, both running with zero restarts, public health ok. The deploy-job execution guard passed in the actual runner. No manual production deployment used for this update.

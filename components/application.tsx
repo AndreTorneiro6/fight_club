@@ -369,6 +369,11 @@ function Modal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  }, [close]);
+  // Focus and keyboard trapping belong to this dialog's lifetime, not form edits.
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     const old = document.body.style.overflow;
@@ -377,7 +382,7 @@ function Modal({
       ?.querySelector<HTMLElement>("button,input,select,textarea")
       ?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") closeRef.current();
       if (e.key === "Tab") {
         const els = ref.current?.querySelectorAll<HTMLElement>(
           "button:not(:disabled),input,select,textarea,a[href]",
@@ -400,7 +405,7 @@ function Modal({
       document.removeEventListener("keydown", onKey);
       previous?.focus();
     };
-  }, [close]);
+  }, []);
   return (
     <div
       className="modal-backdrop"

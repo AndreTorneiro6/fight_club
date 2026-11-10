@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.3";
+export const applicationVersion = "1.19.4";
 export const releaseNotes = [
+  {
+    version: "1.19.4",
+    date: "2026-11-10",
+    title: "Escrever nos prémios sem perder o foco",
+    changes: [
+      "Ao editar prémios e outros formulários em janela, escrever já não desvia o foco para o botão Fechar. Mantêm-se o fecho por Escape, a navegação por Tab e o regresso ao botão que abriu a janela.",
+    ],
+  },
   {
     version: "1.19.3",
     date: "2026-11-08",

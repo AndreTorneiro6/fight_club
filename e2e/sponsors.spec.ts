@@ -41,21 +41,38 @@ test("admin manages sponsor publication and prize links while players see publis
   const state = await (await page.request.get("/api/league")).json();
   const sponsor = state.sponsors.find((s: { name: string }) => s.name === name);
   await page.goto("/premios");
-  await page
-    .getByRole("button", { name: "Editar prémios", exact: true })
-    .click();
+  const editPrizes = page.getByRole("button", {
+    name: "Editar prémios",
+    exact: true,
+  });
+  await editPrizes.click();
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("button", { name: "Adicionar prémio", exact: true })
     .click();
-  await dialog
-    .getByLabel("Nome do prémio", { exact: true })
-    .last()
-    .fill("Prémio Neiva de teste");
-  await dialog
-    .getByLabel("Descrição", { exact: true })
-    .last()
-    .fill("Oferta do parceiro da liga");
+  const prizeName = dialog.getByLabel("Nome do prémio", { exact: true }).last();
+  await prizeName.click();
+  await prizeName.pressSequentially("Prémio Neiva de teste", { delay: 30 });
+  await expect(prizeName).toHaveValue("Prémio Neiva de teste");
+  await expect(prizeName).toBeFocused();
+  const prizeDescription = dialog
+    .getByRole("textbox", { name: /^Descrição/ })
+    .last();
+  await prizeDescription.click();
+  await expect(prizeDescription).toBeFocused();
+  for (const char of "Oferta do parceiro da liga") {
+    await prizeDescription.pressSequentially(char);
+    await expect(prizeDescription).toBeFocused();
+  }
+  await expect(prizeDescription).toHaveValue("Oferta do parceiro da liga");
+  await expect(prizeDescription).toBeFocused();
+  const close = dialog.getByRole("button", { name: "Fechar", exact: true });
+  const publish = dialog.getByRole("button", { name: "Publicar", exact: true });
+  await close.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(publish).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
   const sponsorSelect = dialog
     .getByRole("combobox", { name: "Patrocinador do prémio", exact: true })
     .last();
@@ -66,6 +83,11 @@ test("admin manages sponsor publication and prize links while players see publis
   await sponsorSelect.selectOption(sponsor._id);
   await dialog.getByRole("button", { name: "Publicar", exact: true }).click();
   await expect(dialog).toHaveCount(0);
+  await expect(editPrizes).toBeFocused();
+  await editPrizes.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(editPrizes).toBeFocused();
   await switchWorkspace(page, "player");
   let playerState = await (await page.request.get("/api/league")).json();
   expect(playerState.sponsors).toEqual([]);
