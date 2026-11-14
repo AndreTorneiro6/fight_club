@@ -3,7 +3,7 @@
 - After v1.19.5 went live, user showed that the admin preview still said the #3 “would change to defense” and showed #4 with no game. That display came from `divisionWeekOptions` reading the single canonical maximum matching, while challenge flow now correctly preserves alternative valid attackers. The “planned” pairing is one valid maximum schedule, not a fixed next game.
 - Aligned the preview role with `dynamicRole` and changed the label to explain that this is one maximum combination and is recalculated after every challenge. Regression verifies #2 and #3 can both attack #1, #3 is not warned to switch roles, and the displayed canonical alternative can be #4→#3.
 - Read-only simulation on the live Prata snapshot: if #2 challenges #1, #4 is assigned against #3; if #3 challenges #1, #4 is assigned against #2. Both retain six total games; #4→#1 remains rejected as a consecutive rematch. No live challenges were created.
-- Validation and deployment pending through the `deploy` branch and full GitHub Actions workflow. Do not use manual deployment.
+- Validation: typecheck, all 571 tests, production build, all hosted browser groups and GitHub Actions workflow 43634429720 passed. Deployed exact revision `333bd89060eff8166813db0ee0d91a637acab649` from `deploy`; app and worker both report it, both running with zero restarts, app healthy and public `/api/health` returns `{"ok":true}`. No production league records changed.
 
 ## Version 1.19.5 — preserve eligible attackers in weekly roles — 14 November 2026
 
