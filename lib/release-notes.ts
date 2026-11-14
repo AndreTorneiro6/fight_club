@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.4";
+export const applicationVersion = "1.19.5";
 export const releaseNotes = [
+  {
+    version: "1.19.5",
+    date: "2026-11-14",
+    title: "Papéis semanais preservam ataques com alvos válidos",
+    changes: [
+      "Os papéis publicados em Ataque mantêm acesso aos alvos válidos de qualquer plano máximo, mesmo quando a combinação canónica escolheria outra dupla. A regra de não repetir o mesmo confronto em semanas seguidas mantém-se.",
+    ],
+  },
   {
     version: "1.19.4",
     date: "2026-11-10",

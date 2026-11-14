@@ -10,7 +10,11 @@ import {
 import { execute } from "../lib/engine";
 import { limitChallenges } from "../lib/rules";
 import { weeklyRole } from "../lib/weekly";
-import { dynamicWeeklyPlan, dynamicWeeklyEnabled } from "../lib/dynamic-weekly";
+import {
+  dynamicWeeklyPlan,
+  dynamicWeeklyEnabled,
+  dynamicRoleChanges,
+} from "../lib/dynamic-weekly";
 import { challengeDistance } from "../lib/challenge-distance";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
@@ -165,6 +169,52 @@ test("Bronze keeps alternative valid choices instead of assigning a particular o
   assert.ok(
     plan.eligible.some((e) => e.attackerId === "t9a" && e.defenderId === "t7a"),
   );
+});
+
+test("published attackers keep alternative title targets when rank 4 repeats against rank 1", () => {
+  const s = fixture("prata", 12, 3);
+  s.settings[0].titleMaxPosition = 4;
+  s.weeklyRounds[0].weekType = "NORMAL";
+  s.weeklyRounds[0].assignments = s.players.map((p) => ({
+    playerId: p._id,
+    role: p._id.startsWith("t1") ? ("defense" as const) : ("attack" as const),
+  }));
+  const team = (rank: number) => ["a", "b"].map((side) => ({
+    playerId: `t${rank}${side}`,
+    name: `Team ${rank} ${side}`,
+  }));
+  s.challenges.push({
+    _id: "rank-1-v-rank-4-last-week",
+    number: 1,
+    seasonId: "season",
+    divisionId: "prata",
+    challengerId: "t1a",
+    defenderId: "t4a",
+    challengerTeam: team(1),
+    defenderTeam: team(4),
+    status: "completed",
+    weekStart: "2026-10-19",
+    createdAt: "2026-10-18T12:00:00Z",
+    respondBy: "2026-10-20T12:00:00Z",
+    scheduleBy: "2026-10-25T23:59:59Z",
+    playBy: "2026-10-25T23:59:59Z",
+    durationMinutes: 90,
+    titleFight: false,
+  } as State["challenges"][number]);
+
+  assert.equal(weeklyRole(s, "t2a", now, week), "attack");
+  assert.equal(weeklyRole(s, "t3a", now, week), "attack");
+  assert.ok(
+    !dynamicRoleChanges(s, "prata", week, s.weeklyRounds[0].assignments).some(
+      (change) => change.team === "Team 3 a + Team 3 b",
+    ),
+  );
+  assert.throws(() => send(s, 4, 1), /semanas seguidas/);
+
+  const rank3 = structuredClone(s);
+  send(rank3, 3, 1);
+  const rank2 = structuredClone(s);
+  send(rank2, 2, 1);
 });
 test("both partners receive one forced-match notification and duplicate partner requests cannot reserve another match", () => {
   const s = fixture("ouro", 12);

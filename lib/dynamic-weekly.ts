@@ -258,6 +258,20 @@ export function dynamicRole(s: State, playerId: string, week: string) {
   if (
     s.weeklyRounds.find((r) => r.weekStart === week)?.weekType !== "OPEN_ATTACK"
   ) {
+    // `canonical` is only one optimal schedule. Preserve a published attack
+    // role when that team can still attack in any maximum schedule, so an
+    // alternative valid target does not disappear from the challenge flow.
+    const round = s.weeklyRounds.find((r) => r.weekStart === week);
+    const published = round
+      ? effectiveRoles(round).find((r) =>
+          team.members.some((m) => m._id === r.playerId),
+        )?.role
+      : undefined;
+    if (
+      published === "attack" &&
+      plan.eligible.some((p) => p.attackerKey === team.id)
+    )
+      return "attack" as const;
     if (plan.canonical.some((p) => p.attackerKey === team.id))
       return "attack" as const;
     if (plan.canonical.some((p) => p.defenderKey === team.id))
