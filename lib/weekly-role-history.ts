@@ -11,7 +11,11 @@ import {
   weeklyTeamUnavailableReason,
   weeklyTeamVacationUntil,
 } from "./weekly-pairing-rules";
-import { dynamicWeeklyEnabled, dynamicWeeklyPlan } from "./dynamic-weekly";
+import {
+  dynamicRole,
+  dynamicWeeklyEnabled,
+  dynamicWeeklyPlan,
+} from "./dynamic-weekly";
 
 type Role = "attack" | "defense";
 const ended = new Set(["cancelled", "refused", "expired"]);
@@ -114,7 +118,7 @@ export type TeamWeekOptions = {
   defense: { rank: number; name: string }[];
   /** Game already committed this week, if any. */
   committed?: { rank: number; name: string; side: Role };
-  /** Game in the planner's schedule for these roles. */
+  /** Game in one maximum schedule; recalculated after each challenge. */
   planned?: { rank: number; name: string; side: Role };
   /** Role the planner would give, when it differs from the one on screen. */
   plannerRole?: Role;
@@ -198,8 +202,13 @@ export function divisionWeekOptions(
       if (!a || !d) continue;
       planned.set(a.id, { rank: rank(d), name: name(d), side: "attack" });
       planned.set(d.id, { rank: rank(a), name: name(a), side: "defense" });
-      plannerRoles.set(a.id, "attack");
-      plannerRoles.set(d.id, "defense");
+    }
+    // The canonical matching is only one maximum schedule. Show the role
+    // resolution used by the challenge flow, which preserves viable published
+    // attack roles across alternative maximum matchings.
+    for (const t of entries) {
+      const role = dynamicRole(preview, t.members[0]._id, week);
+      if (role) plannerRoles.set(t.id, role);
     }
   }
 

@@ -16,6 +16,8 @@ import {
   dynamicRoleChanges,
 } from "../lib/dynamic-weekly";
 import { challengeDistance } from "../lib/challenge-distance";
+import { divisionWeekOptions } from "../lib/weekly-role-history";
+import { rankingEntries } from "../lib/ranking-groups";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
 function fixture(
@@ -209,6 +211,16 @@ test("published attackers keep alternative title targets when rank 4 repeats aga
       (change) => change.team === "Team 3 a + Team 3 b",
     ),
   );
+  const onScreen = Object.fromEntries(
+    s.weeklyRounds[0].assignments.map((a) => [a.playerId, a.role]),
+  );
+  const options = divisionWeekOptions(s, "prata", week, onScreen);
+  const teams = rankingEntries(s.players, "prata");
+  const rank3Options = options.get(teams[2].id)!;
+  assert.ok(rank3Options.attack.some((target) => target.rank === 1));
+  assert.equal(rank3Options.planned?.side, "defense");
+  assert.equal(rank3Options.planned?.rank, 4);
+  assert.equal(rank3Options.plannerRole, undefined);
   assert.throws(() => send(s, 4, 1), /semanas seguidas/);
 
   const rank3 = structuredClone(s);

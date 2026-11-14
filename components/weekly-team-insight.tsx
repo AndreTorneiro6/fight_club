@@ -136,10 +136,16 @@ export default function WeeklyTeamInsight({
               )}
               {options.planned && (
                 <span className="success">
-                  No plano:{" "}
+                  Numa combinação máxima:{" "}
                   {options.planned.side === "attack" ? "ataca" : "defende"} #
                   {options.planned.rank} {options.planned.name}
                 </span>
+              )}
+              {options.planned && (
+                <small>
+                  É uma opção de jogos; após cada desafio, o planeador recalcula
+                  os restantes confrontos.
+                </small>
               )}
               {options.plannerRole && (
                 <span className="error">

@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.5";
+export const applicationVersion = "1.19.6";
 export const releaseNotes = [
+  {
+    version: "1.19.6",
+    date: "2026-11-14",
+    title: "Prévia semanal explica as combinações alternativas",
+    changes: [
+      "A gestão de papéis distingue uma combinação máxima de um emparelhamento obrigatório. Os papéis de Ataque válidos continuam disponíveis e o plano é recalculado após cada desafio, preservando confrontos máximos sem repetir adversários em semanas seguidas.",
+    ],
+  },
   {
     version: "1.19.5",
     date: "2026-11-14",
