@@ -196,7 +196,9 @@ export function divisionWeekOptions(
       ],
     };
     const plan = dynamicWeeklyPlan(preview, divisionId, week);
-    for (const p of [...plan.fixed, ...plan.canonical]) {
+    for (const p of plan.fixed.length
+      ? [...plan.fixed, ...plan.canonical]
+      : []) {
       const a = entries.find((t) => t.id === p.attackerKey),
         d = entries.find((t) => t.id === p.defenderKey);
       if (!a || !d) continue;

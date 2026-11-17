@@ -1,7 +1,6 @@
 import { adminMatchmakingEnabled } from "./weekly-matchmaking-mode";
 import type { State } from "./types";
 import { rankingEntries } from "./ranking-groups";
-import { effectiveRoles } from "./effective-roles";
 import { challengeTeamKey } from "./team-competition";
 import { clubWeek } from "./calendar";
 import { challengeDistance } from "./challenge-distance";
@@ -78,12 +77,24 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       defenderKey: d,
     });
   }
+  const round = s.weeklyRounds.find((r) => r.weekStart === week);
+  const roleFor = (key: string) =>
+    round?.assignments.find((r) =>
+      entries
+        .find((t) => t.id === key)
+        ?.members.some((m) => m._id === r.playerId),
+    )?.role;
   const available = entries.filter(
     (t) => !occupied.has(t.id) && weeklyTeamAvailable(s, t, week),
   );
   for (const a of available)
     for (const d of available) {
-      if (weeklyPairAllowed(s, divisionId, entries, a, d, week))
+      // An administrator's defense selection is a constraint, not a cost the
+      // maximum-game solver may pay to turn that team into an attacker.
+      if (
+        roleFor(a.id) !== "defense" &&
+        weeklyPairAllowed(s, divisionId, entries, a, d, week)
+      )
         pairs.push({
           attackerId: a.members[0]._id,
           defenderId: d.members[0]._id,
@@ -142,14 +153,6 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     }
     return without(full) < maximum;
   });
-  const round = s.weeklyRounds.find((r) => r.weekStart === week);
-  const preferred = round ? effectiveRoles(round) : [];
-  const roleFor = (key: string) =>
-    preferred.find((r) =>
-      entries
-        .find((t) => t.id === key)
-        ?.members.some((m) => m._id === r.playerId),
-    )?.role;
   // Teams that already launched a challenge this week (even one later cancelled)
   // keep attacking when several plans need the same number of role changes.
   const launched = new Set(
@@ -251,22 +254,19 @@ export function dynamicRole(s: State, playerId: string, week: string) {
   const plan = dynamicWeeklyPlan(s, p.divisionId, week),
     team = plan.teams.find((t) => t.members.some((m) => m._id === playerId));
   if (!team) return;
+  const round = s.weeklyRounds.find((r) => r.weekStart === week);
+  // Use the administrator's papers, rather than an earlier solver override.
+  const published = round?.assignments.find((r) =>
+    team.members.some((m) => m._id === r.playerId),
+  )?.role;
+  // Papers stay unchanged until a pairing is committed in this division/week.
+  if (!plan.fixed.length) return published;
   if (plan.fixed.some((p) => p.attackerKey === team.id))
     return "attack" as const;
   if (plan.fixed.some((p) => p.defenderKey === team.id))
     return "defense" as const;
-  if (
-    s.weeklyRounds.find((r) => r.weekStart === week)?.weekType !== "OPEN_ATTACK"
-  ) {
-    // `canonical` is only one optimal schedule. Preserve a published attack
-    // role when that team can still attack in any maximum schedule, so an
-    // alternative valid target does not disappear from the challenge flow.
-    const round = s.weeklyRounds.find((r) => r.weekStart === week);
-    const published = round
-      ? effectiveRoles(round).find((r) =>
-          team.members.some((m) => m._id === r.playerId),
-        )?.role
-      : undefined;
+  if (published === "defense") return "defense" as const;
+  if (round?.weekType !== "OPEN_ATTACK") {
     if (
       published === "attack" &&
       plan.eligible.some((p) => p.attackerKey === team.id)

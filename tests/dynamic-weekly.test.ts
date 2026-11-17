@@ -181,10 +181,11 @@ test("published attackers keep alternative title targets when rank 4 repeats aga
     playerId: p._id,
     role: p._id.startsWith("t1") ? ("defense" as const) : ("attack" as const),
   }));
-  const team = (rank: number) => ["a", "b"].map((side) => ({
-    playerId: `t${rank}${side}`,
-    name: `Team ${rank} ${side}`,
-  }));
+  const team = (rank: number) =>
+    ["a", "b"].map((side) => ({
+      playerId: `t${rank}${side}`,
+      name: `Team ${rank} ${side}`,
+    }));
   s.challenges.push({
     _id: "rank-1-v-rank-4-last-week",
     number: 1,
@@ -218,8 +219,7 @@ test("published attackers keep alternative title targets when rank 4 repeats aga
   const teams = rankingEntries(s.players, "prata");
   const rank3Options = options.get(teams[2].id)!;
   assert.ok(rank3Options.attack.some((target) => target.rank === 1));
-  assert.equal(rank3Options.planned?.side, "defense");
-  assert.equal(rank3Options.planned?.rank, 4);
+  assert.equal(rank3Options.planned, undefined);
   assert.equal(rank3Options.plannerRole, undefined);
   assert.throws(() => send(s, 4, 1), /semanas seguidas/);
 
@@ -228,6 +228,78 @@ test("published attackers keep alternative title targets when rank 4 repeats aga
   const rank2 = structuredClone(s);
   send(rank2, 2, 1);
 });
+for (const weekType of ["NORMAL", "OPEN_ATTACK"] as const) {
+  test(`${weekType}: admin papers stay unchanged before challenges and ranks 3/4 defend after 2→1`, () => {
+    const s = fixture("ouro", 12);
+    const round = s.weeklyRounds[0];
+    round.weekType = weekType;
+    round.assignments = s.players.map((p) => {
+      const rank = Number(p._id.match(/^t(\d+)/)![1]);
+      return {
+        playerId: p._id,
+        role: [2, 5, 6, 8, 11, 12].includes(rank)
+          ? ("attack" as const)
+          : ("defense" as const),
+      };
+    });
+    // An earlier solver override must not outweigh the administrator's papers.
+    round.dynamicAssignments = [
+      { playerId: "t4a", role: "attack" },
+      { playerId: "t4b", role: "attack" },
+    ];
+    const published = structuredClone(round.assignments);
+    for (const r of published)
+      assert.equal(weeklyRole(s, r.playerId, now, week), r.role);
+    assert.deepEqual(dynamicRoleChanges(s, "ouro", week, published), []);
+    const options = divisionWeekOptions(
+      s,
+      "ouro",
+      week,
+      Object.fromEntries(published.map((r) => [r.playerId, r.role])),
+    );
+    for (const option of options.values()) {
+      assert.equal(option.planned, undefined);
+      assert.equal(option.plannerRole, undefined);
+    }
+    assert.equal(s.challenges.length, 0);
+    send(s, 2, 1);
+    const plan = dynamicWeeklyPlan(s, "ouro", week);
+    assert.equal(plan.maximumMatches, 6);
+    assert.ok(pairing(s, 2, 1));
+    for (const rank of [3, 4])
+      for (const side of ["a", "b"])
+        assert.equal(weeklyRole(s, `t${rank}${side}`, now, week), "defense");
+    assert.ok(
+      [...plan.fixed, ...plan.eligible].some(
+        (e) => e.attackerId === "t5a" && e.defenderId === "t3a",
+      ),
+    );
+    assert.ok(
+      [...plan.fixed, ...plan.eligible].some(
+        (e) => e.attackerId === "t6a" && e.defenderId === "t4a",
+      ),
+    );
+    assert.ok(!plan.eligible.some((e) => e.attackerId === "t4a"));
+    assert.throws(() => send(s, 4, 3), /necessário|defesa|papéis|atribuído/);
+    assert.deepEqual(round.assignments, published);
+  });
+}
+
+test("defense chosen by the admin takes priority over an extra possible game", () => {
+  const s = fixture("ouro", 6);
+  s.weeklyRounds[0].weekType = "NORMAL";
+  s.weeklyRounds[0].assignments = s.players.map((p) => ({
+    playerId: p._id,
+    role: /^t(2|6)[ab]$/.test(p._id) ? "attack" : "defense",
+  }));
+  send(s, 2, 1);
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 2);
+  for (const rank of [3, 4, 5]) {
+    assert.equal(weeklyRole(s, `t${rank}a`, now, week), "defense");
+    assert.equal(weeklyRole(s, `t${rank}b`, now, week), "defense");
+  }
+});
+
 test("both partners receive one forced-match notification and duplicate partner requests cannot reserve another match", () => {
   const s = fixture("ouro", 12);
   send(s, 12, 10);

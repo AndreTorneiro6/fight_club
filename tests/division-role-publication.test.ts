@@ -48,8 +48,9 @@ test("an unsaved edit in the selected division still blocks publishing until it 
   );
 });
 
-test("publishing warns about roles the dynamic planner would change and stays quiet when the title rule allows the published roles", async () => {
-  const { dynamicRoleChanges } = await import("../lib/dynamic-weekly");
+test("publishing keeps admin papers even when the title rule reduces the possible games", async () => {
+  const { dynamicRoleChanges, dynamicWeeklyPlan } =
+    await import("../lib/dynamic-weekly");
   const { collections, defaultSettings } = await import("../lib/types");
   type State = import("../lib/types").State;
   type Player = import("../lib/types").Player;
@@ -96,10 +97,12 @@ test("publishing warns about roles the dynamic planner would change and stays qu
     role: p.position <= 3 ? ("defense" as const) : ("attack" as const),
   }));
   s.weeklyRounds = [{ _id: week, weekStart: week, assignments }];
-  // Title rule 3: nobody below can challenge the 1st, so the planner switches roles.
-  assert.ok(dynamicRoleChanges(s, "ouro", week, assignments).length > 0);
+  // Title rule 3 leaves the champion without a target, but papers stay as chosen.
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 2);
+  assert.deepEqual(dynamicRoleChanges(s, "ouro", week, assignments), []);
   // Title rule 4: 4→1, 5→2, 6→3 use the published roles exactly.
   s.settings[0].titleMaxPosition = 4;
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 3);
   assert.deepEqual(dynamicRoleChanges(s, "ouro", week, assignments), []);
   // Divisions without dynamic roles never warn.
   s.settings[0].titleMaxPosition = 3;

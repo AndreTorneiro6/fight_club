@@ -379,14 +379,15 @@ test("possible games follow the chosen roles and never offer last week's opponen
     [7, 8],
   );
   assert.ok(!options.get(team(2))!.attack.some((t) => t.rank === 1));
-  // The admin can generate roles with a planned game for every team.
+  // Generated papers offer valid opponents without committing a planner schedule.
   generateWeeklyRoles(s, next, "admin", now);
   const roles = Object.fromEntries(
     nextRound(s)!.assignments.map((a) => [a.playerId, a.role]),
   );
   const planned = divisionWeekOptions(s, "bronze", next, roles);
   for (const [, o] of planned) {
-    assert.ok(o.committed || o.planned);
+    assert.ok(o.attack.length || o.defense.length);
+    assert.equal(o.planned, undefined);
     assert.equal(o.plannerRole, undefined);
   }
   // Two attackers cannot be offered to each other.

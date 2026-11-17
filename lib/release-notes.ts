@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.7";
+export const applicationVersion = "1.19.8";
 export const releaseNotes = [
+  {
+    version: "1.19.8",
+    date: "2026-11-17",
+    title: "Papéis do administrador antes dos desafios",
+    changes: [
+      "Preparar e publicar papéis mantém as escolhas do administrador. O planeador só adapta a divisão depois de existir um desafio com adversário definido nessa jornada.",
+      "As duplas publicadas em Defesa mantêm esse papel; o planeador procura os restantes jogos respeitando essa decisão e os confrontos já definidos, sem transformar defensores em atacantes para aumentar o número de jogos.",
+    ],
+  },
   {
     version: "1.19.7",
     date: "2026-11-17",
