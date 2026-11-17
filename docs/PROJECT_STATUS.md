@@ -1,3 +1,10 @@
+## Version 1.21.2 — restore full rankings, filter only challenge options — 17 November 2026
+
+- User clarified that all players, attacking or defending, must see the full Ranking and dashboard as before, like Prata/Bronze. Only opponent options inside Desafios should be filtered. This supersedes v1.21.1's assumption of filtering player ranking tables.
+- Restored RankingTable exactly to the implementation before the v1.21.1 visibility filter (verified source equality). The existing Desafios opponent checks continue using the real challenge rules. No changes to Ouro adaptive reach, roles, admin exclusions, simulations or Jogos obrigatórios.
+- Typecheck, all 581 tests, production build and all seven affected weekly/manual/workspace browser checks pass. Browser regression verifies full player ranking, top-five dashboard, real rank numbers, filtered challenge targets, and complete rankings even after every opponent has been excluded. Admin ranking remains complete.
+- Submitting v1.21.2 through the required deploy-branch Actions workflow. No live papers/league records changed. Wait 30 minutes after workflow starts before checking deployment, per the user's standing request.
+
 ## v1.21.1 LIVE verified — 17 November 2026
 
 - Waited the requested 30 minutes after workflow start. Actions 44111549947 passed all checks and deployment for exact 08023a5b7f1bc85f4c5ac32f846a89957ef8e177.

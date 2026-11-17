@@ -1697,18 +1697,6 @@ function RankingTable({
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     [target, setTarget] = useState<Player | null>(null),
     router = useRouter();
-  const eligibleOnly =
-    s.actor.role === "player" &&
-    s.settings[0].weeklyCompetition &&
-    s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro";
-  const rankedTeams = rankingEntries(s.players, divisionId)
-    .map((entry, index) => ({ ...entry, teamPosition: index + 1 }))
-    .filter(
-      (entry) =>
-        !eligibleOnly ||
-        entry.members.some((member) => !challengeReason(s, p, member)),
-    )
-    .slice(0, limit);
   const managed = usesManagedCompetition(s, p.divisionId);
   const previousPositions = new Map(
     rankingEntries(
@@ -1729,151 +1717,149 @@ function RankingTable({
         <span className="hide-mobile">Estado</span>
         <span className="right">Desafio</span>
       </div>
-      {eligibleOnly && (
-        <p role="status">
-          {rankedTeams.length
-            ? "Apenas adversários que podes desafiar agora. As posições apresentadas são as posições reais no ranking."
-            : "Sem adversários disponíveis para desafiar neste momento."}
-        </p>
-      )}
-      {rankedTeams.map((entry) => {
-        const record = teamRecord(s.challenges, entry.members);
-        const ownTeam = entry.members.some((member) => member._id === p._id);
-        const options = entry.members.map((member) => ({
-          member,
-          reason: challengeReason(s, p, member),
-        }));
-        const targetMember = ownTeam
-          ? undefined
-          : options.find((option) => !option.reason)?.member;
-        const messages = [
-          ...new Set(options.map((option) => option.reason).filter(Boolean)),
-        ];
-        const teamMessage =
-          ownTeam && entry.members.length > 1
-            ? "A tua equipa"
-            : messages.length === 1
-              ? messages[0]
-              : "Equipa indisponível para este desafio.";
-        const activeTeam = entry.members.every(
-          (member) => member.status === "active",
-        );
-        return (
-          <div
-            className={`ranking-row ${ownTeam ? "me" : ""} ${entry.members.length > 1 ? "ranking-team" : ""}`}
-            key={entry.id}
-            data-ranking-entry={entry.id}
-          >
-            <span
-              className={`rank-number ${entry.teamPosition <= 3 ? "top" : ""}`}
-              aria-label={`Posição da equipa: ${entry.teamPosition}`}
-            >
-              {String(entry.teamPosition).padStart(2, "0")}
-            </span>
-            <div className="ranking-member-list">
-              {entry.members.length > 1 && (
-                <span className="ranking-team-label">Equipa</span>
-              )}
-              {entry.members.map((member) => (
-                <div className="row ranking-member" key={member._id}>
-                  <Avatar p={member} />
-                  <div className="player-name">
-                    {member.name}{" "}
-                    {member._id === p._id && <span className="gold">· Tu</span>}
-                    {entry.members.length === 1 && (
-                      <small>
-                        {member.partner
-                          ? `Parceiro por confirmar: ${member.partner}`
-                          : "Sem parceiro atribuído"}
-                      </small>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <WeeklyBadge
-                s={s}
-                player={entry.members[0]}
-                team={entry.members}
-              />
-              {targetMember &&
-                s.settings[0].weeklyCompetition &&
-                weeklyPendingReceived(s, targetMember._id).length > 0 && (
-                  <small>
-                    Já recebeu um desafio. Podes enviar o teu; fica pendente e
-                    sujeito à prioridade regulamentar.
-                  </small>
-                )}
-            </div>
+      {rankingEntries(s.players, divisionId)
+        .map((entry, index) => ({ ...entry, teamPosition: index + 1 }))
+        .slice(0, limit)
+        .map((entry) => {
+          const record = teamRecord(s.challenges, entry.members);
+          const ownTeam = entry.members.some((member) => member._id === p._id);
+          const options = entry.members.map((member) => ({
+            member,
+            reason: challengeReason(s, p, member),
+          }));
+          const targetMember = ownTeam
+            ? undefined
+            : options.find((option) => !option.reason)?.member;
+          const messages = [
+            ...new Set(options.map((option) => option.reason).filter(Boolean)),
+          ];
+          const teamMessage =
+            ownTeam && entry.members.length > 1
+              ? "A tua equipa"
+              : messages.length === 1
+                ? messages[0]
+                : "Equipa indisponível para este desafio.";
+          const activeTeam = entry.members.every(
+            (member) => member.status === "active",
+          );
+          return (
             <div
-              className="ranking-member-list ranking-member-values"
-              title="Vitórias / derrotas da equipa"
+              className={`ranking-row ${ownTeam ? "me" : ""} ${entry.members.length > 1 ? "ranking-team" : ""}`}
+              key={entry.id}
+              data-ranking-entry={entry.id}
             >
-              <span>
-                {record.wins}
-                <span className="muted"> / {record.losses}</span>
-              </span>
-            </div>
-            <div
-              className="hide-mobile ranking-team-trend"
-              aria-label="Tendência da equipa"
-            >
-              <Trend
-                p={{
-                  position: entry.teamPosition,
-                  previousPosition:
-                    previousPositions.get(entry.id) ?? entry.teamPosition,
-                }}
-              />
-            </div>
-            <div className="hide-mobile ranking-team-status">
               <span
-                className="dot"
-                style={{
-                  background: activeTeam ? "var(--green)" : "var(--muted)",
-                }}
-              />{" "}
-              <small>
-                {entry.members.length > 1
-                  ? activeTeam
-                    ? "Ativa"
-                    : "Indisponível"
-                  : activeTeam
-                    ? "Ativo"
-                    : "Inativo"}
-              </small>
-            </div>
-            <div
-              className="right ranking-team-action"
-              data-team-message={entry.id}
-            >
-              {managed && !ownTeam && divisionId === p.divisionId ? (
-                <Link className="button small" href="/jornadas">
-                  Ver desafios
-                </Link>
-              ) : targetMember ? (
-                <button
-                  className="small"
-                  style={{
-                    color: "var(--gold)",
-                    borderColor: "#e7b85b33",
+                className={`rank-number ${entry.teamPosition <= 3 ? "top" : ""}`}
+                aria-label={`Posição da equipa: ${entry.teamPosition}`}
+              >
+                {String(entry.teamPosition).padStart(2, "0")}
+              </span>
+              <div className="ranking-member-list">
+                {entry.members.length > 1 && (
+                  <span className="ranking-team-label">Equipa</span>
+                )}
+                {entry.members.map((member) => (
+                  <div className="row ranking-member" key={member._id}>
+                    <Avatar p={member} />
+                    <div className="player-name">
+                      {member.name}{" "}
+                      {member._id === p._id && (
+                        <span className="gold">· Tu</span>
+                      )}
+                      {entry.members.length === 1 && (
+                        <small>
+                          {member.partner
+                            ? `Parceiro por confirmar: ${member.partner}`
+                            : "Sem parceiro atribuído"}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <WeeklyBadge
+                  s={s}
+                  player={entry.members[0]}
+                  team={entry.members}
+                />
+                {targetMember &&
+                  s.settings[0].weeklyCompetition &&
+                  weeklyPendingReceived(s, targetMember._id).length > 0 && (
+                    <small>
+                      Já recebeu um desafio. Podes enviar o teu; fica pendente e
+                      sujeito à prioridade regulamentar.
+                    </small>
+                  )}
+              </div>
+              <div
+                className="ranking-member-list ranking-member-values"
+                title="Vitórias / derrotas da equipa"
+              >
+                <span>
+                  {record.wins}
+                  <span className="muted"> / {record.losses}</span>
+                </span>
+              </div>
+              <div
+                className="hide-mobile ranking-team-trend"
+                aria-label="Tendência da equipa"
+              >
+                <Trend
+                  p={{
+                    position: entry.teamPosition,
+                    previousPosition:
+                      previousPositions.get(entry.id) ?? entry.teamPosition,
                   }}
-                  aria-label={
-                    entry.members.length > 1
-                      ? `Desafiar ${entry.members.map((member) => member.name).join(" + ")}`
-                      : undefined
-                  }
-                  onClick={() => setTarget(targetMember)}
-                >
-                  <Swords size={12} />
-                  Desafiar
-                </button>
-              ) : (
-                <small className="muted">{teamMessage}</small>
-              )}
+                />
+              </div>
+              <div className="hide-mobile ranking-team-status">
+                <span
+                  className="dot"
+                  style={{
+                    background: activeTeam ? "var(--green)" : "var(--muted)",
+                  }}
+                />{" "}
+                <small>
+                  {entry.members.length > 1
+                    ? activeTeam
+                      ? "Ativa"
+                      : "Indisponível"
+                    : activeTeam
+                      ? "Ativo"
+                      : "Inativo"}
+                </small>
+              </div>
+              <div
+                className="right ranking-team-action"
+                data-team-message={entry.id}
+              >
+                {managed && !ownTeam && divisionId === p.divisionId ? (
+                  <Link className="button small" href="/jornadas">
+                    Ver desafios
+                  </Link>
+                ) : targetMember ? (
+                  <button
+                    className="small"
+                    style={{
+                      color: "var(--gold)",
+                      borderColor: "#e7b85b33",
+                    }}
+                    aria-label={
+                      entry.members.length > 1
+                        ? `Desafiar ${entry.members.map((member) => member.name).join(" + ")}`
+                        : undefined
+                    }
+                    onClick={() => setTarget(targetMember)}
+                  >
+                    <Swords size={12} />
+                    Desafiar
+                  </button>
+                ) : (
+                  <small className="muted">{teamMessage}</small>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
       {target && (
         <ChallengeComposer
           s={s}

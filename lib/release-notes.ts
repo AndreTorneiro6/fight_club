@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.21.1";
+export const applicationVersion = "1.21.2";
 export const releaseNotes = [
+  {
+    version: "1.21.2",
+    date: "2026-11-17",
+    title: "Ranking completo e opções filtradas apenas nos desafios",
+    changes: [
+      "Restaurado o ranking completo para os jogadores de Ouro no Ranking e no resumo inicial. Apenas as opções de adversário em Desafios são filtradas pelas regras e disponibilidade.",
+    ],
+  },
   {
     version: "1.21.1",
     date: "2026-11-17",

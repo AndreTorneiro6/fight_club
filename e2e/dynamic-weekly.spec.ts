@@ -396,7 +396,7 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
   ).toHaveCount(0);
 });
 
-test("Ouro players see only challengeable opponents in their ranking tables", async ({
+test("Ouro rankings stay complete while challenge options show eligible opponents only", async ({
   page,
   browser,
 }) => {
@@ -444,7 +444,9 @@ test("Ouro players see only challengeable opponents in their ranking tables", as
       .getByRole("button", { name: "Saltar visita", exact: true })
       .click();
     await player.goto("/ranking");
-    await expect(player.locator("[data-ranking-entry]")).toHaveCount(1);
+    await expect(player.locator("[data-ranking-entry]")).toHaveCount(
+      teams.length,
+    );
     await expect(
       player.locator(`[data-ranking-entry="${teams[1].id}"]`),
     ).toBeVisible();
@@ -455,7 +457,9 @@ test("Ouro players see only challengeable opponents in their ranking tables", as
         .first(),
     ).toHaveText("02");
     await player.goto("/inicio");
-    await expect(player.locator("[data-ranking-entry]")).toHaveCount(1);
+    await expect(player.locator("[data-ranking-entry]")).toHaveCount(
+      Math.min(5, teams.length),
+    );
     await player.goto("/desafios");
     await expect(
       player.locator(`[data-weekly-team="${teams[0].id}"]`),
@@ -463,6 +467,28 @@ test("Ouro players see only challengeable opponents in their ranking tables", as
     await expect(
       player.locator(`[data-weekly-team="${teams[1].id}"]`),
     ).toBeVisible();
+    const latest = await (await page.request.get("/api/league")).json();
+    const cleared = await page.request.post("/api/league", {
+      headers: { Origin: "http://localhost:3100" },
+      data: {
+        type: "admin.week.ouro.opponents.save",
+        weekStart: week,
+        expectedVersion: latest.weeklyRounds.find(
+          (r: any) => r.weekStart === week,
+        ).version,
+        teamKey: source.id,
+        allowedTeamKeys: [],
+      },
+    });
+    expect(cleared.ok(), await cleared.text()).toBeTruthy();
+    await player.goto("/ranking");
+    await expect(player.locator("[data-ranking-entry]")).toHaveCount(
+      teams.length,
+    );
+    await player.goto("/desafios");
+    await expect(
+      player.locator(`[data-weekly-team="${teams[1].id}"]`),
+    ).toHaveCount(0);
   } finally {
     await context.close();
   }
