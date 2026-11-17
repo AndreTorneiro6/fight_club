@@ -2675,7 +2675,8 @@ export function execute(
         );
         for (const x of [p, d])
           ensure(
-            limitChallenges(s, x, timestamp).length < rules.maxActiveChallenges,
+            rules.weeklyCompetition ||
+              limitChallenges(s, x, timestamp).length < rules.maxActiveChallenges,
             "Limite de desafios simultâneos atingido.",
           );
         ensure(
@@ -3080,8 +3081,9 @@ export function execute(
       );
       for (const p of [attacker, defender])
         ensure(
-          limitChallenges(s, p, timestamp).filter((x) => x._id !== c._id)
-            .length < rules.maxActiveChallenges,
+          rules.weeklyCompetition ||
+            limitChallenges(s, p, timestamp).filter((x) => x._id !== c._id)
+              .length < rules.maxActiveChallenges,
           "Limite de desafios simultâneos atingido.",
         );
       ensure(

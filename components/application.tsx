@@ -2049,7 +2049,8 @@ function Challenges(a: Actions) {
         ? "Esta semana estás em defesa. Consulta os desafios recebidos."
         : p.status !== "active"
           ? "A tua conta de jogador não está ativa."
-          : active.length >= s.settings[0].maxActiveChallenges
+          : !s.settings[0].weeklyCompetition &&
+              active.length >= s.settings[0].maxActiveChallenges
             ? `Já tens ${active.length} desafios ativos. O limite é ${s.settings[0].maxActiveChallenges}. Continua um dos desafios abaixo ou pede ao administrador para resolver um pendente.`
             : teamPosition(s.players, p._id) === 1
               ? "Estás em primeiro lugar: não há jogadores acima de ti para desafiar. Podes receber desafios."
@@ -6179,7 +6180,7 @@ const settingLabels: Record<
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
   maxPositionsAbove: "Posições que pode desafiar acima",
-  maxActiveChallenges: "Máximo de desafios simultâneos",
+  maxActiveChallenges: "Máximo de desafios simultâneos · fora da competição semanal",
   minDaysBetween: "Intervalo mínimo entre desafios · dias",
   acceptHours: "Prazo para aceitar · horas",
   scheduleDays: "Prazo para marcar · dias",
@@ -7436,7 +7437,9 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     ],
     [
       "Desafios em simultâneo",
-      `No máximo ${rules.maxActiveChallenges} por jogador. Intervalo mínimo entre novos desafios: ${rules.minDaysBetween} dias.`,
+      rules.weeklyCompetition
+        ? "Um jogo por dupla em cada jornada. Jogos por concluir de semanas anteriores não impedem criar ou receber o desafio da nova semana."
+        : `No máximo ${rules.maxActiveChallenges} por jogador. Intervalo mínimo entre novos desafios: ${rules.minDaysBetween} dias.`,
     ],
     [
       "Prazos",

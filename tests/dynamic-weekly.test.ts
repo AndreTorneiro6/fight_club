@@ -299,14 +299,15 @@ function earlierGames(deferredUntil?: string) {
     playBy: "2026-11-15T22:59:59Z",
   }));
 }
-test("a team at the active-challenge limit from earlier weeks is left out with a clear reason", () => {
+test("a team at the active-challenge limit from earlier weeks can receive its weekly challenge", () => {
   const s = fixture();
   s.settings[0].maxActiveChallenges = 2;
   // Open games from an earlier week that can still be played now.
   s.challenges = earlierGames();
   const p = dynamicWeeklyPlan(s, "bronze", week);
-  assert.equal(p.maximumMatches, 4);
-  assert.throws(() => send(s, 5, 3), /máximo de desafios ativos/);
+  assert.equal(p.maximumMatches, 5);
+  send(s, 5, 3, "b");
+  assert.equal(pairing(s, 5, 3)?.status, "accepted");
 });
 test("games on hold for the whole week do not use up a team's active-challenge slots", () => {
   const s = fixture();

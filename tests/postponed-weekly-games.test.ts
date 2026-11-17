@@ -170,6 +170,7 @@ function book(s: State, c: Challenge, start: string, courtId = "c1") {
 for (const division of ["ouro", "prata", "bronze"] as const) {
   test(`${division}: both sides of an older postponed game can create or receive this week's regular challenge`, () => {
     const s = fixture(division);
+    s.settings[0].maxActiveChallenges = 1;
     const before = structuredClone(s.challenges[0]);
     // Use the defender's partner to cover both members of each saved team.
     assert.equal(challengeReason(s, s.players[10], s.players[5], now), null);
@@ -215,13 +216,14 @@ for (const division of ["ouro", "prata", "bronze"] as const) {
     const unrelated = create(s, "p15", "p9");
     assert.throws(() => book(s, unrelated, recoveryStart), /campo.*reservado/i);
   });
-  test(`${division}: older games still consume active slots and cannot be rematched while unresolved`, () => {
+  test(`${division}: older games do not limit new weekly challenges but cannot be rematched while unresolved`, () => {
     const s = fixture(division);
     s.settings[0].maxActiveChallenges = 1;
-    assert.match(
-      challengeReason(s, s.players[10], s.players[4], now)!,
-      /Limite de desafios/,
+    assert.equal(
+      challengeReason(s, s.players[10], s.players[4], now),
+      null,
     );
+    create(s, "p11", "p5");
     s.settings[0].maxActiveChallenges = 2;
     assert.notEqual(challengeReason(s, s.players[6], s.players[4], now), null);
   });

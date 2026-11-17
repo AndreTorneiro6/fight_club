@@ -128,15 +128,9 @@ export function challengeReason(
   if (title && aRank > rules.titleMaxPosition)
     return "Posição fora das regras de Title Fight.";
   if (
-    limitChallenges(s, me, now, week).filter(
-      (c) =>
-        !rules.weeklyCompetition ||
-        c.status !== "pending" ||
-        challengeSide(c, me._id, s.players) === "attack",
-    ).length >= rules.maxActiveChallenges ||
-    limitChallenges(s, defender, now, week).filter(
-      (c) => !rules.weeklyCompetition || c.status !== "pending",
-    ).length >= rules.maxActiveChallenges
+    !rules.weeklyCompetition &&
+    (limitChallenges(s, me, now, week).length >= rules.maxActiveChallenges ||
+      limitChallenges(s, defender, now, week).length >= rules.maxActiveChallenges)
   )
     return "Limite de desafios simultâneos atingido.";
   const previous = s.challenges

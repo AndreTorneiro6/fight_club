@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.6";
+export const applicationVersion = "1.19.7";
 export const releaseNotes = [
+  {
+    version: "1.19.7",
+    date: "2026-11-17",
+    title: "Jogos anteriores não bloqueiam novos desafios semanais",
+    changes: [
+      "Atualização de segurança do Next.js e das dependências de email e testes, mantendo a mesma versão principal do framework.",
+      "Na competição semanal, as duplas podem criar e receber o desafio da nova jornada mesmo com jogos anteriores por concluir. O limite de desafios simultâneos aplica-se apenas fora da competição semanal.",
+      "Mantêm-se um jogo por dupla em cada jornada, os papéis definidos pela administração, a adaptação após cada desafio e as proteções contra confrontos repetidos e horários sobrepostos.",
+    ],
+  },
   {
     version: "1.19.6",
     date: "2026-11-14",

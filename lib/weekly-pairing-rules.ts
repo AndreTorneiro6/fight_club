@@ -3,15 +3,11 @@ import type { RankingEntry } from "./ranking-groups";
 import { clubWeek } from "./calendar";
 import { consecutiveRematch } from "./consecutive-rematch";
 import { challengeDistance } from "./challenge-distance";
-import { challengeMemberIds, challengeTeamKey } from "./team-competition";
-import { onHoldForWeek } from "./rules";
+import { challengeTeamKey } from "./team-competition";
 
 const finished = new Set(["completed", "cancelled", "refused", "expired"]);
 
-/** Why a team cannot take part in `week`'s schedule, or null.
- * A vacation does not exclude a team: it can be challenged and the game stays
- * frozen until it returns. The active-challenge limit does, counting games
- * from earlier weeks that can still be played during `week`. */
+/** In weekly competition, earlier unfinished games never exclude a team. */
 export function weeklyTeamUnavailableReason(
   s: State,
   team: RankingEntry,
@@ -26,20 +22,7 @@ export function weeklyTeamUnavailableReason(
     )
   )
     return "Esta dupla não está ativa nesta jornada.";
-  const ids = new Set(team.members.map((m) => m._id));
-  const open = s.challenges.filter(
-    (c) =>
-      !c.competitionRoundId &&
-      !finished.has(c.status) &&
-      (c.weekStart ?? clubWeek(c.createdAt).start) < week &&
-      !onHoldForWeek(s, c, week) &&
-      (["attack", "defense"] as const).some((side) =>
-        challengeMemberIds(c, side, s.players).some((id) => ids.has(id)),
-      ),
-  ).length;
-  return open >= s.settings[0].maxActiveChallenges
-    ? "Esta dupla já tem o máximo de desafios ativos de semanas anteriores."
-    : null;
+  return null;
 }
 
 /** Rules shared by the weekly role generator and the dynamic planner, so the
