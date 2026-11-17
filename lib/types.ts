@@ -413,7 +413,10 @@ export interface WeeklyRound extends Entity {
     { input: string; assignments: string }
   >;
   divisionOpeningDelays?: Record<string, number>;
-  dynamicAssignments?: { playerId: string; role: "attack" | "defense" }[];
+  dynamicAssignments?: {
+    playerId: string;
+    role: "attack" | "defense" | "super_attack";
+  }[];
   challengesOpenAt?: string;
   /** null holds this division until an administrator opens it. */
   divisionChallengeOpenings?: Record<string, string | null>;
@@ -437,7 +440,10 @@ export interface WeeklyRound extends Entity {
   warnings?: string[];
   weekStart: string;
   publishedAt?: string;
-  assignments: { playerId: string; role: "attack" | "defense" }[];
+  assignments: {
+    playerId: string;
+    role: "attack" | "defense" | "super_attack";
+  }[];
 }
 export interface State {
   clubPhotos?: ClubPhoto[];

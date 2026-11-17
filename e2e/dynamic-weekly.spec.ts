@@ -291,3 +291,68 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
   expect(after.publishedAt).toBeUndefined();
   expect(after.approvedAt).toBeFalsy();
 });
+
+test("Ouro offers Super Attack, persists the choice and keeps boundary roles", async ({
+  page,
+}) => {
+  await page.goto("/auth");
+  await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
+  await page
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
+  await page.getByRole("button", { name: "Entrar na arena" }).click();
+  await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
+  await page
+    .getByRole("button", { name: "Saltar visita", exact: true })
+    .click();
+  const week = addClubDays(clubWeek().start, 28);
+  const response = await page.request.post("/api/league", {
+    headers: { Origin: "http://localhost:3100" },
+    data: {
+      type: "admin.week.generate",
+      divisionId: "ouro",
+      weekStart: week,
+      expectedVersion: 0,
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const s = await (await page.request.get("/api/league")).json();
+  const teams = rankingEntries(s.players, "ouro");
+  await page.goto(`/admin?tab=week&task=roles&division=ouro&week=${week}`);
+  const row = (i: number) =>
+    page.locator(`[data-weekly-team="${teams[i].id}"]`);
+  await expect(row(0).getByRole("button", { name: /^Ataque:/ })).toBeDisabled();
+  await expect(
+    row(teams.length - 1).getByRole("button", { name: /^Super Ataque:/ }),
+  ).toHaveCount(0);
+  await row(2)
+    .getByRole("button", { name: /^Remover seleção:/ })
+    .click();
+  await row(2)
+    .getByRole("button", { name: /^Super Ataque:/ })
+    .click();
+  await page
+    .getByRole("button", { name: "Guardar rascunho", exact: true })
+    .click();
+  await expect
+    .poll(async () => {
+      const v = await (await page.request.get("/api/league")).json();
+      return v.weeklyRounds
+        .find((r: any) => r.weekStart === week)
+        .assignments.find((r: any) => r.playerId === teams[2].members[0]._id)
+        ?.role;
+    })
+    .toBe("super_attack");
+  await page.reload();
+  await expect(
+    row(2).getByRole("button", { name: /^Super Ataque:/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/admin?tab=challenges");
+  await expect(
+    page.getByRole("heading", {
+      name: "Definir jogos por divisão",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+});

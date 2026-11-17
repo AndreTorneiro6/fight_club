@@ -93,6 +93,7 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       // maximum-game solver may pay to turn that team into an attacker.
       if (
         roleFor(a.id) !== "defense" &&
+        roleFor(d.id) !== "super_attack" &&
         weeklyPairAllowed(s, divisionId, entries, a, d, week)
       )
         pairs.push({
@@ -265,6 +266,7 @@ export function dynamicRole(s: State, playerId: string, week: string) {
     return "attack" as const;
   if (plan.fixed.some((p) => p.defenderKey === team.id))
     return "defense" as const;
+  if (published === "super_attack") return published;
   if (published === "defense") return "defense" as const;
   if (round?.weekType !== "OPEN_ATTACK") {
     if (
@@ -330,7 +332,10 @@ export function dynamicRoleChanges(
   s: State,
   divisionId: string,
   week: string,
-  assignments: { playerId: string; role: "attack" | "defense" }[],
+  assignments: {
+    playerId: string;
+    role: "attack" | "defense" | "super_attack";
+  }[],
 ) {
   if (!dynamicWeeklyEnabled(s, divisionId, week)) return [];
   const preview: State = {

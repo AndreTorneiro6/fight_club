@@ -206,7 +206,9 @@ export function weeklyRoleGenerationInput(
         const role = (
           previous ? effectiveWeeklyRoleAssignments(s, previous) : []
         )?.find((a) => t.members.some((m) => m._id === a.playerId))?.role;
-        return role ? [[t.id, role]] : [];
+        return role
+          ? [[t.id, role === "super_attack" ? ("attack" as const) : role]]
+          : [];
       }),
     ),
   };
@@ -326,7 +328,15 @@ export function generateWeeklyRoles(
               !m.awaitingApproval &&
               !m.registrationRejectedAt,
           )
-          .map((m) => ({ playerId: m._id, role: plan.roles[t.id] })),
+          .map((m) => ({
+            playerId: m._id,
+            role:
+              d.code === "ouro"
+                ? entries.indexOf(t) === 0
+                  ? ("defense" as const)
+                  : ("attack" as const)
+                : plan.roles[t.id],
+          })),
       );
     let generated = build();
     // Teams left out of the optimizer's schedule take the role the dynamic
@@ -350,7 +360,7 @@ export function generateWeeklyRoles(
       };
       for (const t of entries) {
         const planned = dynamicRole(preview, t.members[0]._id, weekStart);
-        if (planned) plan.roles[t.id] = planned;
+        if (planned && planned !== "super_attack") plan.roles[t.id] = planned;
       }
       generated = build();
     }

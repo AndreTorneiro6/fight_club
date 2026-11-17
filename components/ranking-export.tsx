@@ -22,7 +22,7 @@ export default function RankingExport({
   s: View;
   kind?: PosterKind;
   week?: string;
-  roles?: Record<string, "attack" | "defense">;
+  roles?: Record<string, "attack" | "defense" | "super_attack">;
   status?: string;
   initialDivision?: string;
 }) {
@@ -41,8 +41,17 @@ export default function RankingExport({
   const division = s.divisions.find((d) => d._id === selection);
   // Live refreshes recreate arrays/role maps even when the poster content is unchanged.
   // Keep the same PNG and clipboard feedback until an actual export input changes.
-  const renderKey = JSON.stringify({ players: s.players, divisions: s.divisions,
-    challenges: s.challenges, kind, selection, page: currentPage, week, roles, status });
+  const renderKey = JSON.stringify({
+    players: s.players,
+    divisions: s.divisions,
+    challenges: s.challenges,
+    kind,
+    selection,
+    page: currentPage,
+    week,
+    roles,
+    status,
+  });
   useEffect(() => {
     let cancelled = false,
       url = "";

@@ -87,20 +87,25 @@ test("admin chooses a division's matches without player challenges or forced ext
   s = await read();
   const teams = rankingEntries(s.players, "ouro");
   const existing = s.challenges.filter((c: any) => c.divisionId === "ouro");
-  await page.goto("/admin?tab=challenges");
+  await page.goto(`/admin?tab=week&task=mandatory&division=ouro&week=${week}`);
   const panel = page.locator("section.panel").filter({
     has: page.getByRole("heading", {
       name: "Definir jogos por divisão",
       exact: true,
     }),
   });
-  await panel.getByLabel("Divisão dos jogos").selectOption("ouro");
+  await page
+    .getByLabel("Divisão a gerir", { exact: true })
+    .selectOption("ouro");
   await panel.getByLabel("Quem define os confrontos").selectOption("admin");
   await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
     "admin",
   );
   await expect(
-    panel.getByRole("button", { name: "Definir jogo", exact: true }),
+    panel.getByRole("button", {
+      name: "Adicionar par ao rascunho",
+      exact: true,
+    }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -109,7 +114,7 @@ test("admin chooses a division's matches without player challenges or forced ext
     ),
   ).toBe(true);
   await panel
-    .getByRole("button", { name: "Definir jogo", exact: true })
+    .getByRole("button", { name: "Adicionar par ao rascunho", exact: true })
     .click();
   const modal = page.getByRole("dialog", { name: "Definir jogo da divisão" });
   await modal
@@ -134,7 +139,7 @@ test("admin chooses a division's matches without player challenges or forced ext
       .manualMatchups.ouro.pairs,
   ).toHaveLength(1);
   await panel
-    .getByRole("button", { name: "Publicar jogos desta semana", exact: true })
+    .getByRole("button", { name: "Publicar jogos obrigatórios", exact: true })
     .click();
   await expect
     .poll(
@@ -177,7 +182,7 @@ test("admin chooses a division's matches without player challenges or forced ext
   } finally {
     await context.close();
   }
-  await page.goto("/admin?tab=challenges");
+  await page.goto(`/admin?tab=week&task=mandatory&division=ouro&week=${week}`);
   await panel.getByLabel("Quem define os confrontos").selectOption("standard");
   await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
     "standard",
@@ -194,27 +199,25 @@ test("admins can save separate drafts several weeks ahead before papers or chall
   const read = async () => (await page.request.get("/api/league")).json();
   const before = await read();
   const teams = rankingEntries(before.players, "ouro");
-  await page.goto("/admin?tab=challenges");
-  const panel = page
-    .locator("section.panel")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Definir jogos por divisão",
-        exact: true,
-      }),
-    });
+  await page.goto("/admin?tab=week&task=mandatory&division=ouro");
+  const panel = page.locator("section.panel").filter({
+    has: page.getByRole("heading", {
+      name: "Definir jogos por divisão",
+      exact: true,
+    }),
+  });
   const weeks = [
     addClubDays(clubWeek().start, 14),
     addClubDays(clubWeek().start, 21),
   ];
   for (const [i, week] of weeks.entries()) {
-    await panel.getByLabel("Semana dos jogos a definir").selectOption(week);
+    await page.getByLabel("Semana a gerir", { exact: true }).selectOption(week);
     await panel.getByLabel("Quem define os confrontos").selectOption("admin");
     await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
       "admin",
     );
     await panel
-      .getByRole("button", { name: "Definir jogo", exact: true })
+      .getByRole("button", { name: "Adicionar par ao rascunho", exact: true })
       .click();
     const modal = page.getByRole("dialog", { name: "Definir jogo da divisão" });
     await modal
@@ -236,6 +239,8 @@ test("admins can save separate drafts several weeks ahead before papers or chall
     expect(round.manualMatchups.ouro.pairs).toHaveLength(1);
     expect(round.manualMatchups.ouro.pairs[0].challengeId).toBeUndefined();
   }
-  await panel.getByLabel("Semana dos jogos a definir").selectOption(weeks[0]);
+  await page
+    .getByLabel("Semana a gerir", { exact: true })
+    .selectOption(weeks[0]);
   await expect(panel.getByText(/1 pares em rascunho/)).toBeVisible();
 });

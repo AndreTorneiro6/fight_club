@@ -9,7 +9,7 @@ export type PosterOptions = {
   selection: string;
   page: number;
   week?: string;
-  roles?: Record<string, "attack" | "defense">;
+  roles?: Record<string, "attack" | "defense" | "super_attack">;
   status?: string;
 };
 export const RANKING_PAGE_SIZE = 12;
@@ -35,7 +35,7 @@ export function posterPageCount(s: View, selection: string, kind: PosterKind) {
 }
 export function posterTeamRole(
   members: View["players"],
-  roles: Record<string, "attack" | "defense">,
+  roles: Record<string, "attack" | "defense" | "super_attack">,
 ) {
   const active = members.filter((p) => p.status === "active");
   const selected = active.map((p) => roles[p._id]);
@@ -191,10 +191,10 @@ export async function renderPublicationPoster(s: View, options: PosterOptions) {
       if (weekly) {
         const role = posterTeamRole(entry.members, options.roles ?? {});
         if (role) {
-          const col = role === "attack" ? 2 : 3;
+          const col = role !== "defense" ? 2 : 3;
           const cx = x + (w * (columns[col] + columns[col + 1])) / 2,
             cy = y + height / 2;
-          ctx.strokeStyle = role === "attack" ? "#ff493e" : "#f6cb46";
+          ctx.strokeStyle = role !== "defense" ? "#ff493e" : "#f6cb46";
           ctx.fillStyle = ctx.strokeStyle;
           ctx.lineWidth = individual ? 3 : 2.6;
           ctx.beginPath();

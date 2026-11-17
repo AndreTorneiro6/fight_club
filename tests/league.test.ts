@@ -1750,8 +1750,9 @@ function publishWeek(s: State, timestamp = time) {
     timestamp,
   );
 }
-test("weekly roles must be published and only attackers can challenge assigned defenders", () => {
+test("outside Ouro weekly roles require attackers to challenge assigned defenders", () => {
   const s = fixture();
+  s.divisions.find((d) => d._id === "ouro")!.code = "prata";
   s.settings[0].weeklyCompetition = true;
   assert.throws(() => create(s), /publicação/);
   assert.throws(

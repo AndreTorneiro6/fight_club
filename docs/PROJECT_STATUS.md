@@ -1,3 +1,11 @@
+## Version 1.20.0 — Ouro role modes, implementation — 17 November 2026
+
+- User requested implementation for Ouro only, explicitly leaving live papers alone so they can reassign them after the fix. Ataque permits creating and receiving challenges; Defesa is receive-only; Super Ataque is create-only. First team remains Defense and last team normal Attack; server rejects Super Attack on either boundary or outside Ouro.
+- Added persisted super_attack role to weekly assignment schemas, correction/publication paths and UI/export types. Ouro eligibility uses original published role constraints even during OPEN_ATTACK weeks. Other divisions retain their existing role checks. Ouro generation defaults to Defense for first and Attack for every other team. No production data changed.
+- Solver excludes Defense attackers and Super Attack defenders, retains fixed games and automatically assigns forced remaining edges. Regression verifies 12→9 plus 10→7 creates 11→8 automatically with reach 3 and six total games.
+- Removed the duplicate division matchmaking panel from admin Desafios and the repeated link in weekly roles. Manual scheduling remains in Gerir semana → Jogos obrigatórios; browser tests now navigate there.
+- Validation: typecheck, all 577 tests and production build pass. Ouro UI browser regression passes for third-button selection, saved draft/reload, boundary roles and duplicate-control removal. All six affected weekly/manual browser checks pass (four in the combined run and both manual checks rerun after updating their button labels for the weekly workspace). User requested continuing after implementation. Submitting the validated feature to the deploy branch through GitHub Actions; deployment completion is unverified. No live papers reassigned. Only confirm workflow submission/start; do not monitor continuously.
+
 ## Version 1.19.8 — admin papers first, adaptation only after challenges — 17 November 2026
 
 - User reported João Passos being changed from published Defesa to Ataque and clarified that papers must stay as chosen until challenges begin. The planner may adapt the remaining teams after a committed pairing, while published defenders must remain defenders.

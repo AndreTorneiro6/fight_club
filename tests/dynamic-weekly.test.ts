@@ -1224,3 +1224,55 @@ test("separate future drafts reject consecutive rematches and removing an unpubl
     1,
   );
 });
+
+test("Ouro flexible attacks preserve automatic 11→8 after 12→9 and 10→7", () => {
+  const s = fixture("ouro", 12, 3);
+  s.weeklyRounds[0].weekType = "NORMAL";
+  send(s, 12, 9);
+  send(s, 10, 7);
+  assert.equal(pairing(s, 11, 8)?.status, "accepted");
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 6);
+});
+
+test("Ouro Attack accepts challenges, Defense cannot attack and Super Attack cannot be challenged", () => {
+  const flexible = fixture("ouro", 12, 3);
+  flexible.weeklyRounds[0].weekType = "NORMAL";
+  send(flexible, 5, 3);
+  assert.equal(pairing(flexible, 5, 3)?.status, "accepted");
+  const s = fixture("ouro", 12, 3);
+  for (const a of s.weeklyRounds[0].assignments) {
+    if (/^t9[ab]$/.test(a.playerId)) a.role = "super_attack";
+    if (/^t5[ab]$/.test(a.playerId)) a.role = "defense";
+  }
+  assert.throws(() => send(s, 12, 9), /Super Ataque/);
+  assert.throws(() => send(s, 5, 3), /defesa/);
+  send(s, 9, 6);
+  assert.equal(pairing(s, 9, 6)?.status, "accepted");
+});
+
+test("Super Attack is restricted to Ouro's intermediate teams", () => {
+  for (const [code, rank] of [
+    ["prata", 3],
+    ["ouro", 1],
+    ["ouro", 12],
+  ] as const) {
+    const s = fixture(code, 12, 3);
+    assert.throws(
+      () =>
+        execute(
+          s,
+          { ...actor(1), role: "admin" },
+          {
+            type: "admin.week.division.correct",
+            divisionId: code,
+            weekStart: week,
+            expectedVersion: 1,
+            changes: [{ playerId: `t${rank}a`, role: "super_attack" }],
+            reason: "Verificar limites do papel",
+          },
+          now,
+        ),
+      /apenas em Ouro|primeira equipa/,
+    );
+  }
+});

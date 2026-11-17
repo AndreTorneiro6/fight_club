@@ -310,7 +310,10 @@ export const commandSchema = z.discriminatedUnion("type", [
     weekStart: day,
     expectedVersion: z.number().int().min(0),
     assignments: z.array(
-      z.object({ playerId: id, role: z.enum(["attack", "defense"]) }),
+      z.object({
+        playerId: id,
+        role: z.enum(["attack", "defense", "super_attack"]),
+      }),
     ),
   }),
   z.object({
@@ -325,7 +328,12 @@ export const commandSchema = z.discriminatedUnion("type", [
     weekStart: day,
     expectedVersion: z.number().int().min(0),
     changes: z
-      .array(z.object({ playerId: id, role: z.enum(["attack", "defense"]) }))
+      .array(
+        z.object({
+          playerId: id,
+          role: z.enum(["attack", "defense", "super_attack"]),
+        }),
+      )
       .min(1),
     reason: text.min(3),
   }),
@@ -363,7 +371,12 @@ export const commandSchema = z.discriminatedUnion("type", [
     weekStart: day,
     publish: z.boolean(),
     assignments: z
-      .array(z.object({ playerId: id, role: z.enum(["attack", "defense"]) }))
+      .array(
+        z.object({
+          playerId: id,
+          role: z.enum(["attack", "defense", "super_attack"]),
+        }),
+      )
       .max(1000),
   }),
   z.object({
@@ -768,6 +781,31 @@ export function execute(
   )
     return executeEngagement(s, actor, raw, new Date(timestamp).toISOString());
   const cmd = commandSchema.parse(raw);
+  if ("assignments" in cmd || "changes" in cmd) {
+    const papers =
+      "assignments" in cmd
+        ? cmd.assignments
+        : "changes" in cmd
+          ? cmd.changes
+          : [];
+    if (Array.isArray(papers))
+      for (const paper of papers) {
+        if (paper.role !== "super_attack") continue;
+        const p = s.players.find((p) => p._id === paper.playerId);
+        ensure(
+          p && s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro",
+          "Super Ataque está disponível apenas em Ouro.",
+        );
+        const teams = rankingEntries(s.players, p.divisionId);
+        ensure(
+          ![teams[0], teams.at(-1)].some((t) =>
+            t?.members.some((m) => m._id === p._id),
+          ),
+          "A primeira equipa defende e a última fica em Ataque.",
+        );
+      }
+  }
+
   if (
     [
       "admin.ranking.move",
@@ -1760,7 +1798,7 @@ export function execute(
           notify(
             r.playerId,
             "Papel semanal atualizado",
-            `O teu papel na semana de ${weekStart} passou para ${r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
+            `O teu papel na semana de ${weekStart} passou para ${r.role === "super_attack" ? "SUPER ATAQUE" : r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
             undefined,
             `dynamic-role:${weekStart}:${round.version}:${r.playerId}`,
             { kind: "update", deliveryChannels: ["push"] },
@@ -2513,7 +2551,7 @@ export function execute(
           notify(
             entry.playerId,
             "Papel semanal publicado",
-            `Semana de ${cmd.weekStart}: ${entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
+            `Semana de ${cmd.weekStart}: ${entry.role === "super_attack" ? "Super Ataque" : entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
           );
       if (cmd.publish && cmd.weekStart === weeklyChallengeWeek(s, timestamp))
         for (const division of s.divisions)
@@ -2676,7 +2714,8 @@ export function execute(
         for (const x of [p, d])
           ensure(
             rules.weeklyCompetition ||
-              limitChallenges(s, x, timestamp).length < rules.maxActiveChallenges,
+              limitChallenges(s, x, timestamp).length <
+                rules.maxActiveChallenges,
             "Limite de desafios simultâneos atingido.",
           );
         ensure(

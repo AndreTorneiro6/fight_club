@@ -2082,7 +2082,10 @@ function Challenges(a: Actions) {
           ) : adminMatchmakingEnabled(s, p.divisionId) ||
             ownTeamCommitment ||
             (s.settings[0].weeklyCompetition &&
-              (weeklyRole(s, p._id) !== "attack" || !!openingBlock)) ? null : (
+              (!["attack", "super_attack"].includes(
+                weeklyRole(s, p._id) ?? "",
+              ) ||
+                !!openingBlock)) ? null : (
             <a
               className="button primary"
               href={
@@ -5089,7 +5092,6 @@ function AdminChallenges(a: Actions) {
       className="stack"
       aria-label="Filtros dos desafios administrativos"
     >
-      <AdminDivisionMatchmaking {...a} />
       <div className="panel stack admin-challenge-filters">
         <div className="form-grid">
           <label>
@@ -6180,7 +6182,8 @@ const settingLabels: Record<
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
   maxPositionsAbove: "Posições que pode desafiar acima",
-  maxActiveChallenges: "Máximo de desafios simultâneos · fora da competição semanal",
+  maxActiveChallenges:
+    "Máximo de desafios simultâneos · fora da competição semanal",
   minDaysBetween: "Intervalo mínimo entre desafios · dias",
   acceptHours: "Prazo para aceitar · horas",
   scheduleDays: "Prazo para marcar · dias",

@@ -18,8 +18,11 @@ export function weeklyPublishedAt(
  * during its week (dynamic roles) and must not block publishing another one. */
 export function hasUnsavedDivisionRoles(
   players: { _id: string; divisionId: string }[],
-  roles: Record<string, "attack" | "defense">,
-  assignments: { playerId: string; role: "attack" | "defense" }[],
+  roles: Record<string, "attack" | "defense" | "super_attack">,
+  assignments: {
+    playerId: string;
+    role: "attack" | "defense" | "super_attack";
+  }[],
   divisionId: string | "all",
 ) {
   const inScope = (playerId: string) =>
@@ -34,4 +37,3 @@ export function hasUnsavedDivisionRoles(
     .sort();
   return JSON.stringify(onScreen) !== JSON.stringify(saved);
 }
-

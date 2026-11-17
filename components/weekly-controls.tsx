@@ -61,11 +61,13 @@ function PreviousWeekRole({
   )
     return null;
   const roleLabel = (role: string | undefined) =>
-    role === "attack"
-      ? "ATAQUE"
-      : role === "defense"
-        ? "DEFESA"
-        : "Por atribuir";
+    role === "super_attack"
+      ? "SUPER ATAQUE"
+      : role === "attack"
+        ? "ATAQUE"
+        : role === "defense"
+          ? "DEFESA"
+          : "Por atribuir";
   // Final = the side the team actually played (or its effective role without a game).
   const last = teamRoleHistory(s, team, week, 1)[0];
   if (last?.week !== previous.weekStart) return null;
@@ -225,18 +227,22 @@ export function WeeklyRoles({
         round,
         s.players.find((p) => p._id === entry.playerId)?.divisionId,
       )
-        ? (weeklyRole(s, entry.playerId, Date.now(), week) ?? entry.role)
+        ? entry.role === "super_attack"
+          ? entry.role
+          : (weeklyRole(s, entry.playerId, Date.now(), week) ?? entry.role)
         : entry.role,
     })) ?? [],
   );
-  const [roles, setRoles] = useState<Record<string, "attack" | "defense">>({});
+  const [roles, setRoles] = useState<
+    Record<string, "attack" | "defense" | "super_attack">
+  >({});
   useEffect(() => {
     setRoles(
       Object.fromEntries(
         (
           JSON.parse(saved) as {
             playerId: string;
-            role: "attack" | "defense";
+            role: "attack" | "defense" | "super_attack";
           }[]
         ).map((entry) => [entry.playerId, entry.role]),
       ),
@@ -260,7 +266,7 @@ export function WeeklyRoles({
       (division === "all" || entry.members[0].divisionId === division) &&
       (admin ||
         entry.members.some((m) => m._id === me._id) ||
-        (weeklyRole(s, me._id) === "attack" &&
+        (["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "") &&
           entry.members.some((m) => !challengeReason(s, me, m)))),
   );
   const published = !!weeklyPublishedAt(
@@ -436,22 +442,22 @@ export function WeeklyRoles({
       <h2>
         {admin
           ? "Atribuição semanal de ataque e defesa"
-          : weeklyRole(s, me._id) === "attack"
+          : ["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "")
             ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
             : weeklyRole(s, me._id) === "defense"
               ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
               : "OS MEUS DESAFIOS"}
       </h2>
-      {admin && !lockedContext ? (
-        <Link
-          className="button"
-          href={`/admin?tab=week&task=mandatory&week=${week}&division=${division === "all" ? (s.divisions[0]?._id ?? "") : division}`}
-        >
-          Definir jogos por divisão
-        </Link>
-      ) : !admin && adminMatchmakingEnabled(s, me.divisionId) ? (
+      {!admin && adminMatchmakingEnabled(s, me.divisionId) && (
         <p role="status">{ADMIN_MATCHMAKING_MESSAGE}</p>
-      ) : null}
+      )}
+      {admin && (
+        <p>
+          Ataque: pode desafiar e ser desafiada em Ouro. Defesa: aguarda um
+          desafio. Super Ataque: só pode desafiar. A primeira equipa defende; a
+          última ataca.
+        </p>
+      )}
       {admin && lockedContext && (
         <p className="inset">
           Gera uma proposta, revê o ataque e a defesa de cada dupla e usa
@@ -688,7 +694,7 @@ export function WeeklyRoles({
         !ownTeamCommitment &&
         opening !== null &&
         (!opening || Date.now() >= Date.parse(opening)) &&
-        weeklyRole(s, me._id) === "attack" &&
+        ["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "") &&
         visible.every((t) => t.members.some((m) => m._id === me._id)) && (
           <p>
             Não existem duplas disponíveis para desafiar nesta jornada. A
@@ -837,7 +843,7 @@ export function WeeklyRoles({
               return next;
             });
           const canEditPublished = editMode;
-          const assign = (value: "attack" | "defense") =>
+          const assign = (value: "attack" | "defense" | "super_attack") =>
             setRoles((previous) => ({
               ...previous,
               ...Object.fromEntries(
@@ -887,13 +893,15 @@ export function WeeklyRoles({
                     ) : role === "defense" ? (
                       <Shield size={14} />
                     ) : null}
-                    {role === "attack"
-                      ? "Ataque"
-                      : role === "defense"
-                        ? "Defesa"
-                        : mixed
-                          ? "Papéis diferentes · aguarda a atualização do clube"
-                          : "Por atribuir"}
+                    {role === "super_attack"
+                      ? "Super Ataque"
+                      : role === "attack"
+                        ? "Ataque"
+                        : role === "defense"
+                          ? "Defesa"
+                          : mixed
+                            ? "Papéis diferentes · aguarda a atualização do clube"
+                            : "Por atribuir"}
                   </span>
                 )}
                 {admin ? (
@@ -954,6 +962,27 @@ export function WeeklyRoles({
                     <Shield size={16} />
                     Defesa
                   </button>
+                  {s.divisions.find((d) => d._id === members[0].divisionId)
+                    ?.code === "ouro" &&
+                    !defenseReason && (
+                      <button
+                        className={`weekly-role-choice ${role === "super_attack" ? "primary small" : "small"}`}
+                        aria-label={`Super Ataque: ${label}`}
+                        aria-pressed={role === "super_attack"}
+                        disabled={
+                          busy ||
+                          !!role ||
+                          !!attackReason ||
+                          lockedByChallenge ||
+                          (published && !correctable && !canEditPublished) ||
+                          week < clubWeek().start
+                        }
+                        onClick={() => assign("super_attack")}
+                      >
+                        <Sword size={16} />
+                        Super Ataque
+                      </button>
+                    )}
                   {(role || mixed) && (
                     <button
                       className="small"

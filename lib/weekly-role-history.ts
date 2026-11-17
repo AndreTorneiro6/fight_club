@@ -17,7 +17,7 @@ import {
   dynamicWeeklyPlan,
 } from "./dynamic-weekly";
 
-type Role = "attack" | "defense";
+type Role = "attack" | "defense" | "super_attack";
 const ended = new Set(["cancelled", "refused", "expired"]);
 const weekOf = (c: Challenge) => c.weekStart ?? clubWeek(c.createdAt).start;
 
@@ -223,12 +223,17 @@ export function divisionWeekOptions(
           ? entries.filter(
               (d) =>
                 free(d) &&
-                roleOf(d) !== "attack" &&
+                (s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
+                  ? roleOf(d) !== "super_attack"
+                  : roleOf(d) !== "attack") &&
                 weeklyPairAllowed(s, divisionId, entries, t, d, week),
             )
           : [];
       const defense =
-        open && mine !== "attack"
+        open &&
+        (s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
+          ? mine !== "super_attack"
+          : mine !== "attack")
           ? entries.filter(
               (a) =>
                 free(a) &&

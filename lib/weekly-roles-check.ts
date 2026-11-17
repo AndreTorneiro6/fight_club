@@ -23,7 +23,7 @@ export function weeklyRolesProblem(s: State, divisionId: string, week: string) {
     week,
     round.assignments.filter((a) => ids.has(a.playerId)),
   );
-  const role = (r: "attack" | "defense") =>
+  const role = (r: "attack" | "defense" | "super_attack") =>
     r === "attack" ? "Ataque" : "Defesa";
   return changes.length
     ? `Os papéis não permitem o máximo de jogos sem trocas: ${changes

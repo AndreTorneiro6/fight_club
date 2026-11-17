@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.19.8";
+export const applicationVersion = "1.20.0";
 export const releaseNotes = [
+  {
+    version: "1.20.0",
+    date: "2026-11-17",
+    title: "Três papéis semanais em Ouro",
+    changes: [
+      "Em Ouro, Ataque permite desafiar e receber desafios, Defesa obriga a aguardar e Super Ataque permite apenas desafiar. A primeira dupla defende e a última fica em Ataque.",
+      "O algoritmo mantém os confrontos automáticos necessários depois dos desafios. Os papéis existentes não são reatribuídos; o administrador pode preparar as novas escolhas.",
+      "Removido o controlo duplicado de definição de jogos por divisão em Desafios. A gestão continua disponível na área semanal.",
+    ],
+  },
   {
     version: "1.19.8",
     date: "2026-11-17",

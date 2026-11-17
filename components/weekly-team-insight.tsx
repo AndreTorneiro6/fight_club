@@ -7,7 +7,13 @@ import {
 } from "@/lib/weekly-role-history";
 
 const roleLabel = (role?: string) =>
-  role === "attack" ? "Ataque" : role === "defense" ? "Defesa" : "—";
+  role === "super_attack"
+    ? "Super Ataque"
+    : role === "attack"
+      ? "Ataque"
+      : role === "defense"
+        ? "Defesa"
+        : "—";
 const day = (week: string) =>
   new Date(week + "T12:00:00Z").toLocaleDateString("pt-PT", {
     day: "numeric",

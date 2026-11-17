@@ -19,14 +19,14 @@ import {
 export function weeklyPositionReason(
   players: Player[],
   playerId: string,
-  role: "attack" | "defense",
+  role: "attack" | "defense" | "super_attack",
 ) {
   const player = players.find((entry) => entry._id === playerId);
   if (!player) return null;
   const teams = rankingEntries(players, player.divisionId);
-  const boundary = role === "attack" ? teams[0] : teams.at(-1);
+  const boundary = role !== "defense" ? teams[0] : teams.at(-1);
   if (!boundary?.members.some((member) => member._id === playerId)) return null;
-  return role === "attack"
+  return role !== "defense"
     ? "A primeira equipa do ranking não pode atacar."
     : "A última equipa do ranking não pode defender.";
 }
@@ -119,7 +119,7 @@ function getEffectiveRoleForChallenge(
   week: string,
   now: number,
   isAttacker: boolean,
-): "attack" | "defense" | undefined {
+): "attack" | "defense" | "super_attack" | undefined {
   // Use weekly published role
   return weeklyRole(s, playerId, now, week);
 }
@@ -159,8 +159,20 @@ export function weeklyReason(
     if (opensAt && Date.parse(opensAt) > now)
       return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
   }
+  const ouro =
+    s.divisions.find((d) => d._id === attacker.divisionId)?.code === "ouro";
+  if (ouro && !manual) {
+    const role = (p: Player) =>
+      selected?.assignments.find((a) => a.playerId === p._id)?.role;
+    if ([...attackingTeam, ...defendingTeam].some((p) => !role(p)))
+      return "Aguarda a atribuição do papel semanal pelo administrador.";
+    if (attackingTeam.some((p) => role(p) === "defense"))
+      return "Esta dupla está em defesa e deve aguardar um desafio.";
+    if (defendingTeam.some((p) => role(p) === "super_attack"))
+      return "Esta dupla está em Super Ataque e não pode ser desafiada.";
+  }
   const open = selected?.weekType === "OPEN_ATTACK";
-  if (!open && !manual) {
+  if (!open && !manual && !ouro) {
     const attackerRole = getEffectiveRoleForChallenge(
       s,
       ignoreId ?? "",
