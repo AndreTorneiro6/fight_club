@@ -1,3 +1,9 @@
+## v1.21.1 LIVE verified — 17 November 2026
+
+- Waited the requested 30 minutes after workflow start. Actions 44111549947 passed all checks and deployment for exact 08023a5b7f1bc85f4c5ac32f846a89957ef8e177.
+- App/worker both run that revision, running with zero restarts; app healthy, public /api/health returns {"ok":true}. Ouro player Ranking/dashboard tables show eligible opponents only with original ranking numbers; admin/spectator rankings remain complete. Live papers were not manually changed.
+- This documentation-only handoff update does not require a production deployment.
+
 ## Version 1.21.1 — player opponent visibility — 17 November 2026
 
 - User clarified that players should see only opponents they can actually challenge within normal or currently unlocked extended reach, rather than all players. Desafios already filters eligible opponents; the full list came from Ranking/dashboard tables. Applied eligibility filtering to Ouro weekly player ranking tables as well, after asking scope and stating the assumption when no answer arrived. Other divisions and admin/spectator views are unchanged.
