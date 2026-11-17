@@ -1,3 +1,9 @@
+## v1.21.0 CI reach expectation repair — 17 November 2026
+
+- After the requested 30-minute wait, verified Actions runs 44093621501 and 44093797012 stopped before deployment. All earlier checks, including the new Ouro simulator/opponent controls, passed; challenge-opening-clock still expected Ouro's old reach of 2. Updated that explicit assertion to the requested default 4. This is a test expectation repair; no runtime changes or bypass.
+- The repaired opening-clock browser suite passes locally. Also ran every remaining CI browser group separately: player-agenda (2), team-rankings (1), weekly-teams (1), all passing. Previous validation remains 581 tests, typecheck, production build and all six affected Ouro/manual/workspace browser checks.
+- Public health remains ok on the prior production release. Submitting the repaired revision normally through deploy-branch GitHub Actions. User asked to fix everything and wait 30 minutes after submission/start before checking again. No production papers reassigned or opened manually.
+
 ## Version 1.21.0 — adaptive Ouro reach and admin opponent controls — 17 November 2026
 
 - User requested refactoring Ouro: normal reach four, preserve the first valid committed challenge, recalculate the remaining games using the minimum necessary reach extensions, including title eligibility/#12→#1 only when required. Defesa and Super Ataque constraints and admin opponent exclusions remain hard limits. Other divisions retain their matching policy.

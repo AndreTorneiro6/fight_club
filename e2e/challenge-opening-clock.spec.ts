@@ -146,7 +146,7 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
     await player.getByRole("button", { name: "OURO", exact: true }).click();
     await expect(
       player.getByText(
-        "Alcance dos desafios nesta divisão: até 2 posições acima.",
+        "Alcance dos desafios nesta divisão: até 4 posições acima.",
         { exact: true },
       ),
     ).toBeVisible();
