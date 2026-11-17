@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.21.0";
+export const applicationVersion = "1.21.1";
 export const releaseNotes = [
+  {
+    version: "1.21.1",
+    date: "2026-11-17",
+    title: "Ouro mostra apenas adversários disponíveis ao jogador",
+    changes: [
+      "As tabelas de ranking dos jogadores de Ouro mostram apenas as duplas que podem desafiar nesse momento, respeitando alcance, alargamentos necessários, papéis, jogos definidos e exclusões do administrador. As posições reais são preservadas.",
+      "Os administradores e espectadores mantêm acesso ao ranking completo.",
+    ],
+  },
   {
     version: "1.21.0",
     date: "2026-11-17",

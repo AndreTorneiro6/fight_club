@@ -1,3 +1,10 @@
+## Version 1.21.1 — player opponent visibility — 17 November 2026
+
+- User clarified that players should see only opponents they can actually challenge within normal or currently unlocked extended reach, rather than all players. Desafios already filters eligible opponents; the full list came from Ranking/dashboard tables. Applied eligibility filtering to Ouro weekly player ranking tables as well, after asking scope and stating the assumption when no answer arrived. Other divisions and admin/spectator views are unchanged.
+- Rank positions are computed before filtering and limiting, so a visible #8 stays #8 and valid opponents below the top five can appear on the dashboard. Empty states explain when no opponents are available. Filtering uses the same challengeReason as submission: role, admin exclusions, occupied teams, reach extensions, title/rematch/opening/availability constraints stay aligned.
+- Validation: typecheck, all 581 tests, production build and all seven affected weekly/manual/workspace browser checks pass. New browser regression saves a single allowed opponent, checks player Ranking and dashboard have only that row with original rank 02, excludes blocked teams in Desafios and verifies admin ranking retains all teams.
+- Submitting through deploy-branch Actions. User's 30-minute delay before checking deployment remains in effect. No live league or paper records manually changed; deployment not yet verified.
+
 ## v1.21.0 LIVE verified — 17 November 2026
 
 - The required 30-minute timer finished and Actions workflow 44099408898 completed successfully: both checks and deploy passed for exact revision 657a65b56e3f1070e99c89aee9f01ff003e9ed55.

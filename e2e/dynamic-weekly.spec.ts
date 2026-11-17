@@ -395,3 +395,80 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     }),
   ).toHaveCount(0);
 });
+
+test("Ouro players see only challengeable opponents in their ranking tables", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/auth");
+  await page.getByLabel("Email", { exact: true }).fill("admin@fightclub.local");
+  await page
+    .getByLabel("Palavra-passe", { exact: true })
+    .fill("FightClub2026!");
+  await page.getByRole("button", { name: "Entrar na arena" }).click();
+  await expect(page).toHaveURL(/\/inicio/);
+  await enterAdminWorkspace(page);
+  const tour = page.getByRole("button", { name: "Saltar visita", exact: true });
+  if (await tour.isVisible()) await tour.click();
+  const s = await (await page.request.get("/api/league")).json();
+  const teams = rankingEntries(s.players, "ouro");
+  const source = teams.find((t) =>
+    t.members.some((p) => p._id === "player-5"),
+  )!;
+  const week = addClubDays(clubWeek().start, 7);
+  const round = s.weeklyRounds.find((r: any) => r.weekStart === week);
+  const saved = await page.request.post("/api/league", {
+    headers: { Origin: "http://localhost:3100" },
+    data: {
+      type: "admin.week.ouro.opponents.save",
+      weekStart: week,
+      expectedVersion: round.version,
+      teamKey: source.id,
+      allowedTeamKeys: [teams[1].id],
+    },
+  });
+  expect(saved.ok(), await saved.text()).toBeTruthy();
+  const context = await browser.newContext();
+  try {
+    const player = await context.newPage();
+    await player.goto("/auth");
+    await player
+      .getByLabel("Email", { exact: true })
+      .fill("adversario@fightclub.local");
+    await player
+      .getByLabel("Palavra-passe", { exact: true })
+      .fill("FightClub2026!");
+    await player.getByRole("button", { name: "Entrar na arena" }).click();
+    await expect(player).toHaveURL(/\/inicio/);
+    await player
+      .getByRole("button", { name: "Saltar visita", exact: true })
+      .click();
+    await player.goto("/ranking");
+    await expect(player.locator("[data-ranking-entry]")).toHaveCount(1);
+    await expect(
+      player.locator(`[data-ranking-entry="${teams[1].id}"]`),
+    ).toBeVisible();
+    await expect(
+      player
+        .locator(`[data-ranking-entry="${teams[1].id}"]`)
+        .locator("span")
+        .first(),
+    ).toHaveText("02");
+    await player.goto("/inicio");
+    await expect(player.locator("[data-ranking-entry]")).toHaveCount(1);
+    await player.goto("/desafios");
+    await expect(
+      player.locator(`[data-weekly-team="${teams[0].id}"]`),
+    ).toHaveCount(0);
+    await expect(
+      player.locator(`[data-weekly-team="${teams[1].id}"]`),
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+  await page.goto("/admin?tab=rankings");
+  await page.getByLabel("Categoria do ranking").selectOption("ouro");
+  await expect(page.locator("[data-admin-ranking-entry]")).toHaveCount(
+    teams.length,
+  );
+});
