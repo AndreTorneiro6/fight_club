@@ -1362,3 +1362,31 @@ test("Ouro opponent exclusions are saved, audited and respected by reach extensi
   assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 5);
   assert.throws(() => send(s, 11, 6));
 });
+
+test("Ouro selections support combined production-length partner IDs", () => {
+  const s = fixture("ouro", 12, 4);
+  const ids = new Map(s.players.map((p) => [p._id, p._id.padEnd(64, "x")]));
+  for (const p of s.players) {
+    p._id = ids.get(p._id)!;
+    p.partnerId = ids.get(p.partnerId!)!;
+  }
+  for (const a of s.weeklyRounds[0].assignments)
+    a.playerId = ids.get(a.playerId)!;
+  const teams = rankingEntries(s.players, "ouro");
+  assert.equal(teams[10].id.length, 129);
+  execute(
+    s,
+    { ...actor(1), role: "admin" },
+    {
+      type: "admin.week.ouro.opponents.save",
+      weekStart: week,
+      expectedVersion: 1,
+      teamKey: teams[10].id,
+      allowedTeamKeys: [teams[5].id],
+    },
+    now,
+  );
+  assert.deepEqual(s.weeklyRounds[0].ouroAllowedOpponents?.[teams[10].id], [
+    teams[5].id,
+  ]);
+});

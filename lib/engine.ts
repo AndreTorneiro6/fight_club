@@ -219,8 +219,8 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("admin.week.ouro.opponents.save"),
     weekStart: day,
     expectedVersion: z.number().int().min(0),
-    teamKey: id,
-    allowedTeamKeys: z.array(id).max(100),
+    teamKey: z.string().min(1).max(201),
+    allowedTeamKeys: z.array(z.string().min(1).max(201)).max(100),
   }),
   z.object({
     type: z.literal("admin.division.matchmaking.set"),
