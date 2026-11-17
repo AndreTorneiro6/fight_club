@@ -212,6 +212,9 @@ test("admins can save separate drafts several weeks ahead before papers or chall
   ];
   for (const [i, week] of weeks.entries()) {
     await page.getByLabel("Semana a gerir", { exact: true }).selectOption(week);
+    await expect(page).toHaveURL(new RegExp(`week=${week}`));
+    await expect(panel.getByText(new RegExp(`Jornada de ${week}`))).toBeVisible();
+    await expect(panel.getByLabel("Quem define os confrontos")).toBeEnabled();
     await panel.getByLabel("Quem define os confrontos").selectOption("admin");
     await expect(panel.getByLabel("Quem define os confrontos")).toHaveValue(
       "admin",

@@ -1,3 +1,9 @@
+## v1.20.0 deployment check repair — 17 November 2026
+
+- Actions 44060410889 stopped in the weekly/manual browser group before deployment: the future-draft test selected a matchmaking mode while client navigation to the next chosen week was still pending. Updated the test to wait for the exact week URL, the panel's week text and an enabled mode control before editing. All six checks in the exact failing CI group pass locally together (19.1s). No runtime feature changes, no check bypass and no live paper writes.
+- User clarified that the new modes are for Ouro's current week, which has not opened. Current-week assignment/correction is supported; user will reassign papers and control opening. Do not automatically advance this request to next week or rewrite live roles.
+- Submitting the test repair through deploy-branch Actions. Completion unverified until the workflow finishes; no continuous monitoring requested.
+
 ## Version 1.20.0 — Ouro role modes, implementation — 17 November 2026
 
 - User requested implementation for Ouro only, explicitly leaving live papers alone so they can reassign them after the fix. Ataque permits creating and receiving challenges; Defesa is receive-only; Super Ataque is create-only. First team remains Defense and last team normal Attack; server rejects Super Attack on either boundary or outside Ouro.
