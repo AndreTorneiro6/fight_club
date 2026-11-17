@@ -6181,6 +6181,7 @@ const settingLabels: Record<
   weeklyRankingHour: "Hora do resumo semanal · Portugal · 0–23",
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
+  ouroNormalReach: "Ouro · posições de alcance normal",
   maxPositionsAbove: "Posições que pode desafiar acima",
   maxActiveChallenges:
     "Máximo de desafios simultâneos · fora da competição semanal",

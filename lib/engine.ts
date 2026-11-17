@@ -190,6 +190,7 @@ export const settingsSchema = z.object({
   initialSuggestionCount: z.union([z.literal(3), z.literal(4)]).default(4),
   rulesText: z.string().trim().max(12000).default(""),
   prizes: z.array(prizeSchema).max(30).default([]),
+  ouroNormalReach: z.number().int().min(1).max(100).optional(),
   maxPositionsAbove: z.number().int().min(1).max(100),
   maxActiveChallenges: z.number().int().min(1).max(10),
   minDaysBetween: z.number().int().min(0).max(90),
@@ -214,6 +215,13 @@ export const settingsSchema = z.object({
   extendResponseHours: z.number().int().min(1).max(720),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("admin.week.ouro.opponents.save"),
+    weekStart: day,
+    expectedVersion: z.number().int().min(0),
+    teamKey: id,
+    allowedTeamKeys: z.array(id).max(100),
+  }),
   z.object({
     type: z.literal("admin.division.matchmaking.set"),
     weekStart: day.optional(),
@@ -2009,6 +2017,72 @@ export function execute(
       }
       break;
     }
+    case "admin.week.ouro.opponents.save": {
+      const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      ensure(
+        round && cmd.weekStart >= clubWeek(timestamp).start,
+        "Escolhe papéis da semana atual ou futura.",
+      );
+      ensure(
+        (round.version ?? 0) === cmd.expectedVersion,
+        "Os papéis mudaram. Atualiza antes de guardar.",
+        409,
+      );
+      const division = s.divisions.find((d) => d.code === "ouro");
+      ensure(division, "Divisão Ouro inexistente.");
+      const teams = rankingEntries(s.players, division._id);
+      const source = teams.findIndex((t) => t.id === cmd.teamKey);
+      ensure(source > 0, "A primeira dupla está em Defesa.");
+      ensure(
+        teams[source].members.every(
+          (p) =>
+            round.assignments.find((a) => a.playerId === p._id)?.role ===
+            "attack",
+        ),
+        "Este controlo aplica-se às duplas em Ataque normal.",
+      );
+      ensure(
+        !s.challenges.some(
+          (c) =>
+            c.divisionId === division._id &&
+            (c.weekStart ?? clubWeek(c.createdAt).start) === cmd.weekStart &&
+            !["cancelled", "refused", "expired"].includes(c.status) &&
+            teams[source].members.some((p) => involves(c, p._id, s.players)),
+        ),
+        "Esta dupla já tem um confronto definido.",
+      );
+      ensure(
+        new Set(cmd.allowedTeamKeys).size === cmd.allowedTeamKeys.length &&
+          cmd.allowedTeamKeys.every((key) =>
+            teams.slice(0, source).some((t) => t.id === key),
+          ),
+        "Seleciona apenas adversários acima desta dupla.",
+      );
+      const before = round.ouroAllowedOpponents?.[cmd.teamKey];
+      round.ouroAllowedOpponents = {
+        ...round.ouroAllowedOpponents,
+        [cmd.teamKey]: cmd.allowedTeamKeys,
+      };
+      round.version = (round.version ?? 0) + 1;
+      delete round.approvedAt;
+      delete round.approvedVersion;
+      delete round.approvalSnapshot;
+      if (
+        round.divisionPublications?.[division._id] &&
+        !round.divisionPublications[division._id].publishedAt
+      ) {
+        delete round.divisionPublications[division._id].approvedAt;
+        delete round.divisionPublications[division._id].approvalSnapshot;
+      }
+      log("week.ouro.opponents.saved", {
+        weekStart: cmd.weekStart,
+        teamKey: cmd.teamKey,
+        before,
+        after: cmd.allowedTeamKeys,
+        version: round.version,
+      });
+      return { id: round._id };
+    }
     case "admin.challenge.distance.set": {
       ensure(
         s.divisions.some((d) => d._id === cmd.divisionId),
@@ -2025,6 +2099,8 @@ export function execute(
         "A distância deve ser inferior ao número de duplas.",
       );
       if (previous === cmd.distance) return { ok: true };
+      if (s.divisions.find((d) => d._id === cmd.divisionId)?.code === "ouro")
+        rules.ouroNormalReach = cmd.distance;
       rules.divisionChallengeDistances = {
         ...rules.divisionChallengeDistances,
         [cmd.divisionId]: cmd.distance,
@@ -2765,7 +2841,10 @@ export function execute(
         })),
         challengerPosition: teamPosition(s.players, p._id),
         positionSnapshotModel: "team",
-        effectiveChallengeDistance: challengeDistance(s, p.divisionId),
+        effectiveChallengeDistance: Math.max(
+          challengeDistance(s, p.divisionId),
+          teamPosition(s.players, p._id) - teamPosition(s.players, d._id),
+        ),
         challengerTeamId: teamMembers(s.players, p._id)
           .map((m) => m._id)
           .sort()
@@ -3094,13 +3173,19 @@ export function execute(
       );
       const attackerRank = teamPosition(s.players, attacker._id),
         defenderRank = teamPosition(s.players, defender._id);
+      const adaptive =
+        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
+        s.divisions.find((d) => d._id === c.divisionId)?.code === "ouro";
       ensure(
         attackerRank > defenderRank &&
-          attackerRank - defenderRank <= challengeDistance(s, c.divisionId),
+          (adaptive ||
+            attackerRank - defenderRank <= challengeDistance(s, c.divisionId)),
         "Adversário fora do limite de posições.",
       );
       ensure(
-        defenderRank !== 1 || attackerRank <= rules.titleMaxPosition,
+        adaptive ||
+          defenderRank !== 1 ||
+          attackerRank <= rules.titleMaxPosition,
         "Posição fora das regras do jogo do título.",
       );
       const weekly = weeklyReason(

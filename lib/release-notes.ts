@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.20.0";
+export const applicationVersion = "1.21.0";
 export const releaseNotes = [
+  {
+    version: "1.21.0",
+    date: "2026-11-17",
+    title: "Ouro adapta o alcance após os primeiros desafios",
+    changes: [
+      "Ouro começa com alcance normal de quatro posições, configurável pelo administrador. O primeiro desafio válido mantém a prioridade e os restantes confrontos adaptam-se com o mínimo de alargamentos necessário, incluindo o campeão quando indispensável.",
+      "A administração pode selecionar adversários permitidos por dupla em Ataque, guardar exclusões e simular desafios sem criar jogos. O planeador respeita as exclusões, Defesa e Super Ataque; Jogos obrigatórios continua disponível.",
+    ],
+  },
   {
     version: "1.20.0",
     date: "2026-11-17",

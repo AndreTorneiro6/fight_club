@@ -34,6 +34,7 @@ function fixture(
       weeklyCompetition: true,
       weeklyMandatoryChallenges: true,
       weeklyDynamicRoles: true,
+      ouroNormalReach: distance,
       maxPositionsAbove: 2,
       divisionChallengeDistances: { [code]: distance },
     },
@@ -828,8 +829,10 @@ for (const code of ["ouro", "prata"] as const) {
       for (const c of s.challenges) {
         assert.equal(c.status, "accepted");
         assert.ok(c.challengerPosition > c.defenderPosition);
-        assert.ok(c.challengerPosition - c.defenderPosition <= 3);
-        if (c.defenderPosition === 1)
+        assert.ok(
+          code === "ouro" || c.challengerPosition - c.defenderPosition <= 3,
+        );
+        if (c.defenderPosition === 1 && code !== "ouro")
           assert.ok(c.challengerPosition <= s.settings[0].titleMaxPosition);
         for (const m of c.challengerTeam ?? [])
           assert.equal(weeklyRole(s, m.playerId, now), "attack");
@@ -1275,4 +1278,87 @@ test("Super Attack is restricted to Ouro's intermediate teams", () => {
       /apenas em Ouro|primeira equipa/,
     );
   }
+});
+
+function committedOuro(s: State, pairs: [number, number][]) {
+  for (const [a, d] of pairs)
+    s.challenges.push({
+      _id: `fixed-${a}-${d}`,
+      seasonId: "season",
+      number: s.challenges.length + 1,
+      divisionId: "ouro",
+      weekStart: week,
+      challengerId: `t${a}a`,
+      defenderId: `t${d}a`,
+      status: "accepted",
+      createdAt: new Date(now).toISOString(),
+      challengerPosition: a,
+      defenderPosition: d,
+      respondBy: "2026-11-01T22:00:00Z",
+      scheduleBy: "2026-11-01T22:00:00Z",
+      playBy: "2026-11-01T22:00:00Z",
+      durationMinutes: 90,
+      titleFight: false,
+    });
+}
+test("Ouro priority preserves 9→7 and extends 11→6 only when remaining games require it", () => {
+  const s = fixture("ouro", 12, 4);
+  committedOuro(s, [
+    [2, 1],
+    [4, 3],
+    [8, 5],
+    [12, 10],
+  ]);
+  const before = structuredClone(s.challenges);
+  send(s, 9, 7);
+  assert.ok(pairing(s, 9, 7));
+  assert.equal(pairing(s, 11, 6)?.status, "accepted");
+  assert.equal(pairing(s, 11, 6)?.effectiveChallengeDistance, 5);
+  assert.deepEqual(s.challenges.slice(0, 4), before);
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 6);
+});
+test("Ouro can extend to 12→1, but never offers it before commitments", () => {
+  const s = fixture("ouro", 12, 4);
+  assert.ok(
+    !dynamicWeeklyPlan(s, "ouro", week).eligible.some(
+      (p) => p.attackerId === "t12a" && p.defenderId === "t1a",
+    ),
+  );
+  committedOuro(s, [
+    [3, 2],
+    [5, 4],
+    [7, 6],
+    [9, 8],
+    [11, 10],
+  ]);
+  send(s, 12, 1);
+  assert.equal(pairing(s, 12, 1)?.status, "accepted");
+  assert.equal(pairing(s, 12, 1)?.effectiveChallengeDistance, 11);
+});
+test("Ouro opponent exclusions are saved, audited and respected by reach extensions", () => {
+  const s = fixture("ouro", 12, 4);
+  committedOuro(s, [
+    [2, 1],
+    [4, 3],
+    [8, 5],
+    [12, 10],
+  ]);
+  execute(
+    s,
+    { ...actor(1), role: "admin" },
+    {
+      type: "admin.week.ouro.opponents.save",
+      weekStart: week,
+      expectedVersion: 1,
+      teamKey: "t11a:t11b",
+      allowedTeamKeys: [],
+    },
+    now,
+  );
+  assert.ok(s.audit.some((a) => a.action === "week.ouro.opponents.saved"));
+  send(s, 9, 7);
+  assert.ok(pairing(s, 9, 7));
+  assert.ok(!pairing(s, 11, 6));
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 5);
+  assert.throws(() => send(s, 11, 6));
 });

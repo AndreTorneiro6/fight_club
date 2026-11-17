@@ -327,6 +327,45 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     row(teams.length - 1).getByRole("button", { name: /^Super Ataque:/ }),
   ).toHaveCount(0);
   await row(2)
+    .getByText("Adversários permitidos e simulação", { exact: true })
+    .click();
+  const allowed = row(2)
+    .locator("details")
+    .filter({
+      has: page.getByText("Adversários permitidos e simulação", {
+        exact: true,
+      }),
+    });
+  await allowed.getByRole("checkbox", { name: /^#1 / }).uncheck();
+  const beforePreview = await (await page.request.get("/api/league")).json();
+  await allowed
+    .getByLabel("Simular outro desafio · não cria jogos")
+    .selectOption({ label: "#2 → #1" });
+  await expect(allowed.getByText(/Após o desafio simulado/)).toBeVisible();
+  const afterPreview = await (await page.request.get("/api/league")).json();
+  expect(afterPreview.challenges).toEqual(beforePreview.challenges);
+  expect(afterPreview.weeklyRounds).toEqual(beforePreview.weeklyRounds);
+  await allowed
+    .getByRole("button", {
+      name: "Guardar adversários permitidos",
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(async () => {
+      const v = await (await page.request.get("/api/league")).json();
+      return v.weeklyRounds.find((r: any) => r.weekStart === week)
+        .ouroAllowedOpponents?.[teams[2].id];
+    })
+    .toEqual([teams[1].id]);
+  await page.reload();
+  await row(2)
+    .getByText("Adversários permitidos e simulação", { exact: true })
+    .click();
+  await expect(
+    allowed.getByRole("checkbox", { name: /^#1 / }),
+  ).not.toBeChecked();
+  await row(2)
     .getByRole("button", { name: /^Remover seleção:/ })
     .click();
   await row(2)

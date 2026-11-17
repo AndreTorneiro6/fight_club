@@ -1,3 +1,4 @@
+import { dynamicWeeklyEnabled } from "./dynamic-weekly";
 import {
   adminMatchmakingEnabled,
   ADMIN_MATCHMAKING_MESSAGE,
@@ -121,16 +122,22 @@ export function challengeReason(
     aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
     dRank =
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
-  if (dRank >= aRank || aRank - dRank > challengeDistance(s, me.divisionId))
+  const adaptive =
+    dynamicWeeklyEnabled(s, me.divisionId, week) &&
+    s.divisions.find((d) => d._id === me.divisionId)?.code === "ouro" &&
+    !manual;
+  if (
+    dRank >= aRank ||
+    (!adaptive && aRank - dRank > challengeDistance(s, me.divisionId))
+  )
     return "Adversário fora do limite de posições.";
-  if (dRank === 1 && aRank > rules.titleMaxPosition)
+  if (!adaptive && (dRank === 1 || title) && aRank > rules.titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
-  if (title && aRank > rules.titleMaxPosition)
-    return "Posição fora das regras de Title Fight.";
   if (
     !rules.weeklyCompetition &&
     (limitChallenges(s, me, now, week).length >= rules.maxActiveChallenges ||
-      limitChallenges(s, defender, now, week).length >= rules.maxActiveChallenges)
+      limitChallenges(s, defender, now, week).length >=
+        rules.maxActiveChallenges)
   )
     return "Limite de desafios simultâneos atingido.";
   const previous = s.challenges

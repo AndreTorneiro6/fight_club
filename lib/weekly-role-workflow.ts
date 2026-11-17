@@ -26,6 +26,7 @@ export function weeklyTeamSnapshot(s: State) {
 }
 export function weeklyApprovalSnapshot(s: State, r: WeeklyRound) {
   return JSON.stringify({
+    ouroAllowedOpponents: r.ouroAllowedOpponents,
     assignments: [...r.assignments].sort((a, b) =>
       a.playerId.localeCompare(b.playerId),
     ),

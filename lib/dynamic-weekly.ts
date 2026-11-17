@@ -77,6 +77,7 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       defenderKey: d,
     });
   }
+  const ouro = s.divisions.find((d) => d._id === divisionId)?.code === "ouro";
   const round = s.weeklyRounds.find((r) => r.weekStart === week);
   const roleFor = (key: string) =>
     round?.assignments.find((r) =>
@@ -94,7 +95,18 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       if (
         roleFor(a.id) !== "defense" &&
         roleFor(d.id) !== "super_attack" &&
-        weeklyPairAllowed(s, divisionId, entries, a, d, week)
+        (!ouro ||
+          !round?.ouroAllowedOpponents?.[a.id] ||
+          round.ouroAllowedOpponents[a.id].includes(d.id)) &&
+        weeklyPairAllowed(
+          s,
+          divisionId,
+          entries,
+          a,
+          d,
+          week,
+          ouro && fixed.length > 0,
+        )
       )
         pairs.push({
           attackerId: a.members[0]._id,
@@ -103,6 +115,30 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
           defenderKey: d.id,
         });
     }
+  const normal = (p: DynamicPair) => {
+    const a = entries.findIndex((t) => t.id === p.attackerKey) + 1;
+    const d = entries.findIndex((t) => t.id === p.defenderKey) + 1;
+    return (
+      a - d <= challengeDistance(s, divisionId) &&
+      (d !== 1 || a <= s.settings[0].titleMaxPosition)
+    );
+  };
+  // Coverage dominates; among complete schedules use the fewest extensions,
+  // then the smallest total extra distance. Other divisions keep their solver.
+  const edgeScore = (p: DynamicPair) =>
+    !ouro
+      ? 1
+      : 1e9 -
+        (normal(p)
+          ? 0
+          : 10000 +
+            Math.max(
+              0,
+              entries.findIndex((t) => t.id === p.attackerKey) -
+                entries.findIndex((t) => t.id === p.defenderKey) -
+                challengeDistance(s, divisionId),
+            ) *
+              10);
   const indices = new Map(available.map((t, i) => [t.id, i])),
     edges = pairs.map((p) => ({
       ...p,
@@ -124,14 +160,14 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       if (e.a !== i && e.d !== i) continue;
       const j = e.a === i ? e.d : e.a;
       if (mask & bit(j))
-        score = Math.max(score, 1 + best(mask & ~bit(i) & ~bit(j)));
+        score = Math.max(score, edgeScore(e) + best(mask & ~bit(i) & ~bit(j)));
     }
     memo.set(mask, score);
     return score;
   }
   const maximum = best(full),
     eligible = edges.filter(
-      (e) => 1 + best(full & ~bit(e.a) & ~bit(e.d)) === maximum,
+      (e) => edgeScore(e) + best(full & ~bit(e.a) & ~bit(e.d)) === maximum,
     );
   // An edge is forced only when excluding it reduces the maximum achievable coverage.
   const forced = eligible.filter((e) => {
@@ -147,7 +183,10 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
         if (other === e || (other.a !== i && other.d !== i)) continue;
         const j = other.a === i ? other.d : other.a;
         if (mask & bit(j))
-          score = Math.max(score, 1 + without(mask & ~bit(i) & ~bit(j)));
+          score = Math.max(
+            score,
+            edgeScore(other) + without(mask & ~bit(i) & ~bit(j)),
+          );
       }
       excluded.set(mask, score);
       return score;
@@ -177,7 +216,7 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       const j = e.a === i ? e.d : e.a;
       if (!(mask & bit(j))) continue;
       const remaining = rest & ~bit(j);
-      if (1 + best(remaining) !== target) continue;
+      if (edgeScore(e) + best(remaining) !== target) continue;
       // Role changes dominate (x100); the launched-attacker preference only breaks ties.
       const candidate =
         minimumChanges(remaining) +
@@ -211,9 +250,12 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
   }
   return {
     canonical,
-    maximumMatches: maximum + fixed.length,
+    maximumMatches: (ouro ? Math.ceil(maximum / 1e9) : maximum) + fixed.length,
     fixed,
-    eligible: eligible.map(({ a, d, ...p }) => p),
+    eligible: (ouro
+      ? edges.filter((e) => normal(e) || eligible.includes(e))
+      : eligible
+    ).map(({ a, d, ...p }) => p),
     forced: errors.length ? [] : forced.map(({ a, d, ...p }) => p),
     errors,
     teams: entries,
@@ -230,6 +272,9 @@ export function dynamicWeeklyPlan(s: State, divisionId: string, week: string) {
   const key = divisionId + ":" + week;
   const signature = JSON.stringify([
     s.players,
+    s.divisions,
+    s.settings[0].ouroNormalReach,
+    s.weeklyRounds.find((r) => r.weekStart === week)?.ouroAllowedOpponents,
     s.challenges,
     s.exceptions,
     s.settings[0].divisionChallengeDistances,
@@ -300,15 +345,20 @@ export function dynamicTargetReason(
     plan.teams.findIndex((t) => t.members.some((m) => m._id === defenderId)) +
     1;
   if (!a || !d) return "As duplas devem pertencer à mesma divisão.";
-  if (d >= a || a - d > challengeDistance(s, p.divisionId))
+  const ouro = s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro";
+  if (d >= a || (!ouro && a - d > challengeDistance(s, p.divisionId)))
     return "Adversário fora do limite de posições.";
-  if (d === 1 && a > s.settings[0].titleMaxPosition)
+  if (!ouro && d === 1 && a > s.settings[0].titleMaxPosition)
     return "Posição fora das regras do jogo do título.";
   if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
     return CONSECUTIVE_REMATCH_MESSAGE;
   const unavailable =
     weeklyTeamUnavailableReason(s, plan.teams[a - 1], week) ??
     weeklyTeamUnavailableReason(s, plan.teams[d - 1], week);
+  const allowed = s.weeklyRounds.find((r) => r.weekStart === week)
+    ?.ouroAllowedOpponents?.[plan.teams[a - 1].id];
+  if (ouro && allowed && !allowed.includes(plan.teams[d - 1].id))
+    return "Este adversário foi excluído pelo administrador.";
   if (unavailable) return unavailable;
   if (plan.errors.length) return plan.errors[0];
   // Every challenge, the first one included, must keep the most games possible,

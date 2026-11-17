@@ -174,6 +174,7 @@ export function divisionWeekOptions(
   // Planner schedule for the roles on screen.
   const planned = new Map<string, TeamWeekOptions["planned"]>();
   const plannerRoles = new Map<string, Role>();
+  let ouroEligible: { attackerKey: string; defenderKey: string }[] | undefined;
   if (dynamicWeeklyEnabled(s, divisionId, week)) {
     const ids = new Set(entries.flatMap((t) => t.members.map((m) => m._id)));
     const existing = s.weeklyRounds.find((r) => r.weekStart === week);
@@ -196,6 +197,8 @@ export function divisionWeekOptions(
       ],
     };
     const plan = dynamicWeeklyPlan(preview, divisionId, week);
+    if (s.divisions.find((d) => d._id === divisionId)?.code === "ouro")
+      ouroEligible = plan.eligible;
     for (const p of plan.fixed.length
       ? [...plan.fixed, ...plan.canonical]
       : []) {
@@ -226,7 +229,11 @@ export function divisionWeekOptions(
                 (s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
                   ? roleOf(d) !== "super_attack"
                   : roleOf(d) !== "attack") &&
-                weeklyPairAllowed(s, divisionId, entries, t, d, week),
+                (ouroEligible
+                  ? ouroEligible.some(
+                      (p) => p.attackerKey === t.id && p.defenderKey === d.id,
+                    )
+                  : weeklyPairAllowed(s, divisionId, entries, t, d, week)),
             )
           : [];
       const defense =
@@ -238,7 +245,11 @@ export function divisionWeekOptions(
               (a) =>
                 free(a) &&
                 roleOf(a) !== "defense" &&
-                weeklyPairAllowed(s, divisionId, entries, a, t, week),
+                (ouroEligible
+                  ? ouroEligible.some(
+                      (p) => p.attackerKey === a.id && p.defenderKey === t.id,
+                    )
+                  : weeklyPairAllowed(s, divisionId, entries, a, t, week)),
             )
           : [];
       const plannerRole = plannerRoles.get(t.id);

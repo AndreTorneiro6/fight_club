@@ -123,6 +123,7 @@ export interface Settings extends Entity {
   rulesText: string;
   prizes: Prize[];
   contentVersion?: number;
+  ouroNormalReach?: number;
   maxPositionsAbove: number;
   maxActiveChallenges: number;
   minDaysBetween: number;
@@ -388,6 +389,7 @@ export interface ManualWeekMatchup {
   challengeId?: string;
 }
 export interface WeeklyRound extends Entity {
+  ouroAllowedOpponents?: Record<string, string[]>;
   manualMatchmaking?: Record<string, boolean>;
   manualMatchups?: Record<
     string,
@@ -600,6 +602,7 @@ export interface View extends State {
 }
 
 export const defaultSettings: Settings = {
+  ouroNormalReach: 4,
   leagueEmailsEnabled: false,
   weeklyCompetition: false,
   weeklyMandatoryChallenges: false,

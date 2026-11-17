@@ -15,6 +15,10 @@ export function divisionPaperSignature(
   const teams = rankingEntries(s.players, divisionId);
   const ids = new Set(teams.flatMap((t) => t.members.map((m) => m._id)));
   return JSON.stringify({
+    ouroAllowedOpponents:
+      s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
+        ? r.ouroAllowedOpponents
+        : undefined,
     assignments: r.assignments
       .filter((a) => ids.has(a.playerId))
       .sort((a, b) => a.playerId.localeCompare(b.playerId)),

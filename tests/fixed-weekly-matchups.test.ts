@@ -203,7 +203,7 @@ test("protected incompatible commitments, stale plans and players cannot be over
 test("hard-rule failures roll back the entire operation including opening restoration", () => {
   const s = fixture();
   pause(s);
-  s.settings[0].maxPositionsAbove = 1;
+  s.settings[0].ouroNormalReach = 1;
   const invalid = {
     ...input,
     fixtures: [
@@ -309,7 +309,7 @@ test("mandatory challenges enforce published roles, distance and team-wide commi
     /public/,
   );
   s.weeklyRounds[0].publishedAt = "2026-10-24T10:00:00Z";
-  s.settings[0].maxPositionsAbove = 1;
+  s.settings[0].ouroNormalReach = 1;
   assert.throws(
     () =>
       execute(

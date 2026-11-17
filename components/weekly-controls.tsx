@@ -1,4 +1,5 @@
 "use client";
+import OuroOpponentsControl from "./ouro-opponents-control";
 import {
   adminMatchmakingEnabled,
   ADMIN_MATCHMAKING_MESSAGE,
@@ -926,6 +927,22 @@ export function WeeklyRoles({
                   </small>
                 )}
               </div>
+              {admin &&
+                s.divisions.find((d) => d._id === members[0].divisionId)
+                  ?.code === "ouro" &&
+                role === "attack" &&
+                round?.assignments.find((a) =>
+                  members.some((m) => m._id === a.playerId),
+                )?.role === "attack" &&
+                round && (
+                  <OuroOpponentsControl
+                    s={s}
+                    week={week}
+                    teamKey={entry.id}
+                    run={run}
+                    busy={busy}
+                  />
+                )}
               {admin ? (
                 <div className="row wrap">
                   <button
