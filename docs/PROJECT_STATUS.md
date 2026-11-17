@@ -1,3 +1,10 @@
+## v1.21.0 LIVE verified — 17 November 2026
+
+- The required 30-minute timer finished and Actions workflow 44099408898 completed successfully: both checks and deploy passed for exact revision 657a65b56e3f1070e99c89aee9f01ff003e9ed55.
+- Read-only verification: public /api/health returns {"ok":true}; app and worker both run that exact revision, both running with zero restarts, app healthy. No manual production deployment, bypass, cancellation or league/paper writes.
+- Ouro adaptive reach, first-committed challenge priority, admin opponent selections/simulator and manual Jogos obrigatórios are deployed as v1.21.0. Normal Ouro reach defaults to four. User retains current-week paper reassignment and opening decisions.
+- The only follow-up after implementation was repairing the stale opening-clock test expectation from two to four; all CI groups now pass on the deployed revision. Long production team IDs are covered by the 581-test suite. Documentation-only handoff update does not require deployment.
+
 ## v1.21.0 CI reach expectation repair — 17 November 2026
 
 - After the requested 30-minute wait, verified Actions runs 44093621501 and 44093797012 stopped before deployment. All earlier checks, including the new Ouro simulator/opponent controls, passed; challenge-opening-clock still expected Ouro's old reach of 2. Updated that explicit assertion to the requested default 4. This is a test expectation repair; no runtime changes or bypass.
