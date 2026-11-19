@@ -569,75 +569,81 @@ export function WeeklyRoles({
           ))}
           <details>
             <summary>Histórico dos papéis semanais</summary>
-            {[...s.weeklyRounds]
-              .filter(
-                (r) => r.weekStart < week && (!first || r.weekStart >= first),
-              )
-              .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
-              .map((r, index) => (
-                <div
-                  className={`inset stack ${index === 0 ? "weekly-role-history-latest" : ""}`}
-                  key={r._id}
-                >
-                  <button
-                    className={index === 0 ? "weekly-history-week" : undefined}
-                    title={r.weekStart}
-                    onClick={() => setWeek(r.weekStart)}
+            <ol className="weekly-role-history-list" aria-label="Histórico de papéis semanais">
+              {[...s.weeklyRounds]
+                .filter(
+                  (r) => r.weekStart < week && (!first || r.weekStart >= first),
+                )
+                .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+                .map((r, index) => (
+                  <li
+                    key={r._id}
+                    className={index === 0 ? "weekly-role-history-latest" : ""}
                   >
-                    {matchdayWeekLabel(s, r.weekStart)}
-                    {index === 0 ? " · Mais recente" : ""} ·{" "}
-                    {weeklyPublishedAt(
-                      r,
-                      division === "all" ? undefined : division,
-                    )
-                      ? "Publicado"
-                      : r.approvedAt
-                        ? "Aprovado"
-                        : "Rascunho"}
-                  </button>
-                  {(
-                    r.teamSnapshot ??
-                    teams.map((t) => ({
-                      id: t.id,
-                      name: t.members.map((m) => m.name).join(" + "),
-                      divisionId: t.members[0].divisionId,
-                      playerIds: t.members.map((m) => m._id),
-                    }))
-                  )
-                    .filter(
-                      (t) => division === "all" || t.divisionId === division,
-                    )
-                    .map((t) => (
-                      <small key={t.id}>
-                        {t.name}: Inicial:{" "}
-                        {r.assignments.find((a) =>
-                          t.playerIds.includes(a.playerId),
-                        )?.role === "attack"
-                          ? "ATAQUE"
-                          : r.assignments.find((a) =>
-                                t.playerIds.includes(a.playerId),
-                              )?.role === "defense"
-                            ? "DEFESA"
-                            : "Por atribuir"}
-                        {" · "}
-                        <strong
-                          className={`weekly-history-role ${effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
-                        >
-                          Final:{" "}
-                          {effectiveRoles(r).find((a) =>
-                            t.playerIds.includes(a.playerId),
-                          )?.role === "attack"
-                            ? "ATAQUE"
-                            : effectiveRoles(r).find((a) =>
-                                  t.playerIds.includes(a.playerId),
-                                )?.role === "defense"
-                              ? "DEFESA"
-                              : "Por atribuir"}
-                        </strong>
-                      </small>
-                    ))}
-                </div>
-              ))}
+                    <div className="row wrap">
+                      <button
+                        className={index === 0 ? "weekly-history-week" : undefined}
+                        title={r.weekStart}
+                        onClick={() => setWeek(r.weekStart)}
+                      >
+                        {matchdayWeekLabel(s, r.weekStart)}
+                        {index === 0 && <span className="weekly-history-latest-label"> · Mais recente</span>}
+                      </button>
+                      <span className="muted">
+                        {weeklyPublishedAt(
+                          r,
+                          division === "all" ? undefined : division,
+                        )
+                          ? "Publicado"
+                          : r.approvedAt
+                            ? "Aprovado"
+                            : "Rascunho"}
+                      </span>
+                    </div>
+                    <div className="stack" style={{ gap: 4 }}>
+                      {(
+                        r.teamSnapshot ??
+                        teams.map((t) => ({
+                          id: t.id,
+                          name: t.members.map((m) => m.name).join(" + "),
+                          divisionId: t.members[0].divisionId,
+                          playerIds: t.members.map((m) => m._id),
+                        }))
+                      )
+                        .filter(
+                          (t) => division === "all" || t.divisionId === division,
+                        )
+                        .map((t) => (
+                          <small key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <strong style={{ fontSize: 11 }}>{t.name}</strong>
+                            <span className="muted" style={{ fontSize: 10 }}>Inicial:</span>
+                            <span
+                              className={`weekly-history-role ${r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
+                              style={{ fontSize: 10 }}
+                            >
+                              {r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role === "attack"
+                                ? "ATAQUE"
+                                : r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role === "defense"
+                                ? "DEFESA"
+                                : "Por atribuir"}
+                            </span>
+                            <span className="muted" style={{ fontSize: 10 }}>·</span>
+                            <span
+                              className={`weekly-history-role ${effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
+                              style={{ fontSize: 10 }}
+                            >
+                              {effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role === "attack"
+                                ? "Final: ATAQUE"
+                                : effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role === "defense"
+                                ? "Final: DEFESA"
+                                : "Final: Por atribuir"}
+                            </span>
+                          </small>
+                        ))}
+                    </div>
+                  </li>
+                ))}
+            </ol>
           </details>
         </>
       )}
