@@ -30,7 +30,7 @@ services:
         max-file: "3"
 
   mongo:
-    image: mongo:4.4.18
+    image: mongo:8.0.38
     restart: unless-stopped
     entrypoint: ["/bin/bash", "/usr/local/bin/fightclub-mongo-entrypoint.sh"]
     environment:
@@ -46,7 +46,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          mongo "mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/admin?directConnection=true"
+          $$(command -v mongosh || echo mongo) "mongodb://$${MONGO_INITDB_ROOT_USERNAME}:$${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/admin?directConnection=true"
           --quiet --eval 'try { var s = rs.status(); print(s.ok === 1 ? 1 : rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}).ok) } catch (e) { print(rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}).ok) }'
           | grep -q 1
       interval: 10s
@@ -131,7 +131,7 @@ services:
     logging: *default-logging
 
   backup:
-    image: mongo:4.4.18
+    image: mongo:8.0.38
     restart: unless-stopped
     user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
     entrypoint: ["/bin/bash", "/usr/local/bin/backup-loop.sh"]

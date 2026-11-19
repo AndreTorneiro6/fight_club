@@ -133,7 +133,9 @@ Use an HTTPS `APP_URL`; session cookies become secure automatically. The health 
 
 ### Self-host with Docker Compose, Traefik and Let's Encrypt
 
-The repository also includes a self-hosted stack. It runs the Next.js app and notification/deadline worker, an authenticated MongoDB 4.4.18 single-node replica set, and Traefik with automatic HTTPS certificates. MongoDB is only reachable on the private Docker network; only ports 80 and 443 are published. The existing `compose.yaml` uses the same MongoDB version for local development.
+The repository also includes a self-hosted stack. It runs the Next.js app and notification/deadline worker, an authenticated MongoDB 8.0 single-node replica set, and Traefik with automatic HTTPS certificates. MongoDB is only reachable on the private Docker network; only ports 80 and 443 are published. The existing `compose.yaml` uses the same MongoDB version for local development.
+
+Production runs on an Oracle Cloud Ampere A1 VM (`/opt/fight-club`, runner label `fight-club-oracle`). Pushes to `deploy` go there by default. To deploy to the Raspberry Pi instead, set the repository variable `DEPLOY_RUNNER_LABEL=fight-club-production`; the Pi runner's `.env` sets `FIGHT_CLUB_DEPLOY_DIR` and `COMPOSE_FILE=compose.production.yaml:compose.pi.yaml`, and `compose.pi.yaml` keeps MongoDB on 4.4.18 (see below). A 4.4 data directory cannot be opened by 8.0; move data between them with `mongodump`/`mongorestore`.
 
 #### Raspberry Pi 4 database compatibility
 

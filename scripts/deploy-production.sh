@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Executed on the Pi by the dedicated repo-scoped GitHub Actions runner.
+# Executed on the production host by the dedicated repo-scoped GitHub Actions runner.
+# Host-specific settings come from the runner's .env file:
+#   Oracle VM (default): no settings needed (/opt/fight-club, compose.production.yaml)
+#   Raspberry Pi: FIGHT_CLUB_DEPLOY_DIR=/home/andre/Desktop/WBGLabs/fight-club
+#                 COMPOSE_FILE=compose.production.yaml:compose.pi.yaml
 set -Eeuo pipefail
 umask 077
 [[ "${GITHUB_ACTIONS:-}" == true && "${GITHUB_JOB:-}" == deploy && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]] || { echo 'Production deployment must run through the GitHub Actions deploy job; manual execution is not allowed.' >&2; exit 64; }
@@ -9,13 +13,14 @@ revision="${GITHUB_SHA:-}"
 source_dir="$(realpath "${1:?Pass the checked-out GitHub workspace.}")"
 [[ "$(git -C "$source_dir" rev-parse HEAD)" == "$revision" ]] || { echo 'Checkout differs from the validated commit.' >&2; exit 65; }
 git -C "$source_dir" diff --quiet HEAD -- || { echo 'The checked-out source has uncommitted changes.' >&2; exit 65; }
-project_dir="${FIGHT_CLUB_DEPLOY_DIR:-/home/andre/Desktop/WBGLabs/fight-club}"
+project_dir="${FIGHT_CLUB_DEPLOY_DIR:-/opt/fight-club}"
 project_dir="$(realpath "$project_dir")"
 [[ "$source_dir" != "$project_dir" ]] || { echo 'Use an isolated runner checkout, not the live production directory.' >&2; exit 65; }
 cd "$project_dir"
 exec 9> .deploy.lock
 flock -w 600 9
-compose=(docker compose --env-file .env.production -f compose.production.yaml -f compose.pi.yaml)
+export COMPOSE_FILE="${COMPOSE_FILE:-compose.production.yaml}"
+compose=(docker compose --env-file .env.production)
 image="fightclub:git-$revision"
 docker build --build-arg APP_URL=https://fight-club.wbglabs.io \
   --label "org.opencontainers.image.revision=$revision" --tag "$image" "$source_dir"
@@ -84,6 +89,6 @@ Path('.deployed-revision').write_text(sys.argv[2] + '\n')
 Path('.deployed-image').write_text(sys.argv[1] + '\n')
 PY
 trap - ERR HUP INT TERM
-printf 'Deployed validated revision %s directly on the Pi\n' "$revision"
+printf 'Deployed validated revision %s on %s\n' "$revision" "$(hostname)"
 # Retention is best-effort after health passes; it must never roll back a healthy release.
 python3 "$source_dir/scripts/cleanup-deployment-images.py" || echo 'Image retention needs operator review.' >&2
