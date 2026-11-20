@@ -3122,5 +3122,7 @@ body::before {
 .weekly-history-role.unassigned { color: var(--muted); }
 .weekly-role-history-list { list-style: none; display: grid; gap: 12px; margin: 8px 0 0; padding: 0; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .weekly-role-history-list > li { padding: 12px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 6px; }
+.weekly-role-history .weekly-role-history-list { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.weekly-role-history .weekly-role-history-list > li { padding: 8px; }
 html[data-theme] .inset.weekly-role-history-latest, .weekly-role-history-latest { border: 1px solid var(--gold); background: #d6a3330d; border-radius: 8px; }
 .weekly-history-latest-label { color: var(--gold); font-weight: 700; }
