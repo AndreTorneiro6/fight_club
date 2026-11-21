@@ -66,7 +66,7 @@ export default function WeeklyTeamInsight({
   return (
     <div className="stack" style={{ gap: 6, fontSize: 12 }}>
       {timeline && (
-        <span className="muted" style={{ fontSize: 11, fontFamily: "monospace", letterSpacing: 1 }}>
+        <span className="role-timeline" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
           {timeline}
         </span>
       )}
@@ -79,7 +79,7 @@ export default function WeeklyTeamInsight({
             <span
               className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
             >
-              Último papel: {roleLabel(history[0].final)} <span className="muted">({roleKey(history[0].initial)}{roleKey(history[0].final)})</span>
+              Último papel: {roleLabel(history[0].final)}
             </span>
             <small>Mais recente</small>
           </summary>
@@ -111,9 +111,6 @@ export default function WeeklyTeamInsight({
                   >
                     {roleLabel(h.final)}
                   </strong>
-                  <span className="muted" style={{ fontFamily: "monospace", fontSize: 11 }}>
-                    {roleKey(h.initial)}{roleKey(h.final)}
-                  </span>
                 </div>
                 <small>
                   {h.game

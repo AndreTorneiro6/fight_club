@@ -92,7 +92,6 @@ function PreviousWeekRole({
   const last = teamRoleHistory(s, team, week, 1)[0];
   if (last?.week !== previous.weekStart) return null;
   const { initial, final } = last;
-  const historyKey = `${roleHistoryKey(initial)}${roleHistoryKey(final)}`;
   return (
     <span className="stack" style={{ gap: 4, fontSize: 11 }}>
       <span className="muted">Semana anterior</span>
@@ -100,9 +99,6 @@ function PreviousWeekRole({
         <span className="muted">Inicial:</span> <strong>{roleLabel(initial)}</strong>
         <span className="muted"> → </span>
         <strong>{roleLabel(final)}</strong>
-        <span className="muted" style={{ fontSize: 10, marginLeft: 8, fontFamily: "monospace" }}>
-          ({historyKey})
-        </span>
       </span>
     </span>
   );
@@ -641,10 +637,6 @@ export function WeeklyRoles({
                           const effective = t.playerIds.map((pid) =>
                             effectiveRoles(r).find((a) => a.playerId === pid)?.role,
                           );
-                          const historyKey = assignments
-                            .map(roleHistoryKey)
-                            .concat(effective.map(roleHistoryKey))
-                            .join("");
                           const initialRole = assignments[0];
                           const finalRole = effective[0];
                           return (
@@ -654,9 +646,6 @@ export function WeeklyRoles({
                                 <span className="muted">Inicial:</span> <strong>{roleLabel(initialRole)}</strong>
                                 <span className="muted"> → </span>
                                 <strong>{roleLabel(finalRole)}</strong>
-                                <span className="muted" style={{ marginLeft: 8, fontFamily: "monospace" }}>
-                                  ({historyKey})
-                                </span>
                               </span>
                             </small>
                           );
@@ -885,14 +874,6 @@ export function WeeklyRoles({
               data-weekly-team={entry.id}
             >
               <div className="stack gap-sm">
-                {(() => {
-                  const timeline = teamRoleTimeline(s, members, week);
-                  return timeline ? (
-                    <span className="muted" style={{ fontSize: 11, fontFamily: "monospace", letterSpacing: 1 }}>
-                      {timeline}
-                    </span>
-                  ) : null;
-                })()}
                 <strong>
                   {label}
                   {ownTeam
@@ -920,6 +901,14 @@ export function WeeklyRoles({
                     </small>
                   ))}
                 </div>
+                {(() => {
+                  const timeline = teamRoleTimeline(s, members, week);
+                  return timeline ? (
+                    <span className="role-timeline" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
+                      {timeline}
+                    </span>
+                  ) : null;
+                })()}
                 {!admin && (
                   <span
                     className={`role-label ${role === "attack" ? "gold" : ""}`}
