@@ -793,7 +793,7 @@ export function WeeklyRoles({
           </div>
         </details>
       )}
-      <div className="stack">
+      <div className="stack" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
         {visible.map((entry) => {
           const members = entry.members;
           const activeMembers = members.filter((member) =>
