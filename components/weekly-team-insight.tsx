@@ -14,9 +14,6 @@ const roleLabel = (role?: string) =>
       : role === "defense"
         ? "Defesa"
         : "—";
-
-const roleKey = (role?: string) =>
-  role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "S" : "?";
 const day = (week: string) =>
   new Date(week + "T12:00:00Z").toLocaleDateString("pt-PT", {
     day: "numeric",
@@ -38,17 +35,6 @@ const status: Record<string, string> = {
 const list = (teams: { rank: number; name: string }[]) =>
   teams.map((t) => `#${t.rank} ${t.name}`).join(" · ");
 
-function teamRoleTimeline(s: View, team: Player[], beforeWeek: string): string {
-  const history = teamRoleHistory(s, team, beforeWeek, 10);
-  if (!history.length) return "";
-  const keys = history
-    .slice()
-    .reverse()
-    .map((h) => roleKey(h.final ?? h.initial))
-    .filter((k) => k !== "?");
-  return keys.join("/");
-}
-
 /** Admin-only: past roles and games of a team, and its possible games this week. */
 export default function WeeklyTeamInsight({
   s,
@@ -62,14 +48,8 @@ export default function WeeklyTeamInsight({
   options?: TeamWeekOptions;
 }) {
   const history = teamRoleHistory(s, team, week, 5);
-  const timeline = teamRoleTimeline(s, team, week);
   return (
     <div className="stack" style={{ gap: 6, fontSize: 12 }}>
-      {timeline && (
-        <span className="role-timeline" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
-          {timeline}
-        </span>
-      )}
       {history.length > 0 && (
         <details className="weekly-role-history" open={false}>
           <summary className="weekly-role-history-summary">
