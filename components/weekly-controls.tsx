@@ -793,7 +793,7 @@ export function WeeklyRoles({
           </div>
         </details>
       )}
-      <div className="row wrap" style={{ gap: 18 }}>
+      <div className="weekly-teams-grid">
         {visible.map((entry) => {
           const members = entry.members;
           const activeMembers = members.filter((member) =>
