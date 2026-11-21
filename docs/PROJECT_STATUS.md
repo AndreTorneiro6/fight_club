@@ -1,3 +1,9 @@
+## Version 1.21.3 — Gerir semanas team grid and collapsibles — 21 November 2026
+
+- Team cards now use an equal-width responsive grid with one internal order: identity and role timeline, role actions, game options, collapsibles. All weekly collapsibles share `.weekly-collapsible`; expanding one no longer stretches neighbouring cards. Layout only: no role, challenge or league data logic changed.
+- Typecheck, all unit tests and production build pass. Weekly browser specs pass individually; `upcoming-week-challenges` and `weekly-teams` failed when run in sequence after other weekly specs on one shared demo server, at API setup before the layout, which looks like shared test data but was not confirmed against the previous commit.
+- Submitted through the required deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.21.2 — restore full rankings, filter only challenge options — 17 November 2026
 
 - User clarified that all players, attacking or defending, must see the full Ranking and dashboard as before, like Prata/Bronze. Only opponent options inside Desafios should be filtered. This supersedes v1.21.1's assumption of filtering player ranking tables.

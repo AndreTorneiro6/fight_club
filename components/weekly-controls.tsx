@@ -584,7 +584,7 @@ export function WeeklyRoles({
           {round?.warnings?.map((w) => (
             <small key={w}>{w}</small>
           ))}
-          <details>
+          <details className="weekly-collapsible">
             <summary>Histórico dos papéis semanais</summary>
             <ol className="weekly-role-history-list" aria-label="Histórico de papéis semanais">
               {[...s.weeklyRounds]
@@ -773,7 +773,7 @@ export function WeeklyRoles({
         </>
       )}
       {admin && (
-        <details>
+        <details className="weekly-collapsible">
           <summary>Duplas sem desafios enviados ou recebidos</summary>
           <div className="stack">
             {s.divisions
@@ -793,7 +793,7 @@ export function WeeklyRoles({
           </div>
         </details>
       )}
-      <div className="row wrap" style={{ gap: 18, width: "100%" }}>
+      <div className="weekly-teams-grid">
         {visible.map((entry) => {
           const members = entry.members;
           const activeMembers = members.filter((member) =>
@@ -869,11 +869,12 @@ export function WeeklyRoles({
             }));
           return (
             <div
-              className="inset row between wrap weekly-team"
+              className="inset weekly-team"
               key={entry.id}
               data-weekly-team={entry.id}
             >
-              <div className="stack gap-sm">
+              <div className="weekly-team-head">
+                <div className="weekly-team-identity">
                 <strong>
                   {label}
                   {ownTeam
@@ -890,7 +891,7 @@ export function WeeklyRoles({
                     )?.name
                   }
                 </small>
-                <div className="row wrap">
+                <div className="weekly-team-members">
                   {members.map((member) => (
                     <small key={member._id}>
                       #{teamPosition(s.players, member._id)} · {member.name}
@@ -901,14 +902,16 @@ export function WeeklyRoles({
                     </small>
                   ))}
                 </div>
+                </div>
                 {(() => {
                   const timeline = teamRoleTimeline(s, members, week);
                   return timeline ? (
-                    <span className="role-timeline" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
+                    <span className="role-timeline" title="Papéis anteriores, do mais antigo ao mais recente">
                       {timeline}
                     </span>
                   ) : null;
                 })()}
+              </div>
                 {!admin && (
                   <span
                     className={`role-label ${role === "attack" ? "gold" : ""}`}
@@ -929,46 +932,8 @@ export function WeeklyRoles({
                             : "Por atribuir"}
                   </span>
                 )}
-                {admin ? (
-                  <WeeklyTeamInsight
-                    s={s}
-                    team={members}
-                    week={week}
-                    options={weekOptions.get(entry.id)}
-                  />
-                ) : (
-                  <PreviousWeekRole s={s} team={members} week={week} />
-                )}
-                {(attackReason || defenseReason) && (
-                  <small>
-                    {[attackReason, defenseReason].filter(Boolean).join(" ")}
-                  </small>
-                )}
-                {admin && mixed && (
-                  <small>
-                    Os parceiros têm papéis diferentes. Escolhe um papel para
-                    toda a equipa.
-                  </small>
-                )}
-              </div>
-              {admin &&
-                s.divisions.find((d) => d._id === members[0].divisionId)
-                  ?.code === "ouro" &&
-                role === "attack" &&
-                round?.assignments.find((a) =>
-                  members.some((m) => m._id === a.playerId),
-                )?.role === "attack" &&
-                round && (
-                  <OuroOpponentsControl
-                    s={s}
-                    week={week}
-                    teamKey={entry.id}
-                    run={run}
-                    busy={busy}
-                  />
-                )}
               {admin ? (
-                <div className="row wrap">
+                <div className="weekly-team-actions">
                   <button
                     className={`weekly-role-choice ${role === "attack" ? "primary small" : "small"}`}
                     aria-label={`Ataque: ${label}`}
@@ -1026,7 +991,7 @@ export function WeeklyRoles({
                     )}
                   {(role || mixed) && (
                     <button
-                      className="small"
+                      className="small weekly-team-clear"
                       aria-label={`Remover seleção: ${label}`}
                       disabled={
                         busy ||
@@ -1047,7 +1012,7 @@ export function WeeklyRoles({
                   )}
                 </div>
               ) : (
-                <div style={{ maxWidth: 320 }}>
+                <div className="stack gap-sm weekly-team-challenge">
                   {reason ? (
                     <small>{reason}</small>
                   ) : (
@@ -1071,6 +1036,45 @@ export function WeeklyRoles({
                   )}
                 </div>
               )}
+              <div className="stack gap-sm weekly-team-body">
+                {admin ? (
+                  <WeeklyTeamInsight
+                    s={s}
+                    team={members}
+                    week={week}
+                    options={weekOptions.get(entry.id)}
+                  />
+                ) : (
+                  <PreviousWeekRole s={s} team={members} week={week} />
+                )}
+                {(attackReason || defenseReason) && (
+                  <small>
+                    {[attackReason, defenseReason].filter(Boolean).join(" ")}
+                  </small>
+                )}
+                {admin && mixed && (
+                  <small>
+                    Os parceiros têm papéis diferentes. Escolhe um papel para
+                    toda a equipa.
+                  </small>
+                )}
+              </div>
+              {admin &&
+                s.divisions.find((d) => d._id === members[0].divisionId)
+                  ?.code === "ouro" &&
+                role === "attack" &&
+                round?.assignments.find((a) =>
+                  members.some((m) => m._id === a.playerId),
+                )?.role === "attack" &&
+                round && (
+                  <OuroOpponentsControl
+                    s={s}
+                    week={week}
+                    teamKey={entry.id}
+                    run={run}
+                    busy={busy}
+                  />
+                )}
             </div>
           );
         })}

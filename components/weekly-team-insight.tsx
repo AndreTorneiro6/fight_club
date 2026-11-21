@@ -49,9 +49,9 @@ export default function WeeklyTeamInsight({
 }) {
   const history = teamRoleHistory(s, team, week, 5);
   return (
-    <div className="stack" style={{ gap: 6, fontSize: 12 }}>
+    <div className="stack weekly-team-insight">
       {history.length > 0 && (
-        <details className="weekly-role-history" open={false}>
+        <details className="weekly-collapsible weekly-role-history">
           <summary className="weekly-role-history-summary">
             <span className="weekly-history-week" title={day(history[0].week)}>
               {matchdayWeekLabel(s, history[0].week)}
@@ -61,7 +61,6 @@ export default function WeeklyTeamInsight({
             >
               Último papel: {roleLabel(history[0].final)}
             </span>
-            <small>Mais recente</small>
           </summary>
           <ol
             aria-label="Histórico de papéis"
@@ -84,7 +83,7 @@ export default function WeeklyTeamInsight({
                     </small>
                   )}
                 </div>
-                <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
+                <div className="weekly-history-roles">
                   <span>Inicial: {roleLabel(h.initial)}</span>
                   <strong
                     className={`weekly-history-role ${h.final ?? "unassigned"}`}
@@ -109,7 +108,7 @@ export default function WeeklyTeamInsight({
         </details>
       )}
       {options && (
-        <div className="stack" style={{ gap: 2 }} aria-label="Jogos possíveis">
+        <div className="stack weekly-team-options" aria-label="Jogos possíveis">
           {options.vacationUntil && (
             <span className="muted">
               De férias até {day(options.vacationUntil)}: pode jogar, mas o jogo

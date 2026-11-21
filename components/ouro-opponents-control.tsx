@@ -86,88 +86,90 @@ export default function OuroOpponentsControl({
       `#${rank(p.defenderKey)} ${name(p.defenderKey)}${rank(p.attackerKey) - rank(p.defenderKey) > challengeDistance(s, division._id) || (rank(p.defenderKey) === 1 && rank(p.attackerKey) > s.settings[0].titleMaxPosition) ? " · alcance alargado necessário" : ""}`,
   );
   return (
-    <details className="inset stack">
+    <details className="weekly-collapsible">
       <summary>Adversários permitidos e simulação</summary>
-      <p>Opções calculadas com os papéis guardados.</p>
-      <p>
-        Alcance normal: {challengeDistance(s, division._id)} posições. As
-        exclusões também se aplicam ao alcance alargado.
-      </p>
-      <div className="stack">
-        {teams.slice(0, index).map((t) => (
-          <label className="check" key={t.id}>
-            <input
-              type="checkbox"
-              checked={selected.includes(t.id)}
-              disabled={busy || fixed || historical}
-              onChange={(e) =>
-                setSelected(
-                  e.target.checked
-                    ? [...selected, t.id]
-                    : selected.filter((k) => k !== t.id),
-                )
-              }
-            />
-            #{rank(t.id)} {name(t.id)}
-          </label>
-        ))}
-      </div>
-      <button
-        className="small"
-        disabled={
-          busy || fixed || historical || saved === JSON.stringify(selected)
-        }
-        onClick={() =>
-          void run(
-            {
-              type: "admin.week.ouro.opponents.save",
-              weekStart: week,
-              expectedVersion: round.version ?? 0,
-              teamKey,
-              allowedTeamKeys: selected,
-            },
-            "Adversários permitidos guardados.",
-          )
-        }
-      >
-        Guardar adversários permitidos
-      </button>
-      {fixed && <p>Esta dupla já tem um confronto definido.</p>}
-      <label>
-        Simular outro desafio · não cria jogos
-        <select
-          value={simulation}
-          onChange={(e) => setSimulation(e.target.value)}
-        >
-          <option value="">Situação atual</option>
-          {options.map((p) => (
-            <option
-              key={`${p.attackerKey}>${p.defenderKey}`}
-              value={`${p.attackerKey}>${p.defenderKey}`}
-            >
-              #{rank(p.attackerKey)} → #{rank(p.defenderKey)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p>
-        {example ? "Após o desafio simulado" : "Disponíveis agora"}:{" "}
-        {available.join("; ") || "Sem adversários para atacar."}
-      </p>
-      <p>
-        {plan.maximumMatches} jogos possíveis para {teams.length} duplas.
-        {plan.maximumMatches * 2 < teams.length
-          ? " As regras e exclusões deixam duplas sem jogo possível."
-          : ""}
-      </p>
-      {example && (
+      <div className="stack gap-sm">
+        <p>Opções calculadas com os papéis guardados.</p>
         <p>
-          Restantes confrontos:{" "}
-          {plan.canonical
-            .map((p) => `#${rank(p.attackerKey)} → #${rank(p.defenderKey)}`)
-            .join("; ") || "Nenhum."}
+          Alcance normal: {challengeDistance(s, division._id)} posições. As
+          exclusões também se aplicam ao alcance alargado.
         </p>
-      )}
+        <div className="stack">
+          {teams.slice(0, index).map((t) => (
+            <label className="check" key={t.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(t.id)}
+                disabled={busy || fixed || historical}
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? [...selected, t.id]
+                      : selected.filter((k) => k !== t.id),
+                  )
+                }
+              />
+              #{rank(t.id)} {name(t.id)}
+            </label>
+          ))}
+        </div>
+        <button
+          className="small"
+          disabled={
+            busy || fixed || historical || saved === JSON.stringify(selected)
+          }
+          onClick={() =>
+            void run(
+              {
+                type: "admin.week.ouro.opponents.save",
+                weekStart: week,
+                expectedVersion: round.version ?? 0,
+                teamKey,
+                allowedTeamKeys: selected,
+              },
+              "Adversários permitidos guardados.",
+            )
+          }
+        >
+          Guardar adversários permitidos
+        </button>
+        {fixed && <p>Esta dupla já tem um confronto definido.</p>}
+        <label>
+          Simular outro desafio · não cria jogos
+          <select
+            value={simulation}
+            onChange={(e) => setSimulation(e.target.value)}
+          >
+            <option value="">Situação atual</option>
+            {options.map((p) => (
+              <option
+                key={`${p.attackerKey}>${p.defenderKey}`}
+                value={`${p.attackerKey}>${p.defenderKey}`}
+              >
+                #{rank(p.attackerKey)} → #{rank(p.defenderKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p>
+          {example ? "Após o desafio simulado" : "Disponíveis agora"}:{" "}
+          {available.join("; ") || "Sem adversários para atacar."}
+        </p>
+        <p>
+          {plan.maximumMatches} jogos possíveis para {teams.length} duplas.
+          {plan.maximumMatches * 2 < teams.length
+            ? " As regras e exclusões deixam duplas sem jogo possível."
+            : ""}
+        </p>
+        {example && (
+          <p>
+            Restantes confrontos:{" "}
+            {plan.canonical
+              .map((p) => `#${rank(p.attackerKey)} → #${rank(p.defenderKey)}`)
+              .join("; ") || "Nenhum."}
+          </p>
+        )}
+      </div>
     </details>
   );
 }

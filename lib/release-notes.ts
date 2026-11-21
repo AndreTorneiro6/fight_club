@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.21.2";
+export const applicationVersion = "1.21.3";
 export const releaseNotes = [
+  {
+    version: "1.21.3",
+    date: "2026-11-21",
+    title: "Cartões das equipas reorganizados em Gerir semanas",
+    changes: [
+      "As equipas aparecem numa grelha regular, com cartões da mesma largura, botões de papel sempre no mesmo lugar e secções recolhíveis consistentes em computador e telemóvel.",
+    ],
+  },
   {
     version: "1.21.2",
     date: "2026-11-17",

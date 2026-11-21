@@ -2109,15 +2109,185 @@ html[data-theme="fight-club"] .landing-hero:before {
   }
 }
 
-.weekly-team {
-  align-items: flex-start;
+.weekly-teams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
-.weekly-team > .stack {
-  flex: 1;
-  min-width: min(220px, 100%);
+.weekly-team {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 .weekly-team strong {
   overflow-wrap: anywhere;
+}
+/* An expanded section must not stretch its neighbours into empty boxes. */
+.weekly-teams-grid:has(details[open]) > .weekly-team {
+  align-self: start;
+}
+.weekly-team-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.weekly-team-identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.weekly-team-identity > strong {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.weekly-team-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+.role-timeline {
+  flex: none;
+  max-width: 45%;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--gold);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.weekly-team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.weekly-team-actions > button {
+  flex: 1 1 0;
+  min-width: max-content;
+  min-height: 38px;
+  justify-content: center;
+}
+.weekly-team-actions > .weekly-team-clear,
+.weekly-team-actions > small {
+  flex: 1 0 100%;
+}
+.weekly-team-actions .weekly-role-choice[aria-pressed="true"]:disabled {
+  opacity: 1;
+}
+.weekly-team-actions .weekly-role-choice[aria-pressed="true"] svg {
+  border-width: 1.5px;
+  padding: 2px;
+}
+.weekly-team-challenge > button {
+  justify-content: center;
+}
+.weekly-team-body:empty {
+  display: none;
+}
+.weekly-team-insight {
+  gap: 10px;
+  font-size: 12px;
+  min-width: 0;
+}
+.weekly-team-options {
+  gap: 4px;
+  line-height: 1.5;
+}
+.weekly-collapsible {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff05;
+}
+.weekly-collapsible > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 7px 34px 7px 12px;
+  position: relative;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.4;
+  list-style: none;
+}
+.weekly-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+.weekly-collapsible > summary::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-65%) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.weekly-collapsible[open] > summary::after {
+  transform: translateY(-35%) rotate(-135deg);
+}
+.weekly-collapsible > summary:hover {
+  background: #ffffff08;
+}
+.weekly-collapsible > summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+.weekly-collapsible[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+}
+.weekly-collapsible > :not(summary) {
+  margin: 0;
+  padding: 12px;
+}
+.weekly-collapsible p {
+  margin: 0;
+}
+.weekly-team .weekly-collapsible {
+  font-size: 12px;
+}
+.weekly-role-history-summary > span {
+  margin-right: 0;
+}
+.weekly-role-history-summary > small {
+  white-space: nowrap;
+}
+.weekly-team .weekly-role-history .weekly-role-history-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.weekly-team .weekly-role-history-list > li {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+}
+.weekly-team .weekly-role-history-list > li > small {
+  grid-column: 1 / -1;
+}
+.weekly-history-roles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .weekly-collapsible > summary::after {
+    transition: none;
+  }
 }
 
 .matchday-preview {
@@ -3113,8 +3283,6 @@ body::before {
 }
 
 /* Published weekly-role history: text labels accompany every colour. */
-.weekly-role-history-summary { line-height: 2; }
-.weekly-role-history-summary > span { margin-right: 6px; }
 .weekly-history-week { color: var(--gold); font-weight: 700; }
 .weekly-history-role { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; border-radius: 6px; font-size: 11px; line-height: 1.6; }
 .weekly-history-role.attack { color: #f7cc73; background: #d6a33318; }
