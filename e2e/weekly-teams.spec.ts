@@ -229,7 +229,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await expect(history.locator("li").first()).toContainText("Mais recente");
   await expect(
     history.locator("li").first().locator(".weekly-history-role.attack"),
-  ).toHaveText("Final: Ataque");
+  ).toHaveText("Ataque");
   await expect(
     previousAttacker.getByRole("button", { name: /^Defesa:/ }),
   ).toHaveAttribute("aria-pressed", "true");

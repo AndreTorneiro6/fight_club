@@ -42,6 +42,20 @@ import {
 import { rankingEntries } from "@/lib/ranking-groups";
 import type { Challenge, Player, View } from "@/lib/types";
 
+function roleHistoryKey(role?: string) {
+  return role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "S" : "?";
+}
+
+function roleLabel(role: string | undefined) {
+  return role === "super_attack"
+    ? "SUPER ATAQUE"
+    : role === "attack"
+      ? "ATAQUE"
+      : role === "defense"
+        ? "DEFESA"
+        : "Por atribuir";
+}
+
 function PreviousWeekRole({
   s,
   team,
@@ -61,27 +75,21 @@ function PreviousWeekRole({
     (first && previous.weekStart < first)
   )
     return null;
-  const roleLabel = (role: string | undefined) =>
-    role === "super_attack"
-      ? "SUPER ATAQUE"
-      : role === "attack"
-        ? "ATAQUE"
-        : role === "defense"
-          ? "DEFESA"
-          : "Por atribuir";
   // Final = the side the team actually played (or its effective role without a game).
   const last = teamRoleHistory(s, team, week, 1)[0];
   if (last?.week !== previous.weekStart) return null;
   const { initial, final } = last;
+  const historyKey = `${roleHistoryKey(initial)}${roleHistoryKey(final)}`;
   return (
     <span className="stack" style={{ gap: 4, fontSize: 11 }}>
       <span className="muted">Semana anterior</span>
       <span>
-        Inicial: <strong>{roleLabel(initial)}</strong>
-      </span>
-      <span>
-        Final: <strong>{roleLabel(final)}</strong>
-        {initial !== final ? " · alterado" : ""}
+        <span className="muted">Inicial:</span> <strong>{roleLabel(initial)}</strong>
+        <span className="muted"> → </span>
+        <strong>{roleLabel(final)}</strong>
+        <span className="muted" style={{ fontSize: 10, marginLeft: 8, fontFamily: "monospace" }}>
+          ({historyKey})
+        </span>
       </span>
     </span>
   );
@@ -613,33 +621,33 @@ export function WeeklyRoles({
                         .filter(
                           (t) => division === "all" || t.divisionId === division,
                         )
-                        .map((t) => (
-                          <small key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                            <strong style={{ fontSize: 11 }}>{t.name}</strong>
-                            <span className="muted" style={{ fontSize: 10 }}>Inicial:</span>
-                            <span
-                              className={`weekly-history-role ${r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
-                              style={{ fontSize: 10 }}
-                            >
-                              {r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role === "attack"
-                                ? "ATAQUE"
-                                : r.assignments.find((a) => t.playerIds.includes(a.playerId))?.role === "defense"
-                                ? "DEFESA"
-                                : "Por atribuir"}
-                            </span>
-                            <span className="muted" style={{ fontSize: 10 }}>·</span>
-                            <span
-                              className={`weekly-history-role ${effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role ?? "unassigned"}`}
-                              style={{ fontSize: 10 }}
-                            >
-                              {effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role === "attack"
-                                ? "Final: ATAQUE"
-                                : effectiveRoles(r).find((a) => t.playerIds.includes(a.playerId))?.role === "defense"
-                                ? "Final: DEFESA"
-                                : "Final: Por atribuir"}
-                            </span>
-                          </small>
-                        ))}
+                        .map((t) => {
+                          const assignments = t.playerIds.map((pid) =>
+                            r.assignments.find((a) => a.playerId === pid)?.role,
+                          );
+                          const effective = t.playerIds.map((pid) =>
+                            effectiveRoles(r).find((a) => a.playerId === pid)?.role,
+                          );
+                          const historyKey = assignments
+                            .map(roleHistoryKey)
+                            .concat(effective.map(roleHistoryKey))
+                            .join("");
+                          const initialRole = assignments[0];
+                          const finalRole = effective[0];
+                          return (
+                            <small key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              <strong style={{ fontSize: 11 }}>{t.name}</strong>
+                              <span style={{ fontSize: 10 }}>
+                                <span className="muted">Inicial:</span> <strong>{roleLabel(initialRole)}</strong>
+                                <span className="muted"> → </span>
+                                <strong>{roleLabel(finalRole)}</strong>
+                                <span className="muted" style={{ marginLeft: 8, fontFamily: "monospace" }}>
+                                  ({historyKey})
+                                </span>
+                              </span>
+                            </small>
+                          );
+                        })}
                     </div>
                   </li>
                 ))}

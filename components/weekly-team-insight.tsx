@@ -14,6 +14,9 @@ const roleLabel = (role?: string) =>
       : role === "defense"
         ? "Defesa"
         : "—";
+
+const roleKey = (role?: string) =>
+  role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "S" : "?";
 const day = (week: string) =>
   new Date(week + "T12:00:00Z").toLocaleDateString("pt-PT", {
     day: "numeric",
@@ -59,7 +62,7 @@ export default function WeeklyTeamInsight({
             <span
               className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
             >
-              Último papel: {roleLabel(history[0].final)}
+              Último papel: {roleLabel(history[0].final)} <span className="muted">({roleKey(history[0].initial)}{roleKey(history[0].final)})</span>
             </span>
             <small>Mais recente</small>
           </summary>
@@ -84,14 +87,16 @@ export default function WeeklyTeamInsight({
                     </small>
                   )}
                 </div>
-                <div className="row wrap">
+                <div className="row wrap" style={{ gap: 8, alignItems: "center" }}>
                   <span>Inicial: {roleLabel(h.initial)}</span>
                   <strong
                     className={`weekly-history-role ${h.final ?? "unassigned"}`}
                   >
-                    Final: {roleLabel(h.final)}
+                    {roleLabel(h.final)}
                   </strong>
-                  {h.final !== h.initial && <small>Alterado</small>}
+                  <span className="muted" style={{ fontFamily: "monospace", fontSize: 11 }}>
+                    {roleKey(h.initial)}{roleKey(h.final)}
+                  </span>
                 </div>
                 <small>
                   {h.game
