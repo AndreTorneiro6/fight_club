@@ -38,6 +38,17 @@ const status: Record<string, string> = {
 const list = (teams: { rank: number; name: string }[]) =>
   teams.map((t) => `#${t.rank} ${t.name}`).join(" · ");
 
+function teamRoleTimeline(s: View, team: Player[], beforeWeek: string): string {
+  const history = teamRoleHistory(s, team, beforeWeek, 10);
+  if (!history.length) return "";
+  const keys = history
+    .slice()
+    .reverse()
+    .map((h) => roleKey(h.final ?? h.initial))
+    .filter((k) => k !== "?");
+  return keys.join("/");
+}
+
 /** Admin-only: past roles and games of a team, and its possible games this week. */
 export default function WeeklyTeamInsight({
   s,
@@ -51,8 +62,14 @@ export default function WeeklyTeamInsight({
   options?: TeamWeekOptions;
 }) {
   const history = teamRoleHistory(s, team, week, 5);
+  const timeline = teamRoleTimeline(s, team, week);
   return (
     <div className="stack" style={{ gap: 6, fontSize: 12 }}>
+      {timeline && (
+        <span className="muted" style={{ fontSize: 11, fontFamily: "monospace", letterSpacing: 1 }}>
+          {timeline}
+        </span>
+      )}
       {history.length > 0 && (
         <details className="weekly-role-history" open={false}>
           <summary className="weekly-role-history-summary">

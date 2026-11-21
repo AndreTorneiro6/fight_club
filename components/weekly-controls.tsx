@@ -56,6 +56,19 @@ function roleLabel(role: string | undefined) {
         : "Por atribuir";
 }
 
+/** Builds a compact timeline like "A/D/A/D/D" for a team's role history. */
+function teamRoleTimeline(s: View, team: Player[], beforeWeek: string): string {
+  const history = teamRoleHistory(s, team, beforeWeek, 10);
+  if (!history.length) return "";
+  // Get the effective (final) role for each published week, oldest first
+  const keys = history
+    .slice()
+    .reverse()
+    .map((h) => roleHistoryKey(h.final ?? h.initial))
+    .filter((k) => k !== "?");
+  return keys.join("/");
+}
+
 function PreviousWeekRole({
   s,
   team,
@@ -872,6 +885,14 @@ export function WeeklyRoles({
               data-weekly-team={entry.id}
             >
               <div className="stack gap-sm">
+                {(() => {
+                  const timeline = teamRoleTimeline(s, members, week);
+                  return timeline ? (
+                    <span className="muted" style={{ fontSize: 11, fontFamily: "monospace", letterSpacing: 1 }}>
+                      {timeline}
+                    </span>
+                  ) : null;
+                })()}
                 <strong>
                   {label}
                   {ownTeam
