@@ -35,77 +35,80 @@ const status: Record<string, string> = {
 const list = (teams: { rank: number; name: string }[]) =>
   teams.map((t) => `#${t.rank} ${t.name}`).join(" · ");
 
-/** Admin-only: past roles and games of a team, and its possible games this week. */
-export default function WeeklyTeamInsight({
+/** Admin-only: a team's past roles and games, shown under its role letters. */
+export function WeeklyTeamRoleHistory({
   s,
   team,
   week,
-  options,
 }: {
   s: View;
   team: Player[];
   week: string;
-  options?: TeamWeekOptions;
 }) {
   const history = teamRoleHistory(s, team, week, 5);
+  if (!history.length) return null;
+  return (
+    <details className="weekly-role-history">
+      <summary className="weekly-role-history-summary">
+        <span className="weekly-history-week" title={day(history[0].week)}>
+          {matchdayWeekLabel(s, history[0].week)}
+        </span>
+        <span
+          className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
+        >
+          Último papel: {roleLabel(history[0].final)}
+        </span>
+        <small>Mais recente</small>
+      </summary>
+      <ol aria-label="Histórico de papéis" className="weekly-role-history-list">
+        {history.map((h, index) => (
+          <li
+            key={h.week}
+            className={index === 0 ? "weekly-role-history-latest" : undefined}
+          >
+            <div className="row wrap">
+              <strong className="weekly-history-week" title={day(h.week)}>
+                {matchdayWeekLabel(s, h.week)}
+              </strong>
+              {index === 0 && (
+                <small className="weekly-history-latest-label">
+                  Mais recente
+                </small>
+              )}
+            </div>
+            <div className="row wrap">
+              <strong
+                className={`weekly-history-role ${h.final ?? "unassigned"}`}
+              >
+                {roleLabel(h.final)}
+              </strong>
+            </div>
+            <small>
+              {h.game
+                ? `#${h.game.number} vs ${h.game.opponent} · ${
+                    h.game.outcome === "win"
+                      ? "vitória"
+                      : h.game.outcome === "loss"
+                        ? "derrota"
+                        : (status[h.game.status] ?? h.game.status)
+                  }`
+                : "Sem jogo"}
+            </small>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+/** Admin-only: a team's possible games this week. */
+export default function WeeklyTeamInsight({
+  options,
+}: {
+  options?: TeamWeekOptions;
+}) {
   return (
     <div className="stack weekly-team-insight">
-      {history.length > 0 && (
-        <details className="weekly-collapsible weekly-role-history">
-          <summary className="weekly-role-history-summary">
-            <span className="weekly-history-week" title={day(history[0].week)}>
-              {matchdayWeekLabel(s, history[0].week)}
-            </span>
-            <span
-              className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
-            >
-              Último papel: {roleLabel(history[0].final)}
-            </span>
-          </summary>
-          <ol
-            aria-label="Histórico de papéis"
-            className="weekly-role-history-list"
-          >
-            {history.map((h, index) => (
-              <li
-                key={h.week}
-                className={
-                  index === 0 ? "weekly-role-history-latest" : undefined
-                }
-              >
-                <div className="row wrap">
-                  <strong className="weekly-history-week" title={day(h.week)}>
-                    {matchdayWeekLabel(s, h.week)}
-                  </strong>
-                  {index === 0 && (
-                    <small className="weekly-history-latest-label">
-                      Mais recente
-                    </small>
-                  )}
-                </div>
-                <div className="weekly-history-roles">
-                  <strong
-                    className={`weekly-history-role ${h.final ?? "unassigned"}`}
-                  >
-                    {roleLabel(h.final)}
-                  </strong>
-                </div>
-                <small>
-                  {h.game
-                    ? `#${h.game.number} vs ${h.game.opponent} · ${
-                        h.game.outcome === "win"
-                          ? "vitória"
-                          : h.game.outcome === "loss"
-                            ? "derrota"
-                            : (status[h.game.status] ?? h.game.status)
-                      }`
-                    : "Sem jogo"}
-                </small>
-              </li>
-            ))}
-          </ol>
-        </details>
-      )}
       {options && (
         <div className="stack weekly-team-options" aria-label="Jogos possíveis">
           {options.vacationUntil && (

@@ -282,7 +282,7 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
     .first();
   await expect(history).toBeAttached();
   await expect(history).toContainText(/Ataque|Defesa/);
-  await expect(history).not.toContainText("Inicial");
+  await expect(history).not.toContainText(/Inicial|Final/);
   await expect(
     page
       .locator("#weekly-role-assignment")

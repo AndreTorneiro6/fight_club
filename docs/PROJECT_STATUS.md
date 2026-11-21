@@ -1,3 +1,8 @@
+## Version 1.21.5 — team history under role letters — 21 November 2026
+
+- User asked for each team's collapsible history directly below the role letters, in the v1.21.0 format, then asked to remove Inicial, Final and therefore Alterado. Each week now shows only the assumed role plus its game/result. Team rows and the one-role weekly history table from v1.21.4 are unchanged.
+- Typecheck, 581 unit tests, production build and the four weekly browser specs (each run separately) pass. Submitted through the deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.21.4 — team rows and assumed-role history — 21 November 2026
 
 - User clarified that each team must be a full-width row, supersedes the v1.21.3 column grid. Rows adapt to their container: three zones on desktop, two on tablet, stacked on mobile.

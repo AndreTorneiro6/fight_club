@@ -20,7 +20,7 @@ import { usesManagedCompetition } from "@/lib/competition-mode";
 import WeeklyOpeningControl from "./weekly-opening-control";
 import RoundChallengeCoverage from "./round-challenge-coverage";
 import RankingExport from "./ranking-export";
-import WeeklyTeamInsight from "./weekly-team-insight";
+import WeeklyTeamInsight, { WeeklyTeamRoleHistory } from "./weekly-team-insight";
 import {
   divisionWeekOptions,
   teamRoleHistory,
@@ -928,6 +928,9 @@ export function WeeklyRoles({
                     </span>
                   ) : null;
                 })()}
+                {admin && (
+                  <WeeklyTeamRoleHistory s={s} team={members} week={week} />
+                )}
               </div>
                 {!admin && (
                   <span
@@ -1056,9 +1059,6 @@ export function WeeklyRoles({
               <div className="stack gap-sm weekly-team-body">
                 {admin ? (
                   <WeeklyTeamInsight
-                    s={s}
-                    team={members}
-                    week={week}
                     options={weekOptions.get(entry.id)}
                   />
                 ) : (
