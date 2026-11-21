@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.21.3";
+export const applicationVersion = "1.21.4";
 export const releaseNotes = [
+  {
+    version: "1.21.4",
+    date: "2026-11-21",
+    title: "Equipas em linhas e histórico com o papel real",
+    changes: [
+      "Em Gerir semanas, cada equipa ocupa uma linha completa, e o histórico semanal mostra apenas o papel que cada equipa assumiu em cada semana.",
+    ],
+  },
   {
     version: "1.21.3",
     date: "2026-11-21",

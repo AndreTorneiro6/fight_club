@@ -56,6 +56,17 @@ function roleLabel(role: string | undefined) {
         : "Por atribuir";
 }
 
+/** The role a team really assumed in a week: its game side, else its effective role. */
+function assumedRole(s: View, round: View["weeklyRounds"][number], playerIds: string[]) {
+  const team = s.players.filter((player) => playerIds.includes(player._id));
+  const entry = team.length
+    ? teamRoleHistory(s, team, addClubDays(round.weekStart, 1), 1)[0]
+    : undefined;
+  return entry?.week === round.weekStart
+    ? entry.final
+    : effectiveRoles(round).find((a) => playerIds.includes(a.playerId))?.role;
+}
+
 /** Builds a compact timeline like "A/D/A/D/D" for a team's role history. */
 function teamRoleTimeline(s: View, team: Player[], beforeWeek: string): string {
   const history = teamRoleHistory(s, team, beforeWeek, 10);
@@ -91,15 +102,10 @@ function PreviousWeekRole({
   // Final = the side the team actually played (or its effective role without a game).
   const last = teamRoleHistory(s, team, week, 1)[0];
   if (last?.week !== previous.weekStart) return null;
-  const { initial, final } = last;
   return (
     <span className="stack" style={{ gap: 4, fontSize: 11 }}>
       <span className="muted">Semana anterior</span>
-      <span>
-        <span className="muted">Inicial:</span> <strong>{roleLabel(initial)}</strong>
-        <span className="muted"> → </span>
-        <strong>{roleLabel(final)}</strong>
-      </span>
+      <strong>{roleLabel(last.final)}</strong>
     </span>
   );
 }
@@ -586,7 +592,10 @@ export function WeeklyRoles({
           ))}
           <details className="weekly-collapsible">
             <summary>Histórico dos papéis semanais</summary>
-            <ol className="weekly-role-history-list" aria-label="Histórico de papéis semanais">
+            <ol
+              className="weekly-role-history-list weekly-round-history"
+              aria-label="Histórico de papéis semanais"
+            >
               {[...s.weeklyRounds]
                 .filter(
                   (r) => r.weekStart < week && (!first || r.weekStart >= first),
@@ -597,16 +606,20 @@ export function WeeklyRoles({
                     key={r._id}
                     className={index === 0 ? "weekly-role-history-latest" : ""}
                   >
-                    <div className="row wrap">
+                    <div className="weekly-round-head">
                       <button
-                        className={index === 0 ? "weekly-history-week" : undefined}
+                        className="small weekly-history-week"
                         title={r.weekStart}
                         onClick={() => setWeek(r.weekStart)}
                       >
                         {matchdayWeekLabel(s, r.weekStart)}
-                        {index === 0 && <span className="weekly-history-latest-label"> · Mais recente</span>}
                       </button>
-                      <span className="muted">
+                      {index === 0 && (
+                        <span className="weekly-history-latest-label">
+                          Mais recente
+                        </span>
+                      )}
+                      <span className="muted weekly-round-status">
                         {weeklyPublishedAt(
                           r,
                           division === "all" ? undefined : division,
@@ -617,40 +630,44 @@ export function WeeklyRoles({
                             : "Rascunho"}
                       </span>
                     </div>
-                    <div className="stack" style={{ gap: 4 }}>
-                      {(
-                        r.teamSnapshot ??
-                        teams.map((t) => ({
-                          id: t.id,
-                          name: t.members.map((m) => m.name).join(" + "),
-                          divisionId: t.members[0].divisionId,
-                          playerIds: t.members.map((m) => m._id),
-                        }))
-                      )
-                        .filter(
-                          (t) => division === "all" || t.divisionId === division,
+                    <table className="weekly-round-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Equipa</th>
+                          <th scope="col">Papel</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(
+                          r.teamSnapshot ??
+                          teams.map((t) => ({
+                            id: t.id,
+                            name: t.members.map((m) => m.name).join(" + "),
+                            divisionId: t.members[0].divisionId,
+                            playerIds: t.members.map((m) => m._id),
+                          }))
                         )
-                        .map((t) => {
-                          const assignments = t.playerIds.map((pid) =>
-                            r.assignments.find((a) => a.playerId === pid)?.role,
-                          );
-                          const effective = t.playerIds.map((pid) =>
-                            effectiveRoles(r).find((a) => a.playerId === pid)?.role,
-                          );
-                          const initialRole = assignments[0];
-                          const finalRole = effective[0];
-                          return (
-                            <small key={t.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              <strong style={{ fontSize: 11 }}>{t.name}</strong>
-                              <span style={{ fontSize: 10 }}>
-                                <span className="muted">Inicial:</span> <strong>{roleLabel(initialRole)}</strong>
-                                <span className="muted"> → </span>
-                                <strong>{roleLabel(finalRole)}</strong>
-                              </span>
-                            </small>
-                          );
-                        })}
-                    </div>
+                          .filter(
+                            (t) =>
+                              division === "all" || t.divisionId === division,
+                          )
+                          .map((t) => {
+                            const role = assumedRole(s, r, t.playerIds);
+                            return (
+                              <tr key={t.id}>
+                                <th scope="row">{t.name}</th>
+                                <td>
+                                  <span
+                                    className={`weekly-history-role ${role ?? "unassigned"}`}
+                                  >
+                                    {roleLabel(role)}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
                   </li>
                 ))}
             </ol>
@@ -793,7 +810,7 @@ export function WeeklyRoles({
           </div>
         </details>
       )}
-      <div className="weekly-teams-grid">
+      <div className="weekly-teams-list">
         {visible.map((entry) => {
           const members = entry.members;
           const activeMembers = members.filter((member) =>

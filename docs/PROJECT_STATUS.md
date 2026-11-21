@@ -1,3 +1,9 @@
+## Version 1.21.4 — team rows and assumed-role history — 21 November 2026
+
+- User clarified that each team must be a full-width row, supersedes the v1.21.3 column grid. Rows adapt to their container: three zones on desktop, two on tablet, stacked on mobile.
+- User clarified that weekly history must show only the role each team truly assumed, never initial and final. "Histórico dos papéis semanais" is now one Equipa/Papel table per week, using `teamRoleHistory` final role (active game side, else effective role). Team-card history and the previous-week label also dropped the initial role. Stored initial assignments are unchanged.
+- Typecheck, 581 unit tests, production build and the four weekly browser specs (each run separately) pass. Submitted through the deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.21.3 — Gerir semanas team grid and collapsibles — 21 November 2026
 
 - Team cards now use an equal-width responsive grid with one internal order: identity and role timeline, role actions, game options, collapsibles. All weekly collapsibles share `.weekly-collapsible`; expanding one no longer stretches neighbouring cards. Layout only: no role, challenge or league data logic changed.

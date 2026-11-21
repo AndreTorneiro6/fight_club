@@ -2109,12 +2109,13 @@ html[data-theme="fight-club"] .landing-hero:before {
   }
 }
 
-.weekly-teams-grid {
+.weekly-teams-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   width: 100%;
   min-width: 0;
+  container-type: inline-size;
 }
 .weekly-team {
   display: flex;
@@ -2124,10 +2125,6 @@ html[data-theme="fight-club"] .landing-hero:before {
 }
 .weekly-team strong {
   overflow-wrap: anywhere;
-}
-/* An expanded section must not stretch its neighbours into empty boxes. */
-.weekly-teams-grid:has(details[open]) > .weekly-team {
-  align-self: start;
 }
 .weekly-team-head {
   display: flex;
@@ -2283,6 +2280,135 @@ html[data-theme="fight-club"] .landing-hero:before {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+.weekly-role-history-list.weekly-round-history {
+  grid-template-columns: minmax(0, 1fr);
+}
+.weekly-round-history > li {
+  gap: 8px;
+  min-width: 0;
+}
+.weekly-round-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.weekly-round-status {
+  margin-left: auto;
+  font-size: 12px;
+}
+.weekly-round-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.weekly-round-table th,
+.weekly-round-table td {
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.weekly-round-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.weekly-round-table thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.weekly-round-table tbody th {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-transform: none;
+  white-space: normal;
+}
+.weekly-round-head > button {
+  min-height: 30px;
+  padding: 3px 10px;
+}
+.weekly-round-head .weekly-history-latest-label {
+  font-size: 12px;
+}
+.weekly-round-table :is(th, td):not(:first-child) {
+  width: 118px;
+}
+.weekly-history-role.super_attack {
+  color: #ffb27a;
+  background: #e0763318;
+}
+@media (max-width: 480px) {
+  .weekly-round-table :is(th, td):not(:first-child) {
+    width: 92px;
+  }
+  .weekly-round-table .weekly-history-role {
+    padding: 1px 5px;
+    font-size: 10px;
+  }
+}
+/* Each team is one full-width row; its sections follow the row's own width. */
+@container (min-width: 620px) {
+  .weekly-team {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    column-gap: 20px;
+    row-gap: 12px;
+    align-items: start;
+  }
+  .weekly-team > .weekly-team-head,
+  .weekly-team > .role-label {
+    grid-column: 1;
+  }
+  .weekly-team > .weekly-team-actions,
+  .weekly-team > .weekly-team-challenge {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .weekly-team > .weekly-team-body,
+  .weekly-team > .weekly-collapsible {
+    grid-column: 1 / -1;
+  }
+}
+@container (min-width: 900px) {
+  .weekly-team {
+    grid-template-columns: 210px minmax(0, 1fr) 350px;
+    grid-template-rows: auto 1fr;
+    row-gap: 0;
+  }
+  .weekly-team-head {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .role-timeline {
+    max-width: 100%;
+    text-align: left;
+  }
+  .weekly-team > .role-label {
+    grid-row: 2;
+    margin-top: 8px;
+  }
+  .weekly-team > .weekly-team-head,
+  .weekly-team > .weekly-team-body {
+    grid-row: 1;
+  }
+  .weekly-team > .weekly-team-body {
+    grid-column: 2;
+  }
+  .weekly-team > .weekly-collapsible {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 10px;
+  }
+  .weekly-team > .weekly-team-actions,
+  .weekly-team > .weekly-team-challenge {
+    grid-column: 3;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .weekly-collapsible > summary::after {

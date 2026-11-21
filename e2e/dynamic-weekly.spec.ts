@@ -281,7 +281,8 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
     .locator('[aria-label="Histórico de papéis"]')
     .first();
   await expect(history).toBeAttached();
-  await expect(history).toContainText(/Inicial:.*Ataque|Inicial:.*Defesa/);
+  await expect(history).toContainText(/Ataque|Defesa/);
+  await expect(history).not.toContainText("Inicial");
   await expect(
     page
       .locator("#weekly-role-assignment")

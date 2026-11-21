@@ -84,7 +84,6 @@ export default function WeeklyTeamInsight({
                   )}
                 </div>
                 <div className="weekly-history-roles">
-                  <span>Inicial: {roleLabel(h.initial)}</span>
                   <strong
                     className={`weekly-history-role ${h.final ?? "unassigned"}`}
                   >
