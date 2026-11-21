@@ -221,7 +221,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await expect(history.locator("summary")).toContainText("Semana 2");
   await expect(
     history.locator("summary .weekly-history-role.attack"),
-  ).toHaveText("Último papel: Ataque");
+  ).toHaveText("Último papel: Ataque (AA)");
   await history.locator("summary").click();
   await expect(history.locator("li").first()).toHaveClass(
     "weekly-role-history-latest",
