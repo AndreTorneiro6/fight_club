@@ -2128,14 +2128,12 @@ html[data-theme="fight-club"] .landing-hero:before {
 }
 .weekly-team-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
-.weekly-team-head > .weekly-role-history {
-  flex: none;
-  width: 100%;
+.weekly-team > .weekly-role-history {
+  min-width: 0;
   font-size: 12px;
 }
 .weekly-team-identity {
@@ -2339,12 +2337,17 @@ html[data-theme="fight-club"] .landing-hero:before {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 350px;
     column-gap: 20px;
-    row-gap: 12px;
+    row-gap: 10px;
     align-items: start;
   }
-  .weekly-team > .weekly-team-head,
-  .weekly-team > .role-label {
+  .weekly-team > .weekly-team-head {
     grid-column: 1;
+    grid-row: 1;
+  }
+  .weekly-team > .role-label,
+  .weekly-team > .weekly-role-history {
+    grid-column: 1;
+    grid-row: 2;
   }
   .weekly-team > .weekly-team-actions,
   .weekly-team > .weekly-team-challenge {
@@ -2355,12 +2358,17 @@ html[data-theme="fight-club"] .landing-hero:before {
   .weekly-team > .weekly-collapsible {
     grid-column: 1 / -1;
   }
+  /* The open history uses the whole row so its weeks fit side by side. */
+  .weekly-team > .weekly-role-history[open] {
+    grid-column: 1 / -1;
+  }
+  .weekly-team:has(> .weekly-role-history[open]) > .weekly-team-actions {
+    grid-row: 1;
+  }
 }
 @container (min-width: 900px) {
   .weekly-team {
     grid-template-columns: 300px minmax(0, 1fr) 350px;
-    grid-template-rows: auto 1fr;
-    row-gap: 0;
   }
   .weekly-team-head {
     flex-direction: column;
@@ -2370,24 +2378,16 @@ html[data-theme="fight-club"] .landing-hero:before {
     max-width: 100%;
     text-align: left;
   }
-  .weekly-team > .role-label {
-    grid-row: 3;
-    margin-top: 8px;
-  }
-  /* The history can grow under the letters without pushing the middle column. */
-  .weekly-team > .weekly-team-head {
-    grid-row: 1 / span 2;
-  }
-  .weekly-team > .weekly-team-body {
-    grid-row: 1;
-  }
   .weekly-team > .weekly-team-body {
     grid-column: 2;
+    grid-row: 1;
   }
   .weekly-team > .weekly-collapsible {
     grid-column: 2;
     grid-row: 2;
-    margin-top: 10px;
+  }
+  .weekly-team:has(> .weekly-role-history[open]) > .weekly-collapsible {
+    grid-row: 3;
   }
   .weekly-team > .weekly-team-actions,
   .weekly-team > .weekly-team-challenge {
@@ -3402,7 +3402,7 @@ body::before {
 .weekly-history-role.unassigned { color: var(--muted); }
 .weekly-role-history-list { list-style: none; display: grid; gap: 12px; margin: 8px 0 0; padding: 0; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .weekly-role-history-list > li { padding: 12px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 6px; }
-.weekly-role-history .weekly-role-history-list { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-.weekly-role-history .weekly-role-history-list > li { padding: 10px; }
+.weekly-role-history .weekly-role-history-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(132px, 1fr); gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.weekly-role-history .weekly-role-history-list > li { padding: 10px; align-content: start; }
 html[data-theme] .inset.weekly-role-history-latest, .weekly-role-history-latest { border: 1px solid var(--gold); background: #d6a3330d; border-radius: 8px; }
 .weekly-history-latest-label { color: var(--gold); font-weight: 700; }

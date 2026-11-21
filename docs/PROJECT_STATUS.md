@@ -1,3 +1,8 @@
+## Version 1.21.6 — team history weeks in columns — 21 November 2026
+
+- User asked for each previous week's role, game and result to sit in columns. The collapsed history stays below the role letters; when open it spans the full team row with one column per week, and scrolls sideways inside the card on mobile.
+- Typecheck, 581 unit tests, production build and the four weekly browser specs (each run separately) pass. Submitted through the deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.21.5 — team history under role letters — 21 November 2026
 
 - User asked for each team's collapsible history directly below the role letters, in the v1.21.0 format, then asked to remove Inicial, Final and therefore Alterado. Each week now shows only the assumed role plus its game/result. Team rows and the one-role weekly history table from v1.21.4 are unchanged.

@@ -60,7 +60,11 @@ export function WeeklyTeamRoleHistory({
         </span>
         <small>Mais recente</small>
       </summary>
-      <ol aria-label="Histórico de papéis" className="weekly-role-history-list">
+      <ol
+        aria-label="Histórico de papéis"
+        tabIndex={0}
+        className="weekly-role-history-list"
+      >
         {history.map((h, index) => (
           <li
             key={h.week}

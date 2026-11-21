@@ -928,10 +928,10 @@ export function WeeklyRoles({
                     </span>
                   ) : null;
                 })()}
-                {admin && (
-                  <WeeklyTeamRoleHistory s={s} team={members} week={week} />
-                )}
               </div>
+              {admin && (
+                <WeeklyTeamRoleHistory s={s} team={members} week={week} />
+              )}
                 {!admin && (
                   <span
                     className={`role-label ${role === "attack" ? "gold" : ""}`}
