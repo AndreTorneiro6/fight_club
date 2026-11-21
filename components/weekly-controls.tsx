@@ -903,11 +903,28 @@ export function WeeklyRoles({
                 </div>
                 {(() => {
                   const timeline = teamRoleTimeline(s, members, week);
-                  return timeline ? (
-                    <span className="role-timeline" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
-                      {timeline}
-                    </span>
-                  ) : null;
+                  const history = teamRoleHistory(s, members, week, 10);
+                  if (!timeline) return null;
+                  return (
+                    <details className="role-timeline-collapse">
+                      <summary className="role-timeline-summary" style={{ fontSize: 12, fontFamily: "monospace", letterSpacing: 1, fontWeight: 600, color: "var(--gold)" }}>
+                        {timeline}
+                      </summary>
+                      <div className="role-timeline-details" style={{ marginTop: 8, fontSize: 11 }}>
+                        {history.map((h, index) => (
+                          <div key={h.week} className="row wrap" style={{ gap: 8, alignItems: "center", padding: "4px 0" }}>
+                            <strong className="weekly-history-week" title={h.week}>
+                              {matchdayWeekLabel(s, h.week)}
+                            </strong>
+                            <span>Inicial: {roleLabel(h.initial)}</span>
+                            <strong className={`weekly-history-role ${h.final ?? "unassigned"}`}>
+                              {roleLabel(h.final)}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  );
                 })()}
                 {!admin && (
                   <span
