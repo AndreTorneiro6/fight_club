@@ -101,12 +101,12 @@ test("last result selects its division, guides ranking and private papers, then 
         exact: true,
       })
       .click();
-    await flow
-      .getByRole("button", {
-        name: `Publicar papéis · ${division.name}`,
-        exact: true,
-      })
-      .click();
+    // New publication scheduling UI: use "after" mode with 0 minutes for immediate publication
+    const pubControl = flow.getByRole("region", { name: "Publicação dos papéis", exact: true });
+    await expect(pubControl.getByLabel("Quando publicar?", { exact: true })).toBeVisible();
+    await pubControl.getByLabel("Quando publicar?", { exact: true }).selectOption("after");
+    await pubControl.getByLabel("Minutos até publicar", { exact: true }).fill("0");
+    await pubControl.getByRole("button", { name: "Ativar contagem decrescente", exact: true }).click();
     await expect(
       flow.getByRole("heading", { name: "Abertura e notificações" }),
     ).toBeVisible();
@@ -207,16 +207,15 @@ test("last result selects its division, guides ranking and private papers, then 
           exact: true,
         })
         .click();
-      const block = page.getByLabel(`Publicar papéis · ${other.name}`, {
-        exact: true,
-      });
-      await block
+      await page
         .getByRole("button", {
           name: `Publicar papéis · ${other.name}`,
           exact: true,
         })
         .click();
-      await expect(block).toContainText(`${other.name} · Publicado`);
+      await expect(
+        page.getByText(`${other.name} · Publicado`, { exact: true }),
+      ).toBeVisible();
       const after = await read();
       const round = after.weeklyRounds.find((r: any) => r._id === next._id);
       expect(round.divisionPublications[other._id].publishedAt).toBeTruthy();
