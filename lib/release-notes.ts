@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.22.0";
+export const applicationVersion = "1.22.1";
 export const releaseNotes = [
+  {
+    version: "1.22.1",
+    date: "2026-11-22",
+    title: "Combo corrigido em Gerir semanas",
+    changes: [
+      "O papel Combo volta a poder ser escolhido ao corrigir semanas publicadas sem desafios e passa a ter o ícone de uma lâmina sobre um escudo.",
+    ],
+  },
   {
     version: "1.22.0",
     date: "2026-11-22",

@@ -1,3 +1,8 @@
+## Version 1.22.1 — Combo icon and published-week correction — 22 November 2026
+
+- Commit 1079840 reached production with an unreadable Combo icon and removed `!correctable` from the Combo button, blocking Combo during published-week corrections. Restored that condition and added `ComboRoleIcon`, the Ataque blade over the Defesa shield.
+- Typecheck, 584 unit tests, production build and weekly browser specs pass. Submitted through the deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.22.0 — Ataque, Defesa and Combo in all divisions — 22 November 2026
 
 - User redefined roles for the entire competition from now on: Ataque only challenges, Defesa only receives, and Super Ataque became Combo (challenges and receives). Combo is stored as `super_attack`, so no data migration ran; shared rules are in `lib/weekly-role-rules.ts`. First and last teams cannot be Combo.
