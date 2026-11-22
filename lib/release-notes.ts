@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.23.1";
+export const applicationVersion = "1.23.2";
 export const releaseNotes = [
+  {
+    version: "1.23.2",
+    date: "2026-11-22",
+    title: "Ranking sem o papel da semana anterior",
+    changes: [
+      "A vista dos jogadores no Ranking e no resumo do ranking deixa de mostrar o papel da semana anterior junto do papel atual.",
+    ],
+  },
   {
     version: "1.23.1",
     date: "2026-11-22",

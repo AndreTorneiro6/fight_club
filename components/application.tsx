@@ -1782,6 +1782,7 @@ function RankingTable({
                   s={s}
                   player={entry.members[0]}
                   team={entry.members}
+                  showPreviousWeek={false}
                 />
                 {targetMember &&
                   s.settings[0].weeklyCompetition &&

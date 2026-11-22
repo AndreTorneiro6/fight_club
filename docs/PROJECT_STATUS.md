@@ -1,3 +1,14 @@
+## Version 1.23.1 LIVE verified — 22 November 2026
+
+- Waited at least ten minutes after workflow 45070564133 started at 21:10:12 UTC, first monitoring at 21:20:18 UTC. All required checks and deployment passed for exact revision a330c7f734f23f3e38d8bd2678ef7b7f663f28b4. Public health independently returned {"ok":true} after completion.
+- Mandatory games are assigned when saved without a second publication step. The attacker can confirm immediately and has twelve hours to do so; the defender sees only the actual challenge, created upon confirmation or automatically at expiry. Admin cards recognise both pending assignments and legacy saved pairs. Published papers, unrelated game deadlines and existing frozen/scheduled records are preserved; Sunday-to-Monday confirmation retains the original competition week.
+- The follow-up player-ranking label removal is validated locally as v1.23.2 and will use the same required workflow and ten-minute monitoring delay. No manual production league writes or deployment bypasses occurred.
+
+## Version 1.23.2 — player ranking previous-role label removal — 22 November 2026
+
+- While the v1.23.1 workflow was running, the user requested removing the previous-week role from player rankings, citing Roberto's actual attacking game against Helder Mota being shown as Defesa under Semana anterior. RankingTable now hides the previous-week child of WeeklyBadge, including the shared dashboard ranking preview. Current roles, full team rankings, challenges and admin role history are unchanged; no historical league records were rewritten.
+- Local typecheck, all 611 unit/database tests and production build pass. All four existing dynamic-weekly browser checks also pass. Preparing a separate patch after the already-submitted v1.23.1 release; do not cancel or bypass that workflow. Its first monitoring time remains 21:20:12 UTC for run 45070564133 (a330c7f).
+
 ## Version 1.23.1 — direct mandatory assignments and team-card correction — 22 November 2026
 
 - User reported that saving a mandatory game still asked for publication, and that assigned Prata #11/#12 cards incorrectly showed no possible game. New admin.week.matchup.assign validates and immediately assigns the selected pair, starts the 12-hour attacker confirmation window and notifies only attackers. The interface uses one Atribuir jogo obrigatório action and no Publicar jogos step.

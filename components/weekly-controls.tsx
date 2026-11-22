@@ -163,10 +163,12 @@ export function WeeklyBadge({
   s,
   player,
   team = [player],
+  showPreviousWeek = true,
 }: {
   s: View;
   player: Player;
   team?: Player[];
+  showPreviousWeek?: boolean;
 }) {
   if (!s.settings[0].weeklyCompetition) return null;
   const roles = new Set(team.map((member) => weeklyRole(s, member._id)));
@@ -185,7 +187,7 @@ export function WeeklyBadge({
         : roles.size > 1
           ? "Papéis por atualizar"
           : "Por atribuir"}
-      <PreviousWeekRole s={s} team={team} />
+      {showPreviousWeek && <PreviousWeekRole s={s} team={team} />}
       {team.some((member) => frozenRanking(s, member._id)) && (
         <span className="role-label">
           <Snowflake size={13} />{" "}
