@@ -34,9 +34,32 @@ import {
   ArrowRight,
   Shield,
   Sword,
-  Swords,
   Snowflake,
 } from "lucide-react";
+
+/** Combo role icon: blade positioned above shield */
+function SwordOverShield({ size = 14, ...props }: { size?: number; className?: string }) {
+  const strokeWidth = Math.max(1.5, size / 10);
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      {/* Sword blade pointing down, centered above shield */}
+      <path d="M12 2v7" />
+      <path d="M10 6h4" />
+      {/* Shield */}
+      <path d="M12 22a10 10 0 0 1-9.5-7.5C2.5 10.5 2.5 7.5 5 5c2.5-2.5 5.5-2.5 8 0 2.5 2.5 5.5 2.5 8 0 2.5 2.5 2.5 5.5 2.5 7.5a10 10 0 0 1-9.5 7.5z" />
+    </svg>
+  );
+}
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
 import {
@@ -173,7 +196,7 @@ export function WeeklyBadge({
       ) : role === "defense" ? (
         <Shield size={14} />
       ) : role === "super_attack" ? (
-        <Swords size={14} />
+        <SwordOverShield size={14} />
       ) : null}
       {role
         ? weeklyRoleName(role)
@@ -953,7 +976,7 @@ export function WeeklyRoles({
                     ) : role === "defense" ? (
                       <Shield size={14} />
                     ) : role === "super_attack" ? (
-                      <Swords size={14} />
+                      <SwordOverShield size={14} />
                     ) : null}
                     {role
                       ? weeklyRoleName(role)
@@ -1008,12 +1031,12 @@ export function WeeklyRoles({
                           !!role ||
                           !!attackReason ||
                           lockedByChallenge ||
-                          (published && !correctable && !canEditPublished) ||
+                          (published && !canEditPublished) ||
                           week < clubWeek().start
                         }
                         onClick={() => assign("super_attack")}
                       >
-                        <Swords size={16} />
+                        <SwordOverShield size={16} />
                         Combo
                       </button>
                     )}
