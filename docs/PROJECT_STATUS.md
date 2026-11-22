@@ -1,3 +1,9 @@
+## Version 1.23.0 deployment check repair — 22 November 2026
+
+- Workflow 45064568417 for d747f05 passed typecheck, all 605 unit/database tests, production build and browser groups through admin pending results, then failed the image-sharing clipboard check. Deploy was skipped; no release or manual league writes occurred. User reported the failure during the requested waiting period and the failure was inspected in response.
+- Root cause: MatchCardExport regenerated its PNG on every replacement of shared state/challenge objects, clearing CopyImageButton feedback during live refreshes. Depend on the serialized export inputs instead, keeping the PNG/copy state until the actual card content changes. No challenge, ranking, schedule or frozen-game logic changed.
+- Added a deterministic browser regression: after copying, trigger a real foreground league refresh, allow React to commit it, and assert the same preview URL and clipboard success message remain. It fails against the prior production build at the changed blob URL. Typecheck, 605 tests and the repaired production build pass; both tests in the exact failing image-sharing/poster-templates browser group pass with the deterministic refresh regression. Submitting through the same mandatory workflow. The ten-minute monitoring delay applies again after the repaired workflow starts.
+
 ## Version 1.23.0 deployment submission — 22 November 2026
 
 - User authorized deployment through deploy-branch GitHub Actions and requested no monitoring until ten minutes after the new workflow starts, superseding the earlier thirty-minute delay for this release.

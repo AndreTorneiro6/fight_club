@@ -94,6 +94,27 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
     .filter({ has: page.getByAltText(`Cartão do jogo #${game.number}`) });
   await expect(card.getByRole("img")).toBeVisible();
   await copy(card, 1080, 1920);
+  const previewUrl = await card.getByRole("img").getAttribute("src");
+  const refreshed = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/league" &&
+      response.request().method() === "GET",
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await (await refreshed).finished();
+  // Let React commit the refreshed objects and run effects before checking.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(card.getByRole("img")).toHaveAttribute("src", previewUrl!);
+  await expect(
+    card.getByText("Imagem copiada. Já podes colar no WhatsApp.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   const downloadEvent = page.waitForEvent("download");
   await card
     .getByRole("link", { name: "Descarregar PNG", exact: true })
@@ -115,13 +136,19 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
   await expect(ranking.getByRole("img")).toBeVisible();
   await copy(ranking, 1882, 3344);
   const rankingDownload = page.waitForEvent("download");
-  await ranking.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+  await ranking
+    .getByRole("link", { name: "Descarregar PNG", exact: true })
+    .click();
   await (await rankingDownload).saveAs("/var/tmp/fc-bronze-ranking.png");
-  await ranking.getByRole("radio", {name:"Bronze",exact:true}).check();
+  await ranking.getByRole("radio", { name: "Bronze", exact: true }).check();
   await expect(ranking.getByRole("img")).toBeVisible();
   const individualDownload = page.waitForEvent("download");
-  await ranking.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
-  await (await individualDownload).saveAs("/var/tmp/fc-bronze-ranking-individual.png");
+  await ranking
+    .getByRole("link", { name: "Descarregar PNG", exact: true })
+    .click();
+  await (
+    await individualDownload
+  ).saveAs("/var/tmp/fc-bronze-ranking-individual.png");
   const response = await page.request.post("/api/league", {
     headers: { Origin: "http://localhost:3100" },
     data: {
@@ -144,7 +171,9 @@ test("admin exports a team match card and copies PNGs for match, ranking and wee
   await expect(weekly.getByRole("img")).toBeVisible();
   await copy(weekly, 1882, 3344);
   const weeklyDownload = page.waitForEvent("download");
-  await weekly.getByRole("link", {name:"Descarregar PNG",exact:true}).click();
+  await weekly
+    .getByRole("link", { name: "Descarregar PNG", exact: true })
+    .click();
   await (await weeklyDownload).saveAs("/var/tmp/fc-bronze-weekly.png");
   // A denied clipboard permission must offer alternatives without claiming success.
   await page.evaluate(() => {

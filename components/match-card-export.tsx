@@ -14,6 +14,18 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
       canShare: boolean;
     } | null>(null),
     [error, setError] = useState("");
+  // Polling replaces state objects even when the card content is identical.
+  // Keep the PNG and clipboard feedback until an export input actually changes.
+  const renderKey = JSON.stringify({
+    challenge: c,
+    players: s.players,
+    divisions: s.divisions,
+    seasons: s.seasons,
+    courts: s.courts,
+    matches: s.matches.filter((m) => m.challengeId === c._id),
+    results: s.results.filter((r) => r.challengeId === c._id),
+    history: s.history.filter((h) => h.challengeId === c._id),
+  });
   useEffect(() => {
     if (!open) return;
     let cancelled = false,
@@ -44,7 +56,7 @@ export default function MatchCardExport({ s, c }: { s: View; c: Challenge }) {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [open, s, c]);
+  }, [open, renderKey]);
   if (
     s.actor.role !== "admin" ||
     !["scheduled", "result_pending", "disputed", "completed"].includes(c.status)

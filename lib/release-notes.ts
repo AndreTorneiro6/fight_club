@@ -9,6 +9,7 @@ export const releaseNotes = [
       "Os novos rascunhos alternam Ataque e Defesa pelo papel assumido na semana anterior. A primeira equipa defende sempre e a última ataca. As escolhas do administrador são respeitadas.",
       "O assistente alarga apenas o alcance necessário para encontrar adversários, sem criar jogos adicionais. Nas semanas livres, todas as equipas exceto a primeira podem desafiar e receber desafios, com prioridade para o primeiro desafio válido.",
       "Os jogos obrigatórios definidos pelo administrador coexistem com os desafios das restantes equipas, sem seletor de modo. Só a dupla atacante vê a atribuição antes de confirmar; após 12 horas o desafio é criado automaticamente.",
+      "O cartão de jogo mantém a imagem e a confirmação de cópia durante atualizações sem alterações ao seu conteúdo.",
     ],
   },
   {
