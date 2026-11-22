@@ -101,7 +101,17 @@ test("last result selects its division, guides ranking and private papers, then 
         exact: true,
       })
       .click();
-    // Wait for the publication scheduling UI to appear after approval
+    // Wait for the approval to be reflected in the API before looking for publication control
+    await expect(async () => {
+      const state = await read();
+      const round = state.weeklyRounds.find(
+        (r: any) => r.divisionTransitions?.[game.divisionId],
+      );
+      const pub = round?.divisionPublications?.[game.divisionId];
+      expect(pub?.approvedAt).toBeTruthy();
+      expect(pub?.publishedAt).toBeFalsy();
+    }).toPass({ timeout: 10000 });
+    // Now the publication scheduling UI should appear
     await expect(
       flow.getByRole("region", { name: "Publicação dos papéis", exact: true }),
     ).toBeVisible();
