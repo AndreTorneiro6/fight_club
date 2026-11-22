@@ -90,11 +90,11 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
   );
   for (const a of available)
     for (const d of available) {
-      // An administrator's defense selection is a constraint, not a cost the
-      // maximum-game solver may pay to turn that team into an attacker.
+      // Assigned roles are constraints: the maximum-game solver never turns
+      // Defesa into an attacker or Ataque into a team that can be challenged.
       if (
         roleFor(a.id) !== "defense" &&
-        roleFor(d.id) !== "super_attack" &&
+        roleFor(d.id) !== "attack" &&
         (!ouro ||
           !round?.ouroAllowedOpponents?.[a.id] ||
           round.ouroAllowedOpponents[a.id].includes(d.id)) &&
@@ -217,13 +217,9 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       if (!(mask & bit(j))) continue;
       const remaining = rest & ~bit(j);
       if (edgeScore(e) + best(remaining) !== target) continue;
-      // Role changes dominate (x100); the launched-attacker preference only breaks ties.
+      // Among equal schedules, teams that already launched a challenge keep attacking.
       const candidate =
-        minimumChanges(remaining) +
-        100 *
-          (Number(roleFor(e.attackerKey) === "defense") +
-            Number(roleFor(e.defenderKey) === "attack")) +
-        Number(launched.has(e.defenderKey));
+        minimumChanges(remaining) + Number(launched.has(e.defenderKey));
       if (candidate < cost || (candidate === cost && choice === null)) {
         cost = candidate;
         choice = e;
@@ -311,14 +307,8 @@ export function dynamicRole(s: State, playerId: string, week: string) {
     return "attack" as const;
   if (plan.fixed.some((p) => p.defenderKey === team.id))
     return "defense" as const;
-  if (published === "super_attack") return published;
-  if (published === "defense") return "defense" as const;
+  if (published) return published;
   if (round?.weekType !== "OPEN_ATTACK") {
-    if (
-      published === "attack" &&
-      plan.eligible.some((p) => p.attackerKey === team.id)
-    )
-      return "attack" as const;
     if (plan.canonical.some((p) => p.attackerKey === team.id))
       return "attack" as const;
     if (plan.canonical.some((p) => p.defenderKey === team.id))

@@ -190,11 +190,15 @@ export async function renderPublicationPoster(s: View, options: PosterOptions) {
       );
       if (weekly) {
         const role = posterTeamRole(entry.members, options.roles ?? {});
-        if (role) {
-          const col = role !== "defense" ? 2 : 3;
+        // Combo fills both the attack and the defense columns.
+        for (const col of role === "super_attack"
+          ? [2, 3]
+          : role
+            ? [role === "attack" ? 2 : 3]
+            : []) {
           const cx = x + (w * (columns[col] + columns[col + 1])) / 2,
             cy = y + height / 2;
-          ctx.strokeStyle = role !== "defense" ? "#ff493e" : "#f6cb46";
+          ctx.strokeStyle = col === 2 ? "#ff493e" : "#f6cb46";
           ctx.fillStyle = ctx.strokeStyle;
           ctx.lineWidth = individual ? 3 : 2.6;
           ctx.beginPath();

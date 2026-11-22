@@ -335,7 +335,9 @@ export function generateWeeklyRoles(
               d.code === "ouro"
                 ? entries.indexOf(t) === 0
                   ? ("defense" as const)
-                  : ("attack" as const)
+                  : entries.indexOf(t) === entries.length - 1
+                    ? ("attack" as const)
+                    : ("super_attack" as const)
                 : plan.roles[t.id],
           })),
       );

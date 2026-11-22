@@ -7,6 +7,7 @@ import {
   dynamicTargetReason,
 } from "./dynamic-weekly";
 import { firstCompetitionWeek } from "./competition-calendar";
+import { canBeChallenged, canChallenge } from "./weekly-role-rules";
 import { challengeMemberIds, challengeSide } from "./team-competition";
 import { rankingEntries, teamMembers } from "./ranking-groups";
 import type { Challenge, Player, State, WeeklyRound } from "./types";
@@ -168,8 +169,9 @@ export function weeklyReason(
       return "Aguarda a atribuição do papel semanal pelo administrador.";
     if (attackingTeam.some((p) => role(p) === "defense"))
       return "Esta dupla está em defesa e deve aguardar um desafio.";
-    if (defendingTeam.some((p) => role(p) === "super_attack"))
-      return "Esta dupla está em Super Ataque e não pode ser desafiada.";
+    // Games created before Ataque became challenge-only remain valid.
+    if ((!ignoreId || reassign) && defendingTeam.some((p) => role(p) === "attack"))
+      return "Esta dupla está em Ataque e não pode ser desafiada.";
   }
   const open = selected?.weekType === "OPEN_ATTACK";
   if (!open && !manual && !ouro) {
@@ -190,34 +192,38 @@ export function weeklyReason(
       false,
     );
 
-    if (attackerRole !== "attack")
+    if (!canChallenge(attackerRole))
       return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
-    if (defenderRole !== "defense")
+    if (!canBeChallenged(defenderRole))
       return "Este jogador não está em defesa esta semana.";
     if (
       attackingTeam.some(
         (member) =>
           member.status === "active" &&
-          getEffectiveRoleForChallenge(
-            s,
-            ignoreId ?? "",
-            member._id,
-            week,
-            now,
-            true,
-          ) !== "attack",
+          !canChallenge(
+            getEffectiveRoleForChallenge(
+              s,
+              ignoreId ?? "",
+              member._id,
+              week,
+              now,
+              true,
+            ),
+          ),
       ) ||
       defendingTeam.some(
         (member) =>
           member.status === "active" &&
-          getEffectiveRoleForChallenge(
-            s,
-            ignoreId ?? "",
-            member._id,
-            week,
-            now,
-            false,
-          ) !== "defense",
+          !canBeChallenged(
+            getEffectiveRoleForChallenge(
+              s,
+              ignoreId ?? "",
+              member._id,
+              week,
+              now,
+              false,
+            ),
+          ),
       )
     )
       return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";

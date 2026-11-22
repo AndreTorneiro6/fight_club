@@ -121,7 +121,8 @@ function weekly(s: State) {
     publishedAt: "2026-10-24T10:00:00Z",
     assignments: s.players.map((p) => ({
       playerId: p._id,
-      role: teamPosition(s.players, p._id) === 1 ? "defense" : "attack",
+      role:
+        teamPosition(s.players, p._id) === 1 ? "defense" : "super_attack",
     })),
   });
 }

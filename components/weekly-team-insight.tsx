@@ -1,19 +1,13 @@
 "use client";
 import { matchdayWeekLabel } from "@/lib/matchday";
+import { weeklyRoleName } from "@/lib/weekly-role-rules";
 import type { Player, View } from "@/lib/types";
 import {
   teamRoleHistory,
   type TeamWeekOptions,
 } from "@/lib/weekly-role-history";
 
-const roleLabel = (role?: string) =>
-  role === "super_attack"
-    ? "Super Ataque"
-    : role === "attack"
-      ? "Ataque"
-      : role === "defense"
-        ? "Defesa"
-        : "—";
+const roleLabel = (role?: string) => (role ? weeklyRoleName(role) : "—");
 const day = (week: string) =>
   new Date(week + "T12:00:00Z").toLocaleDateString("pt-PT", {
     day: "numeric",

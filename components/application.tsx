@@ -1,4 +1,5 @@
 "use client";
+import { canBeChallenged, canChallenge } from "@/lib/weekly-role-rules";
 import {
   adminMatchmakingEnabled,
   ADMIN_MATCHMAKING_MESSAGE,
@@ -2082,9 +2083,7 @@ function Challenges(a: Actions) {
           ) : adminMatchmakingEnabled(s, p.divisionId) ||
             ownTeamCommitment ||
             (s.settings[0].weeklyCompetition &&
-              (!["attack", "super_attack"].includes(
-                weeklyRole(s, p._id) ?? "",
-              ) ||
+              (!canChallenge(weeklyRole(s, p._id)) ||
                 !!openingBlock)) ? null : (
             <a
               className="button primary"
@@ -2398,7 +2397,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
         (c.weekStart ??
           weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
     )?.weekType === "OPEN_ATTACK" ||
-      weeklyRole(s, c.defenderId, Date.now(), c.weekStart) === "defense") &&
+      canBeChallenged(weeklyRole(s, c.defenderId, Date.now(), c.weekStart))) &&
       weeklyResponsePriority?.eligible);
   const mySlots = s.slots.filter(
       (x) =>

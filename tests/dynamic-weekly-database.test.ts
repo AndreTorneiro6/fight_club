@@ -33,7 +33,7 @@ test("concurrent first challenges serialize the original and forced assignments 
           publishedAt: "2026-10-24T12:00:00Z",
           assignments: s.players.map((p) => ({
             playerId: p._id,
-            role: p.position === 1 ? "defense" : "attack",
+            role: p.position === 1 ? "defense" : "super_attack",
           })),
         },
       ];

@@ -226,9 +226,7 @@ export function divisionWeekOptions(
           ? entries.filter(
               (d) =>
                 free(d) &&
-                (s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
-                  ? roleOf(d) !== "super_attack"
-                  : roleOf(d) !== "attack") &&
+                roleOf(d) !== "attack" &&
                 (ouroEligible
                   ? ouroEligible.some(
                       (p) => p.attackerKey === t.id && p.defenderKey === d.id,
@@ -237,10 +235,7 @@ export function divisionWeekOptions(
             )
           : [];
       const defense =
-        open &&
-        (s.divisions.find((d) => d._id === divisionId)?.code === "ouro"
-          ? mine !== "super_attack"
-          : mine !== "attack")
+        open && mine !== "attack"
           ? entries.filter(
               (a) =>
                 free(a) &&

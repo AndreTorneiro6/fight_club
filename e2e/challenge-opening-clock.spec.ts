@@ -54,10 +54,15 @@ test("Admin and Bronze player see the opening clock; distance changes save immed
   s = await read();
   const week = addClubDays(clubWeek().start, 7);
   const assignments = s.divisions.flatMap((d: { _id: string }) =>
-    rankingEntries(s.players, d._id).flatMap((t, i) =>
+    rankingEntries(s.players, d._id).flatMap((t, i, all) =>
       t.members.map((m) => ({
         playerId: m._id,
-        role: i === 0 ? "defense" : "attack",
+        role:
+          i === 0
+            ? "defense"
+            : i === all.length - 1
+              ? "attack"
+              : "super_attack",
       })),
     ),
   );

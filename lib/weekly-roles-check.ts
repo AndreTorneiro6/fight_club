@@ -1,3 +1,4 @@
+import { weeklyRoleName } from "./weekly-role-rules";
 import type { State } from "./types";
 import { rankingEntries } from "./ranking-groups";
 import { dynamicRoleChanges, dynamicWeeklyEnabled } from "./dynamic-weekly";
@@ -23,11 +24,12 @@ export function weeklyRolesProblem(s: State, divisionId: string, week: string) {
     week,
     round.assignments.filter((a) => ids.has(a.playerId)),
   );
-  const role = (r: "attack" | "defense" | "super_attack") =>
-    r === "attack" ? "Ataque" : "Defesa";
   return changes.length
     ? `Os papéis não permitem o máximo de jogos sem trocas: ${changes
-        .map((c) => `${c.team} (${role(c.from)} → ${role(c.to)})`)
+        .map(
+          (c) =>
+            `${c.team} (${weeklyRoleName(c.from)} → ${weeklyRoleName(c.to)})`,
+        )
         .join("; ")}.`
     : null;
 }

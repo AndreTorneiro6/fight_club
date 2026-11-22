@@ -61,10 +61,15 @@ test("Bronze uses three positions and both partners see the forced matchup and u
   s = await read();
   const week = addClubDays(clubWeek().start, 7);
   const assignments = s.divisions.flatMap((d: { _id: string }) =>
-    rankingEntries(s.players, d._id).flatMap((t, i) =>
+    rankingEntries(s.players, d._id).flatMap((t, i, all) =>
       t.members.map((m) => ({
         playerId: m._id,
-        role: i === 0 ? "defense" : "attack",
+        role:
+          i === 0
+            ? "defense"
+            : i === all.length - 1
+              ? "attack"
+              : "super_attack",
       })),
     ),
   );
@@ -325,7 +330,7 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     page.locator(`[data-weekly-team="${teams[i].id}"]`);
   await expect(row(0).getByRole("button", { name: /^Ataque:/ })).toBeDisabled();
   await expect(
-    row(teams.length - 1).getByRole("button", { name: /^Super Ataque:/ }),
+    row(teams.length - 1).getByRole("button", { name: /^Combo:/ }),
   ).toHaveCount(0);
   await row(2)
     .getByText("Adversários permitidos e simulação", { exact: true })
@@ -370,7 +375,7 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     .getByRole("button", { name: /^Remover seleção:/ })
     .click();
   await row(2)
-    .getByRole("button", { name: /^Super Ataque:/ })
+    .getByRole("button", { name: /^Combo:/ })
     .click();
   await page
     .getByRole("button", { name: "Guardar rascunho", exact: true })
@@ -386,7 +391,7 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     .toBe("super_attack");
   await page.reload();
   await expect(
-    row(2).getByRole("button", { name: /^Super Ataque:/ }),
+    row(2).getByRole("button", { name: /^Combo:/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.goto("/admin?tab=challenges");
   await expect(

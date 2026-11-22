@@ -2864,7 +2864,11 @@ test("next-week publication opens challenges immediately, keeps their playing we
   });
   const assignments = s.players.map((p) => ({
     playerId: p._id,
-    role: (p.position === 1 ? "defense" : "attack") as "attack" | "defense",
+    role: (p.position === 1
+      ? "defense"
+      : p.position === 8
+        ? "attack"
+        : "super_attack") as "attack" | "defense" | "super_attack",
   }));
   execute(
     s,
@@ -3024,7 +3028,12 @@ test("scheduled opening keeps published next-week roles visible, blocks until th
     publishedAt: iso(0),
     assignments: s.players.map((p) => ({
       playerId: p._id,
-      role: p.position === 1 ? "defense" : "attack",
+      role:
+        p.position === 1
+          ? "defense"
+          : p.position === 8
+            ? "attack"
+            : "super_attack",
     })),
   });
   execute(
@@ -3145,7 +3154,12 @@ test("division openings notify only Ouro and Prata, hold Bronze until admin rele
     weekType: "OPEN_ATTACK",
     assignments: s.players.map((p) => ({
       playerId: p._id,
-      role: p.position === 1 ? "defense" : "attack",
+      role:
+        p.position === 1
+          ? "defense"
+          : p.position === 8
+            ? "attack"
+            : "super_attack",
     })),
   });
   const r = s.weeklyRounds[0],
@@ -3330,7 +3344,12 @@ test("accepting a weekly challenge closes only incompatible pending requests, no
     weekType: "OPEN_ATTACK",
     assignments: s.players.map((p) => ({
       playerId: p._id,
-      role: p.position === 1 ? "defense" : "attack",
+      role:
+        p.position === 1
+          ? "defense"
+          : p.position === 8
+            ? "attack"
+            : "super_attack",
     })),
   });
   const accepted = create(s, 3, 1),

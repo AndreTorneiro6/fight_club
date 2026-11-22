@@ -1,4 +1,9 @@
 import {
+  canBeChallenged,
+  canChallenge,
+  weeklyRoleName,
+} from "./weekly-role-rules";
+import {
   validateManualWeek,
   manualPairingReason,
 } from "./manual-week-matchups";
@@ -800,16 +805,13 @@ export function execute(
       for (const paper of papers) {
         if (paper.role !== "super_attack") continue;
         const p = s.players.find((p) => p._id === paper.playerId);
-        ensure(
-          p && s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro",
-          "Super Ataque está disponível apenas em Ouro.",
-        );
+        ensure(p, "Jogador inexistente.");
         const teams = rankingEntries(s.players, p.divisionId);
         ensure(
           ![teams[0], teams.at(-1)].some((t) =>
             t?.members.some((m) => m._id === p._id),
           ),
-          "A primeira equipa defende e a última fica em Ataque.",
+          "Combo não está disponível para a primeira nem para a última equipa.",
         );
       }
   }
@@ -1806,7 +1808,7 @@ export function execute(
           notify(
             r.playerId,
             "Papel semanal atualizado",
-            `O teu papel na semana de ${weekStart} passou para ${r.role === "super_attack" ? "SUPER ATAQUE" : r.role === "attack" ? "ATAQUE" : "DEFESA"}, para permitir o máximo de jogos após os desafios prioritários.`,
+            `O teu papel na semana de ${weekStart} passou para ${weeklyRoleName(r.role).toUpperCase()}, para permitir o máximo de jogos após os desafios prioritários.`,
             undefined,
             `dynamic-role:${weekStart}:${round.version}:${r.playerId}`,
             { kind: "update", deliveryChannels: ["push"] },
@@ -2036,10 +2038,11 @@ export function execute(
       ensure(
         teams[source].members.every(
           (p) =>
-            round.assignments.find((a) => a.playerId === p._id)?.role ===
-            "attack",
+            canChallenge(
+              round.assignments.find((a) => a.playerId === p._id)?.role,
+            ),
         ),
-        "Este controlo aplica-se às duplas em Ataque normal.",
+        "Este controlo aplica-se às duplas em Ataque ou Combo.",
       );
       ensure(
         !s.challenges.some(
@@ -2560,10 +2563,14 @@ export function execute(
       )) {
         if (adminMatchmakingEnabled(s, c.divisionId, cmd.weekStart)) continue;
         ensure(
-          cmd.assignments.find((entry) => entry.playerId === c.challengerId)
-            ?.role === "attack" &&
-            cmd.assignments.find((entry) => entry.playerId === c.defenderId)
-              ?.role === "defense",
+          canChallenge(
+            cmd.assignments.find((entry) => entry.playerId === c.challengerId)
+              ?.role,
+          ) &&
+            canBeChallenged(
+              cmd.assignments.find((entry) => entry.playerId === c.defenderId)
+                ?.role,
+            ),
           "Mantém os papéis dos jogadores que já têm desafios nesta semana.",
         );
       }
@@ -2627,7 +2634,7 @@ export function execute(
           notify(
             entry.playerId,
             "Papel semanal publicado",
-            `Semana de ${cmd.weekStart}: ${entry.role === "super_attack" ? "Super Ataque" : entry.role === "attack" ? "Ataque" : "Defesa"}. Consulta os adversários disponíveis.`,
+            `Semana de ${cmd.weekStart}: ${weeklyRoleName(entry.role)}. Consulta os adversários disponíveis.`,
           );
       if (cmd.publish && cmd.weekStart === weeklyChallengeWeek(s, timestamp))
         for (const division of s.divisions)

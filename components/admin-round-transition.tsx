@@ -1,4 +1,5 @@
 "use client";
+import { weeklyRoleName } from "@/lib/weekly-role-rules";
 import Link from "next/link";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { useState } from "react";
@@ -189,14 +190,14 @@ export default function AdminRoundTransition({
             <div className="inset row between" key={t.id}>
               <strong>{t.members.map((m) => m.name).join(" + ")}</strong>
               <span>
-                {round?.assignments.find((a) => a.playerId === t.members[0]._id)
-                  ?.role === "attack"
-                  ? "ATAQUE"
-                  : round?.assignments.some(
-                        (a) => a.playerId === t.members[0]._id,
-                      )
-                    ? "DEFESA"
-                    : "Por atribuir"}
+                {(() => {
+                  const role = round?.assignments.find(
+                    (a) => a.playerId === t.members[0]._id,
+                  )?.role;
+                  return role
+                    ? weeklyRoleName(role).toUpperCase()
+                    : "Por atribuir";
+                })()}
               </span>
             </div>
           ))}

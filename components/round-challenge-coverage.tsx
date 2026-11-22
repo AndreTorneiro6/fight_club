@@ -8,6 +8,7 @@ import type {
   CompetitionRound,
 } from "@/lib/competition-types";
 import { challengeContext } from "@/lib/challenge-access";
+import { weeklyRoleName } from "@/lib/weekly-role-rules";
 
 export default function RoundChallengeCoverage({
   s,
@@ -139,11 +140,9 @@ export default function RoundChallengeCoverage({
                     ? "DEFESA"
                     : context.type === "OPEN_ATTACK"
                       ? "ATAQUE LIVRE"
-                      : roles[t.id] === "attack"
-                        ? "ATAQUE"
-                        : roles[t.id] === "defense"
-                          ? "DEFESA"
-                          : "Por atribuir";
+                      : roles[t.id]
+                        ? weeklyRoleName(roles[t.id]).toUpperCase()
+                        : "Por atribuir";
                 const own = challenges.filter((c) =>
                   [c.attackerId, c.defenderId].includes(t.id),
                 );

@@ -82,7 +82,7 @@ function fixture() {
       divisionChallengeOpenings: { bronze: null },
       assignments: s.players.map((p, i) => ({
         playerId: p._id,
-        role: i < 2 ? "defense" : "attack",
+        role: i < 2 ? "defense" : "super_attack",
       })),
     },
   ];

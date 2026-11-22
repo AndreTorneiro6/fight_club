@@ -9,7 +9,7 @@ import {
 } from "../lib/types";
 import { execute } from "../lib/engine";
 import { limitChallenges } from "../lib/rules";
-import { weeklyRole } from "../lib/weekly";
+import { weeklyReason, weeklyRole } from "../lib/weekly";
 import {
   dynamicWeeklyPlan,
   dynamicWeeklyEnabled,
@@ -85,7 +85,9 @@ function fixture(
       challengesOpenAt: "2026-10-24T19:00:00Z",
       assignments: s.players.map((p, i) => ({
         playerId: p._id,
-        role: i < 2 ? "defense" : "attack",
+        // Combo keeps intermediate teams able to attack and be challenged.
+        role:
+          i < 2 ? "defense" : i >= count * 2 - 2 ? "attack" : "super_attack",
       })),
     },
   ];
@@ -110,7 +112,7 @@ const pairing = (s: State, a: number, d: number) =>
       c.challengerTeam?.some((m) => m.playerId === `t${a}a`) &&
       c.defenderTeam?.some((m) => m.playerId === `t${d}a`),
   );
-test("Gold 4→2 forces 3→1 and changes 5 to defense without rewriting published roles or ranking", () => {
+test("Gold 4→2 forces 3→1 and keeps 5 in Combo without rewriting published roles or ranking", () => {
   const s = fixture("ouro", 12),
     players = structuredClone(s.players),
     published = structuredClone(s.weeklyRounds);
@@ -120,8 +122,8 @@ test("Gold 4→2 forces 3→1 and changes 5 to defense without rewriting publish
     "accepted",
   );
   assert.ok(pairing(s, 3, 1));
-  assert.equal(weeklyRole(s, "t5a", now), "defense");
-  assert.equal(weeklyRole(s, "t5b", now), "defense");
+  assert.equal(weeklyRole(s, "t5a", now), "super_attack");
+  assert.equal(weeklyRole(s, "t5b", now), "super_attack");
   assert.deepEqual(s.players, players);
   assert.deepEqual(s.weeklyRounds[0].assignments, published[0].assignments);
   assert.equal(s.weeklyRounds[0].publishedAt, published[0].publishedAt);
@@ -485,13 +487,13 @@ test("forced pairing blocked by another domain rule leaves the first valid chall
   assert.ok(s.audit.some((a) => a.action === "week.dynamic-roles.conflict"));
   assert.equal(s.results.length, 0);
 });
-test("effective role changes are saved separately from published roles, survive disabling auto-updates and notify both uncommitted partners", () => {
+test("committed roles are saved separately from published roles, survive disabling auto-updates and leave uncommitted teams unchanged", () => {
   const s = fixture("ouro", 12),
     initial = structuredClone(s.weeklyRounds[0].assignments);
   send(s, 4, 2);
   assert.deepEqual(s.weeklyRounds[0].assignments, initial);
   assert.equal(
-    s.weeklyRounds[0].dynamicAssignments?.find((r) => r.playerId === "t5a")
+    s.weeklyRounds[0].dynamicAssignments?.find((r) => r.playerId === "t2a")
       ?.role,
     "defense",
   );
@@ -500,10 +502,11 @@ test("effective role changes are saved separately from published roles, survive 
       s.notifications.filter(
         (n) => n.playerId === id && n.title === "Papel semanal atualizado",
       ).length,
-      1,
+      0,
     );
   s.settings[0].weeklyDynamicRoles = false;
-  assert.equal(weeklyRole(s, "t5b", now), "defense");
+  assert.equal(weeklyRole(s, "t2b", now), "defense");
+  assert.equal(weeklyRole(s, "t5b", now), "super_attack");
 });
 
 test("every initially eligible Bronze choice can finish with five disjoint valid games under distance three", () => {
@@ -691,7 +694,7 @@ test("Bronze-only automatic pairing preserves Gold fixtures while recording actu
   send(s, 12, 10);
   assert.equal(s.challenges.length, 1);
   assert.equal(pairing(s, 11, 9), undefined);
-  assert.equal(weeklyRole(s, "t9a", now), "attack");
+  assert.equal(weeklyRole(s, "t9a", now), "super_attack");
   assert.deepEqual(s.weeklyRounds[0].assignments, before[0].assignments);
   assert.equal(weeklyRole(s, "t10a", now), "defense");
   assert.equal(weeklyRole(s, "t12a", now), "attack");
@@ -1237,25 +1240,28 @@ test("Ouro flexible attacks preserve automatic 11→8 after 12→9 and 10→7", 
   assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 6);
 });
 
-test("Ouro Attack accepts challenges, Defense cannot attack and Super Attack cannot be challenged", () => {
+test("Combo accepts challenges, Defense cannot attack and Attack cannot be challenged", () => {
   const flexible = fixture("ouro", 12, 3);
   flexible.weeklyRounds[0].weekType = "NORMAL";
   send(flexible, 5, 3);
   assert.equal(pairing(flexible, 5, 3)?.status, "accepted");
   const s = fixture("ouro", 12, 3);
   for (const a of s.weeklyRounds[0].assignments) {
-    if (/^t9[ab]$/.test(a.playerId)) a.role = "super_attack";
+    if (/^t9[ab]$/.test(a.playerId)) a.role = "attack";
     if (/^t5[ab]$/.test(a.playerId)) a.role = "defense";
   }
-  assert.throws(() => send(s, 12, 9), /Super Ataque/);
+  assert.throws(() => send(s, 12, 9), /em Ataque/);
   assert.throws(() => send(s, 5, 3), /defesa/);
   send(s, 9, 6);
   assert.equal(pairing(s, 9, 6)?.status, "accepted");
 });
 
-test("Super Attack is restricted to Ouro's intermediate teams", () => {
+test("Combo is available to intermediate teams of every division", () => {
   for (const [code, rank] of [
-    ["prata", 3],
+    ["prata", 1],
+    ["prata", 12],
+    ["bronze", 1],
+    ["bronze", 12],
     ["ouro", 1],
     ["ouro", 12],
   ] as const) {
@@ -1275,7 +1281,7 @@ test("Super Attack is restricted to Ouro's intermediate teams", () => {
           },
           now,
         ),
-      /apenas em Ouro|primeira equipa/,
+      /Combo não está disponível/,
     );
   }
 });
@@ -1389,4 +1395,42 @@ test("Ouro selections support combined production-length partner IDs", () => {
   assert.deepEqual(s.weeklyRounds[0].ouroAllowedOpponents?.[teams[10].id], [
     teams[5].id,
   ]);
+});
+
+for (const code of ["prata", "bronze"] as const)
+  test(`${code}: Attack only challenges while Combo also receives challenges`, () => {
+    const s = fixture(code, 12, 3);
+    s.weeklyRounds[0].weekType = "NORMAL";
+    for (const a of s.weeklyRounds[0].assignments)
+      if (/^t3[ab]$/.test(a.playerId)) a.role = "attack";
+    assert.throws(() => send(s, 5, 3), /não está em defesa/);
+    const plan = dynamicWeeklyPlan(s, code, week);
+    assert.ok(!plan.eligible.some((p) => p.defenderId === "t3a"));
+    const combo = plan.eligible.find((p) =>
+      s.weeklyRounds[0].assignments.some(
+        (a) => a.playerId === p.defenderId && a.role === "super_attack",
+      ),
+    );
+    assert.ok(combo);
+    execute(
+      s,
+      { role: "player", playerId: combo.attackerId, userId: "combo-test" },
+      {
+        type: "challenge.create",
+        weekStart: week,
+        defenderId: combo.defenderId,
+      },
+      now,
+    );
+    assert.ok(s.challenges.some((c) => c.defenderId === combo.defenderId));
+  });
+
+test("a game created before its defender became Attack stays valid", () => {
+  const s = fixture("ouro", 12, 3);
+  s.weeklyRounds[0].weekType = "NORMAL";
+  const { id } = send(s, 5, 3);
+  for (const a of s.weeklyRounds[0].assignments)
+    if (/^t3[ab]$/.test(a.playerId)) a.role = "attack";
+  const player = (id: string) => s.players.find((p) => p._id === id)!;
+  assert.equal(weeklyReason(s, player("t5a"), player("t3a"), now, id), null);
 });

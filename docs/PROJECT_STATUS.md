@@ -1,3 +1,9 @@
+## Version 1.22.0 — Ataque, Defesa and Combo in all divisions — 22 November 2026
+
+- User redefined roles for the entire competition from now on: Ataque only challenges, Defesa only receives, and Super Ataque became Combo (challenges and receives). Combo is stored as `super_attack`, so no data migration ran; shared rules are in `lib/weekly-role-rules.ts`. First and last teams cannot be Combo.
+- Saved Ataque roles become challenge-only on release, so the administrator may need to switch intermediate teams to Combo. Existing games remain valid. The planner no longer flips assigned roles to add games. New Ouro proposals use Defesa first, Ataque last and Combo between; Prata/Bronze proposals still use Ataque/Defesa. Managed "Competição e jornadas" rounds were not changed.
+- Typecheck, 584 unit tests and production build pass. Browser specs pass except `competition`, `engagement`, `guides`, `league` and `live-updates`, which fail identically on released v1.21.6. Submitted through the deploy-branch Actions workflow. No live league records changed.
+
 ## Version 1.21.6 — team history weeks in columns — 21 November 2026
 
 - User asked for each previous week's role, game and result to sit in columns. The collapsed history stays below the role letters; when open it spans the full team row with one column per week, and scrolls sideways inside the card on mobile.

@@ -44,10 +44,15 @@ test("partner sees the same private challenge and can accept and arrange time fo
   });
   const week = addClubDays(clubWeek().start, 7),
     assignments = state.divisions.flatMap((d: { _id: string }) =>
-      rankingEntries(state.players, d._id).flatMap((t, i) =>
+      rankingEntries(state.players, d._id).flatMap((t, i, all) =>
         t.members.map((m) => ({
           playerId: m._id,
-          role: i === 0 ? "defense" : "attack",
+          role:
+          i === 0
+            ? "defense"
+            : i === all.length - 1
+              ? "attack"
+              : "super_attack",
         })),
       ),
     );

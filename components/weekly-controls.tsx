@@ -25,7 +25,18 @@ import {
   divisionWeekOptions,
   teamRoleHistory,
 } from "@/lib/weekly-role-history";
-import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
+import {
+  canChallenge,
+  weeklyRoleName,
+} from "@/lib/weekly-role-rules";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Shield,
+  Sword,
+  Swords,
+  Snowflake,
+} from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
 import {
@@ -43,17 +54,11 @@ import { rankingEntries } from "@/lib/ranking-groups";
 import type { Challenge, Player, View } from "@/lib/types";
 
 function roleHistoryKey(role?: string) {
-  return role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "S" : "?";
+  return role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "C" : "?";
 }
 
 function roleLabel(role: string | undefined) {
-  return role === "super_attack"
-    ? "SUPER ATAQUE"
-    : role === "attack"
-      ? "ATAQUE"
-      : role === "defense"
-        ? "DEFESA"
-        : "Por atribuir";
+  return role ? weeklyRoleName(role).toUpperCase() : "Por atribuir";
 }
 
 /** The role a team really assumed in a week: its game side, else its effective role. */
@@ -167,14 +172,14 @@ export function WeeklyBadge({
         <Sword size={14} />
       ) : role === "defense" ? (
         <Shield size={14} />
+      ) : role === "super_attack" ? (
+        <Swords size={14} />
       ) : null}
-      {role === "attack"
-        ? "Ataque"
-        : role === "defense"
-          ? "Defesa"
-          : roles.size > 1
-            ? "Papéis por atualizar"
-            : "Por atribuir"}
+      {role
+        ? weeklyRoleName(role)
+        : roles.size > 1
+          ? "Papéis por atualizar"
+          : "Por atribuir"}
       <PreviousWeekRole s={s} team={team} />
       {team.some((member) => frozenRanking(s, member._id)) && (
         <span className="role-label">
@@ -290,7 +295,7 @@ export function WeeklyRoles({
       (division === "all" || entry.members[0].divisionId === division) &&
       (admin ||
         entry.members.some((m) => m._id === me._id) ||
-        (["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "") &&
+        (canChallenge(weeklyRole(s, me._id)) &&
           entry.members.some((m) => !challengeReason(s, me, m)))),
   );
   const published = !!weeklyPublishedAt(
@@ -466,7 +471,9 @@ export function WeeklyRoles({
       <h2>
         {admin
           ? "Atribuição semanal de ataque e defesa"
-          : ["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "")
+          : weeklyRole(s, me._id) === "super_attack"
+            ? "⚔️ OS MEUS DESAFIOS — MODO COMBO"
+            : weeklyRole(s, me._id) === "attack"
             ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
             : weeklyRole(s, me._id) === "defense"
               ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
@@ -477,9 +484,8 @@ export function WeeklyRoles({
       )}
       {admin && (
         <p>
-          Ataque: pode desafiar e ser desafiada em Ouro. Defesa: aguarda um
-          desafio. Super Ataque: só pode desafiar. A primeira equipa defende; a
-          última ataca.
+          Ataque: só pode desafiar. Defesa: aguarda um desafio. Combo: pode
+          desafiar e ser desafiada. A primeira equipa defende; a última ataca.
         </p>
       )}
       {admin && lockedContext && (
@@ -709,7 +715,7 @@ export function WeeklyRoles({
             : published
               ? round?.weekType === "OPEN_ATTACK"
                 ? "Papéis publicados. Todas as duplas elegíveis podem desafiar acima, exceto o campeão."
-                : "Papéis publicados. Os atacantes podem desafiar os defensores elegíveis."
+                : "Papéis publicados. As duplas em Ataque ou Combo podem desafiar as duplas elegíveis em Defesa ou Combo."
               : "Os desafios só abrem depois de o administrador atribuir e publicar os papéis da semana."}
       </p>
       {!admin && (
@@ -723,12 +729,18 @@ export function WeeklyRoles({
           elegíveis.
         </p>
       )}
+      {!admin && weeklyRole(s, me._id) === "super_attack" && (
+        <p>
+          Esta jornada estás em modo COMBO. Podes desafiar e também ser
+          desafiado.
+        </p>
+      )}
       {!admin &&
         published &&
         !ownTeamCommitment &&
         opening !== null &&
         (!opening || Date.now() >= Date.parse(opening)) &&
-        ["attack", "super_attack"].includes(weeklyRole(s, me._id) ?? "") &&
+        canChallenge(weeklyRole(s, me._id)) &&
         visible.every((t) => t.members.some((m) => m._id === me._id)) && (
           <p>
             Não existem duplas disponíveis para desafiar nesta jornada. A
@@ -940,16 +952,14 @@ export function WeeklyRoles({
                       <Sword size={14} />
                     ) : role === "defense" ? (
                       <Shield size={14} />
+                    ) : role === "super_attack" ? (
+                      <Swords size={14} />
                     ) : null}
-                    {role === "super_attack"
-                      ? "Super Ataque"
-                      : role === "attack"
-                        ? "Ataque"
-                        : role === "defense"
-                          ? "Defesa"
-                          : mixed
-                            ? "Papéis diferentes · aguarda a atualização do clube"
-                            : "Por atribuir"}
+                    {role
+                      ? weeklyRoleName(role)
+                      : mixed
+                        ? "Papéis diferentes · aguarda a atualização do clube"
+                        : "Por atribuir"}
                   </span>
                 )}
               {admin ? (
@@ -988,12 +998,10 @@ export function WeeklyRoles({
                     <Shield size={16} />
                     Defesa
                   </button>
-                  {s.divisions.find((d) => d._id === members[0].divisionId)
-                    ?.code === "ouro" &&
-                    !defenseReason && (
+                  {!defenseReason && !attackReason && (
                       <button
                         className={`weekly-role-choice ${role === "super_attack" ? "primary small" : "small"}`}
-                        aria-label={`Super Ataque: ${label}`}
+                        aria-label={`Combo: ${label}`}
                         aria-pressed={role === "super_attack"}
                         disabled={
                           busy ||
@@ -1005,8 +1013,8 @@ export function WeeklyRoles({
                         }
                         onClick={() => assign("super_attack")}
                       >
-                        <Sword size={16} />
-                        Super Ataque
+                        <Swords size={16} />
+                        Combo
                       </button>
                     )}
                   {(role || mixed) && (
@@ -1079,10 +1087,12 @@ export function WeeklyRoles({
               {admin &&
                 s.divisions.find((d) => d._id === members[0].divisionId)
                   ?.code === "ouro" &&
-                role === "attack" &&
-                round?.assignments.find((a) =>
-                  members.some((m) => m._id === a.playerId),
-                )?.role === "attack" &&
+                canChallenge(role) &&
+                canChallenge(
+                  round?.assignments.find((a) =>
+                    members.some((m) => m._id === a.playerId),
+                  )?.role,
+                ) &&
                 round && (
                   <OuroOpponentsControl
                     s={s}
@@ -1231,7 +1241,7 @@ export function WeeklyRoles({
                     {changes
                       .map(
                         (c) =>
-                          `${c.team} (${c.from === "attack" ? "Ataque" : "Defesa"} → ${c.to === "attack" ? "Ataque" : "Defesa"})`,
+                          `${c.team} (${weeklyRoleName(c.from)} → ${weeklyRoleName(c.to)})`,
                       )
                       .join(", ")}
                     . Os jogadores recebem o papel publicado; ajusta os papéis

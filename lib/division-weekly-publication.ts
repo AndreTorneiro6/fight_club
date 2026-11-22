@@ -7,6 +7,7 @@ import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRankingPublished } from "./round-transition";
 import { challengeDistance } from "./challenge-distance";
 import { clubWeek } from "./calendar";
+import { weeklyRoleName } from "./weekly-role-rules";
 export function divisionPaperSignature(
   s: State,
   r: WeeklyRound,
@@ -148,7 +149,7 @@ export function publishDivisionPapers(
         playerId: p._id,
         kind: "challenge",
         title: "Papel semanal publicado",
-        body: `Semana de ${weekStart}: ${a.role === "super_attack" ? "Super Ataque" : a.role === "attack" ? "Ataque" : "Defesa"}. Consulta os papéis e a abertura dos desafios.`,
+        body: `Semana de ${weekStart}: ${weeklyRoleName(a.role)}. Consulta os papéis e a abertura dos desafios.`,
         createdAt: now,
         read: false,
         dedupe,
@@ -257,7 +258,7 @@ export function correctPublishedDivisionPapers(
       playerId: change.playerId,
       kind: "challenge",
       title: "Papel semanal corrigido",
-      body: `Semana de ${weekStart}: o teu papel passou para ${change.role === "super_attack" ? "Super Ataque" : change.role === "attack" ? "Ataque" : "Defesa"}. Consulta os papéis e a abertura dos desafios.`,
+      body: `Semana de ${weekStart}: o teu papel passou para ${weeklyRoleName(change.role)}. Consulta os papéis e a abertura dos desafios.`,
       createdAt: now,
       read: false,
       dedupe: `division-papers-correction:${weekStart}:${divisionId}:${r.version}:${change.playerId}`,

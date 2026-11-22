@@ -1,6 +1,14 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.21.6";
+export const applicationVersion = "1.22.0";
 export const releaseNotes = [
+  {
+    version: "1.22.0",
+    date: "2026-11-22",
+    title: "Novos papéis: Ataque, Defesa e Combo",
+    changes: [
+      "Em todas as divisões, Ataque só pode desafiar, Defesa só pode ser desafiada e Combo, que substitui o Super Ataque, pode desafiar e ser desafiada. Os jogos já criados mantêm-se válidos.",
+    ],
+  },
   {
     version: "1.21.6",
     date: "2026-11-21",
