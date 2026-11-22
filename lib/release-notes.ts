@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.23.2";
+export const applicationVersion = "2.0.1";
 export const releaseNotes = [
+  {
+    version: "2.0.1",
+    date: "2026-11-22",
+    title: "Opções de agendamento para publicação de papéis semanais",
+    changes: [
+      "O administrador passa a ter as mesmas opções de agendamento para publicar os papéis semanais que já existiam para abrir os desafios: aguardar decisão manual, agendar data/hora exata ou ativar contagem decrescente.",
+      "Nova interface WeeklyPublicationControl na transição de jornada (passo 2: Papéis) com três modos: «Aguardar decisão do administrador», «Numa data e hora» e «Após uma contagem decrescente».",
+      "Semanas passam a ser exibidas como «Jornada X (DD/MM a DD/MM)» em vez de «Semana X», funcionando por divisão já que cada divisão pode operar em semanas diferentes.",
+    ],
+  },
   {
     version: "1.23.2",
     date: "2026-11-22",
