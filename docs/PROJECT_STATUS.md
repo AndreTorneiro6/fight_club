@@ -1,3 +1,10 @@
+## Version 1.23.2 LIVE verified — 22 November 2026
+
+- Workflow 45071749026 started at 21:22:29 UTC. Honoured the requested ten-minute delay and first monitored after 21:32:29 UTC. All required checks and deployment completed successfully for exact revision 42f925a25fcf3aaaa891c3b667631290d3e3a766. Independent public /api/health verification returned {"ok":true}.
+- Player RankingTable and its dashboard preview no longer display Semana anterior / previous-week role. Current roles, full ranking entries, challenges and administrator role history remain intact; no historical data was rewritten. Local validation: typecheck, 611 unit/database tests, production build and all four dynamic-weekly browser checks passed; full CI then passed.
+- Includes the already-released v1.23.1 mandatory-game fixes: assigning on save removes the second admin publication, gives attackers an immediate opportunity and twelve hours to confirm, hides the defending team's preview and shows pending assignments on both admin cards. Published papers, original competition weeks and other games' deadlines/frozen/scheduled records remain protected. The user confirmed this immediate-opportunity/twelve-hour-deadline behavior with “thats it”.
+- No manual deployment, league-data rewrite, cancellation or check bypass. This handoff update is documentation-only and does not require another production deployment.
+
 ## Version 1.23.1 LIVE verified — 22 November 2026
 
 - Waited at least ten minutes after workflow 45070564133 started at 21:10:12 UTC, first monitoring at 21:20:18 UTC. All required checks and deployment passed for exact revision a330c7f734f23f3e38d8bd2678ef7b7f663f28b4. Public health independently returned {"ok":true} after completion.

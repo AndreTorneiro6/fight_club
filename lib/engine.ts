@@ -38,6 +38,8 @@ import {
   correctPublishedDivisionPapers,
   withdrawAutomaticDivisionPapers,
   publishDivisionPapers,
+  scheduleDivisionPapersPublication,
+  configureDivisionPapersPublicationDelay,
 } from "./division-weekly-publication";
 import { challengeDistance } from "./challenge-distance";
 import {
@@ -279,6 +281,23 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("admin.week.opening.delay.set"),
+    weekStart: day,
+    divisionId: id,
+    expectedVersion: z.number().int().min(0),
+    minutes: z.number().int().min(0).max(10080),
+    activate: z.boolean().default(false),
+    reason: text.min(3),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.publish.set"),
+    weekStart: day,
+    divisionId: id,
+    expectedVersion: z.number().int().min(0),
+    publishesAt: date.nullable(),
+    reason: text.min(3),
+  }),
+  z.object({
+    type: z.literal("admin.week.division.publish.delay.set"),
     weekStart: day,
     divisionId: id,
     expectedVersion: z.number().int().min(0),
@@ -2229,6 +2248,19 @@ export function execute(
     }
     case "admin.week.opening.delay.set":
       return configureWeeklyOpeningDelay(s, actor, cmd, timestamp);
+    case "admin.week.division.publish.set":
+      return scheduleDivisionPapersPublication(
+        s,
+        actor,
+        cmd.weekStart,
+        cmd.expectedVersion,
+        cmd.publishesAt,
+        cmd.reason,
+        timestamp,
+        cmd.divisionId,
+      );
+    case "admin.week.division.publish.delay.set":
+      return configureDivisionPapersPublicationDelay(s, actor, cmd, timestamp);
     case "admin.week.challenges.pause":
       return pauseWeeklyChallenges(s, actor, cmd, timestamp);
     case "admin.challenges.reconciliation.preview": {

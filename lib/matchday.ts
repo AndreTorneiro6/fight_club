@@ -142,5 +142,14 @@ export function matchdayNumber(state: State, week: string) {
 /** Season-relative week label, shared by competition history views. */
 export function matchdayWeekLabel(state: State, week: string) {
   const number = matchdayNumber(state, week);
-  return number === undefined ? `Semana de ${week}` : `Semana ${number}`;
+  const { start, end } = clubWeek(week);
+  const formatDate = (d: string) =>
+    new Date(d + "T12:00:00Z").toLocaleDateString("pt-PT", {
+      day: "2-digit",
+      month: "2-digit",
+      timeZone: "UTC",
+    });
+  const dateRange = `${formatDate(start)} a ${formatDate(end)}`;
+  if (number === undefined) return `Jornada por definir (${dateRange})`;
+  return `Jornada ${number} (${dateRange})`;
 }

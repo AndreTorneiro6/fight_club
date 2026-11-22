@@ -415,8 +415,10 @@ export interface WeeklyRound extends Entity {
       approvalSnapshot?: string;
       publishedAt?: string;
       publishedBy?: string;
+      scheduledAt?: string;
     }
   >;
+  divisionPublicationDelays?: Record<string, number>;
   divisionRoleGeneration?: Record<
     string,
     { input: string; assignments: string }

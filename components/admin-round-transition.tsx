@@ -13,6 +13,7 @@ import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import { rankingEntries } from "@/lib/ranking-groups";
 import { weeklyOpeningAt } from "@/lib/weekly";
 import WeeklyOpeningControl from "./weekly-opening-control";
+import WeeklyPublicationControl from "./weekly-publication-control";
 import RankingExport from "./ranking-export";
 import WeeklyTurnoverStatus from "./weekly-turnover-status";
 export default function AdminRoundTransition({
@@ -173,7 +174,7 @@ export default function AdminRoundTransition({
           )}
         </>
       )}
-      {phase === "papers" && (
+      {phase === "papers" && round && (
         <>
           <p>Distância máxima: {challengeDistance(s, divisionId)} posições.</p>
           <Link
@@ -239,25 +240,15 @@ export default function AdminRoundTransition({
             >
               Aprovar papéis · {division.name}
             </button>
-            <button
-              disabled={busy || papersPublished || !publication?.approvedAt}
-              onClick={async () => {
-                if (
-                  await run(
-                    {
-                      type: "admin.week.division.publish",
-                      weekStart: completion.nextWeek,
-                      divisionId,
-                      expectedVersion: round?.version ?? 0,
-                    },
-                    "Papéis desta divisão publicados. Falta ativar a abertura.",
-                  )
-                )
-                  setPhase("opening");
-              }}
-            >
-              Publicar papéis · {division.name}
-            </button>
+            {!papersPublished && publication?.approvedAt && (
+              <WeeklyPublicationControl
+                key={`pub:${round._id}:${round.version}`}
+                round={round}
+                division={division}
+                run={run}
+                busy={busy}
+              />
+            )}
             {papersPublished && (
               <button onClick={() => setPhase("opening")}>
                 Continuar para a abertura

@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { State, WeeklyRound } from "./types";
+import type { State, WeeklyRound, Actor } from "./types";
 import { ensure } from "./rules";
 import { rankingEntries } from "./ranking-groups";
 import { weeklyPositionReason } from "./weekly";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRankingPublished } from "./round-transition";
 import { challengeDistance } from "./challenge-distance";
-import { clubWeek } from "./calendar";
+import { clubWeek, clubDay, addClubDays } from "./calendar";
 import { weeklyRoleName } from "./weekly-role-rules";
 export function divisionPaperSignature(
   s: State,
@@ -371,4 +371,167 @@ export function withdrawAutomaticDivisionPapers(
     }),
   });
   return { notificationIds, version: r.version };
+}
+
+/** Schedules the publication of a division's weekly papers. */
+export function scheduleDivisionPapersPublication(
+  s: State,
+  actor: Actor,
+  weekStart: string,
+  expectedVersion: number,
+  publishesAt: string | null,
+  reason: string,
+  timestamp = Date.now(),
+  divisionId: string,
+) {
+  ensure(
+    actor.role === "admin",
+    "Apenas administradores podem agendar a publicação dos papéis.",
+    403,
+  );
+  const r = s.weeklyRounds.find((r) => r.weekStart === weekStart);
+  ensure(r, "Papéis semanais não encontrados.", 404);
+  ensure(
+    Number.isInteger(expectedVersion) && (r.version ?? 0) === expectedVersion,
+    "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+    409,
+  );
+  ensure(
+    typeof reason === "string" &&
+      reason.trim().length >= 3 &&
+      reason.length <= 2000,
+    "Indica o motivo da alteração.",
+  );
+  ensure(
+    !divisionId || s.divisions.some((d) => d._id === divisionId),
+    "Divisão inválida.",
+  );
+  ensure(
+    publishesAt !== null || !!divisionId,
+    "Seleciona uma divisão para aguardar publicação manual.",
+  );
+  ensure(
+    publishesAt === null ||
+      (Number.isFinite(Date.parse(publishesAt)) &&
+        Date.parse(publishesAt) >= timestamp),
+    "Escolhe uma publicação atual ou futura.",
+  );
+  if (publishesAt !== null)
+    for (const [d, source] of Object.entries(r.divisionTransitions ?? {})) {
+      if (divisionId && divisionId !== d) continue;
+      ensure(
+        divisionRankingPublished(
+          s,
+          r.seasonId!,
+          d,
+          source.previousWeek,
+          timestamp,
+        ),
+        "Publica primeiro o ranking semanal desta divisão.",
+      );
+    }
+  const canonical = publishesAt === null ? null : new Date(publishesAt).toISOString();
+  ensure(
+    weekStart >= clubWeek(timestamp).start &&
+      (canonical === null ||
+        (clubDay(canonical) >= addClubDays(weekStart, -7) &&
+          Date.parse(canonical) <= Date.parse(clubWeek(weekStart).endsAt))),
+    "A publicação deve estar entre a semana anterior e o fim da semana dos jogos.",
+  );
+  const previous = r.divisionPublications?.[divisionId]?.publishedAt ?? r.divisionPublications?.[divisionId]?.approvedAt;
+  r.divisionPublications ??= {};
+  const pub = r.divisionPublications[divisionId] ??= {};
+  if (canonical !== null) {
+    pub.scheduledAt = canonical;
+  } else {
+    delete pub.scheduledAt;
+  }
+  r.version = (r.version ?? 0) + 1;
+  s.audit.push({
+    _id: randomUUID(),
+    userId: actor.userId,
+    action: "week.division.publication.scheduled",
+    details: JSON.stringify({
+      weekStart,
+      divisionId,
+      previous,
+      publishesAt: canonical,
+      reason: reason.trim(),
+    }),
+    createdAt: new Date(timestamp).toISOString(),
+  });
+  return { ok: true };
+}
+
+/** Configures a countdown delay for automatic publication of a division's weekly papers. */
+export function configureDivisionPapersPublicationDelay(
+  s: State,
+  actor: Actor,
+  input: {
+    weekStart: string;
+    divisionId: string;
+    expectedVersion: number;
+    minutes: number;
+    activate: boolean;
+    reason: string;
+  },
+  timestamp = Date.now(),
+) {
+  ensure(
+    actor.role === "admin",
+    "Apenas administradores podem configurar a contagem de publicação.",
+    403,
+  );
+  const r = s.weeklyRounds.find((r) => r.weekStart === input.weekStart);
+  ensure(r, "Papéis semanais não encontrados.", 404);
+  ensure(
+    s.divisions.some((d) => d._id === input.divisionId),
+    "Divisão inválida.",
+  );
+  ensure(
+    Number.isInteger(input.minutes) &&
+      input.minutes >= 0 &&
+      input.minutes <= 10080,
+    "Intervalo inválido.",
+  );
+  ensure(
+    (r.version ?? 0) === input.expectedVersion,
+    "Outro administrador alterou os papéis. Atualiza antes de continuar.",
+    409,
+  );
+  ensure(input.reason.trim().length >= 3, "Indica o motivo.");
+  const publication = r.divisionPublications?.[input.divisionId];
+  if (publication?.approvedAt) {
+    ensure(input.activate, "Confirma a ativação da contagem.");
+    scheduleDivisionPapersPublication(
+      s,
+      actor,
+      input.weekStart,
+      input.expectedVersion,
+      new Date(timestamp + input.minutes * 60000).toISOString(),
+      input.reason,
+      timestamp,
+      input.divisionId,
+    );
+  } else {
+    ensure(!input.activate, "Aprova os papéis antes de ativar a contagem.");
+    r.version = (r.version ?? 0) + 1;
+  }
+  r.divisionPublicationDelays = {
+    ...r.divisionPublicationDelays,
+    [input.divisionId]: input.minutes,
+  };
+  s.audit.push({
+    _id: randomUUID(),
+    userId: actor.userId,
+    action: "week.division.publication.delay.configured",
+    createdAt: new Date(timestamp).toISOString(),
+    details: JSON.stringify({
+      ...input,
+      publishesAt: publication?.approvedAt
+        ? r.divisionPublications?.[input.divisionId]?.scheduledAt
+        : null,
+    }),
+  });
+  return { ok: true, version: r.version };
 }
