@@ -1,4 +1,5 @@
 "use client";
+import { isDraftMatchup } from "@/lib/mandatory-matchups";
 
 import { useTransition, type ReactNode } from "react";
 import Link from "next/link";
@@ -86,7 +87,7 @@ export default function AdminWeekWorkspace({
   const round = s.weeklyRounds.find((r) => r.weekStart === week);
   const published = !!weeklyPublishedAt(round, division._id);
   const drafts =
-    round?.manualMatchups?.[division._id]?.pairs.filter((p) => !p.challengeId)
+    round?.manualMatchups?.[division._id]?.pairs.filter(isDraftMatchup)
       .length ?? 0;
   const visible = task === "schedule" ? pending : games;
   const returnQuery = new URLSearchParams({

@@ -1,4 +1,5 @@
 "use client";
+import { isDraftMatchup, isWaitingMatchup } from "@/lib/mandatory-matchups";
 import { canBeChallenged, canChallenge } from "@/lib/weekly-role-rules";
 import {
   adminMatchmakingEnabled,
@@ -1697,18 +1698,8 @@ function RankingTable({
 }: Actions & { divisionId: string; limit?: number }) {
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     [target, setTarget] = useState<Player | null>(null),
-    [confirmingMandatory, setConfirmingMandatory] = useState<Challenge | null>(null),
     router = useRouter();
   const managed = usesManagedCompetition(s, p.divisionId);
-  // Check for mandatory pending challenge where current player is challenger
-  const mandatoryPendingChallenge = s.challenges.find(
-    (c) =>
-      c.mandatoryAssignment &&
-      c.mandatoryPendingUntil &&
-      c.status === "pending" &&
-      c.challengerId === p._id &&
-      Date.parse(c.mandatoryPendingUntil) > Date.now(),
-  );
   const previousPositions = new Map(
     rankingEntries(
       s.players.map((member) => ({
@@ -1728,18 +1719,10 @@ function RankingTable({
         <span className="hide-mobile">Estado</span>
         <span className="right">Desafio</span>
       </div>
-      {(() => {
-        const allEntries = rankingEntries(s.players, divisionId).map(
-          (entry, index) => ({ ...entry, teamPosition: index + 1 }),
-        );
-        const entriesToShow = mandatoryPendingChallenge
-          ? allEntries.filter((entry) =>
-              entry.members.some(
-                (member) => member._id === mandatoryPendingChallenge.defenderId,
-              ),
-            )
-          : allEntries.slice(0, limit);
-        return entriesToShow.map((entry) => {
+      {rankingEntries(s.players, divisionId)
+        .map((entry, index) => ({ ...entry, teamPosition: index + 1 }))
+        .slice(0, limit)
+        .map((entry) => {
           const record = teamRecord(s.challenges, entry.members);
           const ownTeam = entry.members.some((member) => member._id === p._id);
           const options = entry.members.map((member) => ({
@@ -1855,36 +1838,6 @@ function RankingTable({
                   <Link className="button small" href="/jornadas">
                     Ver desafios
                   </Link>
-                ) : mandatoryPendingChallenge &&
-                  entry.members.some(
-                    (member) => member._id === mandatoryPendingChallenge.defenderId,
-                  ) ? (
-                  <button
-                    className="small primary"
-                    style={{
-                      color: "var(--gold)",
-                      borderColor: "#e7b85b33",
-                    }}
-                    aria-label={`Confirmar jogo obrigatório contra ${entry.members.map((member) => member.name).join(" + ")}`}
-                    onClick={async () => {
-                      try {
-                        await run(
-                          {
-                            type: "challenge.respond",
-                            challengeId: mandatoryPendingChallenge._id,
-                            accept: true,
-                          },
-                          "Jogo obrigatório confirmado. Combinem o horário.",
-                        );
-                        setConfirmingMandatory(null);
-                      } catch (e) {
-                        notify((e as Error).message, true);
-                      }
-                    }}
-                  >
-                    <Swords size={12} />
-                    Confirmar jogo obrigatório
-                  </button>
                 ) : targetMember ? (
                   <button
                     className="small"
@@ -1908,8 +1861,7 @@ function RankingTable({
               </div>
             </div>
           );
-        })
-      })()}
+        })}
       {target && (
         <ChallengeComposer
           s={s}
@@ -4858,10 +4810,10 @@ function AdminDivisionMatchmaking(
     );
   if (!s.settings[0].weeklyCompetition || !divisions.length || !weeks.length)
     return null;
-  const manual = adminMatchmakingEnabled(s, division, week);
   const plan = s.weeklyRounds.find((r) => r.weekStart === week)
     ?.manualMatchups?.[division] ?? { version: 0, pairs: [] };
-  const draft = plan.pairs.filter((p) => !p.challengeId);
+  const draft = plan.pairs.filter(isDraftMatchup);
+  const waiting = plan.pairs.filter(isWaitingMatchup);
   const games = s.challenges.filter(
     (c) =>
       c.divisionId === division &&
@@ -4880,7 +4832,7 @@ function AdminDivisionMatchmaking(
   const free = teams.filter(
     (t) =>
       !games.some((c) => involves(c, t.members[0]._id, s.players)) &&
-      !draft.some((p) =>
+      ![...draft, ...waiting].some((p) =>
         t.members.some(
           (m) => m._id === p.challengerId || m._id === p.defenderId,
         ),
@@ -4929,111 +4881,116 @@ function AdminDivisionMatchmaking(
             </label>
           </>
         )}
-        <label>
-          Quem define os confrontos
-          <select
-            value={manual ? "admin" : "standard"}
-            disabled={busy}
-            onChange={(e) =>
-              void run(
-                {
-                  type: "admin.division.matchmaking.set",
-                  divisionId: division,
-                  weekStart: week,
-                  manual: e.target.value === "admin",
-                },
-                "Modo atualizado apenas para a divisão e semana escolhidas.",
-              )
-            }
-          >
-            <option value="standard">
-              Jogadores e algoritmo · regras atuais
-            </option>
-            <option value="admin">Administração define os jogos</option>
-          </select>
-        </label>
         <p>
-          {manual
-            ? "Prepara os pares em rascunho e publica quando estiverem prontos. Só a publicação cria os desafios e avisa as duplas para combinar o horário."
-            : "Os jogadores e o algoritmo seguem as regras atuais nesta divisão e semana. Podes preparar qualquer semana futura da época em modo de administração."}
+          Prepara apenas os jogos obrigatórios necessários e publica quando
+          estiverem prontos. A dupla atacante tem 12 horas para confirmar;
+          depois, o jogo é criado automaticamente. As restantes duplas continuam
+          a desafiar normalmente.
         </p>
         <small>
           Jornada de {week} · {games.length} jogos publicados · {draft.length}{" "}
-          pares em rascunho · {free.length} duplas sem jogo.
+          pares em rascunho · {waiting.length} a aguardar confirmação ·{" "}
+          {free.length} duplas sem jogo.
         </small>
-        {manual && (
-          <>
-            <p>
-              As regras de ranking, título e repetição mantêm-se. Os limites
-              ativos e a composição das duplas são novamente validados ao
-              publicar. Outras semanas não são alteradas.
-            </p>
-            <button
-              className="primary"
-              disabled={busy || free.length < 2}
-              onClick={() => setAssigning(true)}
-            >
-              {a.context ? "Adicionar par ao rascunho" : "Definir jogo"}
-            </button>
-            {draft.map((pair) => (
-              <div key={pair.id} className="inset row between wrap">
-                <span>
-                  {name(pair.challengerId)} × {name(pair.defenderId)} · Rascunho
-                </span>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(
-                      {
-                        type: "admin.week.matchup.remove",
-                        weekStart: week,
-                        divisionId: division,
-                        pairId: pair.id,
-                        expectedVersion: plan.version,
-                      },
-                      "Par removido do rascunho.",
-                    )
-                  }
-                >
-                  Remover par
-                </button>
-              </div>
-            ))}
-            {draft.length > 0 && (
+        <>
+          <p>
+            As regras de ranking, título e repetição mantêm-se. Os limites
+            ativos e a composição das duplas são novamente validados ao
+            publicar. Outras semanas não são alteradas.
+          </p>
+          <button
+            className="primary"
+            disabled={busy || free.length < 2}
+            onClick={() => setAssigning(true)}
+          >
+            {a.context ? "Adicionar par ao rascunho" : "Definir jogo"}
+          </button>
+          {draft.map((pair) => (
+            <div key={pair.id} className="inset row between wrap">
+              <span>
+                {name(pair.challengerId)} × {name(pair.defenderId)} · Rascunho
+              </span>
               <button
                 disabled={busy}
-                className="primary"
                 onClick={() =>
                   void run(
                     {
-                      type: "admin.week.matchups.publish",
+                      type: "admin.week.matchup.remove",
                       weekStart: week,
                       divisionId: division,
+                      pairId: pair.id,
                       expectedVersion: plan.version,
                     },
-                    "Jogos publicados. As duplas foram notificadas.",
+                    "Par removido do rascunho.",
                   )
                 }
               >
-                {a.context
-                  ? "Publicar jogos obrigatórios"
-                  : "Publicar jogos desta semana"}
+                Remover par
               </button>
-            )}
-            {free.length > 0 && (
-              <details>
-                <summary>Duplas sem jogo nesta jornada</summary>
-                <ul>
-                  {free.map((t) => (
-                    <li key={t.id}>
-                      {t.members.map((p) => p.name).join(" + ")}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
-        )}
+            </div>
+          ))}
+          {waiting.map((pair) => (
+            <div key={pair.id} className="inset row between wrap">
+              <span>
+                {name(pair.challengerId)} × {name(pair.defenderId)} · Aguarda
+                confirmação até{" "}
+                {new Date(pair.mandatoryPendingUntil!).toLocaleString("pt-PT", {
+                  timeZone: "Europe/Lisbon",
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+              </span>
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    {
+                      type: "admin.week.matchup.remove",
+                      weekStart: week,
+                      divisionId: division,
+                      pairId: pair.id,
+                      expectedVersion: plan.version,
+                    },
+                    "Jogo retirado. As duplas foram notificadas.",
+                  )
+                }
+              >
+                Retirar jogo
+              </button>
+            </div>
+          ))}
+          {draft.length > 0 && (
+            <button
+              disabled={busy}
+              className="primary"
+              onClick={() =>
+                void run(
+                  {
+                    type: "admin.week.matchups.publish",
+                    weekStart: week,
+                    divisionId: division,
+                    expectedVersion: plan.version,
+                  },
+                  "Jogos publicados. A dupla atacante tem 12 horas para confirmar.",
+                )
+              }
+            >
+              {a.context
+                ? "Publicar jogos obrigatórios"
+                : "Publicar jogos desta semana"}
+            </button>
+          )}
+          {free.length > 0 && (
+            <details>
+              <summary>Duplas sem jogo nesta jornada</summary>
+              <ul>
+                {free.map((t) => (
+                  <li key={t.id}>{t.members.map((p) => p.name).join(" + ")}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
         {games.map((c) => (
           <Link key={c._id} href={"/desafios/" + c._id}>
             #{c.number} · {challengeTeamName(c, c.challengerId, s.players)} ×{" "}
@@ -6217,7 +6174,7 @@ const settingLabels: Record<
     "Permitir notificações da liga por email · desativado: apenas questões de conta",
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
   weeklyDynamicRoles:
-    "Ajustar papéis e atribuir emparelhamentos obrigatórios pela prioridade",
+    "Ajudar a encontrar adversários e alargar o alcance sem alterar os papéis",
   weeklyMandatoryChallenges:
     "Desafios semanais obrigatórios · combinar apenas horário",
   autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
@@ -6361,7 +6318,7 @@ function Rules({ s, run, busy }: Actions) {
                   });
                 }}
               />
-              Papéis dinâmicos · {d.name}
+              Assistente de adversários · {d.name}
             </label>
           ))}
           {s.divisions.map((d) => (
@@ -7273,11 +7230,7 @@ function AssignmentDialog(
   const attackerIds = teamMembers(s.players, attacker).map(
     (member) => member._id,
   );
-  const manual = adminMatchmakingEnabled(
-    s,
-    division,
-    a.draftWeekStart ?? c?.weekStart,
-  );
+  const manual = !!a.draftWeekStart;
   const reason =
     !c && attacker && defender
       ? a.draftWeekStart

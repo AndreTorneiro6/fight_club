@@ -1,3 +1,4 @@
+import { isDraftMatchup } from "./mandatory-matchups";
 import { addClubDays, clubWeek } from "./calendar";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { weeklyOpeningAt } from "./weekly";
@@ -110,7 +111,7 @@ export function adminWeekTasks(
         );
       }
       const pairs =
-        round?.manualMatchups?.[d._id]?.pairs.filter((p) => !p.challengeId)
+        round?.manualMatchups?.[d._id]?.pairs.filter(isDraftMatchup)
           .length ?? 0;
       if (pairs)
         add(

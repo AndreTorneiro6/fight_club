@@ -1,18 +1,13 @@
 import type { State } from "./types";
-import { weeklyChallengeWeek } from "./weekly";
 
 export const ADMIN_MATCHMAKING_MESSAGE =
   "Os jogos desta divisão são definidos pela administração. Aguarda a atribuição do teu adversário.";
 export function adminMatchmakingEnabled(
   s: State,
   divisionId: string,
-  week = weeklyChallengeWeek(s, Date.now(), divisionId),
+  week?: string,
 ) {
-  return !!(
-    s.settings[0].weeklyCompetition &&
-    (s.weeklyRounds.find((r) => r.weekStart === week)?.manualMatchmaking?.[
-      divisionId
-    ] ??
-      s.settings[0].manualMatchmakingDivisionIds?.includes(divisionId))
-  );
+  // Legacy mode flags no longer suspend player challenges. Mandatory games
+  // reserve only their two teams and coexist with the normal weekly flow.
+  return false;
 }

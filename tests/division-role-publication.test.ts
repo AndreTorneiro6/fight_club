@@ -48,7 +48,7 @@ test("an unsaved edit in the selected division still blocks publishing until it 
   );
 });
 
-test("publishing keeps admin papers even when the title rule reduces the possible games", async () => {
+test("the helper extends title reach instead of changing administrator papers", async () => {
   const { dynamicRoleChanges, dynamicWeeklyPlan } =
     await import("../lib/dynamic-weekly");
   const { collections, defaultSettings } = await import("../lib/types");
@@ -97,8 +97,8 @@ test("publishing keeps admin papers even when the title rule reduces the possibl
     role: p.position <= 3 ? ("defense" as const) : ("attack" as const),
   }));
   s.weeklyRounds = [{ _id: week, weekStart: week, assignments }];
-  // Title rule 3 leaves the champion without a target, but papers stay as chosen.
-  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 2);
+  // Expand only the necessary reach to include the champion; papers stay as chosen.
+  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 3);
   assert.deepEqual(dynamicRoleChanges(s, "ouro", week, assignments), []);
   // Title rule 4: 4→1, 5→2, 6→3 use the published roles exactly.
   s.settings[0].titleMaxPosition = 4;

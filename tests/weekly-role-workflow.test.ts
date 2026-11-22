@@ -267,7 +267,7 @@ test("legacy automation preserves published weeks and produces editable Open Att
     r.assignments
       .filter((a) => a.playerId !== "p0")
       .slice(0, -1)
-      .every((a) => a.role === "super_attack"),
+      .every((a) => a.role === "attack"),
   );
   assert.equal(r.assignments.at(-1)?.role, "attack");
   const publish = () =>

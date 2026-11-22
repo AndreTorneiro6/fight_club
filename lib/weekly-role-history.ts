@@ -197,8 +197,7 @@ export function divisionWeekOptions(
       ],
     };
     const plan = dynamicWeeklyPlan(preview, divisionId, week);
-    if (s.divisions.find((d) => d._id === divisionId)?.code === "ouro")
-      ouroEligible = plan.eligible;
+    ouroEligible = plan.eligible;
     for (const p of plan.fixed.length
       ? [...plan.fixed, ...plan.canonical]
       : []) {
@@ -217,16 +216,19 @@ export function divisionWeekOptions(
     }
   }
 
+  const freeWeek =
+    s.weeklyRounds.find((r) => r.weekStart === week)?.weekType ===
+    "OPEN_ATTACK";
   return new Map(
     entries.map((t): [string, TeamWeekOptions] => {
       const mine = roleOf(t),
         open = free(t);
       const attack =
-        open && mine !== "defense"
+        open && (freeWeek || mine !== "defense")
           ? entries.filter(
               (d) =>
                 free(d) &&
-                roleOf(d) !== "attack" &&
+                (freeWeek || roleOf(d) !== "attack") &&
                 (ouroEligible
                   ? ouroEligible.some(
                       (p) => p.attackerKey === t.id && p.defenderKey === d.id,
@@ -235,11 +237,11 @@ export function divisionWeekOptions(
             )
           : [];
       const defense =
-        open && mine !== "attack"
+        open && (freeWeek || mine !== "attack")
           ? entries.filter(
               (a) =>
                 free(a) &&
-                roleOf(a) !== "defense" &&
+                (freeWeek || roleOf(a) !== "defense") &&
                 (ouroEligible
                   ? ouroEligible.some(
                       (p) => p.attackerKey === a.id && p.defenderKey === t.id,

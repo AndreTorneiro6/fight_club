@@ -198,8 +198,13 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
-      - name: Check Bronze distance and dynamic team role assignments
-        run: npx playwright test e2e/dynamic-weekly.spec.ts e2e/manual-matchmaking.spec.ts e2e/admin-week-workspace.spec.ts
+      # The helper scenario moves player accounts between divisions. Each file
+      # needs fresh demo data for mandatory-game confirmation and workspace checks.
+      - name: Check weekly helper, mandatory games and admin workspace
+        run: |
+          npx playwright test e2e/dynamic-weekly.spec.ts
+          npx playwright test e2e/manual-matchmaking.spec.ts
+          npx playwright test e2e/admin-week-workspace.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 

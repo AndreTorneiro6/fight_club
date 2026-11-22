@@ -8,12 +8,23 @@ import {
   eligibleChallengeTargets,
 } from "./challenge-access";
 import { rankingEntries } from "./ranking-groups";
+import {
+  mandatoryReservedTeamKeys,
+  visibleMandatoryMatchups,
+} from "./mandatory-matchups";
 import type { Actor, State } from "./types";
 
 /** Apply before serializing the shared state. SSE sends invalidations, never drafts. */
 export function filterFeatureView(state: State, actor: Actor) {
   if (actor.role !== "admin")
-    for (const round of state.weeklyRounds) delete round.manualMatchups;
+    for (const round of state.weeklyRounds) {
+      round.mandatoryReservedTeamKeys = mandatoryReservedTeamKeys(round);
+      round.manualMatchups = visibleMandatoryMatchups(
+        round,
+        state.players,
+        actor.playerId,
+      );
+    }
   filterTeamSpaceView(state, actor);
   const season = state.seasons.find((season) => season.status === "active");
   const album = state.stickerSettings?.find(

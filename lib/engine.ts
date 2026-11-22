@@ -132,10 +132,15 @@ import {
   terminal,
 } from "./rules";
 import {
+  isDraftMatchup,
+  isWaitingMatchup,
+  MANDATORY_MATCHUP_HOURS,
+  assignedMandatoryMatchup,
+} from "./mandatory-matchups";
+import {
   defaultSettings,
   type Actor,
   type Challenge,
-  type ManualWeekMatchup,
   type Player,
   type State,
 } from "./types";
@@ -1849,130 +1854,6 @@ export function execute(
       "A tua conta de jogador não está ativa.",
       403,
     );
-  // Auto-accept mandatory pending challenges that have passed their deadline
-  for (const c of s.challenges) {
-    if (
-      c.mandatoryAssignment &&
-      c.mandatoryPendingUntil &&
-      c.status === "pending" &&
-      Date.parse(c.mandatoryPendingUntil) <= timestamp
-    ) {
-      c.status = "accepted";
-      c.mandatoryPendingUntil = undefined;
-      c.scheduleBy = c.playBy;
-      c.weeklyPriorityWinner = true;
-      c.weeklyPriorityReason = "Confirmação automática após 12h sem resposta da dupla atacante";
-      closeIncompatibleQueue(c);
-      for (const pid of challengeParticipants(c, s.players))
-        notify(
-          pid,
-          "Jogo obrigatório confirmado automaticamente",
-          "A dupla atacante não confirmou em 12 horas. O desafio foi aceite automaticamente. Combinem o horário.",
-          c._id,
-          `mandatory-auto-accepted:${c._id}:${pid}`,
-          { deliveryChannels: ["push"], kind: "challenge" },
-        );
-      notifyAdmins(
-        "Jogo obrigatório confirmado automaticamente",
-        `Desafio #${c.number}: confirmado automaticamente após 12h sem resposta.`,
-        c._id,
-      );
-      log("mandatory.challenge.auto-accepted", {
-        challengeId: c._id,
-        reason: "Challenger did not confirm within 12 hours",
-      });
-    }
-  }
-  // Auto-create challenges for published mandatory matchups that expired
-  for (const round of s.weeklyRounds) {
-    if (!round.manualMatchups) continue;
-    for (const [divId, plan] of Object.entries(round.manualMatchups)) {
-      for (const pair of plan.pairs) {
-        if (
-          pair.publishedAt &&
-          pair.mandatoryPendingUntil &&
-          !pair.challengeId &&
-          Date.parse(pair.mandatoryPendingUntil) <= timestamp
-        ) {
-          // Auto-create the challenge
-          const currentSeason = season();
-          const teams = rankingEntries(s.players, divId);
-          const challenger = player(pair.challengerId);
-          const defender = player(pair.defenderId);
-          const weekEnd = new Date(
-            Date.parse(round.weekStart) + 6 * 86400000 + 86399999,
-          ).toISOString();
-          const c: Challenge = {
-            origin: {
-              kind: "admin",
-              actorUserId: "system:auto-mandatory",
-              createdAt: new Date(timestamp).toISOString(),
-            },
-            _id: uid(),
-            number: Math.max(0, ...s.challenges.map((c) => c.number)) + 1,
-            seasonId: currentSeason._id,
-            divisionId: divId,
-            challengerId: pair.challengerId,
-            defenderId: pair.defenderId,
-            challengerTeam: teamMembers(s.players, pair.challengerId).map(
-              (member) => ({ playerId: member._id, name: member.name }),
-            ),
-            defenderTeam: teamMembers(s.players, pair.defenderId).map(
-              (member) => ({ playerId: member._id, name: member.name }),
-            ),
-            challengerPosition: teamPosition(s.players, pair.challengerId),
-            positionSnapshotModel: "team",
-            effectiveChallengeDistance: Math.max(
-              challengeDistance(s, divId),
-              teamPosition(s.players, pair.challengerId) -
-                teamPosition(s.players, pair.defenderId),
-            ),
-            challengerTeamId: teamMembers(s.players, pair.challengerId)
-              .map((m) => m._id)
-              .sort()
-              .join(":"),
-            defenderTeamId: teamMembers(s.players, pair.defenderId)
-              .map((m) => m._id)
-              .sort()
-              .join(":"),
-            defenderPosition: teamPosition(s.players, pair.defenderId),
-            status: "accepted",
-            createdAt: new Date(timestamp).toISOString(),
-            respondBy: weekEnd,
-            scheduleBy: weekEnd,
-            playBy: weekEnd,
-            durationMinutes: rules.matchMinutes,
-            titleFight: false,
-            weekStart: round.weekStart,
-            mandatoryAssignment: true,
-          };
-          s.challenges.push(c);
-          pair.challengeId = c._id;
-          closeIncompatibleQueue(c);
-          for (const pid of challengeParticipants(c, s.players))
-            notify(
-              pid,
-              "Jogo obrigatório criado automaticamente",
-              "A dupla atacante não desafiou em 12 horas. O jogo foi criado e agendado automaticamente.",
-              c._id,
-              `mandatory-auto-created:${c._id}:${pid}`,
-              { deliveryChannels: ["push"], kind: "challenge" },
-            );
-          notifyAdmins(
-            "Jogo obrigatório criado automaticamente",
-            `Desafio #${c.number}: criado automaticamente após 12h sem desafio do atacante.`,
-            c._id,
-          );
-          log("mandatory.challenge.auto-created", {
-            challengeId: c._id,
-            pairId: pair.id,
-            reason: "Challenger did not initiate challenge within 12 hours",
-          });
-        }
-      }
-    }
-  }
-
   switch (cmd.type) {
     case "admin.division.matchmaking.set": {
       ensure(
@@ -2028,12 +1909,9 @@ export function execute(
           !usesManagedCompetition(s, cmd.divisionId),
         "Divisão inválida para este planeamento.",
       );
-      ensure(
-        adminMatchmakingEnabled(s, cmd.divisionId, cmd.weekStart),
-        "Ativa o modo de administração para esta divisão e semana.",
-      );
-      const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
-      ensure(round, "Ativa o modo desta semana antes de preparar os jogos.");
+      const round =
+        s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart) ??
+        generateWeeklyRoles(s, cmd.weekStart, actor.userId, timestamp);
       const plan = round.manualMatchups?.[cmd.divisionId] ?? {
         version: 0,
         pairs: [],
@@ -2076,8 +1954,20 @@ export function execute(
         const pair = plan.pairs.find((p) => p.id === cmd.pairId);
         ensure(
           pair && !pair.challengeId,
-          "Só podes remover pares ainda não publicados. Gere os jogos publicados no detalhe do desafio.",
+          "Este jogo já foi criado. Gere-o no detalhe do desafio.",
         );
+        if (pair.publishedAt)
+          for (const pid of teamMembers(s.players, pair.challengerId).map(
+            (member) => member._id,
+          ))
+            notify(
+              pid,
+              "Jogo obrigatório retirado",
+              "A administração retirou este confronto antes de o jogo ser criado.",
+              undefined,
+              `mandatory-matchup-removed:${pair.id}:${pid}`,
+              { deliveryChannels: ["push"], kind: "challenge" },
+            );
         round.manualMatchups = {
           ...round.manualMatchups,
           [cmd.divisionId]: {
@@ -2087,7 +1977,7 @@ export function execute(
         };
         log("admin.week.matchup.removed", { ...cmd, pair });
       } else {
-        const pending = plan.pairs.filter((p) => !p.challengeId);
+        const pending = plan.pairs.filter(isDraftMatchup);
         if (!pending.length)
           return {
             ok: true,
@@ -2097,7 +1987,7 @@ export function execute(
           };
         const publishedAt = new Date(timestamp).toISOString();
         const mandatoryPendingUntil = new Date(
-          timestamp + 12 * 60 * 60 * 1000,
+          timestamp + MANDATORY_MATCHUP_HOURS * 3600000,
         ).toISOString();
         // Validate all pairs first (atomic)
         const teams = rankingEntries(s.players, cmd.divisionId);
@@ -2136,24 +2026,21 @@ export function execute(
         });
         // Notify players
         for (const pair of pending) {
-          const challenger = player(pair.challengerId);
-          const defender = player(pair.defenderId);
-          for (const pid of [pair.challengerId, pair.defenderId]) {
-            const isAttacker = pid === pair.challengerId;
+          const attackers = teamMembers(s.players, pair.challengerId);
+          for (const member of attackers) {
             notify(
-              pid,
+              member._id,
               "🥊 Jogo obrigatório atribuído",
-              isAttacker
-                ? "Este confronto é obrigatório. Tens 12 horas para desafiar este adversário. Se não o fizeres, o jogo será criado automaticamente."
-                : "A tua dupla foi atribuída a um jogo obrigatório. O adversário tem 12 horas para iniciar o desafio.",
-              `mandatory-matchup:${pair.id}:${pid}`,
-              `mandatory-matchup:${pair.id}:${pid}`,
+              "Tens 12 horas para confirmar este jogo em Desafios. Se não o fizeres, o jogo é criado automaticamente.",
+              undefined,
+              `mandatory-matchup:${pair.id}:${member._id}`,
               { deliveryChannels: ["push"], kind: "challenge" },
             );
           }
           notifyAdmins(
             "Jogo obrigatório atribuído",
-            `Emparelhamento obrigatório publicado para a semana de ${cmd.weekStart}. Aguarda desafio do atacante (12h).`,
+            `Emparelhamento obrigatório publicado para a semana de ${cmd.weekStart}. Aguarda confirmação da dupla atacante (12h).`,
+            undefined,
             `mandatory-matchup:${pair.id}`,
           );
           log("mandatory.matchup.published", {
@@ -2184,11 +2071,10 @@ export function execute(
       const source = teams.findIndex((t) => t.id === cmd.teamKey);
       ensure(source > 0, "A primeira dupla está em Defesa.");
       ensure(
-        teams[source].members.every(
-          (p) =>
-            canChallenge(
-              round.assignments.find((a) => a.playerId === p._id)?.role,
-            ),
+        teams[source].members.every((p) =>
+          canChallenge(
+            round.assignments.find((a) => a.playerId === p._id)?.role,
+          ),
         ),
         "Este controlo aplica-se às duplas em Ataque ou Combo.",
       );
@@ -2709,7 +2595,13 @@ export function execute(
           (c.weekStart ?? clubWeek(c.createdAt).start) === cmd.weekStart &&
           !["cancelled", "refused", "expired"].includes(c.status),
       )) {
-        if (adminMatchmakingEnabled(s, c.divisionId, cmd.weekStart)) continue;
+        if (
+          (cmd.weekType ?? existing?.weekType) === "OPEN_ATTACK" ||
+          existing?.manualMatchups?.[c.divisionId]?.pairs.some(
+            (pair) => pair.challengeId === c._id,
+          )
+        )
+          continue;
         ensure(
           canChallenge(
             cmd.assignments.find((entry) => entry.playerId === c.challengerId)
@@ -2887,56 +2779,51 @@ export function execute(
       const titleFight = cmd.type === "challenge.create" && cmd.titleFight;
       const requestedWeek =
         cmd.weekStart ?? weeklyChallengeWeek(s, timestamp, p.divisionId);
-      const manual = adminMatchmakingEnabled(s, p.divisionId, requestedWeek);
-      if (manual) validateManualWeek(s, requestedWeek, timestamp);
-      // Check if this is a published mandatory matchup for this challenger/defender/week
-      let mandatoryPair: ManualWeekMatchup | undefined;
-      if (rules.weeklyCompetition && manual) {
-        for (const round of s.weeklyRounds) {
-          if (round.weekStart !== requestedWeek) continue;
-          if (!round.manualMatchups?.[p.divisionId]) continue;
-          const plan = round.manualMatchups[p.divisionId];
-          const pair = plan.pairs.find(
-            (pair) =>
-              pair.challengerId === p._id &&
-              pair.defenderId === d._id &&
-              pair.publishedAt &&
-              !pair.challengeId,
-          );
-          if (pair) {
-            mandatoryPair = pair;
-            break;
-          }
-        }
-      }
-      // Allow player-initiated challenge for published mandatory matchup
-      if (manual && !mandatoryPair)
-        ensure(
-          cmd.type === "admin.challenge.create" &&
-            actor.userId !== "system:weekly-matchmaking",
-          ADMIN_MATCHMAKING_MESSAGE,
-          403,
+      const mandatoryPair = assignedMandatoryMatchup(
+        s,
+        requestedWeek,
+        p._id,
+        d._id,
+      );
+      const manual = !!mandatoryPair;
+      if (manual) {
+        validateManualWeek(s, requestedWeek, timestamp);
+        const reason = manualPairingReason(
+          s,
+          p.divisionId,
+          requestedWeek,
+          p._id,
+          d._id,
+          mandatoryPair.id,
         );
+        ensure(!reason, reason ?? "Confronto inválido.");
+        const teams = rankingEntries(s.players, p.divisionId);
+        ensure(
+          teams.find((t) => t.members.some((m) => m._id === p._id))?.id ===
+            mandatoryPair.challengerTeamKey &&
+            teams.find((t) => t.members.some((m) => m._id === d._id))?.id ===
+              mandatoryPair.defenderTeamKey,
+          "A composição de uma dupla mudou. Contacta a administração.",
+          409,
+        );
+      }
       if (rules.weeklyCompetition && cmd.weekStart && !manual)
         ensure(
           cmd.weekStart === weeklyChallengeWeek(s, timestamp, p.divisionId),
           "Os papéis da semana mudaram. Atualiza a página antes de enviar o desafio.",
           409,
         );
-      // Skip weeklyReason validation for published mandatory matchups
-      if (!mandatoryPair) {
-        const weekly = weeklyReason(
-          s,
-          p,
-          d,
-          timestamp,
-          undefined,
-          false,
-          requestedWeek,
-          manual,
-        );
-        ensure(!weekly, weekly ?? "Desafio semanal inválido.");
-      }
+      const weekly = weeklyReason(
+        s,
+        p,
+        d,
+        timestamp,
+        undefined,
+        false,
+        requestedWeek,
+        manual,
+      );
+      ensure(!weekly, weekly ?? "Desafio semanal inválido.");
       const window = rules.weeklyCompetition
         ? weeklyWindow(s, [p._id, d._id], timestamp, requestedWeek)
         : null;
@@ -2947,19 +2834,16 @@ export function execute(
           "admin.challenge.assign",
         ].includes(cmd.type)
       ) {
-        // Skip challengeReason for published mandatory matchups
-        if (!mandatoryPair) {
-          const reason = challengeReason(
-            s,
-            p,
-            d,
-            timestamp,
-            titleFight,
-            cmd.type === "admin.challenge.create",
-            requestedWeek,
-          );
-          ensure(!reason, reason ?? "Desafio inválido.");
-        }
+        const reason = challengeReason(
+          s,
+          p,
+          d,
+          timestamp,
+          titleFight,
+          cmd.type === "admin.challenge.create" || !!mandatoryPair,
+          requestedWeek,
+        );
+        ensure(!reason, reason ?? "Desafio inválido.");
       } else {
         ensure(
           p._id !== d._id && p.divisionId === d.divisionId,
@@ -3109,7 +2993,7 @@ export function execute(
       }
       if (
         rules.weeklyCompetition &&
-        (rules.weeklyMandatoryChallenges || manual || mandatoryPair)
+        (rules.weeklyMandatoryChallenges || manual)
       ) {
         // Include the candidate only in the priority projection until all guards pass.
         const priority = weeklyChallengePriority(
@@ -3128,15 +3012,9 @@ export function execute(
         c.weeklyPriorityReason = priority.reason;
         c.scheduleBy = c.playBy;
       }
-      // If this is a mandatory pair challenge, link it and use week deadlines
       if (mandatoryPair) {
         mandatoryPair.challengeId = c._id;
-        const weekEnd = new Date(
-          Date.parse(requestedWeek) + 6 * 86400000 + 86399999,
-        ).toISOString();
-        c.playBy = weekEnd;
-        c.scheduleBy = weekEnd;
-        c.respondBy = weekEnd;
+        delete mandatoryPair.mandatoryPendingUntil;
       }
       s.challenges.push(c);
       if (c.mandatoryAssignment) closeIncompatibleQueue(c);
@@ -3232,65 +3110,6 @@ export function execute(
         dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
       ) {
         const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
-        for (const forced of plan.forced) {
-          const latest = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
-          if (
-            !latest.forced.some(
-              (p) =>
-                p.attackerKey === forced.attackerKey &&
-                p.defenderKey === forced.defenderKey,
-            )
-          )
-            continue;
-          // A trusted system action applies only a pairing proven necessary by the exact solver.
-          try {
-            const draft = structuredClone(s);
-            const result = execute(
-              draft,
-              {
-                role: "admin",
-                userId: "system:weekly-matchmaking",
-                playerId: actor.playerId,
-              },
-              {
-                type: "admin.challenge.create",
-                weekStart: c.weekStart,
-                challengerId: forced.attackerId,
-                defenderId: forced.defenderId,
-              },
-              timestamp,
-            ) as { id: string };
-            Object.assign(s, draft);
-            const assigned = s.challenges.find((x) => x._id === result.id)!;
-            assigned.origin = {
-              ...assigned.origin!,
-              kind: "rules",
-              triggerChallengeId: c._id,
-              reason:
-                "Emparelhamento necessário em todas as soluções de cobertura máxima",
-            };
-            log("challenge.forced-by-priority", {
-              challengeId: result.id,
-              triggerChallengeId: c._id,
-              reason:
-                "Emparelhamento necessário em todas as soluções de cobertura máxima",
-              maximumMatches: plan.maximumMatches,
-            });
-          } catch (error) {
-            if (!(error instanceof LeagueError)) throw error;
-            notifyAdmins(
-              "Emparelhamento automático exige revisão",
-              `O desafio prioritário #${c.number} foi preservado. ${error.message}`,
-              c._id,
-              `dynamic-conflict:${c._id}:${forced.attackerKey}:${forced.defenderKey}`,
-            );
-            log("week.dynamic-roles.conflict", {
-              triggerChallengeId: c._id,
-              forced,
-              error: error.message,
-            });
-          }
-        }
         const finalPlan = refreshDynamicRoles(
           c.divisionId,
           c.weekStart!,
@@ -3365,9 +3184,7 @@ export function execute(
       );
       const attackerRank = teamPosition(s.players, attacker._id),
         defenderRank = teamPosition(s.players, defender._id);
-      const adaptive =
-        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
-        s.divisions.find((d) => d._id === c.divisionId)?.code === "ouro";
+      const adaptive = dynamicWeeklyEnabled(s, c.divisionId, c.weekStart);
       ensure(
         attackerRank > defenderRank &&
           (adaptive ||
@@ -3515,15 +3332,9 @@ export function execute(
     }
     case "challenge.respond": {
       const c = challenge(cmd.challengeId);
-      const isMandatoryPending =
-        c.mandatoryAssignment && c.mandatoryPendingUntil && c.status === "pending";
-      const isChallenger = challengeSide(c, actor.playerId, s.players) === "attack";
-      const isDefender = challengeSide(c, actor.playerId, s.players) === "defense";
       ensure(
-        (isDefender || admin || (isMandatoryPending && isChallenger)),
-        isMandatoryPending
-          ? "Só a dupla atacante pode confirmar este jogo obrigatório."
-          : "Só o defensor pode responder.",
+        challengeSide(c, actor.playerId, s.players) === "defense" || admin,
+        "Só o defensor pode responder.",
         403,
       );
       ensure(
@@ -3551,9 +3362,6 @@ export function execute(
         }
       }
       if (cmd.accept) {
-        if (isMandatoryPending) {
-          c.mandatoryPendingUntil = undefined;
-        }
         c.status = "accepted";
         c.scheduleBy = new Date(
           Math.min(
@@ -4795,10 +4603,8 @@ export function execute(
     }
     case "admin.settings.save": {
       ensure(
-        !cmd.settings.weeklyDynamicRoles ||
-          (cmd.settings.weeklyCompetition &&
-            cmd.settings.weeklyMandatoryChallenges),
-        "Os papéis dinâmicos exigem competição semanal e desafios obrigatórios.",
+        !cmd.settings.weeklyDynamicRoles || cmd.settings.weeklyCompetition,
+        "O assistente de adversários exige competição semanal.",
       );
       if (cmd.settings.manualMatchmakingDivisionIds)
         ensure(
@@ -5744,6 +5550,75 @@ export function lisbonDay(timestamp: number) {
   return `${p.find((x) => x.type === "year")!.value}-${p.find((x) => x.type === "month")!.value}-${p.find((x) => x.type === "day")!.value}`;
 }
 
+/** Creates expired published games through the same validated command as the administrator. */
+function processMandatoryMatchups(s: State, timestamp: number) {
+  const SYSTEM = "system:auto-mandatory";
+  const current = clubWeek(timestamp).start;
+  const due = s.weeklyRounds
+    .filter((round) => round.weekStart >= current)
+    .flatMap((round) =>
+      Object.entries(round.manualMatchups ?? {}).flatMap(([divisionId, plan]) =>
+        plan.pairs
+          .filter(
+            (pair) =>
+              isWaitingMatchup(pair) &&
+              !!pair.mandatoryPendingUntil &&
+              Date.parse(pair.mandatoryPendingUntil) <= timestamp,
+          )
+          .map((pair) => ({ weekStart: round.weekStart, divisionId, pair })),
+      ),
+    );
+  const createdAt = new Date(timestamp).toISOString();
+  for (const { weekStart, divisionId, pair } of due) {
+    try {
+      const reason = manualPairingReason(
+        s,
+        divisionId,
+        weekStart,
+        pair.challengerId,
+        pair.defenderId,
+        pair.id,
+      );
+      ensure(!reason, reason ?? "Confronto inválido.");
+      const draft = structuredClone(s);
+      const result = execute(
+        draft,
+        { role: "admin", userId: SYSTEM, playerId: SYSTEM },
+        {
+          type: "admin.challenge.create",
+          weekStart,
+          challengerId: pair.challengerId,
+          defenderId: pair.defenderId,
+        },
+        timestamp,
+      ) as { id: string };
+      draft.audit.push({
+        _id: uid(),
+        userId: SYSTEM,
+        action: "mandatory.challenge.auto-created",
+        details: JSON.stringify({ challengeId: result.id, pairId: pair.id }),
+        createdAt,
+      });
+      Object.assign(s, draft);
+    } catch (error) {
+      if (!(error instanceof LeagueError)) throw error;
+      // A pair that stopped being valid waits for the administrator and never blocks other commands.
+      const dedupe = `mandatory-auto-failed:${pair.id}:${error.message}`;
+      if (!s.notifications.some((n) => n.dedupe === dedupe))
+        s.notifications.push({
+          _id: uid(),
+          playerId: "__admins__",
+          kind: "update",
+          title: "Jogo obrigatório por resolver",
+          body: `Semana de ${weekStart}: o jogo não foi criado automaticamente. ${error.message}`,
+          createdAt,
+          read: false,
+          dedupe,
+        });
+    }
+  }
+}
+
 export function processDeadlines(
   s: State,
   timestamp = Date.now(),
@@ -5758,6 +5633,7 @@ export function processDeadlines(
     notifyWeeklyOpenings(s, timestamp);
   }
   processCompetitionDeadlines(s, timestamp, generateRoles);
+  processMandatoryMatchups(s, timestamp);
   const now = new Date(timestamp).toISOString(),
     rules = s.settings[0] ?? defaultSettings;
   const add = (

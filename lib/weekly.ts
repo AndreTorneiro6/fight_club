@@ -1,11 +1,9 @@
-import { adminMatchmakingEnabled } from "./weekly-matchmaking-mode";
-import { weeklyPublishedAt } from "./weekly-publication";
-import { effectiveRoles } from "./effective-roles";
 import {
-  dynamicWeeklyEnabled,
-  dynamicRole,
-  dynamicTargetReason,
-} from "./dynamic-weekly";
+  assignedMandatoryMatchup,
+  waitingMandatoryMatchups,
+} from "./mandatory-matchups";
+import { weeklyPublishedAt } from "./weekly-publication";
+import { dynamicWeeklyEnabled, dynamicTargetReason } from "./dynamic-weekly";
 import { firstCompetitionWeek } from "./competition-calendar";
 import { canBeChallenged, canChallenge } from "./weekly-role-rules";
 import { challengeMemberIds, challengeSide } from "./team-competition";
@@ -88,41 +86,25 @@ export function weeklyRole(
   ),
 ) {
   const round = s.weeklyRounds.find((entry) => entry.weekStart === weekStart);
+  const divisionId = s.players.find((p) => p._id === playerId)?.divisionId;
   if (
-    weeklyPublishedAt(
-      round,
-      s.players.find((p) => p._id === playerId)?.divisionId,
-    ) &&
-    dynamicWeeklyEnabled(
-      s,
-      s.players.find((p) => p._id === playerId)?.divisionId,
-      weekStart,
-    )
-  )
-    return (
-      dynamicRole(s, playerId, weekStart) ??
-      round!.dynamicAssignments?.find((e) => e.playerId === playerId)?.role ??
-      round!.assignments.find((e) => e.playerId === playerId)?.role
+    divisionId &&
+    weeklyPublishedAt(round, divisionId) &&
+    round?.weekType === "OPEN_ATTACK"
+  ) {
+    const teams = rankingEntries(s.players, divisionId);
+    const team = teams.findIndex((t) =>
+      t.members.some((m) => m._id === playerId),
     );
+    if (team >= 0)
+      return team === 0 ? ("defense" as const) : ("attack" as const);
+  }
   return weeklyPublishedAt(
     round,
     s.players.find((p) => p._id === playerId)?.divisionId,
   )
-    ? effectiveRoles(round!).find((entry) => entry.playerId === playerId)?.role
+    ? round!.assignments.find((entry) => entry.playerId === playerId)?.role
     : undefined;
-}
-
-/** Get the effective role for a player in a challenge. */
-function getEffectiveRoleForChallenge(
-  s: State,
-  challengeId: string,
-  playerId: string,
-  week: string,
-  now: number,
-  isAttacker: boolean,
-): "attack" | "defense" | "super_attack" | undefined {
-  // Use weekly published role
-  return weeklyRole(s, playerId, now, week);
 }
 
 export function weeklyReason(
@@ -149,9 +131,9 @@ export function weeklyReason(
       ? s.challenges.find((c) => c._id === ignoreId)?.weekStart
       : undefined) ??
     weeklyChallengeWeek(s, now, attacker.divisionId);
-  const manual = adminMatchmakingEnabled(s, attacker.divisionId, week);
+  const manual = administrativePreparation;
   const selected = s.weeklyRounds.find((r) => r.weekStart === week);
-  if (!(manual && administrativePreparation)) {
+  if (!manual) {
     if (!weeklyPublishedAt(selected, attacker.divisionId))
       return "A aguardar a publicação dos papéis semanais pelo administrador.";
     const opensAt = weeklyOpeningAt(selected!, attacker.divisionId);
@@ -160,74 +142,38 @@ export function weeklyReason(
     if (opensAt && Date.parse(opensAt) > now)
       return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
   }
-  const ouro =
-    s.divisions.find((d) => d._id === attacker.divisionId)?.code === "ouro";
-  if (ouro && !manual) {
+  const open = selected?.weekType === "OPEN_ATTACK";
+  if (!open && !manual) {
     const role = (p: Player) =>
       selected?.assignments.find((a) => a.playerId === p._id)?.role;
     if ([...attackingTeam, ...defendingTeam].some((p) => !role(p)))
       return "Aguarda a atribuição do papel semanal pelo administrador.";
-    if (attackingTeam.some((p) => role(p) === "defense"))
+    if (attackingTeam.some((p) => !canChallenge(role(p))))
       return "Esta dupla está em defesa e deve aguardar um desafio.";
-    // Games created before Ataque became challenge-only remain valid.
-    if ((!ignoreId || reassign) && defendingTeam.some((p) => role(p) === "attack"))
-      return "Esta dupla está em Ataque e não pode ser desafiada.";
-  }
-  const open = selected?.weekType === "OPEN_ATTACK";
-  if (!open && !manual && !ouro) {
-    const attackerRole = getEffectiveRoleForChallenge(
-      s,
-      ignoreId ?? "",
-      attacker._id,
-      week,
-      now,
-      true,
-    );
-    const defenderRole = getEffectiveRoleForChallenge(
-      s,
-      ignoreId ?? "",
-      defender._id,
-      week,
-      now,
-      false,
-    );
-
-    if (!canChallenge(attackerRole))
-      return "Esta semana estás em defesa. Só os atacantes podem lançar desafios.";
-    if (!canBeChallenged(defenderRole))
-      return "Este jogador não está em defesa esta semana.";
+    // Keep games created before their current papers valid.
     if (
-      attackingTeam.some(
-        (member) =>
-          member.status === "active" &&
-          !canChallenge(
-            getEffectiveRoleForChallenge(
-              s,
-              ignoreId ?? "",
-              member._id,
-              week,
-              now,
-              true,
-            ),
-          ),
-      ) ||
-      defendingTeam.some(
-        (member) =>
-          member.status === "active" &&
-          !canBeChallenged(
-            getEffectiveRoleForChallenge(
-              s,
-              ignoreId ?? "",
-              member._id,
-              week,
-              now,
-              false,
-            ),
-          ),
-      )
+      (!ignoreId || reassign) &&
+      defendingTeam.some((p) => !canBeChallenged(role(p)))
     )
-      return "O clube precisa de atribuir o mesmo papel aos parceiros da equipa.";
+      return "Esta dupla está em Ataque e não pode ser desafiada; não está em defesa esta semana.";
   }
+  const assigned = assignedMandatoryMatchup(
+    s,
+    week,
+    attacker._id,
+    defender._id,
+  );
+  const participantIds = [...attackingTeam, ...defendingTeam].map((m) => m._id);
+  if (
+    waitingMandatoryMatchups(s, week, attacker.divisionId).some(
+      (pair) =>
+        pair.id !== assigned?.id &&
+        [pair.challengerId, pair.defenderId].some((id) =>
+          participantIds.includes(id),
+        ),
+    )
+  )
+    return "Uma destas duplas já tem um jogo obrigatório atribuído nesta semana.";
   const positionReason =
     weeklyPositionReason(s.players, attacker._id, "attack") ??
     weeklyPositionReason(s.players, defender._id, "defense");
@@ -289,7 +235,7 @@ export function weeklyReason(
     )
   )
     return CONSECUTIVE_REMATCH_MESSAGE;
-  if (check && dynamicWeeklyEnabled(s, attacker.divisionId, week)) {
+  if (check && !manual && dynamicWeeklyEnabled(s, attacker.divisionId, week)) {
     const others = ignoreId
       ? { ...s, challenges: s.challenges.filter((c) => c._id !== ignoreId) }
       : s;

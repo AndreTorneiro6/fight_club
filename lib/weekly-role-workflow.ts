@@ -8,8 +8,7 @@ import type { State, WeeklyRound } from "./types";
 import { clubWeek, addClubDays, clubDay } from "./calendar";
 import { rankingEntries } from "./ranking-groups";
 import { ensure } from "./rules";
-import { proposeTeamRoles } from "./role-proposals";
-import { dynamicRole, dynamicWeeklyEnabled } from "./dynamic-weekly";
+import { dynamicWeeklyPlan, dynamicWeeklyEnabled } from "./dynamic-weekly";
 import {
   consecutiveRematchKeys,
   weeklyTeamAvailable,
@@ -170,7 +169,9 @@ export function weeklyRoleGenerationInput(
   const previous = s.weeklyRounds
     .filter(
       (r) =>
-        weeklyPublishedAt(r, divisionId) &&
+        r.assignments.some((a) =>
+          divisionPlayerIds(s, r, divisionId).has(a.playerId),
+        ) &&
         r.weekStart < week &&
         (!season?.firstCompetitionWeek ||
           r.weekStart >= season.firstCompetitionWeek) &&
@@ -292,7 +293,7 @@ export function generateWeeklyRoles(
     existing?.weekType ??
     (s.weeklyRounds.some(
       (r) =>
-        r.seasonId === season._id &&
+        (!r.seasonId || r.seasonId === season._id) &&
         r.weekStart < weekStart &&
         (!season.firstCompetitionWeek ||
           r.weekStart >= season.firstCompetitionWeek),
@@ -317,37 +318,30 @@ export function generateWeeklyRoles(
     (d) => !divisionId || d._id === divisionId,
   )) {
     const input = weeklyRoleGenerationInput(s, weekStart, d._id, weekType);
-    const plan = proposeTeamRoles(input);
-    warnings.push(...plan.warnings.map((w) => `${d.name}: ${w}`));
     const entries = rankingEntries(s.players, d._id);
-    const build = () =>
-      entries.flatMap((t) =>
-        t.members
-          .filter(
-            (m) =>
-              m.status === "active" &&
-              !m.awaitingApproval &&
-              !m.registrationRejectedAt,
-          )
-          .map((m) => ({
-            playerId: m._id,
-            role:
-              d.code === "ouro"
-                ? entries.indexOf(t) === 0
+    const generated: WeeklyRound["assignments"] = entries.flatMap((t, i) => {
+      const role =
+        i === 0
+          ? ("defense" as const)
+          : i === entries.length - 1 || weekType === "OPEN_ATTACK"
+            ? ("attack" as const)
+            : input.previous[t.id] === "attack"
+              ? ("defense" as const)
+              : input.previous[t.id] === "defense"
+                ? ("attack" as const)
+                : i % 2 === 0
                   ? ("defense" as const)
-                  : entries.indexOf(t) === entries.length - 1
-                    ? ("attack" as const)
-                    : ("super_attack" as const)
-                : plan.roles[t.id],
-          })),
-      );
-    let generated = build();
-    // Teams left out of the optimizer's schedule take the role the dynamic
-    // planner would give them, so publishing never triggers a role flip.
-    if (weekType === "NORMAL" && dynamicWeeklyEnabled(s, d._id, weekStart)) {
-      const others = assignments.filter(
-        (a) => !generated.some((g) => g.playerId === a.playerId),
-      );
+                  : ("attack" as const);
+      return t.members
+        .filter(
+          (m) =>
+            m.status === "active" &&
+            !m.awaitingApproval &&
+            !m.registrationRejectedAt,
+        )
+        .map((m) => ({ playerId: m._id, role }));
+    });
+    if (dynamicWeeklyEnabled(s, d._id, weekStart)) {
       const preview: State = {
         ...s,
         weeklyRounds: [
@@ -356,16 +350,28 @@ export function generateWeeklyRoles(
             ...(existing ?? { _id: weekStart, version: 0 }),
             weekStart,
             weekType,
-            assignments: [...others, ...generated],
+            assignments: [...assignments, ...generated],
             dynamicAssignments: undefined,
-          } as WeeklyRound,
+          },
         ],
       };
-      for (const t of entries) {
-        const planned = dynamicRole(preview, t.members[0]._id, weekStart);
-        if (planned && planned !== "super_attack") plan.roles[t.id] = planned;
-      }
-      generated = build();
+      const possible = dynamicWeeklyPlan(
+        preview,
+        d._id,
+        weekStart,
+      ).maximumMatches;
+      const activeTeams = entries.filter((t) =>
+        t.members.every(
+          (m) =>
+            m.status === "active" &&
+            !m.awaitingApproval &&
+            !m.registrationRejectedAt,
+        ),
+      ).length;
+      if (possible * 2 < activeTeams)
+        warnings.push(
+          `${d.name}: os papéis permitem ${possible} jogos para ${activeTeams} duplas, mesmo com alcance alargado. Revê os papéis sem os alterar automaticamente.`,
+        );
     }
     assignments.push(...generated);
     divisionRoleGeneration[d._id] = {

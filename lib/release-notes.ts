@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.22.1";
+export const applicationVersion = "1.23.0";
 export const releaseNotes = [
+  {
+    version: "1.23.0",
+    date: "2026-11-22",
+    title: "Assistente semanal e jogos obrigatórios em conjunto",
+    changes: [
+      "Os novos rascunhos alternam Ataque e Defesa pelo papel assumido na semana anterior. A primeira equipa defende sempre e a última ataca. As escolhas do administrador são respeitadas.",
+      "O assistente alarga apenas o alcance necessário para encontrar adversários, sem criar jogos adicionais. Nas semanas livres, todas as equipas exceto a primeira podem desafiar e receber desafios, com prioridade para o primeiro desafio válido.",
+      "Os jogos obrigatórios definidos pelo administrador coexistem com os desafios das restantes equipas, sem seletor de modo. Só a dupla atacante vê a atribuição antes de confirmar; após 12 horas o desafio é criado automaticamente.",
+    ],
+  },
   {
     version: "1.22.1",
     date: "2026-11-22",

@@ -1,4 +1,4 @@
-import { adminMatchmakingEnabled } from "./weekly-matchmaking-mode";
+import { mandatoryReservedTeamKeys } from "./mandatory-matchups";
 import type { State } from "./types";
 import { rankingEntries } from "./ranking-groups";
 import { challengeTeamKey } from "./team-competition";
@@ -20,9 +20,7 @@ export function dynamicWeeklyEnabled(
 ) {
   return !!(
     s.settings[0].weeklyCompetition &&
-    s.settings[0].weeklyMandatoryChallenges &&
     s.settings[0].weeklyDynamicRoles &&
-    (!divisionId || !adminMatchmakingEnabled(s, divisionId, week)) &&
     (!s.settings[0].weeklyDynamicDivisionIds ||
       (divisionId
         ? s.settings[0].weeklyDynamicDivisionIds.includes(divisionId)
@@ -85,6 +83,9 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
         .find((t) => t.id === key)
         ?.members.some((m) => m._id === r.playerId),
     )?.role;
+  const reservedKeys = round ? mandatoryReservedTeamKeys(round) : [];
+  for (const key of reservedKeys) occupied.add(key);
+  const freeWeek = round?.weekType === "OPEN_ATTACK";
   const available = entries.filter(
     (t) => !occupied.has(t.id) && weeklyTeamAvailable(s, t, week),
   );
@@ -93,20 +94,12 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       // Assigned roles are constraints: the maximum-game solver never turns
       // Defesa into an attacker or Ataque into a team that can be challenged.
       if (
-        roleFor(a.id) !== "defense" &&
-        roleFor(d.id) !== "attack" &&
+        (freeWeek || roleFor(a.id) !== "defense") &&
+        (freeWeek || roleFor(d.id) !== "attack") &&
         (!ouro ||
           !round?.ouroAllowedOpponents?.[a.id] ||
           round.ouroAllowedOpponents[a.id].includes(d.id)) &&
-        weeklyPairAllowed(
-          s,
-          divisionId,
-          entries,
-          a,
-          d,
-          week,
-          ouro && fixed.length > 0,
-        )
+        weeklyPairAllowed(s, divisionId, entries, a, d, week, true)
       )
         pairs.push({
           attackerId: a.members[0]._id,
@@ -124,21 +117,19 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     );
   };
   // Coverage dominates; among complete schedules use the fewest extensions,
-  // then the smallest total extra distance. Other divisions keep their solver.
+  // then the smallest total extra distance, in every enabled division.
   const edgeScore = (p: DynamicPair) =>
-    !ouro
-      ? 1
-      : 1e9 -
-        (normal(p)
-          ? 0
-          : 10000 +
-            Math.max(
-              0,
-              entries.findIndex((t) => t.id === p.attackerKey) -
-                entries.findIndex((t) => t.id === p.defenderKey) -
-                challengeDistance(s, divisionId),
-            ) *
-              10);
+    1e9 -
+    (normal(p)
+      ? 0
+      : 10000 +
+        Math.max(
+          0,
+          entries.findIndex((t) => t.id === p.attackerKey) -
+            entries.findIndex((t) => t.id === p.defenderKey) -
+            challengeDistance(s, divisionId),
+        ) *
+          10);
   const indices = new Map(available.map((t, i) => [t.id, i])),
     edges = pairs.map((p) => ({
       ...p,
@@ -246,12 +237,12 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
   }
   return {
     canonical,
-    maximumMatches: (ouro ? Math.ceil(maximum / 1e9) : maximum) + fixed.length,
+    maximumMatches:
+      Math.ceil(maximum / 1e9) + fixed.length + reservedKeys.length / 2,
     fixed,
-    eligible: (ouro
-      ? edges.filter((e) => normal(e) || eligible.includes(e))
-      : eligible
-    ).map(({ a, d, ...p }) => p),
+    eligible: edges
+      .filter((e) => normal(e) || eligible.includes(e))
+      .map(({ a, d, ...p }) => p),
     forced: errors.length ? [] : forced.map(({ a, d, ...p }) => p),
     errors,
     teams: entries,
@@ -278,6 +269,9 @@ export function dynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     s.settings[0].titleMaxPosition,
     s.weeklyRounds.find((r) => r.weekStart === week)?.assignments,
     s.weeklyRounds.find((r) => r.weekStart === week)?.dynamicAssignments,
+    s.weeklyRounds.find((r) => r.weekStart === week)?.weekType,
+    s.weeklyRounds.find((r) => r.weekStart === week)?.manualMatchups,
+    s.weeklyRounds.find((r) => r.weekStart === week)?.mandatoryReservedTeamKeys,
   ]);
   let cache = planCache.get(s);
   if (!cache) {
@@ -293,31 +287,10 @@ export function dynamicWeeklyPlan(s: State, divisionId: string, week: string) {
 export function dynamicRole(s: State, playerId: string, week: string) {
   const p = s.players.find((p) => p._id === playerId);
   if (!p) return;
-  const plan = dynamicWeeklyPlan(s, p.divisionId, week),
-    team = plan.teams.find((t) => t.members.some((m) => m._id === playerId));
-  if (!team) return;
-  const round = s.weeklyRounds.find((r) => r.weekStart === week);
-  // Use the administrator's papers, rather than an earlier solver override.
-  const published = round?.assignments.find((r) =>
-    team.members.some((m) => m._id === r.playerId),
-  )?.role;
-  // Papers stay unchanged until a pairing is committed in this division/week.
-  if (!plan.fixed.length) return published;
-  if (plan.fixed.some((p) => p.attackerKey === team.id))
-    return "attack" as const;
-  if (plan.fixed.some((p) => p.defenderKey === team.id))
-    return "defense" as const;
-  if (published) return published;
-  if (round?.weekType !== "OPEN_ATTACK") {
-    if (plan.canonical.some((p) => p.attackerKey === team.id))
-      return "attack" as const;
-    if (plan.canonical.some((p) => p.defenderKey === team.id))
-      return "defense" as const;
-  }
-  if (plan.eligible.some((p) => p.attackerKey === team.id))
-    return "attack" as const;
-  if (plan.eligible.some((p) => p.defenderKey === team.id))
-    return "defense" as const;
+  // Published papers remain authoritative, including Combo after a commitment.
+  return s.weeklyRounds
+    .find((r) => r.weekStart === week)
+    ?.assignments.find((a) => a.playerId === playerId)?.role;
 }
 export function dynamicTargetReason(
   s: State,
@@ -336,10 +309,7 @@ export function dynamicTargetReason(
     1;
   if (!a || !d) return "As duplas devem pertencer à mesma divisão.";
   const ouro = s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro";
-  if (d >= a || (!ouro && a - d > challengeDistance(s, p.divisionId)))
-    return "Adversário fora do limite de posições.";
-  if (!ouro && d === 1 && a > s.settings[0].titleMaxPosition)
-    return "Posição fora das regras do jogo do título.";
+  if (d >= a) return "Adversário fora do limite de posições.";
   if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
     return CONSECUTIVE_REMATCH_MESSAGE;
   const unavailable =
@@ -351,8 +321,8 @@ export function dynamicTargetReason(
     return "Este adversário foi excluído pelo administrador.";
   if (unavailable) return unavailable;
   if (plan.errors.length) return plan.errors[0];
-  // Every challenge, the first one included, must keep the most games possible,
-  // so no team is left without an opponent it could have had.
+  // Normal valid choices preserve first-come priority. Extended choices come
+  // from optimal remaining schedules; the helper never creates those games.
   return plan.eligible.some(
     (e) =>
       plan.teams
@@ -363,7 +333,7 @@ export function dynamicTargetReason(
         ?.members.some((m) => m._id === defenderId),
   )
     ? null
-    : "Este adversário é necessário para outra dupla. Os papéis foram ajustados para preservar o máximo de jogos da jornada.";
+    : "Sem adversário disponível dentro do alcance atual. Revê os papéis e as opções da jornada.";
 }
 
 /** Teams whose role the dynamic planner would change if these roles were

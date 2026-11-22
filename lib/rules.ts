@@ -1,8 +1,5 @@
+import { assignedMandatoryMatchup } from "./mandatory-matchups";
 import { dynamicWeeklyEnabled } from "./dynamic-weekly";
-import {
-  adminMatchmakingEnabled,
-  ADMIN_MATCHMAKING_MESSAGE,
-} from "./weekly-matchmaking-mode";
 import { challengeDistance } from "./challenge-distance";
 import {
   challengeSide,
@@ -99,8 +96,7 @@ export function challengeReason(
     return "Os espetadores não participam em desafios.";
   const rules = s.settings[0];
   const week = requestedWeek ?? weeklyChallengeWeek(s, now, me.divisionId);
-  const manual = adminMatchmakingEnabled(s, me.divisionId, week);
-  if (!administrative && manual) return ADMIN_MATCHMAKING_MESSAGE;
+  const assigned = assignedMandatoryMatchup(s, week, me._id, defender._id);
   const weekly = weeklyReason(
     s,
     me,
@@ -109,7 +105,7 @@ export function challengeReason(
     undefined,
     false,
     week,
-    administrative && manual,
+    !!assigned,
   );
   if (weekly) return weekly;
   if (teamMembers(s.players, me._id).some((m) => m._id === defender._id))
@@ -122,10 +118,7 @@ export function challengeReason(
     aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
     dRank =
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
-  const adaptive =
-    dynamicWeeklyEnabled(s, me.divisionId, week) &&
-    s.divisions.find((d) => d._id === me.divisionId)?.code === "ouro" &&
-    !manual;
+  const adaptive = dynamicWeeklyEnabled(s, me.divisionId, week) && !assigned;
   if (
     dRank >= aRank ||
     (!adaptive && aRank - dRank > challengeDistance(s, me.divisionId))

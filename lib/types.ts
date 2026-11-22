@@ -207,8 +207,6 @@ export interface Challenge extends Entity {
   completedAt?: string;
   titleFight?: boolean;
   expiredFrom?: ChallengeStatus;
-  /** Timestamp until which the mandatory challenge awaits confirmation from the challenger. */
-  mandatoryPendingUntil?: string;
 }
 export interface ScheduleProposal {
   _id: string;
@@ -389,13 +387,16 @@ export interface ManualWeekMatchup {
   challengerTeamKey: string;
   defenderTeamKey: string;
   challengeId?: string;
-  /** When the mandatory matchup was published; starts the 12h window for the attacker to challenge. */
+  /** When the mandatory matchup was published; starts the 12h window for the attacking team to confirm it. */
   publishedAt?: string;
-  /** Deadline for the attacker to initiate the challenge; after this it is auto-created. */
+  /** After this the deadline worker creates the game through the validated command. */
   mandatoryPendingUntil?: string;
 }
 export interface WeeklyRound extends Entity {
+  /** Public projection of reserved teams, without disclosing their opponent or side. */
+  mandatoryReservedTeamKeys?: string[];
   ouroAllowedOpponents?: Record<string, string[]>;
+  /** Legacy metadata; mandatory games no longer disable normal player challenges. */
   manualMatchmaking?: Record<string, boolean>;
   manualMatchups?: Record<
     string,

@@ -12,6 +12,10 @@ import { enqueueNotifications } from "./notification-delivery";
 import { settlePredictions } from "./predictions";
 import { filterFeatureView } from "./feature-view";
 import {
+  mandatoryReservedTeamKeys,
+  visibleMandatoryMatchups,
+} from "./mandatory-matchups";
+import {
   MongoClient,
   type ClientSession,
   type Db,
@@ -593,7 +597,9 @@ export async function view(
       .filter(
         (round) =>
           weeklyPublishedAt(round) ||
-          Object.values(round.manualMatchmaking ?? {}).some(Boolean),
+          Object.values(round.manualMatchups ?? {}).some((plan) =>
+            plan.pairs.some((pair) => pair.publishedAt),
+          ),
       )
       .map((round) => ({
         ...round,
@@ -625,7 +631,12 @@ export async function view(
         warnings: undefined,
         divisionTransitions: undefined,
         divisionRoleGeneration: undefined,
-        manualMatchups: undefined,
+        mandatoryReservedTeamKeys: mandatoryReservedTeamKeys(round),
+        manualMatchups: visibleMandatoryMatchups(
+          round,
+          s.players,
+          actor.playerId,
+        ),
         divisionPublications: round.divisionPublications
           ? Object.fromEntries(
               Object.entries(round.divisionPublications)

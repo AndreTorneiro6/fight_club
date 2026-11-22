@@ -7,7 +7,11 @@ import {
   type State,
   type DivisionCode,
 } from "../lib/types";
-import { execute } from "../lib/engine";
+import { execute, processDeadlines } from "../lib/engine";
+import {
+  playerMandatoryMatchups,
+  visibleMandatoryMatchups,
+} from "../lib/mandatory-matchups";
 import { limitChallenges } from "../lib/rules";
 import { weeklyReason, weeklyRole } from "../lib/weekly";
 import {
@@ -18,6 +22,11 @@ import {
 import { challengeDistance } from "../lib/challenge-distance";
 import { divisionWeekOptions } from "../lib/weekly-role-history";
 import { rankingEntries } from "../lib/ranking-groups";
+import {
+  generateWeeklyRoles,
+  refreshGeneratedWeeklyDrafts,
+} from "../lib/weekly-role-workflow";
+import { filterFeatureView } from "../lib/feature-view";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
 function fixture(
@@ -79,7 +88,7 @@ function fixture(
     {
       _id: week,
       weekStart: week,
-      weekType: "OPEN_ATTACK",
+      weekType: "NORMAL",
       version: 1,
       publishedAt: "2026-10-24T12:00:00Z",
       challengesOpenAt: "2026-10-24T19:00:00Z",
@@ -112,7 +121,184 @@ const pairing = (s: State, a: number, d: number) =>
       c.challengerTeam?.some((m) => m.playerId === `t${a}a`) &&
       c.defenderTeam?.some((m) => m.playerId === `t${d}a`),
   );
-test("Gold 4→2 forces 3→1 and keeps 5 in Combo without rewriting published roles or ranking", () => {
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  test(`${code}: drafts alternate actual previous sides, keep boundaries and preserve administrator edits`, () => {
+    const s = fixture(code, 6, 1);
+    const previous = s.weeklyRounds[0];
+    previous.assignments = s.players.map((p) => ({
+      playerId: p._id,
+      role: "super_attack",
+    }));
+    previous.assignments[0].role = previous.assignments[1].role = "defense";
+    previous.assignments.at(-1)!.role = previous.assignments.at(-2)!.role =
+      "attack";
+    send(s, 3, 2);
+    send(s, 5, 4);
+    const next = "2026-11-02";
+    const draft = generateWeeklyRoles(s, next, "admin", now, code);
+    const role = (rank: number) =>
+      draft.assignments.find((a) => a.playerId === `t${rank}a`)?.role;
+    assert.equal(role(1), "defense");
+    assert.equal(role(2), "attack");
+    assert.equal(role(3), "defense");
+    assert.equal(role(4), "attack");
+    assert.equal(role(5), "defense");
+    assert.equal(role(6), "attack");
+    assert.equal(draft.publishedAt, undefined);
+    for (const a of draft.assignments)
+      if (/^t4[ab]$/.test(a.playerId)) a.role = "defense";
+    const edited = structuredClone(draft.assignments);
+    s.settings[0].divisionChallengeDistances = { [code]: 3 };
+    s.settings[0].ouroNormalReach = 3;
+    refreshGeneratedWeeklyDrafts(s, now);
+    assert.deepEqual(
+      s.weeklyRounds.find((r) => r.weekStart === next)?.assignments,
+      edited,
+    );
+    const following = generateWeeklyRoles(s, "2026-11-09", "admin", now, code);
+    assert.equal(
+      following.assignments.find((a) => a.playerId === "t2a")?.role,
+      "defense",
+    );
+    assert.equal(
+      following.assignments.find((a) => a.playerId === "t4a")?.role,
+      "attack",
+    );
+  });
+
+  test(`${code}: expands only necessary reach before the first challenge, without changing papers`, () => {
+    const s = fixture(code, 4, 1);
+    s.settings[0].titleMaxPosition = 2;
+    s.weeklyRounds[0].assignments = s.players.map((p) => ({
+      playerId: p._id,
+      role: /^t[12][ab]$/.test(p._id) ? "defense" : "attack",
+    }));
+    const papers = structuredClone(s.weeklyRounds[0].assignments);
+    const plan = dynamicWeeklyPlan(s, code, week);
+    assert.equal(plan.maximumMatches, 2);
+    assert.ok(
+      plan.eligible.some(
+        (p) => p.attackerId === "t4a" && p.defenderId === "t1a",
+      ),
+    );
+    assert.ok(
+      !plan.eligible.some(
+        (p) => p.attackerId === "t3a" && p.defenderId === "t1a",
+      ),
+    );
+    send(s, 4, 1);
+    assert.equal(s.challenges.length, 1);
+    assert.equal(pairing(s, 4, 1)?.effectiveChallengeDistance, 3);
+    assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+    assert.equal(weeklyRole(s, "t3a", now), "attack");
+    assert.equal(weeklyRole(s, "t2b", now), "defense");
+    send(s, 3, 2);
+    assert.equal(s.challenges.length, 2);
+  });
+
+  test(`${code}: free weeks accept the fastest challenge between attackers and do not force other games`, () => {
+    const s = fixture(code, 6, 2);
+    s.weeklyRounds[0].weekType = "OPEN_ATTACK";
+    s.weeklyRounds[0].assignments = s.players.map((p) => ({
+      playerId: p._id,
+      role: /^t1[ab]$/.test(p._id) ? "defense" : "attack",
+    }));
+    send(s, 5, 3);
+    assert.equal(s.challenges.length, 1);
+    assert.throws(() => send(s, 4, 3), /atribuído|nesta semana/);
+    assert.equal(pairing(s, 5, 3)?.status, "accepted");
+    assert.equal(weeklyRole(s, "t3a", now), "attack");
+    assert.throws(() => send(s, 1, 2));
+    assert.throws(() => send(s, 4, 6));
+    assert.ok(
+      !s.audit.some((a) => a.action === "challenge.forced-by-priority"),
+    );
+  });
+}
+
+test("one mandatory game coexists with ordinary challenges; drafts do not reserve teams", () => {
+  const s = fixture("ouro", 8, 3);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const add = (a: number, d: number, expectedVersion: number) =>
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.week.matchup.add",
+        divisionId: "ouro",
+        weekStart: week,
+        challengerId: `t${a}a`,
+        defenderId: `t${d}a`,
+        expectedVersion,
+      },
+      now,
+    );
+  add(4, 2, 0);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart: week,
+      expectedVersion: 1,
+    },
+    now,
+  );
+  const reserved = dynamicWeeklyPlan(s, "ouro", week);
+  assert.ok(
+    !reserved.eligible.some((p) =>
+      [p.attackerId, p.defenderId].some((id) => ["t4a", "t2a"].includes(id)),
+    ),
+  );
+  assert.throws(() => send(s, 3, 2), /obrigatório/);
+  assert.throws(() => send(s, 4, 3), /obrigatório/);
+  const view = structuredClone(s);
+  filterFeatureView(view, actor(6));
+  assert.equal(view.weeklyRounds[0].manualMatchups, undefined);
+  assert.ok(
+    !dynamicWeeklyPlan(view, "ouro", week).eligible.some((p) =>
+      [p.attackerId, p.defenderId].some((id) => ["t4a", "t2a"].includes(id)),
+    ),
+  );
+  add(6, 5, 2);
+  send(s, 6, 5);
+  assert.equal(s.challenges.length, 1);
+  send(s, 4, 2, "b");
+  assert.equal(s.challenges.length, 2);
+  assert.ok(pairing(s, 4, 2)?.mandatoryAssignment);
+  assert.deepEqual(playerMandatoryMatchups(s, "t2b"), []);
+});
+
+for (const originalWeek of [week, "2026-10-12"]) {
+  test(`frozen game from ${originalWeek} survives challenges, draft generation and deadline processing unchanged`, () => {
+    const s = fixture("ouro", 8, 3);
+    const { id } = send(s, 4, 2);
+    const frozen = s.challenges.find((c) => c._id === id)!;
+    frozen.weekStart = originalWeek;
+    frozen.deferredUntil = "2026-11-09";
+    frozen.playBy = "2026-11-15T23:59:59.999Z";
+    frozen.scheduleBy = frozen.playBy;
+    const before = structuredClone(frozen);
+    const plan = dynamicWeeklyPlan(s, "ouro", week);
+    assert.ok(
+      !plan.eligible.some(
+        (p) => p.attackerId === "t4a" && p.defenderId === "t2a",
+      ),
+    );
+    send(s, 8, 6);
+    generateWeeklyRoles(s, "2026-11-02", "admin", now, "ouro");
+    processDeadlines(s, now + 3600000, false);
+    assert.deepEqual(
+      s.challenges.find((c) => c._id === id),
+      before,
+    );
+    assert.equal(s.challenges.filter((c) => c._id === id).length, 1);
+    assert.equal(s.challenges.length, 2);
+  });
+}
+test("Gold 4→2 suggests 3→1 and keeps 5 in Combo without rewriting published roles or ranking", () => {
   const s = fixture("ouro", 12),
     players = structuredClone(s.players),
     published = structuredClone(s.weeklyRounds);
@@ -121,7 +307,12 @@ test("Gold 4→2 forces 3→1 and keeps 5 in Combo without rewriting published r
     s.challenges.find((c) => c._id === first.id)?.status,
     "accepted",
   );
-  assert.ok(pairing(s, 3, 1));
+  assert.equal(pairing(s, 3, 1), undefined);
+  assert.ok(
+    dynamicWeeklyPlan(s, "ouro", week).eligible.some(
+      (p) => p.attackerId === "t3a" && p.defenderId === "t1a",
+    ),
+  );
   assert.equal(weeklyRole(s, "t5a", now), "super_attack");
   assert.equal(weeklyRole(s, "t5b", now), "super_attack");
   assert.deepEqual(s.players, players);
@@ -130,13 +321,13 @@ test("Gold 4→2 forces 3→1 and keeps 5 in Combo without rewriting published r
   assert.equal(s.matches.length, 0);
   assert.equal(s.results.length, 0);
 });
-test("Gold 12→10 reserves the sole remaining target of 11, even though 9 could locally attack 7 or 8", () => {
+test("Gold preserves fastest normal challenges without reserving another opponent", () => {
   const s = fixture("ouro", 12);
   send(s, 12, 10, "b");
-  assert.ok(pairing(s, 11, 9));
-  assert.equal(weeklyRole(s, "t9a", now), "defense");
-  assert.equal(weeklyRole(s, "t11b", now), "attack");
-  assert.throws(() => send(s, 9, 7), /necessário|atribuído|defesa/);
+  assert.equal(pairing(s, 11, 9), undefined);
+  assert.equal(weeklyRole(s, "t9a", now), "super_attack");
+  assert.equal(weeklyRole(s, "t11b", now), "super_attack");
+  send(s, 9, 7);
   assert.equal(s.challenges.length, 2);
 });
 test("per-division configuration supports different distances and keeps champion eligibility separate", () => {
@@ -151,14 +342,18 @@ test("per-division configuration supports different distances and keeps champion
   assert.throws(() => send(b, 4, 1));
   assert.equal(b.challenges.length, 0);
 });
-test("Bronze 9→6 followed by 8→5 forces 10→7 using the configured three-position reach", () => {
+test("Bronze 9→6 followed by 8→5 suggests 10→7 using the configured three-position reach", () => {
   const s = fixture();
   send(s, 9, 6);
   send(s, 8, 5);
-  assert.ok(pairing(s, 10, 7));
-  assert.equal(pairing(s, 10, 7)?.status, "accepted");
-  assert.equal(weeklyRole(s, "t7a", now), "defense");
-  assert.equal(weeklyRole(s, "t7b", now), "defense");
+  assert.equal(pairing(s, 10, 7), undefined);
+  assert.ok(
+    dynamicWeeklyPlan(s, "bronze", week).eligible.some(
+      (p) => p.attackerId === "t10a" && p.defenderId === "t7a",
+    ),
+  );
+  assert.equal(weeklyRole(s, "t7a", now), "super_attack");
+  assert.equal(weeklyRole(s, "t7b", now), "super_attack");
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
   assert.equal(s.matches.length, 0);
 });
@@ -252,7 +447,12 @@ for (const weekType of ["NORMAL", "OPEN_ATTACK"] as const) {
     ];
     const published = structuredClone(round.assignments);
     for (const r of published)
-      assert.equal(weeklyRole(s, r.playerId, now, week), r.role);
+      assert.equal(
+        weeklyRole(s, r.playerId, now, week),
+        weekType === "OPEN_ATTACK" && !/^t1[ab]$/.test(r.playerId)
+          ? "attack"
+          : r.role,
+      );
     assert.deepEqual(dynamicRoleChanges(s, "ouro", week, published), []);
     const options = divisionWeekOptions(
       s,
@@ -271,7 +471,10 @@ for (const weekType of ["NORMAL", "OPEN_ATTACK"] as const) {
     assert.ok(pairing(s, 2, 1));
     for (const rank of [3, 4])
       for (const side of ["a", "b"])
-        assert.equal(weeklyRole(s, `t${rank}${side}`, now, week), "defense");
+        assert.equal(
+          weeklyRole(s, `t${rank}${side}`, now, week),
+          weekType === "OPEN_ATTACK" ? "attack" : "defense",
+        );
     assert.ok(
       [...plan.fixed, ...plan.eligible].some(
         (e) => e.attackerId === "t5a" && e.defenderId === "t3a",
@@ -282,8 +485,10 @@ for (const weekType of ["NORMAL", "OPEN_ATTACK"] as const) {
         (e) => e.attackerId === "t6a" && e.defenderId === "t4a",
       ),
     );
-    assert.ok(!plan.eligible.some((e) => e.attackerId === "t4a"));
-    assert.throws(() => send(s, 4, 3), /necessário|defesa|papéis|atribuído/);
+    if (weekType === "NORMAL") {
+      assert.ok(!plan.eligible.some((e) => e.attackerId === "t4a"));
+      assert.throws(() => send(s, 4, 3), /necessário|defesa|papéis|atribuído/);
+    } else send(s, 4, 3);
     assert.deepEqual(round.assignments, published);
   });
 }
@@ -303,9 +508,16 @@ test("defense chosen by the admin takes priority over an extra possible game", (
   }
 });
 
-test("both partners receive one forced-match notification and duplicate partner requests cannot reserve another match", () => {
+test("both partners receive a notification only after their team challenges and duplicate partner requests cannot reserve another match", () => {
   const s = fixture("ouro", 12);
   send(s, 12, 10);
+  assert.equal(pairing(s, 11, 9), undefined);
+  for (const id of ["t11a", "t11b", "t9a", "t9b"])
+    assert.equal(
+      s.notifications.filter((n) => n.playerId === id && n.challengeId).length,
+      0,
+    );
+  send(s, 11, 9);
   const forced = pairing(s, 11, 9)!;
   for (const id of ["t11a", "t11b", "t9a", "t9b"])
     assert.equal(
@@ -317,7 +529,7 @@ test("both partners receive one forced-match notification and duplicate partner 
   const count = s.challenges.length;
   assert.throws(() => send(s, 12, 11, "b"));
   assert.equal(s.challenges.length, count);
-  assert.ok(s.audit.some((a) => a.action === "challenge.forced-by-priority"));
+  assert.ok(!s.audit.some((a) => a.action === "challenge.forced-by-priority"));
 });
 test("unpublished or unopened weekly roles cannot initiate dynamic assignment", () => {
   const s = fixture();
@@ -396,7 +608,7 @@ test("games on hold for the whole week do not use up a team's active-challenge s
   send(s, attacker, 3);
   assert.ok(pairing(s, attacker, 3));
 });
-test("existing accepted and scheduled fixtures are immutable even when configuration distance changes", () => {
+test("an existing scheduling proposal is immutable when configuration distance changes", () => {
   const s = fixture();
   send(s, 9, 6);
   const c = pairing(s, 9, 6)!;
@@ -420,7 +632,55 @@ test("existing accepted and scheduled fixtures are immutable even when configura
     before,
   );
 });
-test("admin settings validate per-league distances and require mandatory weekly challenges for dynamic roles", () => {
+test("scheduled games keep their teams, date, time and court while the helper replans", () => {
+  const s = fixture("ouro", 8, 3);
+  const { id } = send(s, 4, 2);
+  const scheduled = s.challenges.find((c) => c._id === id)!;
+  scheduled.status = "scheduled";
+  scheduled.scheduledAt = "2026-10-28T19:00:00.000Z";
+  scheduled.courtId = "court-1";
+  s.matches.push({
+    _id: "scheduled-match",
+    challengeId: id,
+    courtId: "court-1",
+    start: scheduled.scheduledAt,
+    end: "2026-10-28T20:30:00.000Z",
+    seasonId: scheduled.seasonId,
+  });
+  const before = structuredClone(scheduled);
+  const matches = structuredClone(s.matches);
+  execute(
+    s,
+    { ...actor(1), role: "admin" },
+    {
+      type: "admin.challenge.distance.set",
+      divisionId: "ouro",
+      distance: 2,
+      expectedDistance: 3,
+      reason: "Rever o alcance sem alterar marcações",
+    },
+    now,
+  );
+  const plan = dynamicWeeklyPlan(s, "ouro", week);
+  assert.ok(
+    plan.fixed.some((p) => p.attackerId === "t4a" && p.defenderId === "t2a"),
+  );
+  assert.ok(
+    !plan.eligible.some((p) =>
+      [p.attackerId, p.defenderId].some((pid) => ["t4a", "t2a"].includes(pid)),
+    ),
+  );
+  send(s, 8, 6);
+  generateWeeklyRoles(s, "2026-11-02", "admin", now, "ouro");
+  processDeadlines(s, now + 3600000, false);
+  assert.deepEqual(
+    s.challenges.find((c) => c._id === id),
+    before,
+  );
+  assert.deepEqual(s.matches, matches);
+  assert.equal(s.challenges.length, 2);
+});
+test("admin settings validate per-league distances and allow the helper with optional challenges", () => {
   const s = fixture(),
     admin: Actor = { ...actor(1), role: "admin" };
   assert.throws(
@@ -439,22 +699,19 @@ test("admin settings validate per-league distances and require mandatory weekly 
       ),
     /distância/,
   );
-  assert.throws(
-    () =>
-      execute(
-        s,
-        admin,
-        {
-          type: "admin.settings.save",
-          settings: { ...s.settings[0], weeklyMandatoryChallenges: false },
-        },
-        now,
-      ),
-    /obrigatórios/,
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.settings.save",
+      settings: { ...s.settings[0], weeklyMandatoryChallenges: false },
+    },
+    now,
   );
+  assert.equal(dynamicWeeklyEnabled(s, "bronze", week), true);
 });
 
-test("forced pairing blocked by another domain rule leaves the first valid challenge intact and flags the administrator", () => {
+test("suggestions do not create games or conflict alerts; rest-day guards still apply", () => {
   const s = fixture("ouro", 12);
   s.settings[0].minDaysBetween = 2;
   s.challenges = [
@@ -484,10 +741,11 @@ test("forced pairing blocked by another domain rule leaves the first valid chall
     "accepted",
   );
   assert.equal(s.challenges.length, 2);
-  assert.ok(s.audit.some((a) => a.action === "week.dynamic-roles.conflict"));
+  assert.ok(!s.audit.some((a) => a.action === "week.dynamic-roles.conflict"));
+  assert.throws(() => send(s, 11, 9), /intervalo mínimo/);
   assert.equal(s.results.length, 0);
 });
-test("committed roles are saved separately from published roles, survive disabling auto-updates and leave uncommitted teams unchanged", () => {
+test("published roles remain authoritative after commitments and disabling the helper", () => {
   const s = fixture("ouro", 12),
     initial = structuredClone(s.weeklyRounds[0].assignments);
   send(s, 4, 2);
@@ -505,7 +763,7 @@ test("committed roles are saved separately from published roles, survive disabli
       0,
     );
   s.settings[0].weeklyDynamicRoles = false;
-  assert.equal(weeklyRole(s, "t2b", now), "defense");
+  assert.equal(weeklyRole(s, "t2b", now), "super_attack");
   assert.equal(weeklyRole(s, "t5b", now), "super_attack");
 });
 
@@ -517,7 +775,7 @@ test("every initially eligible Bronze choice can finish with five disjoint valid
     const rank = (id: string) => Number(id.match(/^t(\d+)/)![1]);
     send(s, rank(choice.attackerId), rank(choice.defenderId));
     for (let i = 0; i < 10 && s.challenges.length < 5; i++) {
-      const next = dynamicWeeklyPlan(s, "bronze", week).eligible[0];
+      const next = dynamicWeeklyPlan(s, "bronze", week).canonical[0];
       assert.ok(next);
       send(s, rank(next.attackerId), rank(next.defenderId));
     }
@@ -546,15 +804,16 @@ test("Bronze supports its current ten-team structure with a single-member team w
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
   send(s, 9, 6);
   send(s, 8, 5);
-  assert.ok(pairing(s, 10, 7));
+  assert.equal(pairing(s, 10, 7), undefined);
+  send(s, 10, 7);
   assert.equal(pairing(s, 10, 7)?.challengerTeam?.length, 1);
 });
 
-test("a first challenge that would make complete coverage impossible is refused", () => {
+test("a valid first challenge is preserved and reach expands for the remaining teams", () => {
   const s = fixture();
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
-  assert.throws(() => send(s, 3, 2), /necessário para outra dupla/);
-  assert.equal(s.challenges.length, 0);
+  send(s, 3, 2);
+  assert.equal(s.challenges.length, 1);
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
 });
 
@@ -589,18 +848,17 @@ function bronzeLastWeek(s: State) {
   }));
 }
 
-test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play 7 after last week's 10→8", () => {
+test("Bronze 2 Nov: 9→7 is preserved and remaining teams can extend reach without repeating last week", () => {
   const s = fixture();
   bronzeLastWeek(s);
   assert.equal(dynamicWeeklyPlan(s, "bronze", week).maximumMatches, 5);
-  assert.throws(() => send(s, 9, 7), /necessário para outra dupla/);
-  send(s, 9, 8);
+  send(s, 9, 7);
   for (
     let i = 0;
-    i < 5 && dynamicWeeklyPlan(s, "bronze", week).eligible[0];
+    i < 5 && dynamicWeeklyPlan(s, "bronze", week).canonical[0];
     i++
   ) {
-    const next = dynamicWeeklyPlan(s, "bronze", week).eligible[0];
+    const next = dynamicWeeklyPlan(s, "bronze", week).canonical[0];
     send(
       s,
       Number(next.attackerId.match(/^t(\d+)/)![1]),
@@ -609,7 +867,7 @@ test("Bronze 2 Nov: 9→7 as first challenge is refused because 10 can only play
   }
   const live = s.challenges.filter((c) => c.weekStart === week);
   assert.equal(live.length, 5);
-  assert.ok(pairing(s, 10, 7));
+  assert.ok(pairing(s, 9, 7));
   assert.equal(
     new Set(live.flatMap((c) => [c.challengerTeamId, c.defenderTeamId])).size,
     10,
@@ -642,7 +900,7 @@ test("an admin reassignment cannot create last week's rematch and leaves the man
   assert.equal(c.defenderId, "t8a");
 });
 
-test("normal weeks retain feasible published role preferences while forced pairings still update both partners", () => {
+test("normal weeks retain feasible published role preferences without automatically creating suggested pairings", () => {
   const s = fixture("ouro", 12);
   s.weeklyRounds[0].weekType = "NORMAL";
   s.weeklyRounds[0].assignments = s.players.map((p) => {
@@ -655,7 +913,12 @@ test("normal weeks retain feasible published role preferences while forced pairi
   assert.equal(weeklyRole(s, "t2a", now), "defense");
   assert.equal(weeklyRole(s, "t5a", now), "defense");
   send(s, 4, 2);
-  assert.ok(pairing(s, 3, 1));
+  assert.equal(pairing(s, 3, 1), undefined);
+  assert.ok(
+    dynamicWeeklyPlan(s, "ouro", week).eligible.some(
+      (p) => p.attackerId === "t3a" && p.defenderId === "t1a",
+    ),
+  );
   assert.equal(weeklyRole(s, "t5a", now), "defense");
   assert.equal(weeklyRole(s, "t6b", now), "attack");
 });
@@ -696,7 +959,7 @@ test("Bronze-only automatic pairing preserves Gold fixtures while recording actu
   assert.equal(pairing(s, 11, 9), undefined);
   assert.equal(weeklyRole(s, "t9a", now), "super_attack");
   assert.deepEqual(s.weeklyRounds[0].assignments, before[0].assignments);
-  assert.equal(weeklyRole(s, "t10a", now), "defense");
+  assert.equal(weeklyRole(s, "t10a", now), "super_attack");
   assert.equal(weeklyRole(s, "t12a", now), "attack");
 });
 test("explicit division scope still enables Bronze priority-derived assignments", () => {
@@ -704,8 +967,8 @@ test("explicit division scope still enables Bronze priority-derived assignments"
   s.settings[0].weeklyDynamicDivisionIds = ["bronze"];
   send(s, 9, 6);
   send(s, 8, 5);
-  assert.ok(pairing(s, 10, 7));
-  assert.equal(weeklyRole(s, "t7a", now), "defense");
+  assert.equal(pairing(s, 10, 7), undefined);
+  assert.equal(weeklyRole(s, "t7a", now), "super_attack");
 });
 
 test("distance selection applies immediately to new options, preserves committed games and rejects stale admin updates", () => {
@@ -731,7 +994,7 @@ test("distance selection applies immediately to new options, preserves committed
     s.challenges.find((c) => c._id === existing._id),
     existing,
   );
-  assert.throws(() => send(s, 8, 5), /limite|posições/);
+  assert.throws(() => send(s, 8, 5), /alcance|limite|posições/);
   assert.throws(
     () =>
       execute(
@@ -818,7 +1081,7 @@ for (const code of ["ouro", "prata"] as const) {
       const rank = (id: string) => Number(id.match(/^t(\d+)/)![1]);
       send(s, rank(choice.attackerId), rank(choice.defenderId));
       for (let i = 0; i < 12 && s.challenges.length < 6; i++) {
-        const next = dynamicWeeklyPlan(s, code, week).eligible[0];
+        const next = dynamicWeeklyPlan(s, code, week).canonical[0];
         assert.ok(next);
         send(s, rank(next.attackerId), rank(next.defenderId));
       }
@@ -832,15 +1095,23 @@ for (const code of ["ouro", "prata"] as const) {
       for (const c of s.challenges) {
         assert.equal(c.status, "accepted");
         assert.ok(c.challengerPosition > c.defenderPosition);
+
         assert.ok(
-          code === "ouro" || c.challengerPosition - c.defenderPosition <= 3,
+          c.effectiveChallengeDistance! >=
+            c.challengerPosition - c.defenderPosition,
         );
-        if (c.defenderPosition === 1 && code !== "ouro")
-          assert.ok(c.challengerPosition <= s.settings[0].titleMaxPosition);
         for (const m of c.challengerTeam ?? [])
-          assert.equal(weeklyRole(s, m.playerId, now), "attack");
+          assert.equal(
+            weeklyRole(s, m.playerId, now),
+            s.weeklyRounds[0].assignments.find((a) => a.playerId === m.playerId)
+              ?.role,
+          );
         for (const m of c.defenderTeam ?? [])
-          assert.equal(weeklyRole(s, m.playerId, now), "defense");
+          assert.equal(
+            weeklyRole(s, m.playerId, now),
+            s.weeklyRounds[0].assignments.find((a) => a.playerId === m.playerId)
+              ?.role,
+          );
       }
       assert.equal(s.matches.length, 0);
       assert.equal(s.results.length, 0);
@@ -913,78 +1184,19 @@ test("a division republished alone keeps its published roles when other division
     );
 });
 
-test("per-division admin matchmaking blocks players and the system, assigns only the chosen game and preserves existing games when disabled", () => {
+test("legacy admin-only flags never suspend normal player challenges", () => {
   const s = fixture("ouro", 12);
-  const admin: Actor = { ...actor(1), role: "admin" };
-  const mode = {
-    type: "admin.division.matchmaking.set",
-    divisionId: "ouro",
-    manual: true,
-  };
-  assert.throws(() => execute(s, actor(4), mode, now), /administradores/);
-  assert.throws(
-    () => execute(s, admin, { ...mode, divisionId: "missing" }, now),
-    /Divisão/,
-  );
-  execute(s, admin, mode, now);
-  assert.equal(dynamicWeeklyEnabled(s, "ouro"), false);
-  assert.equal(dynamicWeeklyEnabled(s, "prata"), true);
-  assert(
-    s.audit.some((a) => a.action === "admin.division.matchmaking.changed"),
-  );
-  assert.throws(() => send(s, 4, 2), /administração/);
-  const command = {
-    type: "admin.challenge.create",
-    challengerId: "t4a",
-    defenderId: "t2a",
-    weekStart: week,
-  };
-  assert.throws(
-    () =>
-      execute(
-        s,
-        { ...admin, userId: "system:weekly-matchmaking" },
-        command,
-        now,
-      ),
-    /administração/,
-  );
-  // The admin chooses a pairing regardless of the published attack/defense role.
-  s.weeklyRounds[0].weekType = "NORMAL";
-  s.weeklyRounds[0].assignments = s.players.map((p) => ({
-    playerId: p._id,
-    role: p._id.startsWith("t1") ? "defense" : "attack",
-  }));
-  execute(s, admin, command, now);
-  assert.equal(s.challenges.length, 1);
-  assert.equal(s.challenges[0].status, "accepted");
-  assert.equal(s.challenges[0].mandatoryAssignment, true);
-  assert.equal(s.challenges[0].origin?.kind, "admin");
-  assert.equal(s.matches.length, 0);
-  assert.equal(s.results.length, 0);
-  assert.throws(
-    () => execute(s, admin, { ...command, challengerId: "t5a" }, now),
-    /nesta semana/,
-  );
-  assert.throws(
-    () =>
-      execute(
-        s,
-        admin,
-        { ...command, challengerId: "t8a", defenderId: "t1a" },
-        now,
-      ),
-    /limite de posições/,
-  );
-  const before = structuredClone(s.challenges);
-  execute(s, admin, { ...mode, manual: false }, now);
-  assert.equal(dynamicWeeklyEnabled(s, "ouro"), true);
-  assert.deepEqual(s.challenges, before);
+  s.settings[0].manualMatchmakingDivisionIds = ["ouro"];
+  s.weeklyRounds[0].manualMatchmaking = { ouro: true };
+  assert.equal(dynamicWeeklyEnabled(s, "ouro", week), true);
+  send(s, 4, 2);
+  send(s, 12, 10);
+  assert.equal(s.challenges.length, 2);
 });
 
 test("the planner never offers the same unresolved pairing from an earlier frozen week", () => {
   const s = fixture("ouro", 12);
-  send(s, 4, 2);
+  send(s, 3, 1);
   const old = structuredClone(pairing(s, 3, 1)!);
   old.weekStart = "2026-10-12";
   old.deferredUntil = "2026-11-02";
@@ -998,30 +1210,14 @@ test("the planner never offers the same unresolved pairing from an earlier froze
   assert.equal(offered(), true);
 });
 
-test("manual match assignment is mandatory even when player challenges normally require acceptance", () => {
-  const s = fixture("ouro", 12);
+test("a published admin game remains mandatory when ordinary challenges require acceptance", () => {
+  const { s, weekStart } = publishedMandatoryGame();
   s.settings[0].weeklyMandatoryChallenges = false;
   s.settings[0].weeklyDynamicRoles = false;
-  const admin: Actor = { ...actor(1), role: "admin" };
   execute(
     s,
-    admin,
-    {
-      type: "admin.division.matchmaking.set",
-      divisionId: "ouro",
-      manual: true,
-    },
-    now,
-  );
-  execute(
-    s,
-    admin,
-    {
-      type: "admin.challenge.create",
-      challengerId: "t4a",
-      defenderId: "t2a",
-      weekStart: week,
-    },
+    actor(4),
+    { type: "challenge.create", weekStart, defenderId: "t2a" },
     now,
   );
   assert.equal(s.challenges.length, 1);
@@ -1046,7 +1242,7 @@ test("future manual drafts are week-specific, consume no active slots and publis
     now,
   );
   assert.equal(dynamicWeeklyEnabled(s, "ouro", week), true);
-  assert.equal(dynamicWeeklyEnabled(s, "ouro", future), false);
+  assert.equal(dynamicWeeklyEnabled(s, "ouro", future), true);
   const add = {
     type: "admin.week.matchup.add",
     divisionId: "ouro",
@@ -1261,6 +1457,8 @@ test("Ouro flexible attacks preserve automatic 11→8 after 12→9 and 10→7", 
   s.weeklyRounds[0].weekType = "NORMAL";
   send(s, 12, 9);
   send(s, 10, 7);
+  assert.equal(pairing(s, 11, 8), undefined);
+  send(s, 11, 8);
   assert.equal(pairing(s, 11, 8)?.status, "accepted");
   assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 6);
 });
@@ -1343,12 +1541,14 @@ test("Ouro priority preserves 9→7 and extends 11→6 only when remaining games
   const before = structuredClone(s.challenges);
   send(s, 9, 7);
   assert.ok(pairing(s, 9, 7));
+  assert.equal(pairing(s, 11, 6), undefined);
+  send(s, 11, 6);
   assert.equal(pairing(s, 11, 6)?.status, "accepted");
   assert.equal(pairing(s, 11, 6)?.effectiveChallengeDistance, 5);
   assert.deepEqual(s.challenges.slice(0, 4), before);
   assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 6);
 });
-test("Ouro can extend to 12→1, but never offers it before commitments", () => {
+test("Ouro can extend to 12→1, but only offers the extension when necessary", () => {
   const s = fixture("ouro", 12, 4);
   assert.ok(
     !dynamicWeeklyPlan(s, "ouro", week).eligible.some(
@@ -1458,4 +1658,212 @@ test("a game created before its defender became Attack stays valid", () => {
     if (/^t3[ab]$/.test(a.playerId)) a.role = "attack";
   const player = (id: string) => s.players.find((p) => p._id === id)!;
   assert.equal(weeklyReason(s, player("t5a"), player("t3a"), now, id), null);
+});
+
+function publishedMandatoryGame() {
+  const s = fixture("ouro", 12);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const weekStart = "2026-11-16";
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.add",
+      divisionId: "ouro",
+      weekStart,
+      challengerId: "t4a",
+      defenderId: "t2a",
+      expectedVersion: 0,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart,
+      expectedVersion: 1,
+    },
+    now,
+  );
+  const round = () => s.weeklyRounds.find((r) => r.weekStart === weekStart)!;
+  return {
+    s,
+    admin,
+    weekStart,
+    round,
+    pair: () => round().manualMatchups!.ouro.pairs[0],
+  };
+}
+const after12h = now + 12 * 3600000;
+
+test("publishing papers after an explicit mandatory game preserves both the game and administrator papers", () => {
+  const { s, admin, weekStart, round } = publishedMandatoryGame();
+  execute(
+    s,
+    actor(4),
+    { type: "challenge.create", weekStart, defenderId: "t2a" },
+    now,
+  );
+  const game = structuredClone(s.challenges[0]);
+  const papers = structuredClone(round().assignments);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.approve",
+      weekStart,
+      expectedVersion: round().version ?? 0,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.save",
+      weekStart,
+      expectedVersion: round().version ?? 0,
+      assignments: papers,
+      weekType: round().weekType,
+      publish: true,
+    },
+    now,
+  );
+  assert.deepEqual(round().assignments, papers);
+  assert.deepEqual(s.challenges[0], game);
+});
+
+test("a published mandatory game is created by the deadline worker only after 12 hours", () => {
+  const { s, pair } = publishedMandatoryGame();
+  processDeadlines(s, after12h - 1, false);
+  assert.equal(s.challenges.length, 0);
+  processDeadlines(s, after12h, false);
+  assert.equal(s.challenges.length, 1);
+  assert.equal(s.challenges[0].status, "accepted");
+  assert.equal(s.challenges[0].mandatoryAssignment, true);
+  assert.equal(pair().challengeId, s.challenges[0]._id);
+  assert.ok(
+    s.audit.some((e) => e.action === "mandatory.challenge.auto-created"),
+  );
+  processDeadlines(s, after12h + 60000, false);
+  assert.equal(s.challenges.length, 1);
+});
+
+test("either attacking partner can confirm, but the defending team and other teams cannot", () => {
+  const { s, weekStart, pair } = publishedMandatoryGame();
+  const create = (rank: number, side: string, defenderId: string) =>
+    execute(
+      s,
+      actor(rank, side),
+      { type: "challenge.create", weekStart, defenderId },
+      now,
+    );
+  assert.throws(() => create(2, "a", "t4a"));
+  assert.throws(() => create(5, "a", "t2a"));
+  assert.equal(s.challenges.length, 0);
+  create(4, "b", "t2b");
+  assert.equal(s.challenges.length, 1);
+  assert.equal(pair().challengeId, s.challenges[0]._id);
+});
+
+test("only attackers see published assignments; defenders and drafts stay hidden", () => {
+  const { s, admin, weekStart, round, pair } = publishedMandatoryGame();
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.add",
+      divisionId: "ouro",
+      weekStart,
+      challengerId: "t8a",
+      defenderId: "t6a",
+      expectedVersion: 2,
+    },
+    now,
+  );
+  const seen = (id: string) =>
+    visibleMandatoryMatchups(round(), s.players, id)?.ouro.pairs.map(
+      (p) => p.id,
+    );
+  assert.deepEqual(seen("t4b"), [pair().id]);
+  assert.deepEqual(seen("t4a"), [pair().id]);
+  assert.equal(seen("t2a"), undefined);
+  assert.equal(seen("t2b"), undefined);
+  assert.equal(seen("t8a"), undefined);
+  assert.equal(seen("t1a"), undefined);
+  assert.equal(playerMandatoryMatchups(s, "t4b").length, 1);
+  assert.deepEqual(playerMandatoryMatchups(s, "t2a"), []);
+  assert.deepEqual(playerMandatoryMatchups(s, "t2b"), []);
+});
+
+for (const automatic of [false, true]) {
+  test(`defenders are notified only when the challenge is ${automatic ? "automatically created" : "confirmed by the attacker"}`, () => {
+    const { s, weekStart } = publishedMandatoryGame();
+    for (const id of ["t4a", "t4b"])
+      assert.ok(
+        s.notifications.some(
+          (n) =>
+            n.playerId === id && n.dedupe?.startsWith("mandatory-matchup:"),
+        ),
+      );
+    for (const id of ["t2a", "t2b"])
+      assert.equal(
+        s.notifications.some(
+          (n) =>
+            n.playerId === id && n.dedupe?.startsWith("mandatory-matchup:"),
+        ),
+        false,
+      );
+    if (automatic) processDeadlines(s, after12h, false);
+    else
+      execute(
+        s,
+        actor(4, "b"),
+        { type: "challenge.create", weekStart, defenderId: "t2a" },
+        now,
+      );
+    const c = s.challenges[0];
+    assert.ok(c);
+    for (const id of ["t2a", "t2b"])
+      assert.ok(
+        s.notifications.some(
+          (n) => n.playerId === id && n.challengeId === c._id,
+        ),
+      );
+    assert.deepEqual(playerMandatoryMatchups(s, "t4b"), []);
+  });
+}
+
+test("an expired game that became invalid alerts the admin once and blocks nothing", () => {
+  const { s, pair } = publishedMandatoryGame();
+  s.players.find((p) => p._id === "t4a")!.status = "inactive";
+  processDeadlines(s, after12h, false);
+  processDeadlines(s, after12h + 60000, false);
+  assert.equal(s.challenges.length, 0);
+  assert.equal(pair().challengeId, undefined);
+  assert.equal(
+    s.notifications.filter((n) => n.title === "Jogo obrigatório por resolver")
+      .length,
+    1,
+  );
+});
+
+test("publishing again does not restart the 12-hour window", () => {
+  const { s, admin, weekStart, pair } = publishedMandatoryGame();
+  const deadline = pair().mandatoryPendingUntil;
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart,
+      expectedVersion: 2,
+    },
+    now + 3600000,
+  );
+  assert.equal(pair().mandatoryPendingUntil, deadline);
 });

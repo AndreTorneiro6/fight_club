@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { enterAdminWorkspace } from "./workspace-helper";
 import { rankingEntries } from "../lib/ranking-groups";
 import { clubWeek, addClubDays } from "../lib/calendar";
-test("Bronze uses three positions and both partners see the forced matchup and updated defense role", async ({
+test("Bronze suggests a remaining game without creating it or changing published papers", async ({
   page,
   browser,
 }) => {
@@ -78,7 +78,7 @@ test("Bronze uses three positions and both partners see the forced matchup and u
     weekStart: week,
     expectedVersion: 0,
     publish: false,
-    weekType: "OPEN_ATTACK",
+    weekType: "NORMAL",
     assignments,
   });
   s = await read();
@@ -97,7 +97,7 @@ test("Bronze uses three positions and both partners see the forced matchup and u
       (r: { weekStart: string }) => r.weekStart === week,
     ).version,
     publish: true,
-    weekType: "OPEN_ATTACK",
+    weekType: "NORMAL",
     assignments,
   });
   const before = await read(),
@@ -115,6 +115,19 @@ test("Bronze uses three positions and both partners see the forced matchup and u
     challengerId: teams[5].members[0]._id,
     defenderId: teams[2].members[0]._id,
   });
+  const suggested = await read();
+  expect(
+    suggested.challenges.filter((c: any) => c.weekStart === week),
+  ).toHaveLength(2);
+  expect(
+    suggested.weeklyRounds.find((r: any) => r.weekStart === week).assignments,
+  ).toEqual(assignments);
+  await post({
+    type: "admin.challenge.create",
+    weekStart: week,
+    challengerId: teams[7].members[0]._id,
+    defenderId: teams[4].members[0]._id,
+  });
   const after = await read(),
     forced = after.challenges.find(
       (c: { challengerId: string; defenderId: string; status: string }) =>
@@ -131,14 +144,14 @@ test("Bronze uses three positions and both partners see the forced matchup and u
       ).role,
   ).toBe("defense");
   await page.goto(`/desafios/${forced._id}`);
-  await expect(page.locator('[data-challenge-origin="rules"]')).toBeVisible();
+  await expect(page.locator('[data-challenge-origin="admin"]')).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Originado pelo desafio/ }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.goto("/admin?tab=challenges");
   await page
     .getByRole("combobox", { name: "Filtrar origem do desafio" })
-    .selectOption("rules");
+    .selectOption("admin");
   await expect(page.locator(".challenge-card")).not.toHaveCount(0);
   await expect(
     page.locator('.challenge-card [data-challenge-origin="player"]'),
@@ -177,13 +190,13 @@ test("Bronze uses three positions and both partners see the forced matchup and u
     await player.goto("/ranking");
     await expect(
       player.locator(".ranking-row").filter({ hasText: p.name }),
-    ).toContainText("Defesa");
+    ).toContainText("Combo");
     const v = await (await player.request.get("/api/league")).json();
     expect(v.challenges.every((c: any) => c.origin === undefined)).toBe(true);
     expect(
       v.notifications.some(
         (n: { challengeId: string; title: string }) =>
-          n.challengeId === forced._id && n.title.includes("prioridade"),
+          n.challengeId === forced._id && n.title.includes("definido"),
       ),
     ).toBe(true);
   } finally {
@@ -332,6 +345,30 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
   await expect(
     row(teams.length - 1).getByRole("button", { name: /^Combo:/ }),
   ).toHaveCount(0);
+  if (
+    (await row(2)
+      .getByRole("button", { name: /^Ataque:/ })
+      .getAttribute("aria-pressed")) !== "true"
+  ) {
+    await row(2)
+      .getByRole("button", { name: /^Remover seleção:/ })
+      .click();
+    await row(2)
+      .getByRole("button", { name: /^Ataque:/ })
+      .click();
+  }
+  await page
+    .getByRole("button", { name: "Guardar rascunho", exact: true })
+    .click();
+  await expect
+    .poll(async () => {
+      const v = await (await page.request.get("/api/league")).json();
+      return v.weeklyRounds
+        .find((r: any) => r.weekStart === week)
+        .assignments.find((a: any) => a.playerId === teams[2].members[0]._id)
+        ?.role;
+    })
+    .toBe("attack");
   await row(2)
     .getByText("Adversários permitidos e simulação", { exact: true })
     .click();
@@ -390,9 +427,10 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
     })
     .toBe("super_attack");
   await page.reload();
-  await expect(
-    row(2).getByRole("button", { name: /^Combo:/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(row(2).getByRole("button", { name: /^Combo:/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await page.goto("/admin?tab=challenges");
   await expect(
     page.getByRole("heading", {

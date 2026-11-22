@@ -5,7 +5,7 @@ import { database, readState, transaction } from "../lib/db";
 import { execute } from "../lib/engine";
 import { seed } from "../scripts/seed";
 import type { Actor } from "../lib/types";
-test("concurrent first challenges serialize the original and forced assignments without double-booking teams", async () => {
+test("concurrent first challenges preserve one winner without forcing games or double-booking teams", async () => {
   const repl = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   process.env.MONGODB_URI = repl.getUri();
   process.env.MONGODB_DB = "dynamic_weekly_test";
@@ -60,7 +60,7 @@ test("concurrent first challenges serialize the original and forced assignments 
     assert.equal(requests.filter((r) => r.status === "rejected").length, 1);
     const after = await readState(db),
       challenges = after.challenges.filter((c) => c.divisionId === "bronze");
-    assert.ok(challenges.length >= 1);
+    assert.equal(challenges.length, 1);
     const members = challenges.flatMap((c) => [c.challengerId, c.defenderId]);
     assert.equal(new Set(members).size, members.length);
     assert.ok(challenges.every((c) => c.status === "accepted"));

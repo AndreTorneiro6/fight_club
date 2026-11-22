@@ -13,6 +13,8 @@ import { matchdayWeekLabel } from "@/lib/matchday";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
 import { teamPosition } from "@/lib/team-competition";
+import { teamMembers } from "@/lib/ranking-groups";
+import { playerMandatoryMatchups } from "@/lib/mandatory-matchups";
 import { useEffect, useState } from "react";
 import { dynamicRoleChanges } from "@/lib/dynamic-weekly";
 import { effectiveRoles } from "@/lib/effective-roles";
@@ -21,22 +23,15 @@ import { usesManagedCompetition } from "@/lib/competition-mode";
 import WeeklyOpeningControl from "./weekly-opening-control";
 import RoundChallengeCoverage from "./round-challenge-coverage";
 import RankingExport from "./ranking-export";
-import WeeklyTeamInsight, { WeeklyTeamRoleHistory } from "./weekly-team-insight";
+import WeeklyTeamInsight, {
+  WeeklyTeamRoleHistory,
+} from "./weekly-team-insight";
 import {
   divisionWeekOptions,
   teamRoleHistory,
 } from "@/lib/weekly-role-history";
-import {
-  canChallenge,
-  weeklyRoleName,
-} from "@/lib/weekly-role-rules";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Shield,
-  Sword,
-  Snowflake,
-} from "lucide-react";
+import { canChallenge, weeklyRoleName } from "@/lib/weekly-role-rules";
+import { ArrowLeft, ArrowRight, Shield, Sword, Snowflake } from "lucide-react";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import { challengeReason } from "@/lib/rules";
 import {
@@ -54,7 +49,13 @@ import { rankingEntries } from "@/lib/ranking-groups";
 import type { Challenge, Player, View } from "@/lib/types";
 
 function roleHistoryKey(role?: string) {
-  return role === "attack" ? "A" : role === "defense" ? "D" : role === "super_attack" ? "C" : "?";
+  return role === "attack"
+    ? "A"
+    : role === "defense"
+      ? "D"
+      : role === "super_attack"
+        ? "C"
+        : "?";
 }
 
 function roleLabel(role: string | undefined) {
@@ -62,7 +63,11 @@ function roleLabel(role: string | undefined) {
 }
 
 /** The role a team really assumed in a week: its game side, else its effective role. */
-function assumedRole(s: View, round: View["weeklyRounds"][number], playerIds: string[]) {
+function assumedRole(
+  s: View,
+  round: View["weeklyRounds"][number],
+  playerIds: string[],
+) {
   const team = s.players.filter((player) => playerIds.includes(player._id));
   const entry = team.length
     ? teamRoleHistory(s, team, addClubDays(round.weekStart, 1), 1)[0]
@@ -474,14 +479,62 @@ export function WeeklyRoles({
           : weeklyRole(s, me._id) === "super_attack"
             ? "⚔️ OS MEUS DESAFIOS — MODO COMBO"
             : weeklyRole(s, me._id) === "attack"
-            ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
-            : weeklyRole(s, me._id) === "defense"
-              ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
-              : "OS MEUS DESAFIOS"}
+              ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
+              : weeklyRole(s, me._id) === "defense"
+                ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
+                : "OS MEUS DESAFIOS"}
       </h2>
       {!admin && adminMatchmakingEnabled(s, me.divisionId) && (
         <p role="status">{ADMIN_MATCHMAKING_MESSAGE}</p>
       )}
+      {!admin &&
+        playerMandatoryMatchups(s, me._id).map(
+          ({ pair, weekStart, attacking }) => {
+            const opponent = attacking ? pair.defenderId : pair.challengerId;
+            const opponents = teamMembers(s.players, opponent)
+              .map((member) => member.name)
+              .join(" + ");
+            const deadline = new Date(
+              pair.mandatoryPendingUntil!,
+            ).toLocaleString("pt-PT", {
+              timeZone: "Europe/Lisbon",
+              dateStyle: "short",
+              timeStyle: "short",
+            });
+            return (
+              <div
+                key={pair.id}
+                className="inset row between wrap"
+                role="status"
+              >
+                <span>
+                  <strong>Jogo obrigatório contra {opponents}.</strong>{" "}
+                  {attacking
+                    ? `Confirma até ${deadline}. Depois disso, o jogo é criado automaticamente.`
+                    : `A dupla atacante tem até ${deadline} para confirmar. Depois disso, o jogo é criado automaticamente.`}
+                </span>
+                {attacking && (
+                  <button
+                    className="primary small"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        {
+                          type: "challenge.create",
+                          defenderId: pair.defenderId,
+                          weekStart,
+                        },
+                        "Jogo obrigatório confirmado. Combinem o horário.",
+                      )
+                    }
+                  >
+                    Confirmar jogo obrigatório
+                  </button>
+                )}
+              </div>
+            );
+          },
+        )}
       {admin && (
         <p>
           Ataque: só pode desafiar. Defesa: aguarda um desafio. Combo: pode
@@ -586,7 +639,23 @@ export function WeeklyRoles({
                   division !== "all" ||
                   week < clubWeek().start
                 }
-                onChange={(e) => setWeekType(e.target.value as typeof weekType)}
+                onChange={(e) => {
+                  const next = e.target.value as typeof weekType;
+                  setWeekType(next);
+                  if (next === "OPEN_ATTACK")
+                    setRoles(
+                      Object.fromEntries(
+                        s.divisions.flatMap((d) =>
+                          rankingEntries(s.players, d._id).flatMap((team, i) =>
+                            team.members.map((m) => [
+                              m._id,
+                              i === 0 ? "defense" : "attack",
+                            ]),
+                          ),
+                        ),
+                      ),
+                    );
+                }}
               >
                 <option value="NORMAL">Normal</option>
                 <option value="OPEN_ATTACK">SEMANA DE ATAQUE LIVRE</option>
@@ -904,38 +973,41 @@ export function WeeklyRoles({
             >
               <div className="weekly-team-head">
                 <div className="weekly-team-identity">
-                <strong>
-                  {label}
-                  {ownTeam
-                    ? members.length > 1
-                      ? " · A tua equipa"
-                      : " · Tu"
-                    : ""}
-                </strong>
-                <small>
-                  {members.length > 1 ? "Equipa" : "Jogador sem parceiro"} ·{" "}
-                  {
-                    s.divisions.find(
-                      (category) => category._id === members[0].divisionId,
-                    )?.name
-                  }
-                </small>
-                <div className="weekly-team-members">
-                  {members.map((member) => (
-                    <small key={member._id}>
-                      #{teamPosition(s.players, member._id)} · {member.name}
-                      {member.status !== "active" ? " · Inativo" : ""}
-                      {frozenRanking(s, member._id)
-                        ? " · Férias · ranking congelado"
-                        : ""}
-                    </small>
-                  ))}
-                </div>
+                  <strong>
+                    {label}
+                    {ownTeam
+                      ? members.length > 1
+                        ? " · A tua equipa"
+                        : " · Tu"
+                      : ""}
+                  </strong>
+                  <small>
+                    {members.length > 1 ? "Equipa" : "Jogador sem parceiro"} ·{" "}
+                    {
+                      s.divisions.find(
+                        (category) => category._id === members[0].divisionId,
+                      )?.name
+                    }
+                  </small>
+                  <div className="weekly-team-members">
+                    {members.map((member) => (
+                      <small key={member._id}>
+                        #{teamPosition(s.players, member._id)} · {member.name}
+                        {member.status !== "active" ? " · Inativo" : ""}
+                        {frozenRanking(s, member._id)
+                          ? " · Férias · ranking congelado"
+                          : ""}
+                      </small>
+                    ))}
+                  </div>
                 </div>
                 {(() => {
                   const timeline = teamRoleTimeline(s, members, week);
                   return timeline ? (
-                    <span className="role-timeline" title="Papéis anteriores, do mais antigo ao mais recente">
+                    <span
+                      className="role-timeline"
+                      title="Papéis anteriores, do mais antigo ao mais recente"
+                    >
                       {timeline}
                     </span>
                   ) : null;
@@ -944,24 +1016,24 @@ export function WeeklyRoles({
               {admin && (
                 <WeeklyTeamRoleHistory s={s} team={members} week={week} />
               )}
-                {!admin && (
-                  <span
-                    className={`role-label ${role === "attack" ? "gold" : ""}`}
-                  >
-                    {role === "attack" ? (
-                      <Sword size={14} />
-                    ) : role === "defense" ? (
-                      <Shield size={14} />
-                    ) : role === "super_attack" ? (
-                      <ComboRoleIcon size={14} />
-                    ) : null}
-                    {role
-                      ? weeklyRoleName(role)
-                      : mixed
-                        ? "Papéis diferentes · aguarda a atualização do clube"
-                        : "Por atribuir"}
-                  </span>
-                )}
+              {!admin && (
+                <span
+                  className={`role-label ${role === "attack" ? "gold" : ""}`}
+                >
+                  {role === "attack" ? (
+                    <Sword size={14} />
+                  ) : role === "defense" ? (
+                    <Shield size={14} />
+                  ) : role === "super_attack" ? (
+                    <ComboRoleIcon size={14} />
+                  ) : null}
+                  {role
+                    ? weeklyRoleName(role)
+                    : mixed
+                      ? "Papéis diferentes · aguarda a atualização do clube"
+                      : "Por atribuir"}
+                </span>
+              )}
               {admin ? (
                 <div className="weekly-team-actions">
                   <button
@@ -999,24 +1071,24 @@ export function WeeklyRoles({
                     Defesa
                   </button>
                   {!defenseReason && !attackReason && (
-                      <button
-                        className={`weekly-role-choice ${role === "super_attack" ? "primary small" : "small"}`}
-                        aria-label={`Combo: ${label}`}
-                        aria-pressed={role === "super_attack"}
-                        disabled={
-                          busy ||
-                          !!role ||
-                          !!attackReason ||
-                          lockedByChallenge ||
-                          (published && !correctable && !canEditPublished) ||
-                          week < clubWeek().start
-                        }
-                        onClick={() => assign("super_attack")}
-                      >
-                        <ComboRoleIcon size={16} />
-                        Combo
-                      </button>
-                    )}
+                    <button
+                      className={`weekly-role-choice ${role === "super_attack" ? "primary small" : "small"}`}
+                      aria-label={`Combo: ${label}`}
+                      aria-pressed={role === "super_attack"}
+                      disabled={
+                        busy ||
+                        !!role ||
+                        !!attackReason ||
+                        lockedByChallenge ||
+                        (published && !correctable && !canEditPublished) ||
+                        week < clubWeek().start
+                      }
+                      onClick={() => assign("super_attack")}
+                    >
+                      <ComboRoleIcon size={16} />
+                      Combo
+                    </button>
+                  )}
                   {(role || mixed) && (
                     <button
                       className="small weekly-team-clear"
@@ -1066,9 +1138,7 @@ export function WeeklyRoles({
               )}
               <div className="stack gap-sm weekly-team-body">
                 {admin ? (
-                  <WeeklyTeamInsight
-                    options={weekOptions.get(entry.id)}
-                  />
+                  <WeeklyTeamInsight options={weekOptions.get(entry.id)} />
                 ) : (
                   <PreviousWeekRole s={s} team={members} week={week} />
                 )}
