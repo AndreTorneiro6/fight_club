@@ -121,9 +121,20 @@ export default function WeeklyTeamInsight({
             </span>
           ) : options.committed ? (
             <span>
-              Jogo definido:{" "}
+              {options.committed.mandatoryPendingUntil
+                ? "Jogo obrigatório atribuído:"
+                : "Jogo definido:"}{" "}
               {options.committed.side === "attack" ? "ataca" : "defende"} #
               {options.committed.rank} {options.committed.name}
+              {options.committed.mandatoryPendingUntil &&
+                " · Aguarda confirmação da dupla atacante."}
+            </span>
+          ) : options.mandatoryDraft ? (
+            <span>
+              Jogo obrigatório guardado:{" "}
+              {options.mandatoryDraft.side === "attack" ? "ataca" : "defende"} #
+              {options.mandatoryDraft.rank} {options.mandatoryDraft.name}.
+              Atribui este jogo em Jogos obrigatórios para o ativar.
             </span>
           ) : (
             <>

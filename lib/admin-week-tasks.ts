@@ -111,13 +111,13 @@ export function adminWeekTasks(
         );
       }
       const pairs =
-        round?.manualMatchups?.[d._id]?.pairs.filter(isDraftMatchup)
-          .length ?? 0;
+        round?.manualMatchups?.[d._id]?.pairs.filter(isDraftMatchup).length ??
+        0;
       if (pairs)
         add(
-          "Jogos obrigatórios por publicar",
+          "Jogos obrigatórios por atribuir",
           "mandatory",
-          "Revê e publica os confrontos guardados em rascunho.",
+          "Atribui os confrontos que ficaram guardados em rascunho.",
           pairs,
         );
       const unscheduled = s.challenges.filter(

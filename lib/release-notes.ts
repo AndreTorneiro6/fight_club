@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "1.23.0";
+export const applicationVersion = "1.23.1";
 export const releaseNotes = [
+  {
+    version: "1.23.1",
+    date: "2026-11-22",
+    title: "Jogos obrigatórios atribuídos ao guardar",
+    changes: [
+      "Guardar um jogo obrigatório atribui logo o adversário, sem uma publicação adicional. A dupla atacante é notificada e mantém 12 horas para confirmar.",
+      "Os cartões das duas equipas mostram o jogo obrigatório atribuído enquanto aguardam a confirmação, em vez de indicar que não existe jogo possível.",
+      "O prazo de confirmação é exclusivo de cada jogo obrigatório e mantém-se válido ao passar de domingo para segunda-feira, preservando a semana original e os outros jogos.",
+    ],
+  },
   {
     version: "1.23.0",
     date: "2026-11-22",

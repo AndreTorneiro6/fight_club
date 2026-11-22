@@ -110,7 +110,7 @@ test("admin chooses a division's matches without player challenges or forced ext
   await expect(panel.getByLabel("Quem define os confrontos")).toHaveCount(0);
   await expect(
     panel.getByRole("button", {
-      name: "Adicionar par ao rascunho",
+      name: "Definir jogo obrigatório",
       exact: true,
     }),
   ).toBeVisible();
@@ -121,7 +121,7 @@ test("admin chooses a division's matches without player challenges or forced ext
     ),
   ).toBe(true);
   await panel
-    .getByRole("button", { name: "Adicionar par ao rascunho", exact: true })
+    .getByRole("button", { name: "Definir jogo obrigatório", exact: true })
     .click();
   const modal = page.getByRole("dialog", { name: "Definir jogo da divisão" });
   await modal
@@ -132,7 +132,7 @@ test("admin chooses a division's matches without player challenges or forced ext
     .selectOption(defenderTeam.members[0]._id);
   await modal
     .getByRole("button", {
-      name: "Guardar par no rascunho",
+      name: "Atribuir jogo obrigatório",
       exact: true,
     })
     .click();
@@ -145,9 +145,9 @@ test("admin chooses a division's matches without player challenges or forced ext
     draftState.weeklyRounds.find((r: any) => r.weekStart === week)
       .manualMatchups.ouro.pairs,
   ).toHaveLength(1);
-  await panel
-    .getByRole("button", { name: "Publicar jogos obrigatórios", exact: true })
-    .click();
+  await expect(
+    panel.getByRole("button", { name: /Publicar jogos/ }),
+  ).toHaveCount(0);
   await expect
     .poll(
       async () =>
@@ -159,6 +159,18 @@ test("admin chooses a division's matches without player challenges or forced ext
     (await read()).challenges.filter((c: any) => c.divisionId === "ouro"),
   ).toHaveLength(existing.length);
   await expect(panel.getByText(/Aguarda\s+confirmação até/)).toBeVisible();
+  await page.goto(`/admin?tab=week&task=roles&division=ouro&week=${week}`);
+  for (const team of [attackerTeam, defenderTeam]) {
+    const row = page.locator(`[data-weekly-team="${team.id}"]`);
+    await expect(row.getByLabel("Jogos possíveis")).toContainText(
+      "Jogo obrigatório atribuído:",
+    );
+    await expect(
+      row.getByText("Sem jogo possível com estes papéis."),
+    ).toHaveCount(0);
+  }
+  await page.goto(`/admin?tab=week&task=mandatory&division=ouro&week=${week}`);
+
   const defenderContext = await browser.newContext();
   try {
     const defender = await defenderContext.newPage();
@@ -246,7 +258,7 @@ test("admin chooses a division's matches without player challenges or forced ext
   ).toEqual(assigned);
 });
 
-test("admins can save separate drafts several weeks ahead before papers or challenges open", async ({
+test("admins can assign mandatory games several weeks ahead without a publication step", async ({
   page,
 }) => {
   await login(page, "admin@fightclub.local", true);
@@ -272,7 +284,7 @@ test("admins can save separate drafts several weeks ahead before papers or chall
     ).toBeVisible();
     await expect(panel.getByLabel("Quem define os confrontos")).toHaveCount(0);
     await panel
-      .getByRole("button", { name: "Adicionar par ao rascunho", exact: true })
+      .getByRole("button", { name: "Definir jogo obrigatório", exact: true })
       .click();
     const modal = page.getByRole("dialog", { name: "Definir jogo da divisão" });
     await modal
@@ -282,10 +294,10 @@ test("admins can save separate drafts several weeks ahead before papers or chall
       .getByLabel("Jogador em defesa")
       .selectOption(teams[i === 0 ? 0 : 4].members[0]._id);
     await modal
-      .getByRole("button", { name: "Guardar par no rascunho", exact: true })
+      .getByRole("button", { name: "Atribuir jogo obrigatório", exact: true })
       .click();
     await expect(modal).toHaveCount(0);
-    await expect(panel.getByText(/1 pares em rascunho/)).toBeVisible();
+    await expect(panel.getByText(/1 a aguardar confirmação/)).toBeVisible();
   }
   const after = await read();
   expect(after.challenges).toEqual(before.challenges);
@@ -293,9 +305,62 @@ test("admins can save separate drafts several weeks ahead before papers or chall
     const round = after.weeklyRounds.find((r: any) => r.weekStart === week);
     expect(round.manualMatchups.ouro.pairs).toHaveLength(1);
     expect(round.manualMatchups.ouro.pairs[0].challengeId).toBeUndefined();
+    expect(round.manualMatchups.ouro.pairs[0].publishedAt).toBeTruthy();
+    expect(
+      round.manualMatchups.ouro.pairs[0].mandatoryPendingUntil,
+    ).toBeTruthy();
   }
   await page
     .getByLabel("Semana a gerir", { exact: true })
     .selectOption(weeks[0]);
-  await expect(panel.getByText(/1 pares em rascunho/)).toBeVisible();
+  await expect(panel.getByText(/1 a aguardar confirmação/)).toBeVisible();
+});
+
+test("legacy saved mandatory pairs appear on both team cards and can be assigned individually", async ({
+  page,
+}) => {
+  await login(page, "admin@fightclub.local", true);
+  const week = addClubDays(clubWeek().start, 28);
+  const state = await (await page.request.get("/api/league")).json();
+  const teams = rankingEntries(state.players, "prata");
+  const attacker = teams.at(-1)!;
+  const defender = teams.at(-2)!;
+  const saved = await page.request.post("/api/league", {
+    headers: { Origin: new URL(page.url()).origin },
+    data: {
+      type: "admin.week.matchup.add",
+      divisionId: "prata",
+      weekStart: week,
+      challengerId: attacker.members[0]._id,
+      defenderId: defender.members[0]._id,
+      expectedVersion: 0,
+    },
+  });
+  expect(saved.ok(), await saved.text()).toBe(true);
+  const checkRows = async (text: string) => {
+    await page.goto(`/admin?tab=week&task=roles&division=prata&week=${week}`);
+    for (const team of [attacker, defender]) {
+      const row = page.locator(`[data-weekly-team="${team.id}"]`);
+      await expect(row.getByLabel("Jogos possíveis")).toContainText(text);
+      await expect(
+        row.getByText("Sem jogo possível com estes papéis."),
+      ).toHaveCount(0);
+    }
+  };
+  await checkRows("Jogo obrigatório guardado:");
+  await page.goto(`/admin?tab=week&task=mandatory&division=prata&week=${week}`);
+  await expect(
+    page.getByRole("button", { name: /Publicar jogos/ }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Atribuir jogo", exact: true })
+    .click();
+  await expect
+    .poll(async () => {
+      const s = await (await page.request.get("/api/league")).json();
+      return s.weeklyRounds.find((r: any) => r.weekStart === week)
+        .manualMatchups.prata.pairs[0].publishedAt;
+    })
+    .toBeTruthy();
+  await checkRows("Jogo obrigatório atribuído:");
 });

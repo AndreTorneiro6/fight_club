@@ -1,3 +1,4 @@
+import { isDraftMatchup, waitingMandatoryMatchups } from "./mandatory-matchups";
 import type { Challenge, Player, State, WeeklyRound } from "./types";
 import { clubWeek } from "./calendar";
 import { firstCompetitionWeek } from "./competition-calendar";
@@ -117,7 +118,14 @@ export type TeamWeekOptions = {
   /** Opponents that could attack this team (attackers under the current roles). */
   defense: { rank: number; name: string }[];
   /** Game already committed this week, if any. */
-  committed?: { rank: number; name: string; side: Role };
+  committed?: {
+    rank: number;
+    name: string;
+    side: Role;
+    mandatoryPendingUntil?: string;
+  };
+  /** Legacy saved pair that has not yet been activated; it does not reserve teams. */
+  mandatoryDraft?: { rank: number; name: string; side: Role };
   /** Game in one maximum schedule; recalculated after each challenge. */
   planned?: { rank: number; name: string; side: Role };
   /** Role the planner would give, when it differs from the one on screen. */
@@ -146,7 +154,12 @@ export function divisionWeekOptions(
       weekOf(c) === week &&
       !ended.has(c.status),
   );
-  const commitment = (t: RankingEntry) => {
+  const waiting = waitingMandatoryMatchups(s, week, divisionId);
+  const drafts =
+    s.weeklyRounds
+      .find((r) => r.weekStart === week)
+      ?.manualMatchups?.[divisionId]?.pairs.filter(isDraftMatchup) ?? [];
+  const commitment = (t: RankingEntry): TeamWeekOptions["committed"] => {
     for (const c of live)
       for (const side of ["attack", "defense"] as const)
         if (
@@ -166,6 +179,23 @@ export function divisionWeekOptions(
             ? { rank: rank(other), name: name(other), side }
             : undefined;
         }
+    const pair = waiting.find(
+      (p) => p.challengerTeamKey === t.id || p.defenderTeamKey === t.id,
+    );
+    if (pair) {
+      const attacking = pair.challengerTeamKey === t.id;
+      const other = entries.find(
+        (e) =>
+          e.id === (attacking ? pair.defenderTeamKey : pair.challengerTeamKey),
+      );
+      if (other)
+        return {
+          rank: rank(other),
+          name: name(other),
+          side: attacking ? "attack" : "defense",
+          mandatoryPendingUntil: pair.mandatoryPendingUntil,
+        };
+    }
   };
   const committed = new Map(entries.map((t) => [t.id, commitment(t)]));
   const free = (t: RankingEntry) =>
@@ -250,6 +280,17 @@ export function divisionWeekOptions(
             )
           : [];
       const plannerRole = plannerRoles.get(t.id);
+      const draft = drafts.find(
+        (p) => p.challengerTeamKey === t.id || p.defenderTeamKey === t.id,
+      );
+      const draftAttacker = draft?.challengerTeamKey === t.id;
+      const draftOpponent =
+        draft &&
+        entries.find(
+          (e) =>
+            e.id ===
+            (draftAttacker ? draft.defenderTeamKey : draft.challengerTeamKey),
+        );
       return [
         t.id,
         {
@@ -261,6 +302,13 @@ export function divisionWeekOptions(
           attack: attack.map((d) => ({ rank: rank(d), name: name(d) })),
           defense: defense.map((a) => ({ rank: rank(a), name: name(a) })),
           committed: committed.get(t.id),
+          mandatoryDraft: draftOpponent
+            ? {
+                rank: rank(draftOpponent),
+                name: name(draftOpponent),
+                side: draftAttacker ? "attack" : "defense",
+              }
+            : undefined,
           planned: planned.get(t.id),
           plannerRole:
             plannerRole && mine && plannerRole !== mine

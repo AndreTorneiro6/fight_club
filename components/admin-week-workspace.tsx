@@ -146,7 +146,7 @@ export default function AdminWeekWorkspace({
           <span className="badge">
             Papéis: {published ? "publicados" : "por publicar"}
           </span>
-          <span className="badge">{drafts} pares em rascunho</span>
+          <span className="badge">{drafts} pares por atribuir</span>
           <span className="badge">{games.length} jogos</span>
         </div>
       </div>
@@ -169,7 +169,7 @@ export default function AdminWeekWorkspace({
                     ? "Publicados · rever"
                     : "Preparar e publicar"
                   : id === "mandatory"
-                    ? `${drafts} por publicar`
+                    ? `${drafts} por atribuir`
                     : id === "schedule"
                       ? `${pending.length} por agendar`
                       : `${results.length} por resolver`}

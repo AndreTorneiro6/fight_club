@@ -1,6 +1,6 @@
 # Assistente semanal de papéis e adversários
 
-Comportamento local de v1.23.0, preparado em 22/11/2026. Este documento descreve o código; não confirma a configuração nem a versão em produção. As jornadas oficiais geridas em Competição e jornadas mantêm o seu fluxo próprio.
+Comportamento local de v1.23.1, preparado em 22/11/2026. Este documento descreve o código; não confirma a configuração nem a versão em produção. As jornadas oficiais geridas em Competição e jornadas mantêm o seu fluxo próprio.
 
 ## Rascunhos e papéis
 
@@ -20,11 +20,11 @@ As regras de divisão, participação, posição acima, repetição da semana an
 
 ## Jogos obrigatórios escolhidos pelo administrador
 
-Não existe seletor entre administração e algoritmo. O administrador prepara e publica apenas os pares necessários; as outras duplas continuam no fluxo normal. Um par em rascunho não reserva equipas. Ao publicar, só as duas duplas escolhidas ficam reservadas para esse confronto e semana.
+Não existe seletor entre administração e algoritmo. O administrador define apenas os pares necessários; as outras duplas continuam no fluxo normal. Guardar um novo jogo obrigatório atribui-o imediatamente, sem publicação adicional, e reserva apenas as duas equipas escolhidas nessa semana. A partir desse momento começa o prazo de 12 horas, exclusivo desse par e sem alterar os prazos dos outros jogos. Se atravessar o fim da semana, o prazo continua válido: o novo desafio conserva a semana original e pode ser marcado na semana de confirmação, sem alterar jogos existentes. Rascunhos de versões anteriores continuam identificados como jogos guardados, sem reservar equipas; a ação Atribuir jogo ativa apenas o par escolhido, sem ativar os outros rascunhos.
 
-Só os parceiros da dupla atacante veem a atribuição e recebem o aviso de publicação. Qualquer um deles pode confirmar em Desafios durante 12 horas. A dupla em defesa espera pelo desafio real. Se o prazo terminar, o worker cria o desafio através do mesmo comando validado. Ambas as duplas recebem então a notificação e combinam o horário; a marcação mantém as confirmações exigidas pelo clube.
+Só os parceiros da dupla atacante veem a atribuição e recebem o aviso de atribuição. Qualquer um deles pode confirmar em Desafios durante 12 horas. A dupla em defesa espera pelo desafio real. Se o prazo terminar, o worker cria o desafio através do mesmo comando validado. Ambas as duplas recebem então a notificação e combinam o horário; a marcação mantém as confirmações exigidas pelo clube.
 
-A publicação é idempotente: voltar a publicar não reinicia o prazo nem duplica o desafio. Uma atribuição que deixou de ser válida exige revisão administrativa; não ultrapassa as validações. A administração pode retirar uma atribuição antes da criação do desafio.
+Voltar a atribuir o mesmo par já ativo não reinicia o prazo nem duplica o desafio. Uma atribuição que deixou de ser válida exige revisão administrativa; não ultrapassa as validações. A administração pode retirar uma atribuição antes da criação do desafio. Em Gerir semanas, os cartões de ambas as equipas mostram o adversário atribuído e a confirmação pendente em vez de indicar que não existe jogo possível. Esta informação é administrativa; a defesa continua sem pré-visualização do adversário.
 
 ## Jogos congelados e compromissos
 

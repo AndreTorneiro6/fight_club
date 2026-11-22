@@ -271,6 +271,254 @@ test("one mandatory game coexists with ordinary challenges; drafts do not reserv
   assert.deepEqual(playerMandatoryMatchups(s, "t2b"), []);
 });
 
+for (const code of ["prata", "bronze"] as const) {
+  test(`${code}: saving a mandatory game after paper publication assigns both last teams without republishing papers`, () => {
+    const s = fixture(code, 12, 3);
+    const admin: Actor = { ...actor(1), role: "admin" };
+    for (const a of s.weeklyRounds[0].assignments)
+      if (/^t11[ab]$/.test(a.playerId)) a.role = "defense";
+    s.weeklyRounds[0].divisionPublications = {
+      [code]: {
+        publishedAt: s.weeklyRounds[0].publishedAt!,
+        publishedBy: "original-admin",
+      },
+    };
+    delete s.weeklyRounds[0].publishedAt;
+    s.weeklyRounds[0].divisionChallengeOpenings = { [code]: null };
+    const publications = structuredClone(
+      s.weeklyRounds[0].divisionPublications,
+    );
+    const papers = structuredClone(s.weeklyRounds[0].assignments);
+    const command = {
+      type: "admin.week.matchup.assign",
+      divisionId: code,
+      weekStart: week,
+      challengerId: "t12a",
+      defenderId: "t11a",
+      expectedVersion: 0,
+    };
+    assert.throws(() => execute(s, actor(12), command, now), /administradores/);
+    execute(s, admin, command, now);
+    const round = s.weeklyRounds[0];
+    const pair = round.manualMatchups![code].pairs[0];
+    assert.ok(pair.publishedAt);
+    assert.equal(Date.parse(pair.mandatoryPendingUntil!), now + 12 * 3600000);
+    assert.equal(s.challenges.length, 0);
+    const options = divisionWeekOptions(
+      s,
+      code,
+      week,
+      Object.fromEntries(papers.map((a) => [a.playerId, a.role])),
+    );
+    const teams = rankingEntries(s.players, code);
+    assert.deepEqual(options.get(teams[10].id)?.committed, {
+      rank: 12,
+      name: "Team 12 a + Team 12 b",
+      side: "defense",
+      mandatoryPendingUntil: pair.mandatoryPendingUntil,
+    });
+    assert.deepEqual(options.get(teams[11].id)?.committed, {
+      rank: 11,
+      name: "Team 11 a + Team 11 b",
+      side: "attack",
+      mandatoryPendingUntil: pair.mandatoryPendingUntil,
+    });
+    assert.equal(visibleMandatoryMatchups(round, s.players, "t11b"), undefined);
+    assert.equal(playerMandatoryMatchups(s, "t12b").length, 1);
+    assert.deepEqual(round.assignments, papers);
+    assert.deepEqual(round.divisionPublications, publications);
+    assert.deepEqual(round.divisionChallengeOpenings, { [code]: null });
+    assert.throws(() => execute(s, admin, command, now));
+    const deadline = pair.mandatoryPendingUntil;
+    execute(
+      s,
+      admin,
+      { ...command, expectedVersion: 1, pairId: pair.id },
+      now + 3600000,
+    );
+    assert.equal(pair.mandatoryPendingUntil, deadline);
+    assert.equal(round.manualMatchups![code].pairs.length, 1);
+    processDeadlines(s, now + 12 * 3600000, false);
+    assert.equal(s.challenges.length, 1);
+    assert.equal(s.challenges[0].status, "accepted");
+    assert.equal(s.challenges[0].defenderId, "t11a");
+    assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+    assert.deepEqual(s.weeklyRounds[0].divisionPublications, publications);
+    assert.deepEqual(s.weeklyRounds[0].divisionChallengeOpenings, {
+      [code]: null,
+    });
+  });
+}
+
+test("assigning a saved legacy pair does not assign or notify other drafts", () => {
+  const s = fixture("ouro", 8, 3);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  for (const [a, d, version] of [
+    [4, 2, 0],
+    [8, 6, 1],
+  ])
+    execute(
+      s,
+      admin,
+      {
+        type: "admin.week.matchup.add",
+        divisionId: "ouro",
+        weekStart: week,
+        challengerId: `t${a}a`,
+        defenderId: `t${d}a`,
+        expectedVersion: version,
+      },
+      now,
+    );
+  const pairs = s.weeklyRounds[0].manualMatchups!.ouro.pairs;
+  const teams = rankingEntries(s.players, "ouro");
+  const papers = Object.fromEntries(
+    s.weeklyRounds[0].assignments.map((a) => [a.playerId, a.role]),
+  );
+  const beforeOptions = divisionWeekOptions(s, "ouro", week, papers);
+  assert.equal(beforeOptions.get(teams[3].id)?.mandatoryDraft?.rank, 2);
+  assert.equal(beforeOptions.get(teams[1].id)?.mandatoryDraft?.rank, 4);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.assign",
+      divisionId: "ouro",
+      weekStart: week,
+      pairId: pairs[0].id,
+      challengerId: "t4a",
+      defenderId: "t2a",
+      expectedVersion: 2,
+    },
+    now,
+  );
+  assert.ok(pairs[0].publishedAt);
+  const afterOptions = divisionWeekOptions(s, "ouro", week, papers);
+  assert.equal(afterOptions.get(teams[3].id)?.mandatoryDraft, undefined);
+  assert.equal(afterOptions.get(teams[3].id)?.committed?.rank, 2);
+  assert.equal(afterOptions.get(teams[7].id)?.mandatoryDraft?.rank, 6);
+  assert.equal(pairs[1].publishedAt, undefined);
+  assert.equal(
+    s.notifications.some((n) =>
+      ["t8a", "t8b", "t6a", "t6b"].includes(n.playerId),
+    ),
+    false,
+  );
+  const frozen = structuredClone(s.challenges);
+  s.players.find((p) => p._id === "t8a")!.status = "inactive";
+  const notices = s.notifications.length;
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.week.matchup.assign",
+          divisionId: "ouro",
+          weekStart: week,
+          pairId: pairs[1].id,
+          challengerId: "t8a",
+          defenderId: "t6a",
+          expectedVersion: 3,
+        },
+        now,
+      ),
+    /ativas/,
+  );
+  assert.equal(pairs[1].publishedAt, undefined);
+  assert.equal(s.notifications.length, notices);
+  assert.deepEqual(s.challenges, frozen);
+});
+
+test("the mandatory confirmation clock leaves other games and their schedules and deadlines unchanged", () => {
+  const s = fixture("prata", 12, 3);
+  send(s, 10, 8);
+  send(s, 7, 6);
+  const scheduled = pairing(s, 7, 6)!;
+  scheduled.status = "scheduled";
+  scheduled.scheduledAt = "2026-10-28T19:00:00.000Z";
+  scheduled.courtId = "court-1";
+  s.matches.push({
+    _id: "other-schedule",
+    challengeId: scheduled._id,
+    seasonId: scheduled.seasonId,
+    courtId: "court-1",
+    start: scheduled.scheduledAt,
+    end: "2026-10-28T20:30:00.000Z",
+  });
+  send(s, 4, 2);
+  const frozen = pairing(s, 4, 2)!;
+  frozen.weekStart = "2026-10-12";
+  frozen.deferredUntil = "2026-11-09";
+  frozen.playBy = frozen.scheduleBy = "2026-11-15T23:59:59.999Z";
+  const before = structuredClone(s.challenges);
+  const matches = structuredClone(s.matches);
+  execute(
+    s,
+    { ...actor(1), role: "admin" },
+    {
+      type: "admin.week.matchup.assign",
+      divisionId: "prata",
+      weekStart: week,
+      challengerId: "t12a",
+      defenderId: "t11a",
+      expectedVersion: 0,
+    },
+    now,
+  );
+  processDeadlines(s, now + 12 * 3600000 - 1, false);
+  assert.deepEqual(s.challenges, before);
+  processDeadlines(s, now + 12 * 3600000, false);
+  assert.equal(s.challenges.length, before.length + 1);
+  assert.deepEqual(
+    s.challenges.filter((c) => before.some((old) => old._id === c._id)),
+    before,
+  );
+  assert.deepEqual(s.matches, matches);
+  assert.equal(pairing(s, 12, 11)?.status, "accepted");
+});
+
+for (const automatic of [false, true]) {
+  test(`the 12-hour mandatory window survives Sunday midnight through ${automatic ? "the worker" : "player confirmation"}`, () => {
+    const s = fixture("prata", 12, 3);
+    const sunday = Date.parse("2026-11-01T20:00:00Z");
+    const monday = sunday + 12 * 3600000;
+    execute(
+      s,
+      { ...actor(1), role: "admin" },
+      {
+        type: "admin.week.matchup.assign",
+        divisionId: "prata",
+        weekStart: week,
+        challengerId: "t12a",
+        defenderId: "t11a",
+        expectedVersion: 0,
+      },
+      sunday,
+    );
+    const papers = structuredClone(s.weeklyRounds[0].assignments);
+    processDeadlines(s, monday - 1, false);
+    assert.equal(s.challenges.length, 0);
+    if (automatic) processDeadlines(s, monday, false);
+    else
+      execute(
+        s,
+        actor(12),
+        { type: "challenge.create", weekStart: week, defenderId: "t11a" },
+        monday - 1,
+      );
+    assert.equal(s.challenges.length, 1);
+    const c = s.challenges[0];
+    assert.equal(c.status, "accepted");
+    assert.equal(c.weekStart, week);
+    assert.equal(c.deferredUntil, "2026-11-02");
+    assert.ok(Date.parse(c.playBy) > monday);
+    assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+    processDeadlines(s, monday + 60000, false);
+    assert.equal(s.challenges.length, 1);
+  });
+}
+
 for (const originalWeek of [week, "2026-10-12"]) {
   test(`frozen game from ${originalWeek} survives challenges, draft generation and deadline processing unchanged`, () => {
     const s = fixture("ouro", 8, 3);

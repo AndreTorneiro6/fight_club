@@ -4882,34 +4882,55 @@ function AdminDivisionMatchmaking(
           </>
         )}
         <p>
-          Prepara apenas os jogos obrigatórios necessários e publica quando
-          estiverem prontos. A dupla atacante tem 12 horas para confirmar;
-          depois, o jogo é criado automaticamente. As restantes duplas continuam
-          a desafiar normalmente.
+          Define apenas os jogos obrigatórios necessários. Ao guardar, o
+          adversário fica atribuído e a dupla atacante tem 12 horas para
+          confirmar; depois, o jogo é criado automaticamente. As restantes
+          duplas continuam a desafiar normalmente.
         </p>
         <small>
-          Jornada de {week} · {games.length} jogos publicados · {draft.length}{" "}
-          pares em rascunho · {waiting.length} a aguardar confirmação ·{" "}
+          Jornada de {week} · {games.length} jogos criados · {draft.length}{" "}
+          pares por atribuir · {waiting.length} a aguardar confirmação ·{" "}
           {free.length} duplas sem jogo.
         </small>
         <>
           <p>
             As regras de ranking, título e repetição mantêm-se. Os limites
-            ativos e a composição das duplas são novamente validados ao
-            publicar. Outras semanas não são alteradas.
+            ativos e a composição das duplas são validados ao guardar. Outras
+            semanas não são alteradas.
           </p>
           <button
             className="primary"
             disabled={busy || free.length < 2}
             onClick={() => setAssigning(true)}
           >
-            {a.context ? "Adicionar par ao rascunho" : "Definir jogo"}
+            Definir jogo obrigatório
           </button>
           {draft.map((pair) => (
             <div key={pair.id} className="inset row between wrap">
               <span>
-                {name(pair.challengerId)} × {name(pair.defenderId)} · Rascunho
+                {name(pair.challengerId)} × {name(pair.defenderId)} · Por
+                atribuir
               </span>
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    {
+                      type: "admin.week.matchup.assign",
+                      weekStart: week,
+                      divisionId: division,
+                      pairId: pair.id,
+                      challengerId: pair.challengerId,
+                      defenderId: pair.defenderId,
+                      expectedVersion: plan.version,
+                    },
+                    "Jogo atribuído. A dupla atacante tem 12 horas para confirmar.",
+                  )
+                }
+              >
+                Atribuir jogo
+              </button>
               <button
                 disabled={busy}
                 onClick={() =>
@@ -4959,27 +4980,6 @@ function AdminDivisionMatchmaking(
               </button>
             </div>
           ))}
-          {draft.length > 0 && (
-            <button
-              disabled={busy}
-              className="primary"
-              onClick={() =>
-                void run(
-                  {
-                    type: "admin.week.matchups.publish",
-                    weekStart: week,
-                    divisionId: division,
-                    expectedVersion: plan.version,
-                  },
-                  "Jogos publicados. A dupla atacante tem 12 horas para confirmar.",
-                )
-              }
-            >
-              {a.context
-                ? "Publicar jogos obrigatórios"
-                : "Publicar jogos desta semana"}
-            </button>
-          )}
           {free.length > 0 && (
             <details>
               <summary>Duplas sem jogo nesta jornada</summary>
@@ -7255,7 +7255,7 @@ function AssignmentDialog(
           const result = await run(
             {
               type: a.draftWeekStart
-                ? "admin.week.matchup.add"
+                ? "admin.week.matchup.assign"
                 : c
                   ? "admin.challenge.assign"
                   : "admin.challenge.create",
@@ -7270,7 +7270,7 @@ function AssignmentDialog(
               defenderId: defender,
             },
             a.draftWeekStart
-              ? "Confronto guardado no rascunho. Publica os jogos quando estiverem prontos."
+              ? "Jogo obrigatório atribuído. A dupla atacante tem 12 horas para confirmar."
               : c
                 ? "Papéis atualizados. O defensor recebe um novo pedido de aceitação."
                 : "Desafio atribuído. Jogadores notificados.",
@@ -7283,7 +7283,7 @@ function AssignmentDialog(
       >
         <p style={{ fontSize: 12 }}>
           {a.draftWeekStart
-            ? `Escolhe as duplas para a semana de ${a.draftWeekStart}. O par fica em rascunho até publicares os jogos.`
+            ? `Escolhe as duplas para a semana de ${a.draftWeekStart}. Ao guardar, o adversário fica atribuído e a dupla atacante é notificada. A dupla em defesa aguarda o desafio.`
             : manual
               ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
               : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}
@@ -7384,7 +7384,7 @@ function AssignmentDialog(
           <Sword size={15} />
           <Shield size={15} />
           {a.draftWeekStart
-            ? "Guardar par no rascunho"
+            ? "Atribuir jogo obrigatório"
             : manual
               ? "Definir jogo e notificar duplas"
               : "Guardar atribuição"}
