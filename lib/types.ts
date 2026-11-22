@@ -207,6 +207,8 @@ export interface Challenge extends Entity {
   completedAt?: string;
   titleFight?: boolean;
   expiredFrom?: ChallengeStatus;
+  /** Timestamp until which the mandatory challenge awaits confirmation from the challenger. */
+  mandatoryPendingUntil?: string;
 }
 export interface ScheduleProposal {
   _id: string;
@@ -387,6 +389,10 @@ export interface ManualWeekMatchup {
   challengerTeamKey: string;
   defenderTeamKey: string;
   challengeId?: string;
+  /** When the mandatory matchup was published; starts the 12h window for the attacker to challenge. */
+  publishedAt?: string;
+  /** Deadline for the attacker to initiate the challenge; after this it is auto-created. */
+  mandatoryPendingUntil?: string;
 }
 export interface WeeklyRound extends Entity {
   ouroAllowedOpponents?: Record<string, string[]>;

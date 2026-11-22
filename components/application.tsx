@@ -1697,8 +1697,18 @@ function RankingTable({
 }: Actions & { divisionId: string; limit?: number }) {
   const p = s.players.find((p) => p._id === s.actor.playerId)!,
     [target, setTarget] = useState<Player | null>(null),
+    [confirmingMandatory, setConfirmingMandatory] = useState<Challenge | null>(null),
     router = useRouter();
   const managed = usesManagedCompetition(s, p.divisionId);
+  // Check for mandatory pending challenge where current player is challenger
+  const mandatoryPendingChallenge = s.challenges.find(
+    (c) =>
+      c.mandatoryAssignment &&
+      c.mandatoryPendingUntil &&
+      c.status === "pending" &&
+      c.challengerId === p._id &&
+      Date.parse(c.mandatoryPendingUntil) > Date.now(),
+  );
   const previousPositions = new Map(
     rankingEntries(
       s.players.map((member) => ({
@@ -1718,10 +1728,18 @@ function RankingTable({
         <span className="hide-mobile">Estado</span>
         <span className="right">Desafio</span>
       </div>
-      {rankingEntries(s.players, divisionId)
-        .map((entry, index) => ({ ...entry, teamPosition: index + 1 }))
-        .slice(0, limit)
-        .map((entry) => {
+      {(() => {
+        const allEntries = rankingEntries(s.players, divisionId).map(
+          (entry, index) => ({ ...entry, teamPosition: index + 1 }),
+        );
+        const entriesToShow = mandatoryPendingChallenge
+          ? allEntries.filter((entry) =>
+              entry.members.some(
+                (member) => member._id === mandatoryPendingChallenge.defenderId,
+              ),
+            )
+          : allEntries.slice(0, limit);
+        return entriesToShow.map((entry) => {
           const record = teamRecord(s.challenges, entry.members);
           const ownTeam = entry.members.some((member) => member._id === p._id);
           const options = entry.members.map((member) => ({
@@ -1837,6 +1855,36 @@ function RankingTable({
                   <Link className="button small" href="/jornadas">
                     Ver desafios
                   </Link>
+                ) : mandatoryPendingChallenge &&
+                  entry.members.some(
+                    (member) => member._id === mandatoryPendingChallenge.defenderId,
+                  ) ? (
+                  <button
+                    className="small primary"
+                    style={{
+                      color: "var(--gold)",
+                      borderColor: "#e7b85b33",
+                    }}
+                    aria-label={`Confirmar jogo obrigatório contra ${entry.members.map((member) => member.name).join(" + ")}`}
+                    onClick={async () => {
+                      try {
+                        await run(
+                          {
+                            type: "challenge.respond",
+                            challengeId: mandatoryPendingChallenge._id,
+                            accept: true,
+                          },
+                          "Jogo obrigatório confirmado. Combinem o horário.",
+                        );
+                        setConfirmingMandatory(null);
+                      } catch (e) {
+                        notify((e as Error).message, true);
+                      }
+                    }}
+                  >
+                    <Swords size={12} />
+                    Confirmar jogo obrigatório
+                  </button>
                 ) : targetMember ? (
                   <button
                     className="small"
@@ -1860,7 +1908,8 @@ function RankingTable({
               </div>
             </div>
           );
-        })}
+        })
+      })()}
       {target && (
         <ChallengeComposer
           s={s}

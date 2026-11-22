@@ -1085,12 +1085,15 @@ test("future manual drafts are week-specific, consume no active slots and publis
     },
     now,
   );
-  assert.equal(s.challenges.length, 1);
-  const c = s.challenges[0];
-  assert.equal(c.weekStart, future);
-  assert.equal(c.status, "accepted");
-  assert.equal(c.deferredUntil, undefined);
-  assert.equal(c.playBy, "2026-11-22T23:59:59.999Z");
+  // After publish, no challenges created yet - attacker must initiate within 12h
+  assert.equal(s.challenges.length, 0);
+  const futureRound = s.weeklyRounds.find((r) => r.weekStart === future)!;
+  const plan = futureRound.manualMatchups!.ouro;
+  assert.equal(plan.pairs.length, 1);
+  const pair = plan.pairs[0];
+  assert.ok(pair.publishedAt);
+  assert.ok(pair.mandatoryPendingUntil);
+  assert.equal(pair.challengeId, undefined);
   // Publishing a future game must not consume the current week's active slots.
   assert.equal(
     limitChallenges(
@@ -1101,6 +1104,28 @@ test("future manual drafts are week-specific, consume no active slots and publis
     ).length,
     0,
   );
+  // Attacker initiates the challenge
+  const attacker: Actor = { ...actor(4), role: "player" };
+  execute(
+    s,
+    attacker,
+    {
+      type: "challenge.create",
+      challengerId: "t4a",
+      defenderId: "t2a",
+      weekStart: future,
+    },
+    now,
+  );
+  assert.equal(s.challenges.length, 1);
+  const c = s.challenges[0];
+  assert.equal(c.weekStart, future);
+  assert.equal(c.status, "accepted");
+  assert.equal(c.mandatoryAssignment, true);
+  assert.equal(c.playBy, "2026-11-22T23:59:59.999Z");
+  // Pair should now be linked to the challenge
+  assert.equal(pair.challengeId, c._id);
+  // Second publish should be idempotent
   execute(
     s,
     admin,
