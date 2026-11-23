@@ -120,7 +120,7 @@ test("last result selects its division, guides ranking and private papers, then 
     await expect(pubControl.getByLabel("Quando publicar?")).toBeVisible();
     await pubControl.getByLabel("Quando publicar?").selectOption("after");
     await pubControl.getByLabel("Minutos até publicar").fill("0");
-    await pubControl.getByRole("button", { name: "Ativar contagem decrescente", exact: true }).click();
+    await pubControl.getByRole("button", { name: "Guardar contagem para após aprovação", exact: true }).click();
     await expect(
       flow.getByRole("heading", { name: "Abertura e notificações" }),
     ).toBeVisible();
