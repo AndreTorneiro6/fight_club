@@ -1,0 +1,82 @@
+name: Restore selected expired games
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: JSON array of game IDs and expected SHA256 document hashes
+        required: true
+      public_key:
+        description: Base64 PEM RSA public key for the encrypted backup
+        required: true
+      apply:
+        description: Apply the previewed deadline extensions
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, "${{ vars.DEPLOY_RUNNER_LABEL || 'fight-club-oracle' }}"]
+    timeout-minutes: 5
+    environment: production
+    steps:
+      # Data maintenance only. Uses the running release's validated engine and
+      # normal league transaction; never deploys or replaces application files.
+      - name: Preview or apply guarded recovery
+        env:
+          RECOVERY_MANIFEST: ${{ inputs.manifest }}
+          RECOVERY_PUBLIC_KEY: ${{ inputs.public_key }}
+          RECOVERY_APPLY: ${{ inputs.apply }}
+        run: |
+          docker exec -i -e RECOVERY_MANIFEST -e RECOVERY_PUBLIC_KEY -e RECOVERY_APPLY fight-club-app-1 node --import tsx --input-type=module <<'JS'
+          import { createHash, createPublicKey, randomBytes, createCipheriv, publicEncrypt } from 'node:crypto';
+          import { gzipSync } from 'node:zlib';
+          import { database, readState, transaction } from './lib/db.ts';
+          import { execute } from './lib/engine.ts';
+          import { ensure } from './lib/rules.ts';
+          const manifest = JSON.parse(process.env.RECOVERY_MANIFEST);
+          ensure(Array.isArray(manifest) && manifest.length > 0 && manifest.length <= 10 && new Set(manifest.map(x => x.id)).size === manifest.length && manifest.every(x => typeof x.id === 'string' && /^[a-f0-9]{64}$/.test(x.sha256)), 'Invalid recovery manifest');
+          const publicKey = createPublicKey(Buffer.from(process.env.RECOVERY_PUBLIC_KEY, 'base64'));
+          ensure(publicKey.asymmetricKeyType === 'rsa' && publicKey.asymmetricKeyDetails.modulusLength >= 3072, 'RSA key of at least 3072 bits required');
+          const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+          const { client, db } = await database();
+          try {
+            const repair = async (s, database, session) => {
+              const before = structuredClone(s), ids = new Set(manifest.map(x => x.id));
+              for (const entry of manifest) {
+                const c = s.challenges.find(c => c._id === entry.id);
+                ensure(c && digest(c) === entry.sha256, 'Game changed since inspection; refusing recovery');
+                ensure(c.status === 'expired' && ['accepted', 'schedule_pending', 'scheduled'].includes(c.expiredFrom) && !c.competitionRoundId, 'Only expired accepted ordinary games can be recovered');
+                ensure(!s.results.some(r => r.challengeId === c._id), 'Game already has a result');
+              }
+              const users = await database.collection('users').find({ role: 'admin', verified: true }, { session }).toArray();
+              const player = s.players.find(p => users.some(u => u._id === p.userId) && p.status === 'active' && !p.awaitingApproval && !p.registrationRejectedAt);
+              ensure(player?.userId, 'No eligible verified administrator');
+              const actor = { userId: player.userId, playerId: player._id, role: 'admin' };
+              for (const { id } of manifest) execute(s, actor, { type: 'admin.resolve', challengeId: id, action: 'extend' });
+              for (const key of Object.keys(before)) {
+                if (['audit', 'notifications', 'challenges'].includes(key)) continue;
+                ensure(digest(s[key]) === digest(before[key]), 'Recovery changed an unrelated collection');
+              }
+              ensure(digest(s.challenges.filter(c => !ids.has(c._id))) === digest(before.challenges.filter(c => !ids.has(c._id))), 'Recovery changed another game');
+              for (const c of s.challenges.filter(c => ids.has(c._id))) {
+                const previous = before.challenges.find(p => p._id === c._id);
+                const strip = value => Object.fromEntries(Object.entries(value).filter(([k]) => !['status', 'respondBy', 'scheduleBy', 'playBy'].includes(k)));
+                ensure(digest(strip(c)) === digest(strip(previous)), 'Recovery changed game identity, schedule or competition week');
+              }
+              const key = randomBytes(32), iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);
+              const ciphertext = Buffer.concat([cipher.update(gzipSync(JSON.stringify({ capturedAt: new Date().toISOString(), before: before.challenges.filter(c => ids.has(c._id)), after: s.challenges.filter(c => ids.has(c._id)), audit: s.audit.slice(before.audit.length) }))), cipher.final()]);
+              const encoded = Buffer.from(JSON.stringify({ key: publicEncrypt({ key: publicKey, oaepHash: 'sha256' }, key).toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: ciphertext.toString('base64') })).toString('base64');
+              for (let offset = 0; offset < encoded.length; offset += 4000) console.log('ENCRYPTED_RECOVERY_REPORT=' + encoded.slice(offset, offset + 4000));
+              return { mode: process.env.RECOVERY_APPLY === 'true' ? 'applied' : 'preview', games: manifest.length };
+            };
+            const result = process.env.RECOVERY_APPLY === 'true'
+              ? await transaction(repair)
+              : await repair(await readState(db), db);
+            console.log(JSON.stringify(result));
+          } finally { await client.close(); }
+          JS
