@@ -115,17 +115,12 @@ test("last result selects its division, guides ranking and private papers, then 
     await expect(
       flow.getByRole("region", { name: "Publicação dos papéis", exact: true }),
     ).toBeVisible();
-    // Use "at" mode with a time 1 minute in the future for reliable CI scheduling
+    // Use "after" mode with 0 minutes for immediate publication after approval
     const pubControl = flow.getByRole("region", { name: "Publicação dos papéis", exact: true });
     await expect(pubControl.getByLabel("Quando publicar?")).toBeVisible();
-    await pubControl.getByLabel("Quando publicar?").selectOption("at");
-    // Fill date and time inputs with current UTC time + 1 minute
-    const now = new Date(Date.now() + 60000);
-    const day = now.toISOString().split("T")[0];
-    const hour = now.toTimeString().slice(0, 5);
-    await pubControl.getByLabel("Dia de publicação").fill(day);
-    await pubControl.getByLabel("Hora · Portugal").fill(hour);
-    await pubControl.getByRole("button", { name: "Agendar publicação", exact: true }).click();
+    await pubControl.getByLabel("Quando publicar?").selectOption("after");
+    await pubControl.getByLabel("Minutos até publicar", { exact: true }).fill("0");
+    await pubControl.getByRole("button", { name: "Guardar contagem para após aprovação", exact: true }).click();
     // Wait for publication to be reflected in the API
     await expect(async () => {
       const state = await read();
@@ -135,6 +130,8 @@ test("last result selects its division, guides ranking and private papers, then 
       const pub = round?.divisionPublications?.[game.divisionId];
       expect(pub?.publishedAt).toBeTruthy();
     }).toPass({ timeout: 30000 });
+    // Click the "3. Abertura" button to show the opening section
+    await flow.getByRole("button", { name: "3. Abertura", exact: true }).click();
     await expect(
       flow.getByRole("heading", { name: "Abertura e notificações" }),
     ).toBeVisible();

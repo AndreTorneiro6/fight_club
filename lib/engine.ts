@@ -40,6 +40,7 @@ import {
   publishDivisionPapers,
   scheduleDivisionPapersPublication,
   configureDivisionPapersPublicationDelay,
+  divisionPaperSignature,
 } from "./division-weekly-publication";
 import { challengeDistance } from "./challenge-distance";
 import {
@@ -5729,6 +5730,27 @@ function processMandatoryMatchups(s: State, timestamp: number) {
   }
 }
 
+export function processScheduledPublications(
+  s: State,
+  timestamp = Date.now(),
+) {
+  const now = new Date(timestamp).toISOString();
+  for (const r of s.weeklyRounds) {
+    if (!r.divisionPublications) continue;
+    for (const [divisionId, pub] of Object.entries(r.divisionPublications)) {
+      if (!pub.scheduledAt) continue;
+      if (Date.parse(pub.scheduledAt) > timestamp) continue;
+      if (pub.publishedAt) continue;
+      if (!pub.approvedAt) continue;
+      // Verify the approval snapshot still matches
+      const currentSignature = divisionPaperSignature(s, r, divisionId);
+      if (pub.approvalSnapshot !== currentSignature) continue;
+      // Publish the papers
+      publishDivisionPapers(s, divisionId, r.weekStart, r.version ?? 0, false, "system:scheduled-publication", timestamp);
+    }
+  }
+}
+
 export function processDeadlines(
   s: State,
   timestamp = Date.now(),
@@ -5741,6 +5763,7 @@ export function processDeadlines(
     autoWeeklyRanking(s, timestamp);
     autoWeeklyTurnover(s, timestamp);
     notifyWeeklyOpenings(s, timestamp);
+    processScheduledPublications(s, timestamp);
   }
   processCompetitionDeadlines(s, timestamp, generateRoles);
   processMandatoryMatchups(s, timestamp);

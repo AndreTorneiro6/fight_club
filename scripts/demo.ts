@@ -60,7 +60,11 @@ const child = spawn(
   ],
   { stdio: "inherit", env: process.env },
 );
-const stopNotifications = testing ? () => {} : startNotificationWorker();
+// Start notification worker in production or when running the round-transition test (which needs deadline processing)
+const needsWorker = !testing || process.env.DEMO_TEST_ROUND_TRANSITION === "1";
+// In test mode, run deadline scans every 5 seconds instead of 60 for faster CI feedback
+const workerIntervalMs = process.env.DEMO_TEST_ROUND_TRANSITION === "1" ? 5000 : 60000;
+const stopNotifications = needsWorker ? startNotificationWorker(workerIntervalMs) : () => {};
 let stopping = false;
 async function stop() {
   if (stopping) return;
