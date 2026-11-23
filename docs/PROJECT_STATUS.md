@@ -1,3 +1,10 @@
+## GitHub Actions final browser check repaired — 23 November 2026
+
+- Latest failed run 45097916592 (8597760) passed typecheck, all 611 tests, build and every browser group before the final weekly-teams check. That assertion still expected Semana 2 after v2.0.1 intentionally changed the label to Jornada 2. Updated the assertion; all required checks remain enabled.
+- Local typecheck, all 611 tests, production build and the complete weekly-teams browser scenario pass. This is a test/documentation correction for the pending v2.0.1 release; no additional application version change.
+- User also reports missing Hélder Marques vs Tiago Carreira and Tiago vs Raul Machado games. Live health is OK, but game records have not been inspected or changed: DNS now resolves to 152.70.4.8 and its presented SSH key differs from the saved legacy Pi alias. Current production connection details requested. Do not infer deletion or recreate games before inspecting their actual records/history.
+- Submitting through the deploy-branch GitHub Actions workflow; successful deployment and game recovery are not yet verified. No manual deployment or live league-data writes.
+
 ## Version 1.23.2 LIVE verified — 22 November 2026
 
 - Workflow 45071749026 started at 21:22:29 UTC. Honoured the requested ten-minute delay and first monitored after 21:32:29 UTC. All required checks and deployment completed successfully for exact revision 42f925a25fcf3aaaa891c3b667631290d3e3a766. Independent public /api/health verification returned {"ok":true}.

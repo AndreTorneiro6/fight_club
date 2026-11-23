@@ -218,7 +218,7 @@ test("team weekly controls are admin-only, lock on selection and can be cleared 
   await openAdminSection(admin, "Papéis semanais");
   const previousAttacker = adminRow(admin, "Luís Costa");
   const history = previousAttacker.locator(".weekly-role-history");
-  await expect(history.locator("summary")).toContainText("Semana 2");
+  await expect(history.locator("summary")).toContainText("Jornada 2");
   await expect(
     history.locator("summary .weekly-history-role.attack"),
   ).toHaveText("Último papel: Ataque");
