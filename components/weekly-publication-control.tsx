@@ -106,10 +106,11 @@ export default function WeeklyPublicationControl({
           }
         }}
       >
-        <label>
+        <label htmlFor="publish-mode">
           Quando publicar?
           <select
-            aria-label="Quando publicar os papéis"
+            id="publish-mode"
+            aria-label="Quando publicar?"
             value={mode}
             onChange={(e) => {
               setMode(e.target.value as typeof mode);

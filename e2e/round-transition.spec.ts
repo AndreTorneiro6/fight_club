@@ -117,9 +117,9 @@ test("last result selects its division, guides ranking and private papers, then 
     ).toBeVisible();
     // New publication scheduling UI: use "after" mode with 0 minutes for immediate publication
     const pubControl = flow.getByRole("region", { name: "Publicação dos papéis", exact: true });
-    await expect(pubControl.getByLabel("Quando publicar?", { exact: true })).toBeVisible();
-    await pubControl.getByLabel("Quando publicar?", { exact: true }).selectOption("after");
-    await pubControl.getByLabel("Minutos até publicar", { exact: true }).fill("0");
+    await expect(pubControl.getByLabel("Quando publicar?")).toBeVisible();
+    await pubControl.getByLabel("Quando publicar?").selectOption("after");
+    await pubControl.getByLabel("Minutos até publicar").fill("0");
     await pubControl.getByRole("button", { name: "Ativar contagem decrescente", exact: true }).click();
     await expect(
       flow.getByRole("heading", { name: "Abertura e notificações" }),
