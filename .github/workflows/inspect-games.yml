@@ -29,6 +29,7 @@ jobs:
         run: |
           docker exec -i -e INSPECT_NAMES -e INSPECT_PUBLIC_KEY fight-club-app-1 node --input-type=module <<'JS'
           import { MongoClient } from 'mongodb';
+          import { gzipSync } from 'node:zlib';
           import { randomBytes, createCipheriv, publicEncrypt, createPublicKey } from 'node:crypto';
           const publicKey = createPublicKey(Buffer.from(process.env.INSPECT_PUBLIC_KEY, 'base64'));
           if (publicKey.asymmetricKeyType !== 'rsa' || publicKey.asymmetricKeyDetails.modulusLength < 3072) throw new Error('RSA key of at least 3072 bits required');
@@ -48,14 +49,15 @@ jobs:
             const related = { challengeId: { $in: gameIds } };
             const [matches, results, history, weeklyRounds, audit, divisions, seasons] = await Promise.all([
               read('matches', related), read('results', related), read('history', related),
-              read('weeklyRounds'), read('audit'), read('divisions'), read('seasons'),
+              read('weeklyRounds', {}, { weekStart: 1, manualMatchups: 1, divisionPublications: 1, assignments: 1, publishedAt: 1 }), read('audit', {}, { action: 1, details: 1, createdAt: 1 }), read('divisions'), read('seasons', {}, { status: 1, start: 1, end: 1, firstCompetitionWeek: 1 }),
             ]);
-            const selectedAudit = audit.filter(a => [...gameIds, ...ids].some(id => a.details?.includes(id)));
+            const selectedAudit = audit.filter(a => [...gameIds, ...ids].some(id => a.details?.includes(id))).map(a => ({ ...a, details: a.details.slice(0, 10000) }));
             const report = { capturedAt: new Date().toISOString(), selected, players, challenges, matches, results, history, weeklyRounds, audit: selectedAudit, divisions, seasons };
             const key = randomBytes(32), iv = randomBytes(12);
             const cipher = createCipheriv('aes-256-gcm', key, iv);
-            const ciphertext = Buffer.concat([cipher.update(JSON.stringify(report)), cipher.final()]);
+            const ciphertext = Buffer.concat([cipher.update(gzipSync(JSON.stringify(report))), cipher.final()]);
             const encoded = Buffer.from(JSON.stringify({ key: publicEncrypt({ key: publicKey, oaepHash: 'sha256' }, key).toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: ciphertext.toString('base64') })).toString('base64');
+            if (encoded.length > 2000000) throw new Error('Report too large; narrow the diagnostic');
             for (let offset = 0; offset < encoded.length; offset += 4000) console.log('ENCRYPTED_GAME_REPORT=' + encoded.slice(offset, offset + 4000));
           } finally { await client.close(); }
           JS
