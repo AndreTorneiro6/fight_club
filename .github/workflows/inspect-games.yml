@@ -1,0 +1,61 @@
+name: Inspect games (read only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      names:
+        description: Comma-separated player names to inspect
+        required: true
+      public_key:
+        description: Base64 PEM RSA public key for encrypting the report
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, "${{ vars.DEPLOY_RUNNER_LABEL || 'fight-club-oracle' }}"]
+    timeout-minutes: 5
+    environment: production
+    steps:
+      # No checkout, build, deployment, application imports or database writes.
+      # Inputs go through environment variables, never shell interpolation.
+      - name: Read selected game records and encrypt the report
+        env:
+          INSPECT_NAMES: ${{ inputs.names }}
+          INSPECT_PUBLIC_KEY: ${{ inputs.public_key }}
+        run: |
+          docker exec -i -e INSPECT_NAMES -e INSPECT_PUBLIC_KEY fight-club-app-1 node --input-type=module <<'JS'
+          import { MongoClient } from 'mongodb';
+          import { randomBytes, createCipheriv, publicEncrypt, createPublicKey } from 'node:crypto';
+          const publicKey = createPublicKey(Buffer.from(process.env.INSPECT_PUBLIC_KEY, 'base64'));
+          if (publicKey.asymmetricKeyType !== 'rsa' || publicKey.asymmetricKeyDetails.modulusLength < 3072) throw new Error('RSA key of at least 3072 bits required');
+          const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          const names = process.env.INSPECT_NAMES.split(',').map(normalize).filter(Boolean);
+          if (!names.length || names.length > 10 || names.some(n => n.length < 4)) throw new Error('Provide 1–10 player names, each at least four characters');
+          const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+          try {
+            await client.connect();
+            const db = client.db(process.env.MONGODB_DB ?? 'fight_club');
+            const read = (name, query = {}, projection) => db.collection(name).find(query, { projection, maxTimeMS: 15000 }).sort({ createdAt: -1 }).limit(5000).toArray();
+            const players = await read('players', {}, { name: 1, partnerId: 1, divisionId: 1, position: 1, status: 1 });
+            const selected = players.filter(p => names.some(n => normalize(p.name).includes(n)));
+            const ids = selected.map(p => p._id);
+            const challenges = await read('challenges', { $or: [{ challengerId: { $in: ids } }, { defenderId: { $in: ids } }, { 'challengerTeam.playerId': { $in: ids } }, { 'defenderTeam.playerId': { $in: ids } }] });
+            const gameIds = challenges.map(c => c._id);
+            const related = { challengeId: { $in: gameIds } };
+            const [matches, results, history, weeklyRounds, audit, divisions, seasons] = await Promise.all([
+              read('matches', related), read('results', related), read('history', related),
+              read('weeklyRounds'), read('audit'), read('divisions'), read('seasons'),
+            ]);
+            const selectedAudit = audit.filter(a => [...gameIds, ...ids].some(id => a.details?.includes(id)));
+            const report = { capturedAt: new Date().toISOString(), selected, players, challenges, matches, results, history, weeklyRounds, audit: selectedAudit, divisions, seasons };
+            const key = randomBytes(32), iv = randomBytes(12);
+            const cipher = createCipheriv('aes-256-gcm', key, iv);
+            const ciphertext = Buffer.concat([cipher.update(JSON.stringify(report)), cipher.final()]);
+            const encoded = Buffer.from(JSON.stringify({ key: publicEncrypt({ key: publicKey, oaepHash: 'sha256' }, key).toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: ciphertext.toString('base64') })).toString('base64');
+            for (let offset = 0; offset < encoded.length; offset += 4000) console.log('ENCRYPTED_GAME_REPORT=' + encoded.slice(offset, offset + 4000));
+          } finally { await client.close(); }
+          JS
