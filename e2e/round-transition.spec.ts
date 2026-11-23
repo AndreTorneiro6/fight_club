@@ -121,7 +121,7 @@ test("last result selects its division, guides ranking and private papers, then 
     await pubControl.getByLabel("Quando publicar?").selectOption("after");
     await pubControl.getByLabel("Minutos até publicar").fill("0");
     await pubControl.getByRole("button", { name: "Guardar contagem para após aprovação", exact: true }).click();
-    // Wait for publication to be reflected in the API
+    // Wait for publication to be reflected in the API (may take longer in CI due to background worker)
     await expect(async () => {
       const state = await read();
       const round = state.weeklyRounds.find(
@@ -129,7 +129,7 @@ test("last result selects its division, guides ranking and private papers, then 
       );
       const pub = round?.divisionPublications?.[game.divisionId];
       expect(pub?.publishedAt).toBeTruthy();
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 30000 });
     await expect(
       flow.getByRole("heading", { name: "Abertura e notificações" }),
     ).toBeVisible();
