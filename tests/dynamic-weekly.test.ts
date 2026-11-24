@@ -12,7 +12,7 @@ import {
   playerMandatoryMatchups,
   visibleMandatoryMatchups,
 } from "../lib/mandatory-matchups";
-import { limitChallenges } from "../lib/rules";
+import { challengeReason, limitChallenges } from "../lib/rules";
 import { weeklyReason, weeklyRole } from "../lib/weekly";
 import {
   dynamicWeeklyPlan,
@@ -27,6 +27,7 @@ import {
   refreshGeneratedWeeklyDrafts,
 } from "../lib/weekly-role-workflow";
 import { effectiveRoles } from "../lib/effective-roles";
+import { notificationTarget } from "../lib/notification-link";
 import { filterFeatureView } from "../lib/feature-view";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
@@ -1578,7 +1579,7 @@ test("future manual drafts are week-specific, consume no active slots and publis
       type: "admin.week.matchups.publish",
       divisionId: "ouro",
       weekStart: future,
-      expectedVersion: 2,
+      expectedVersion: 3,
     },
     now,
   );
@@ -2287,4 +2288,299 @@ test("mandatory drafts publish with unrelated games still awaiting schedules and
   send(s, 6, 5);
   assert.ok(pair.challengeId);
   assert.deepEqual(s.challenges[0], games[0]);
+});
+
+function assignMandatory(s: State, a: number, d: number) {
+  const divisionId = s.divisions[0]._id;
+  execute(
+    s,
+    { ...actor(1), role: "admin" },
+    {
+      type: "admin.week.matchup.assign",
+      weekStart: week,
+      divisionId,
+      challengerId: `t${a}a`,
+      defenderId: `t${d}a`,
+      expectedVersion: 0,
+    },
+    now,
+  );
+  return s.weeklyRounds[0].manualMatchups![divisionId].pairs[0];
+}
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  for (const [a, d] of [
+    [12, 1],
+    [1, 12],
+  ]) {
+    test(`${code}: admin-selected mandatory ${a} versus ${d} bypasses ranking and role restrictions for attacker and partner confirmation`, () => {
+      const s = fixture(code, 12, 2);
+      const admin: Actor = { ...actor(1), role: "admin" };
+      s.settings[0].weeklyDynamicRoles = false;
+      s.settings[0].titleMaxPosition = 2;
+      // Even unpublished or closed papers cannot prevent confirmation of a published assignment.
+      delete s.weeklyRounds[0].publishedAt;
+      s.weeklyRounds[0].divisionChallengeOpenings = { [code]: null };
+      assert.ok(
+        challengeReason(
+          s,
+          s.players.find((p) => p._id === `t${a}b`)!,
+          s.players.find((p) => p._id === `t${d}a`)!,
+          now,
+          false,
+          false,
+          week,
+        ),
+      );
+      const papers = structuredClone(s.weeklyRounds[0].assignments);
+      const pair = assignMandatory(s, a, d);
+      assert.equal(
+        challengeReason(
+          s,
+          s.players.find((p) => p._id === `t${a}b`)!,
+          s.players.find((p) => p._id === `t${d}a`)!,
+          now,
+          false,
+          false,
+          week,
+        ),
+        null,
+      );
+      const confirm = {
+        type: "mandatory.matchup.confirm",
+        weekStart: week,
+        pairId: pair.id,
+      };
+      assert.throws(
+        () => execute(s, actor(d), confirm, now),
+        /Só a dupla atacante/,
+      );
+      assert.throws(
+        () => execute(s, actor(6), confirm, now),
+        /Só a dupla atacante/,
+      );
+      const result = execute(s, actor(a, "b"), confirm, now) as { id: string };
+      assert.equal(s.challenges.length, 1);
+      assert.equal(s.challenges[0].status, "accepted");
+      assert.equal(s.challenges[0].mandatoryAssignment, true);
+      assert.equal(pair.challengeId, result.id);
+      assert.equal(pair.mandatoryPendingUntil, undefined);
+      assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+      const snapshot = structuredClone(s);
+      assert.deepEqual(execute(s, actor(a), confirm, now), result);
+      assert.deepEqual(s, snapshot);
+      assert.throws(
+        () =>
+          execute(
+            s,
+            admin,
+            {
+              type: "admin.week.matchup.assign",
+              divisionId: code,
+              weekStart: week,
+              challengerId: `t${a}a`,
+              defenderId: "t7a",
+              expectedVersion: s.weeklyRounds[0].manualMatchups![code].version,
+            },
+            now,
+          ),
+        /já tem um jogo/,
+      );
+    });
+  }
+  test(`${code}: mandatory game can be booked by admin immediately with no player confirmation`, () => {
+    const s = fixture(code, 12, 2);
+    s.courts = [{ _id: "court", name: "Campo", active: true }];
+    const pair = assignMandatory(s, 12, 1);
+    const deadline = pair.mandatoryPendingUntil;
+    const command = {
+      type: "admin.week.matchup.schedule",
+      weekStart: week,
+      divisionId: code,
+      pairId: pair.id,
+      expectedVersion: 1,
+      start: "2026-10-27T18:00:00Z",
+      courtId: "court",
+      minutes: 90,
+      note: "Marcação imediata pelo clube.",
+    };
+    assert.throws(() => execute(s, actor(12), command, now), /administradores/);
+    const result = execute(s, { ...actor(1), role: "admin" }, command, now) as {
+      id: string;
+    };
+    assert.ok(now < Date.parse(deadline!));
+    assert.equal(s.challenges.length, 1);
+    assert.equal(s.challenges[0]._id, result.id);
+    assert.equal(s.challenges[0].status, "scheduled");
+    assert.equal(s.challenges[0].scheduledAt, command.start);
+    assert.equal(s.challenges[0].scheduleProposal, undefined);
+    assert.equal(s.matches.length, 1);
+    assert.equal(s.matches[0].courtId, "court");
+    assert.equal(
+      s.weeklyRounds[0].manualMatchups![code].pairs[0].challengeId,
+      result.id,
+    );
+    assert.equal(
+      s.weeklyRounds[0].manualMatchups![code].pairs[0].mandatoryPendingUntil,
+      undefined,
+    );
+    for (const playerId of ["t12a", "t12b", "t1a", "t1b"])
+      assert.ok(
+        s.notifications.some(
+          (n) => n.playerId === playerId && n.challengeId === result.id,
+        ),
+      );
+    assert.ok(s.audit.some((a) => a.action === "mandatory.matchup.scheduled"));
+    assert.ok(
+      s.notifications
+        .filter(
+          (n) => n.challengeId === result.id && n.playerId !== "__admins__",
+        )
+        .every((n) => n.title === "Jogo marcado ✅"),
+    );
+    const snapshot = structuredClone(s);
+    assert.throws(
+      () => execute(s, { ...actor(1), role: "admin" }, command, now),
+      /atribuição mudou/,
+    );
+    processDeadlines(s, now + 12 * 3600000, false);
+    assert.deepEqual(s.challenges, snapshot.challenges);
+    assert.deepEqual(s.matches, snapshot.matches);
+  });
+}
+
+test("mandatory assignment confirmation does not inherit the ordinary challenge cooldown", () => {
+  const s = fixture("bronze", 12);
+  const previous = structuredClone(fixture("bronze", 12));
+  send(previous, 4, 2);
+  const old = {
+    ...previous.challenges[0],
+    weekStart: "2026-10-12",
+    status: "completed" as const,
+  };
+  s.challenges = [old];
+  s.settings[0].minDaysBetween = 7;
+  assert.match(
+    challengeReason(
+      s,
+      s.players.find((p) => p._id === "t4a")!,
+      s.players.find((p) => p._id === "t3a")!,
+      now,
+      false,
+      false,
+      week,
+    )!,
+    /intervalo mínimo/,
+  );
+  const pair = assignMandatory(s, 4, 3);
+  execute(
+    s,
+    actor(4),
+    { type: "mandatory.matchup.confirm", weekStart: week, pairId: pair.id },
+    now,
+  );
+  assert.equal(s.challenges.length, 2);
+  assert.deepEqual(s.challenges[0], old);
+});
+
+test("invalid immediate booking rolls back challenge creation, notices and assignment state", () => {
+  const s = fixture("ouro", 12);
+  const pair = assignMandatory(s, 12, 1);
+  const snapshot = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...actor(1), role: "admin" },
+        {
+          type: "admin.week.matchup.schedule",
+          weekStart: week,
+          divisionId: "ouro",
+          pairId: pair.id,
+          expectedVersion: 1,
+          start: "2026-10-27T18:00:00Z",
+          courtId: "invalid-court",
+          minutes: 90,
+          note: "Marcação com campo inválido.",
+        },
+        now,
+      ),
+    /Campo indisponível/,
+  );
+  assert.deepEqual(s, snapshot);
+});
+
+test("new and already-sent mandatory assignment notifications open the confirmation action", () => {
+  const s = fixture("bronze", 12);
+  const pair = assignMandatory(s, 12, 1);
+  const notice = s.notifications.find(
+    (n) =>
+      n.playerId === "t12a" &&
+      n.dedupe?.startsWith(`mandatory-matchup:${pair.id}:`),
+  )!;
+  assert.equal(notificationTarget(notice), "/desafios#weekly-role-assignment");
+  const legacy = { ...notice };
+  delete legacy.mandatoryMatchup;
+  assert.equal(notificationTarget(legacy), "/desafios#weekly-role-assignment");
+});
+
+test("immediate mandatory scheduling preserves occupied courts and unrelated games", () => {
+  const s = fixture("bronze", 12);
+  s.courts = [{ _id: "court", name: "Campo", active: true }];
+  send(s, 6, 5);
+  const other = s.challenges[0];
+  other.status = "scheduled";
+  other.scheduledAt = "2026-10-27T18:00:00Z";
+  s.matches = [
+    {
+      _id: "occupied",
+      challengeId: other._id,
+      courtId: "court",
+      seasonId: "season",
+      start: "2026-10-27T18:00:00Z",
+      end: "2026-10-27T19:30:00Z",
+    },
+  ];
+  const pair = assignMandatory(s, 12, 1);
+  const snapshot = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...actor(1), role: "admin" },
+        {
+          type: "admin.week.matchup.schedule",
+          weekStart: week,
+          divisionId: "bronze",
+          pairId: pair.id,
+          expectedVersion: 1,
+          start: "2026-10-27T18:00:00Z",
+          courtId: "court",
+          minutes: 90,
+          note: "Tentativa num campo ocupado.",
+        },
+        now,
+      ),
+    /campo já reservado/,
+  );
+  assert.deepEqual(s, snapshot);
+});
+
+test("deadline worker creates an admin-selected last-versus-first game without ordinary reach restrictions", () => {
+  const s = fixture("bronze", 12, 2);
+  s.settings[0].titleMaxPosition = 2;
+  const pair = assignMandatory(s, 12, 1);
+  processDeadlines(s, now + 12 * 3600000, false);
+  const created = s.weeklyRounds.find((r) => r.weekStart === week)!
+    .manualMatchups!.bronze.pairs[0];
+  assert.ok(created.challengeId);
+  const game = s.challenges.find((c) => c._id === created.challengeId)!;
+  assert.equal(game.challengerId, "t12a");
+  assert.equal(game.defenderId, "t1a");
+  assert.equal(game.status, "accepted");
+  assert.equal(game.weekStart, week);
+  assert.equal(created.id, pair.id);
+  assert.ok(
+    s.audit.some((a) => a.action === "mandatory.challenge.auto-created"),
+  );
 });

@@ -7,6 +7,11 @@ export function notificationTarget(n: Notification): string {
     return `/caderneta?negociacao=${encodeURIComponent(n.stickerTradeId)}${n.seasonId ? `&epoca=${encodeURIComponent(n.seasonId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`;
   if (n.bettingNotice)
     return `/apostas${n.challengeId ? `?jogo=${encodeURIComponent(n.challengeId)}` : ""}${n.chatMessageId ? `#mensagem-${encodeURIComponent(n.chatMessageId)}` : ""}`;
+  // Also route assignments sent before explicit event metadata was introduced.
+  if (n.mandatoryMatchup || n.dedupe?.startsWith("mandatory-matchup:"))
+    return n.playerId === "__admins__"
+      ? `/admin?tab=week&task=mandatory${n.mandatoryMatchup ? `&division=${encodeURIComponent(n.mandatoryMatchup.divisionId)}&week=${encodeURIComponent(n.mandatoryMatchup.weekStart)}` : ""}`
+      : "/desafios#weekly-role-assignment";
   if (n.weeklyChallengeOpening) return "/desafios";
   if (n.rankingNotice) return "/ranking";
   if (n.seasonId) return "/epocas";

@@ -177,7 +177,7 @@ export function weeklyReason(
   const positionReason =
     weeklyPositionReason(s.players, attacker._id, "attack") ??
     weeklyPositionReason(s.players, defender._id, "defense");
-  if (positionReason) return positionReason;
+  if (positionReason && !assigned) return positionReason;
   for (const p of [...attackingTeam, ...defendingTeam]) {
     if (
       s.matches.some(

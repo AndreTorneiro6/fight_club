@@ -53,8 +53,19 @@ export function manualPairingReason(
     )
   )
     return "As duas duplas devem estar ativas e aprovadas.";
-  if (!weeklyPairAllowed(s, divisionId, teams, attacker, defender, week))
-    return "Confronto inválido: verifica a distância, o título, os adversários da semana anterior e os jogos pendentes entre estas duplas.";
+  if (
+    !weeklyPairAllowed(
+      s,
+      divisionId,
+      teams,
+      attacker,
+      defender,
+      week,
+      false,
+      true,
+    )
+  )
+    return "Confronto inválido: verifica os adversários da semana anterior e os jogos pendentes entre estas duplas.";
   const ids = [...attacker.members, ...defender.members].map((p) => p._id);
   if (
     s.challenges.some(

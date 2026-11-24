@@ -120,11 +120,17 @@ export function challengeReason(
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
   const adaptive = dynamicWeeklyEnabled(s, me.divisionId, week) && !assigned;
   if (
-    dRank >= aRank ||
-    (!adaptive && aRank - dRank > challengeDistance(s, me.divisionId))
+    !assigned &&
+    (dRank >= aRank ||
+      (!adaptive && aRank - dRank > challengeDistance(s, me.divisionId)))
   )
     return "Adversário fora do limite de posições.";
-  if (!adaptive && (dRank === 1 || title) && aRank > rules.titleMaxPosition)
+  if (
+    !assigned &&
+    !adaptive &&
+    (dRank === 1 || title) &&
+    aRank > rules.titleMaxPosition
+  )
     return "Posição fora das regras do jogo do título.";
   if (
     !rules.weeklyCompetition &&
@@ -141,6 +147,7 @@ export function challengeReason(
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   if (
+    !assigned &&
     previous &&
     Date.parse(previous.createdAt) + rules.minDaysBetween * 86400000 > now
   )

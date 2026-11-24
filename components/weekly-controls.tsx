@@ -255,6 +255,7 @@ export function WeeklyRoles({
     admin ? (initialDivision ?? "all") : me.divisionId,
   );
   const [editMode, setEditMode] = useState(false);
+  const [confirmedGameId, setConfirmedGameId] = useState<string>();
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(
     round?.assignments.map((entry) => {
@@ -348,6 +349,7 @@ export function WeeklyRoles({
   );
   const opening = round ? weeklyOpeningAt(round, me.divisionId) : undefined;
   const ownTeamCommitment = weeklyTeamCommitment(s, me._id);
+  const mandatoryAssignments = admin ? [] : playerMandatoryMatchups(s, me._id);
   const save = async (publish: boolean) => {
     await run(
       {
@@ -493,65 +495,74 @@ export function WeeklyRoles({
       <h2>
         {admin
           ? "Atribuição semanal de ataque e defesa"
-          : weeklyRole(s, me._id) === "super_attack"
-            ? "⚔️ OS MEUS DESAFIOS — MODO COMBO"
-            : weeklyRole(s, me._id) === "attack"
-              ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
-              : weeklyRole(s, me._id) === "defense"
-                ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
-                : "OS MEUS DESAFIOS"}
+          : mandatoryAssignments.length
+            ? "🥊 JOGO OBRIGATÓRIO ATRIBUÍDO"
+            : weeklyRole(s, me._id) === "super_attack"
+              ? "⚔️ OS MEUS DESAFIOS — MODO COMBO"
+              : weeklyRole(s, me._id) === "attack"
+                ? "🥊 OS MEUS DESAFIOS — MODO ATAQUE"
+                : weeklyRole(s, me._id) === "defense"
+                  ? "🛡️ OS MEUS DESAFIOS — MODO DEFESA"
+                  : "OS MEUS DESAFIOS"}
       </h2>
       {!admin && adminMatchmakingEnabled(s, me.divisionId) && (
         <p role="status">{ADMIN_MATCHMAKING_MESSAGE}</p>
       )}
       {!admin &&
-        playerMandatoryMatchups(s, me._id).map(
-          ({ pair, weekStart, attacking }) => {
-            const opponent = attacking ? pair.defenderId : pair.challengerId;
-            const opponents = teamMembers(s.players, opponent)
-              .map((member) => member.name)
-              .join(" + ");
-            const deadline = new Date(
-              pair.mandatoryPendingUntil!,
-            ).toLocaleString("pt-PT", {
+        mandatoryAssignments.map(({ pair, weekStart, attacking }) => {
+          const opponent = attacking ? pair.defenderId : pair.challengerId;
+          const opponents = teamMembers(s.players, opponent)
+            .map((member) => member.name)
+            .join(" + ");
+          const deadline = new Date(pair.mandatoryPendingUntil!).toLocaleString(
+            "pt-PT",
+            {
               timeZone: "Europe/Lisbon",
               dateStyle: "short",
               timeStyle: "short",
-            });
-            return (
-              <div
-                key={pair.id}
-                className="inset row between wrap"
-                role="status"
-              >
-                <span>
-                  <strong>Jogo obrigatório contra {opponents}.</strong>{" "}
-                  {attacking
-                    ? `Confirma até ${deadline}. Depois disso, o jogo é criado automaticamente.`
-                    : `A dupla atacante tem até ${deadline} para confirmar. Depois disso, o jogo é criado automaticamente.`}
-                </span>
-                {attacking && (
-                  <button
-                    className="primary small"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(
-                        {
-                          type: "challenge.create",
-                          defenderId: pair.defenderId,
-                          weekStart,
-                        },
-                        "Jogo obrigatório confirmado. Combinem o horário.",
-                      )
-                    }
-                  >
-                    Confirmar jogo obrigatório
-                  </button>
-                )}
-              </div>
-            );
-          },
-        )}
+            },
+          );
+          return (
+            <div key={pair.id} className="inset row between wrap" role="status">
+              <span>
+                <strong>Jogo obrigatório contra {opponents}.</strong>{" "}
+                {attacking
+                  ? `O adversário já foi escolhido pelo administrador. Carrega em «Confirmar jogo obrigatório» até ${deadline}; depois combina o horário no jogo criado. Não precisas de enviar um desafio normal. Se não confirmares, o jogo é criado automaticamente no fim do prazo.`
+                  : `A dupla atacante tem até ${deadline} para confirmar. Depois disso, o jogo é criado automaticamente.`}
+              </span>
+              {attacking && (
+                <button
+                  className="primary small"
+                  disabled={busy}
+                  onClick={async () => {
+                    const result = await run(
+                      {
+                        type: "mandatory.matchup.confirm",
+                        pairId: pair.id,
+                        weekStart,
+                      },
+                      "Jogo obrigatório confirmado. Abre o jogo para combinar o horário.",
+                    );
+                    if (result?.id) setConfirmedGameId(result.id);
+                  }}
+                >
+                  Confirmar jogo obrigatório
+                </button>
+              )}
+            </div>
+          );
+        })}
+      {!admin && confirmedGameId && (
+        <p className="inset" role="status">
+          Jogo obrigatório confirmado.{" "}
+          <Link
+            className="button primary"
+            href={"/desafios/" + confirmedGameId}
+          >
+            Abrir jogo para combinar o horário
+          </Link>
+        </p>
+      )}
       {admin && (
         <p>
           Ataque: só pode desafiar. Defesa: aguarda um desafio. Combo: pode
@@ -809,12 +820,15 @@ export function WeeklyRoles({
           O teu papel: <WeeklyBadge s={s} player={me} />
         </p>
       )}
-      {!admin && weeklyRole(s, me._id) === "defense" && (
-        <p>
-          Esta jornada estás em modo DEFESA. Aguarda pelos desafios das duplas
-          elegíveis.
-        </p>
-      )}
+      {!admin &&
+        !mandatoryAssignments.length &&
+        !ownTeamCommitment &&
+        weeklyRole(s, me._id) === "defense" && (
+          <p>
+            Esta jornada estás em modo DEFESA. Aguarda pelos desafios das duplas
+            elegíveis.
+          </p>
+        )}
       {!admin && weeklyRole(s, me._id) === "super_attack" && (
         <p>
           Esta jornada estás em modo COMBO. Podes desafiar e também ser

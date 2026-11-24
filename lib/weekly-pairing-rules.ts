@@ -65,11 +65,12 @@ export function weeklyPairAllowed(
   defender: RankingEntry,
   week: string,
   extend = false,
+  adminSelected = false,
 ) {
   const ar = entries.indexOf(attacker) + 1,
     dr = entries.indexOf(defender) + 1;
   return (
-    ar > dr &&
+    (adminSelected || ar > dr) &&
     !s.challenges.some((c) => {
       if (
         finished.has(c.status) ||
@@ -83,8 +84,11 @@ export function weeklyPairAllowed(
         (attack === defender.id && defense === attacker.id)
       );
     }) &&
-    (extend || ar - dr <= challengeDistance(s, divisionId)) &&
-    (extend || dr !== 1 || ar <= s.settings[0].titleMaxPosition) &&
+    (adminSelected || extend || ar - dr <= challengeDistance(s, divisionId)) &&
+    (adminSelected ||
+      extend ||
+      dr !== 1 ||
+      ar <= s.settings[0].titleMaxPosition) &&
     !consecutiveRematch(s, attacker.id, defender.id, week)
   );
 }

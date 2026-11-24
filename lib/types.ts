@@ -251,6 +251,7 @@ export interface Message extends Entity {
   createdAt: string;
 }
 export interface Notification extends Entity {
+  mandatoryMatchup?: { pairId: string; weekStart: string; divisionId: string };
   stickerTradeId?: string;
   stickerReportId?: string;
   bettingResult?: { userId: string; version: number; fingerprint: string };

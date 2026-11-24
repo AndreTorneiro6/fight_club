@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.2";
+export const applicationVersion = "2.0.3";
 export const releaseNotes = [
+  {
+    version: "2.0.3",
+    date: "2026-11-24",
+    title: "Jogos obrigatórios sem limites de ranking e marcação imediata",
+    changes: [
+      "O administrador pode atribuir jogos obrigatórios entre quaisquer duas duplas disponíveis, incluindo a última contra a primeira, sem limites de alcance, título ou papel semanal.",
+      "A dupla atacante confirma em Desafios através de Confirmar jogo obrigatório. A confirmação respeita o adversário escolhido pelo administrador e as notificações abrem essa ação diretamente.",
+      "Marcar e confirmar agora permite ao administrador criar e agendar um jogo obrigatório atribuído sem esperar as 12 horas ou as confirmações dos jogadores. A marcação mantém a validação de disponibilidade, campo e conflitos.",
+    ],
+  },
   {
     version: "2.0.2",
     date: "2026-11-24",

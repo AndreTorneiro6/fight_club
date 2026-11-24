@@ -1,5 +1,10 @@
 "use client";
-import { isDraftMatchup, isWaitingMatchup } from "@/lib/mandatory-matchups";
+import type { ManualWeekMatchup } from "@/lib/types";
+import {
+  isDraftMatchup,
+  isWaitingMatchup,
+  playerMandatoryMatchups,
+} from "@/lib/mandatory-matchups";
 import { canBeChallenged, canChallenge } from "@/lib/weekly-role-rules";
 import {
   adminMatchmakingEnabled,
@@ -2040,6 +2045,7 @@ function Challenges(a: Actions) {
           : ""
       : "";
   const ownTeamCommitment = weeklyTeamCommitment(s, p._id);
+  const hasMandatoryAssignment = playerMandatoryMatchups(s, p._id).length > 0;
   const blockedReason =
     (adminMatchmakingEnabled(s, p.divisionId)
       ? ADMIN_MATCHMAKING_MESSAGE
@@ -2082,7 +2088,8 @@ function Challenges(a: Actions) {
               <Swords size={15} />
               Atribuir ataque / defesa
             </button>
-          ) : adminMatchmakingEnabled(s, p.divisionId) ||
+          ) : hasMandatoryAssignment ||
+            adminMatchmakingEnabled(s, p.divisionId) ||
             ownTeamCommitment ||
             (s.settings[0].weeklyCompetition &&
               (!canChallenge(weeklyRole(s, p._id)) ||
@@ -2127,6 +2134,7 @@ function Challenges(a: Actions) {
         </div>
       ) : (
         !managed &&
+        !hasMandatoryAssignment &&
         !openingBlock &&
         blockedReason && (
           <div
@@ -4799,6 +4807,12 @@ function AdminDivisionMatchmaking(
     a.context?.week ?? weeks[1] ?? weeks[0] ?? "",
   );
   const [assigning, setAssigning] = useState(false);
+  const [scheduling, setScheduling] = useState<{
+    pair: ManualWeekMatchup;
+    week: string;
+    divisionId: string;
+    expectedVersion: number;
+  } | null>(null);
   if (
     a.context &&
     (!weeks.includes(week) || !divisions.some((d) => d._id === division))
@@ -4895,9 +4909,11 @@ function AdminDivisionMatchmaking(
         </small>
         <>
           <p>
-            As regras de ranking, título e repetição mantêm-se. Os limites
-            ativos e a composição das duplas são validados ao guardar. Outras
-            semanas não são alteradas.
+            O administrador pode escolher quaisquer duas duplas disponíveis,
+            independentemente da posição, alcance, título ou papel semanal.
+            Mantêm-se as verificações de repetição, composição e jogos já
+            atribuídos. Podes marcar um jogo atribuído imediatamente, sem
+            esperar as 12 horas.
           </p>
           <button
             className="primary"
@@ -4986,6 +5002,20 @@ function AdminDivisionMatchmaking(
                 })}
               </span>
               <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  setScheduling({
+                    pair,
+                    week,
+                    divisionId: division,
+                    expectedVersion: plan.version,
+                  })
+                }
+              >
+                Marcar e confirmar agora
+              </button>
+              <button
                 disabled={busy}
                 onClick={() =>
                   void run(
@@ -5021,6 +5051,13 @@ function AdminDivisionMatchmaking(
             {challengeTeamName(c, c.defenderId, s.players)}
           </Link>
         ))}
+        {scheduling && (
+          <MandatoryScheduleDialog
+            {...a}
+            {...scheduling}
+            close={() => setScheduling(null)}
+          />
+        )}
         {assigning && (
           <AssignmentDialog
             {...a}
@@ -5031,6 +5068,98 @@ function AdminDivisionMatchmaking(
         )}
       </div>
     </Section>
+  );
+}
+
+function MandatoryScheduleDialog(
+  a: Actions & {
+    pair: ManualWeekMatchup;
+    week: string;
+    divisionId: string;
+    expectedVersion: number;
+    close: () => void;
+  },
+) {
+  const { s, run, busy, pair, week, divisionId, expectedVersion, close } = a;
+  return (
+    <Modal title="Marcar jogo obrigatório agora" close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          const result = await run(
+            {
+              type: "admin.week.matchup.schedule",
+              weekStart: week,
+              divisionId,
+              pairId: pair.id,
+              expectedVersion,
+              start: new Date(String(data.get("start"))).toISOString(),
+              courtId: data.get("courtId"),
+              minutes: Number(data.get("minutes")),
+              note: data.get("note"),
+            },
+            "Jogo obrigatório marcado e confirmado. As duas duplas foram notificadas.",
+          );
+          if (result) close();
+        }}
+      >
+        <p>
+          <strong>
+            {teamName(s.players, pair.challengerId)} ×{" "}
+            {teamName(s.players, pair.defenderId)}
+          </strong>
+        </p>
+        <p>
+          O clube cria e confirma a marcação diretamente, sem esperar a
+          confirmação da dupla atacante nem o prazo de 12 horas. Todos os
+          participantes são notificados.
+        </p>
+        <label>
+          Data e hora
+          <input type="datetime-local" name="start" required />
+        </label>
+        <small>
+          Fuso horário: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+        </small>
+        <label>
+          Campo
+          <select name="courtId" required>
+            {s.courts
+              .filter((c) => c.active)
+              .map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          Duração · minutos
+          <input
+            type="number"
+            name="minutes"
+            min={15}
+            max={240}
+            defaultValue={90}
+            required
+          />
+        </label>
+        <label>
+          Nota da marcação
+          <textarea
+            name="note"
+            defaultValue="Marcação direta de jogo obrigatório pelo clube."
+            minLength={3}
+            maxLength={2000}
+            required
+          />
+        </label>
+        <button className="primary" disabled={busy}>
+          Confirmar marcação e notificar duplas
+        </button>
+      </form>
+    </Modal>
   );
 }
 
@@ -7307,7 +7436,7 @@ function AssignmentDialog(
       >
         <p style={{ fontSize: 12 }}>
           {a.draftWeekStart
-            ? `Escolhe as duplas para a semana de ${a.draftWeekStart}. Ao guardar, o adversário fica atribuído e a dupla atacante é notificada. A dupla em defesa aguarda o desafio.`
+            ? `Escolhe quaisquer duas duplas disponíveis para a semana de ${a.draftWeekStart}, sem limite de posições. Ao guardar, a dupla atacante recebe a confirmação em Desafios. Podes marcar o jogo imediatamente em Jogos obrigatórios, sem esperar as 12 horas.`
             : manual
               ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
               : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}
