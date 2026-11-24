@@ -127,7 +127,7 @@ export default function WeeklyTeamInsight({
               {options.committed.side === "attack" ? "ataca" : "defende"} #
               {options.committed.rank} {options.committed.name}
               {options.committed.mandatoryPendingUntil &&
-                " · Aguarda confirmação da dupla atacante."}
+                " · Aguarda o desafio da dupla atacante."}
             </span>
           ) : options.mandatoryDraft ? (
             <span>

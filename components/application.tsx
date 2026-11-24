@@ -1,5 +1,4 @@
 "use client";
-import type { ManualWeekMatchup } from "@/lib/types";
 import {
   isDraftMatchup,
   isWaitingMatchup,
@@ -4821,12 +4820,6 @@ function AdminDivisionMatchmaking(
     a.context?.week ?? weeks[1] ?? weeks[0] ?? "",
   );
   const [assigning, setAssigning] = useState(false);
-  const [scheduling, setScheduling] = useState<{
-    pair: ManualWeekMatchup;
-    week: string;
-    divisionId: string;
-    expectedVersion: number;
-  } | null>(null);
   if (
     a.context &&
     (!weeks.includes(week) || !divisions.some((d) => d._id === division))
@@ -4912,13 +4905,13 @@ function AdminDivisionMatchmaking(
         )}
         <p>
           Define apenas os jogos obrigatórios necessários. Ao guardar, o
-          adversário fica atribuído e a dupla atacante tem 12 horas para
-          confirmar; depois, o jogo é criado automaticamente. As restantes
+          adversário fica atribuído e a dupla atacante tem 12 horas para enviar
+          o desafio; depois, o jogo é criado automaticamente. As restantes
           duplas continuam a desafiar normalmente.
         </p>
         <small>
           Jornada de {week} · {games.length} jogos criados · {draft.length}{" "}
-          pares por atribuir · {waiting.length} a aguardar confirmação ·{" "}
+          pares por atribuir · {waiting.length} a aguardar desafio ·{" "}
           {free.length} duplas sem jogo.
         </small>
         <>
@@ -4926,8 +4919,8 @@ function AdminDivisionMatchmaking(
             O administrador pode escolher quaisquer duas duplas disponíveis,
             independentemente da posição, alcance, título ou papel semanal.
             Mantêm-se as verificações de repetição, composição e jogos já
-            atribuídos. Podes marcar um jogo atribuído imediatamente, sem
-            esperar as 12 horas.
+            atribuídos. Podes lançar o desafio imediatamente e avisar as duas
+            duplas, sem esperar as 12 horas. O horário é combinado depois.
           </p>
           <button
             className="primary"
@@ -4948,7 +4941,7 @@ function AdminDivisionMatchmaking(
                     divisionId: division,
                     expectedVersion: plan.version,
                   },
-                  "Jogos obrigatórios atribuídos. As duplas atacantes têm 12 horas para confirmar.",
+                  "Jogos obrigatórios atribuídos. As duplas atacantes têm 12 horas para enviar o desafio.",
                 )
               }
             >
@@ -4979,7 +4972,7 @@ function AdminDivisionMatchmaking(
                       defenderId: pair.defenderId,
                       expectedVersion: plan.version,
                     },
-                    "Jogo atribuído. A dupla atacante tem 12 horas para confirmar.",
+                    "Jogo atribuído. A dupla atacante tem 12 horas para enviar o desafio.",
                   )
                 }
               >
@@ -5008,7 +5001,7 @@ function AdminDivisionMatchmaking(
             <div key={pair.id} className="inset row between wrap">
               <span>
                 {name(pair.challengerId)} × {name(pair.defenderId)} · Aguarda
-                confirmação até{" "}
+                desafio até{" "}
                 {new Date(pair.mandatoryPendingUntil!).toLocaleString("pt-PT", {
                   timeZone: "Europe/Lisbon",
                   dateStyle: "short",
@@ -5019,15 +5012,19 @@ function AdminDivisionMatchmaking(
                 className="primary"
                 disabled={busy}
                 onClick={() =>
-                  setScheduling({
-                    pair,
-                    week,
-                    divisionId: division,
-                    expectedVersion: plan.version,
-                  })
+                  void run(
+                    {
+                      type: "admin.week.matchup.launch",
+                      weekStart: week,
+                      divisionId: division,
+                      pairId: pair.id,
+                      expectedVersion: plan.version,
+                    },
+                    "Desafio lançado. As duas duplas foram notificadas para combinar o horário.",
+                  )
                 }
               >
-                Marcar e confirmar agora
+                Lançar desafio agora
               </button>
               <button
                 disabled={busy}
@@ -5065,13 +5062,6 @@ function AdminDivisionMatchmaking(
             {challengeTeamName(c, c.defenderId, s.players)}
           </Link>
         ))}
-        {scheduling && (
-          <MandatoryScheduleDialog
-            {...a}
-            {...scheduling}
-            close={() => setScheduling(null)}
-          />
-        )}
         {assigning && (
           <AssignmentDialog
             {...a}
@@ -5082,98 +5072,6 @@ function AdminDivisionMatchmaking(
         )}
       </div>
     </Section>
-  );
-}
-
-function MandatoryScheduleDialog(
-  a: Actions & {
-    pair: ManualWeekMatchup;
-    week: string;
-    divisionId: string;
-    expectedVersion: number;
-    close: () => void;
-  },
-) {
-  const { s, run, busy, pair, week, divisionId, expectedVersion, close } = a;
-  return (
-    <Modal title="Marcar jogo obrigatório agora" close={close}>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          const result = await run(
-            {
-              type: "admin.week.matchup.schedule",
-              weekStart: week,
-              divisionId,
-              pairId: pair.id,
-              expectedVersion,
-              start: new Date(String(data.get("start"))).toISOString(),
-              courtId: data.get("courtId"),
-              minutes: Number(data.get("minutes")),
-              note: data.get("note"),
-            },
-            "Jogo obrigatório marcado e confirmado. As duas duplas foram notificadas.",
-          );
-          if (result) close();
-        }}
-      >
-        <p>
-          <strong>
-            {teamName(s.players, pair.challengerId)} ×{" "}
-            {teamName(s.players, pair.defenderId)}
-          </strong>
-        </p>
-        <p>
-          O clube cria e confirma a marcação diretamente, sem esperar a
-          confirmação da dupla atacante nem o prazo de 12 horas. Todos os
-          participantes são notificados.
-        </p>
-        <label>
-          Data e hora
-          <input type="datetime-local" name="start" required />
-        </label>
-        <small>
-          Fuso horário: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-        </small>
-        <label>
-          Campo
-          <select name="courtId" required>
-            {s.courts
-              .filter((c) => c.active)
-              .map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          Duração · minutos
-          <input
-            type="number"
-            name="minutes"
-            min={15}
-            max={240}
-            defaultValue={90}
-            required
-          />
-        </label>
-        <label>
-          Nota da marcação
-          <textarea
-            name="note"
-            defaultValue="Marcação direta de jogo obrigatório pelo clube."
-            minLength={3}
-            maxLength={2000}
-            required
-          />
-        </label>
-        <button className="primary" disabled={busy}>
-          Confirmar marcação e notificar duplas
-        </button>
-      </form>
-    </Modal>
   );
 }
 
@@ -7452,7 +7350,7 @@ function AssignmentDialog(
               defenderId: defender,
             },
             a.draftWeekStart
-              ? "Jogo obrigatório atribuído. A dupla atacante tem 12 horas para confirmar."
+              ? "Jogo obrigatório atribuído. A dupla atacante tem 12 horas para enviar o desafio."
               : c
                 ? "Papéis atualizados. O defensor recebe um novo pedido de aceitação."
                 : "Desafio atribuído. Jogadores notificados.",
@@ -7465,7 +7363,7 @@ function AssignmentDialog(
       >
         <p style={{ fontSize: 12 }}>
           {a.draftWeekStart
-            ? `Escolhe quaisquer duas duplas disponíveis para a semana de ${a.draftWeekStart}, sem limite de posições. Ao guardar, a dupla atacante recebe a confirmação em Desafios. Podes marcar o jogo imediatamente em Jogos obrigatórios, sem esperar as 12 horas.`
+            ? `Escolhe quaisquer duas duplas disponíveis para a semana de ${a.draftWeekStart}, sem limite de posições. Ao guardar, a dupla atacante usa Desafiar em Desafios. Podes lançar o desafio imediatamente em Jogos obrigatórios, sem definir horários nem esperar as 12 horas.`
             : manual
               ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
               : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}

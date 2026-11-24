@@ -66,7 +66,7 @@ async function assign(
   await save.click();
   await expect(modal).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Marcar e confirmar agora", exact: true }),
+    page.getByRole("button", { name: "Lançar desafio agora", exact: true }),
   ).toBeVisible();
 }
 
@@ -173,7 +173,7 @@ test("player uses the normal challenge composer with a fixed admin-selected oppo
   }
 });
 
-test("admin selects last against first and immediately schedules a waiting mandatory assignment", async ({
+test("admin launches the last-versus-first challenge immediately without asking for a schedule", async ({
   page,
 }) => {
   await login(page, "admin@fightclub.local", true);
@@ -194,42 +194,29 @@ test("admin selects last against first and immediately schedules a waiting manda
   expect(pair.challengeId).toBeUndefined();
   expect(Date.parse(pair.mandatoryPendingUntil!)).toBeGreaterThan(Date.now());
   await page
-    .getByRole("button", { name: "Marcar e confirmar agora", exact: true })
+    .getByRole("button", { name: "Lançar desafio agora", exact: true })
     .click();
-  const modal = page.getByRole("dialog", {
-    name: "Marcar jogo obrigatório agora",
-  });
-  const local = addClubDays(week, 1) + "T18:00";
-  await modal.getByLabel("Data e hora", { exact: true }).fill(local);
-  await modal.getByRole("combobox", { name: /^Campo/ }).selectOption("campo-1");
-  await modal
-    .getByRole("button", {
-      name: "Confirmar marcação e notificar duplas",
-      exact: true,
-    })
-    .click();
-  await expect(modal).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Marcar e confirmar agora", exact: true }),
+    page.getByRole("button", { name: "Lançar desafio agora", exact: true }),
   ).toHaveCount(0);
   const after = await read(page);
   const linked = after.weeklyRounds.find((r) => r.weekStart === week)!
     .manualMatchups!.prata.pairs[0];
   const game = after.challenges.find((c) => c._id === linked.challengeId)!;
-  expect(game.status).toBe("scheduled");
-  expect(game.scheduledAt).toBe(new Date(local).toISOString());
-  expect(game.courtId).toBe("campo-1");
+  expect(game.status).toBe("accepted");
+  expect(game.scheduledAt).toBeUndefined();
+  expect(game.courtId).toBeUndefined();
   expect(game.scheduleProposal).toBeUndefined();
   expect(linked.mandatoryPendingUntil).toBeUndefined();
-  expect(
-    after.matches.some(
-      (m) => m.challengeId === game._id && m.courtId === "campo-1",
-    ),
-  ).toBe(true);
+  expect(after.matches).toEqual(before.matches);
+  await expect(
+    page.getByRole("link", { name: new RegExp("^#" + game.number + " ·") }),
+  ).toHaveAttribute("href", "/desafios/" + game._id);
   expect(
     after.audit.some(
       (a) =>
-        a.action === "mandatory.matchup.scheduled" &&
+        a.action === "mandatory.matchup.launched" &&
         a.details.includes(game._id),
     ),
   ).toBe(true);

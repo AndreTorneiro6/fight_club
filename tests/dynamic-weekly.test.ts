@@ -2660,3 +2660,57 @@ for (const code of ["ouro", "prata", "bronze"] as const) {
     assert.deepEqual(s.challenges, games);
   });
 }
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  test(`${code}: admin launches the selected challenge immediately and notifies both teams without booking`, () => {
+    const s = fixture(code, 12, 2);
+    s.settings[0].weeklyMandatoryChallenges = false;
+    const pair = assignMandatory(s, 12, 1);
+    const admin: Actor = { ...actor(1), role: "admin" };
+    const command = {
+      type: "admin.week.matchup.launch",
+      weekStart: week,
+      divisionId: code,
+      pairId: pair.id,
+      expectedVersion: 1,
+    };
+    const before = structuredClone(s);
+    assert.throws(() => execute(s, actor(12), command, now), /administradores/);
+    assert.throws(
+      () => execute(s, admin, { ...command, expectedVersion: 0 }, now),
+      /atribuição mudou/,
+    );
+    assert.deepEqual(s, before);
+    const result = execute(s, admin, command, now) as { id: string };
+    assert.ok(now < Date.parse(pair.mandatoryPendingUntil!));
+    const game = s.challenges.find((c) => c._id === result.id)!;
+    assert.equal(game.status, "accepted");
+    assert.equal(game.mandatoryAssignment, true);
+    assert.equal(game.scheduledAt, undefined);
+    assert.equal(game.scheduleProposal, undefined);
+    assert.equal(game.courtId, undefined);
+    assert.deepEqual(s.matches, before.matches);
+    assert.deepEqual(s.slots, before.slots);
+    assert.deepEqual(s.results, before.results);
+    assert.deepEqual(s.players, before.players);
+    for (const playerId of ["t12a", "t12b", "t1a", "t1b"])
+      assert.ok(
+        s.notifications.some(
+          (n) =>
+            n.playerId === playerId &&
+            n.challengeId === result.id &&
+            n.body.includes("combinar o horário"),
+        ),
+      );
+    const linked = s.weeklyRounds[0].manualMatchups![code].pairs[0];
+    assert.equal(linked.challengeId, result.id);
+    assert.equal(linked.mandatoryPendingUntil, undefined);
+    assert.ok(s.audit.some((a) => a.action === "mandatory.matchup.launched"));
+    const launched = structuredClone(s);
+    assert.deepEqual(execute(s, admin, command, now), result);
+    assert.deepEqual(s, launched);
+    processDeadlines(s, now + 12 * 3600000, false);
+    assert.equal(s.challenges.length, 1);
+    assert.deepEqual(s.matches, before.matches);
+  });
+}

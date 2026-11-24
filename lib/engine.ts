@@ -249,6 +249,13 @@ export const commandSchema = z.discriminatedUnion("type", [
     pairId: id,
   }),
   z.object({
+    type: z.literal("admin.week.matchup.launch"),
+    weekStart: day,
+    divisionId: id,
+    pairId: id,
+    expectedVersion: z.number().int().min(0),
+  }),
+  z.object({
     type: z.literal("admin.week.matchup.schedule"),
     weekStart: day,
     divisionId: id,
@@ -1919,7 +1926,7 @@ export function execute(
       notify(
         member._id,
         "🥊 Jogo obrigatório atribuído",
-        "Abre Desafios e usa «Desafiar» para enviar o desafio à dupla escolhida pelo administrador. Podes propor horários no formulário habitual. Tens 12 horas para enviar; depois, o jogo é criado automaticamente. O clube também o pode marcar imediatamente.",
+        "Abre Desafios e usa «Desafiar» para enviar o desafio à dupla escolhida pelo administrador. Podes propor horários no formulário habitual. Tens 12 horas para enviar; depois, o jogo é criado automaticamente. O administrador também pode lançar o desafio imediatamente, sem definir o horário.",
         undefined,
         `mandatory-matchup:${pair.id}:${member._id}`,
         {
@@ -1935,7 +1942,7 @@ export function execute(
     }
     notifyAdmins(
       "Jogo obrigatório atribuído",
-      `Emparelhamento obrigatório publicado para a semana de ${weekStart}. Aguarda confirmação da dupla atacante (12h).`,
+      `Emparelhamento obrigatório publicado para a semana de ${weekStart}. Aguarda o desafio da dupla atacante (12h), ou lança o desafio imediatamente em Jogos obrigatórios.`,
       undefined,
       `mandatory-matchup:${pair.id}`,
     );
@@ -2017,6 +2024,44 @@ export function execute(
         },
         timestamp,
       );
+    }
+    case "admin.week.matchup.launch": {
+      const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      const plan = round?.manualMatchups?.[cmd.divisionId];
+      const pair = plan?.pairs.find((p) => p.id === cmd.pairId);
+      ensure(pair?.publishedAt, "Atribuição obrigatória não encontrada.", 404);
+      if (pair.challengeId) return { id: pair.challengeId };
+      ensure(
+        plan!.version === cmd.expectedVersion,
+        "A atribuição mudou. Atualiza antes de lançar o desafio.",
+        409,
+      );
+      const draft = structuredClone(s);
+      const result = execute(
+        draft,
+        actor,
+        {
+          type: "admin.challenge.create",
+          weekStart: cmd.weekStart,
+          challengerId: pair.challengerId,
+          defenderId: pair.defenderId,
+        },
+        timestamp,
+      ) as { id: string };
+      draft.audit.push({
+        _id: uid(),
+        userId: actor.userId,
+        action: "mandatory.matchup.launched",
+        createdAt: now,
+        details: JSON.stringify({
+          pairId: pair.id,
+          challengeId: result.id,
+          weekStart: cmd.weekStart,
+          divisionId: cmd.divisionId,
+        }),
+      });
+      Object.assign(s, draft);
+      return result;
     }
     case "admin.week.matchup.schedule": {
       const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);

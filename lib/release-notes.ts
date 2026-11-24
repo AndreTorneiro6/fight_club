@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.5";
+export const applicationVersion = "2.0.6";
 export const releaseNotes = [
+  {
+    version: "2.0.6",
+    date: "2026-11-24",
+    title: "Lançar o desafio obrigatório imediatamente, sem marcar horário",
+    changes: [
+      "Lançar desafio agora permite ao administrador criar imediatamente o confronto obrigatório e notificar as duas duplas, sem esperar as 12 horas e sem pedir data, hora ou campo.",
+      "O adversário fica confirmado e o desafio abre para as duplas combinarem o horário depois. Guardar a atribuição continua a permitir à dupla atacante usar Desafiar no formulário habitual.",
+    ],
+  },
   {
     version: "2.0.5",
     date: "2026-11-24",

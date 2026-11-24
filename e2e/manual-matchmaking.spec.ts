@@ -158,7 +158,7 @@ test("admin chooses a division's matches without player challenges or forced ext
   expect(
     (await read()).challenges.filter((c: any) => c.divisionId === "ouro"),
   ).toHaveLength(existing.length);
-  await expect(panel.getByText(/Aguarda\s+confirmação até/)).toBeVisible();
+  await expect(panel.getByText(/Aguarda\s+desafio até/)).toBeVisible();
   await page.goto(`/admin?tab=week&task=roles&division=ouro&week=${week}`);
   for (const team of [attackerTeam, defenderTeam]) {
     const row = page.locator(`[data-weekly-team="${team.id}"]`);
@@ -304,7 +304,7 @@ test("admins can assign mandatory games several weeks ahead without a publicatio
       .getByRole("button", { name: "Atribuir jogo obrigatório", exact: true })
       .click();
     await expect(modal).toHaveCount(0);
-    await expect(panel.getByText(/1 a aguardar confirmação/)).toBeVisible();
+    await expect(panel.getByText(/1 a aguardar desafio/)).toBeVisible();
   }
   const after = await read();
   expect(after.challenges).toEqual(before.challenges);
@@ -320,7 +320,7 @@ test("admins can assign mandatory games several weeks ahead without a publicatio
   await page
     .getByLabel("Semana a gerir", { exact: true })
     .selectOption(weeks[0]);
-  await expect(panel.getByText(/1 a aguardar confirmação/)).toBeVisible();
+  await expect(panel.getByText(/1 a aguardar desafio/)).toBeVisible();
 });
 
 test("legacy saved mandatory pairs appear on both team cards and can be assigned individually", async ({

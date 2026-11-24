@@ -527,7 +527,7 @@ export function WeeklyRoles({
                 <strong>Jogo obrigatório contra {opponents}.</strong>{" "}
                 {attacking
                   ? `O administrador escolheu o teu adversário. Usa «Desafiar» para enviar o desafio normal a esta dupla até ${deadline}. Podes propor horários no mesmo formulário. Se não enviares, o jogo é criado automaticamente no fim do prazo.`
-                  : `A dupla atacante tem até ${deadline} para confirmar. Depois disso, o jogo é criado automaticamente.`}
+                  : `A dupla atacante tem até ${deadline} para enviar o desafio. Depois disso, o jogo é criado automaticamente.`}
               </span>
               {attacking && (
                 <button
