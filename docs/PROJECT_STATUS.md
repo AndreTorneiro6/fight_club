@@ -1,3 +1,9 @@
+## Version 2.0.5 — complete defender UI for the ordinary mandatory-opponent flow — 24 November 2026
+
+- Final browser review found that ChallengeDetail still disabled Aceitar based on published roles even though the server correctly accepted the administrator's fixed pairing. The interface now recognises the explicit mandatory assignment while retaining queue priority. This completes the user's ordinary Desafiar/Enviar desafio flow with only the opponent fixed.
+- Extended the browser test to use actual attacker and defender accounts: the attacker uses the usual composer and four optional time proposals, then the defender opens the challenge and clicks Aceitar. The pairing exceeds the configured normal distance and its week has unpublished roles. Both this scenario and immediate admin scheduling pass locally. Final validation passes: all 631 domain/database tests, typecheck, production build and git diff --check. Submitting the final correction through the authorized deployment workflow.
+- v2.0.4 run 45468423461 for a257207eb35158764e89097ea578bca9d2782c8d was already executing its required checks when this remaining UI gate was found. Do not cancel or bypass required checks. Submit this final correction as a separate patch through the same workflow and verify the final production revision. No real game or booking was changed by these tests.
+
 ## Version 2.0.4 — ordinary challenge form for the mandatory opponent — 24 November 2026
 
 - During the v2.0.3 deployment, the user clarified that mandatory games must use the same Desafiar/Enviar desafio flow as ordinary games, with only the opponent fixed by the administrator. Implemented the clarification as a follow-up patch; submitting through the same required deploy-branch workflow. Completion is not yet verified.

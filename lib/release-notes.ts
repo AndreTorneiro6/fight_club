@@ -1,6 +1,15 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.4";
+export const applicationVersion = "2.0.5";
 export const releaseNotes = [
+  {
+    version: "2.0.5",
+    date: "2026-11-24",
+    title: "Resposta ao desafio obrigatório independente dos papéis semanais",
+    changes: [
+      "O defensor consegue responder pelo fluxo habitual ao desafio enviado para o confronto definido pelo administrador, mesmo quando os papéis da semana ainda não estão publicados ou indicam outro papel.",
+      "O jogador continua a usar Desafiar e Enviar desafio com o adversário obrigatório fixo, incluindo propostas de horário opcionais. A marcação imediata pelo administrador mantém-se.",
+    ],
+  },
   {
     version: "2.0.4",
     date: "2026-11-24",

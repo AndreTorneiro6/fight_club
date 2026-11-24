@@ -31,6 +31,11 @@ async function enable(page: Page) {
         weeklyCompetition: true,
         weeklyDynamicRoles: false,
         weeklyMandatoryChallenges: false,
+        ouroNormalReach: 1,
+        divisionChallengeDistances: {
+          ...s.settings[0].divisionChallengeDistances,
+          ouro: 1,
+        },
         titleMaxPosition: 2,
       },
     },
@@ -76,7 +81,9 @@ test("player uses the normal challenge composer with a fixed admin-selected oppo
   const attacker = teams.find((t) =>
     t.members.some((m) => m.email === "jogador@fightclub.local"),
   )!;
-  const defender = teams[0];
+  const defender = teams.find((t) =>
+    t.members.some((m) => m.email === "adversario@fightclub.local"),
+  )!;
   const week = addClubDays(clubWeek().start, 21);
   await assign(
     page,
@@ -140,14 +147,27 @@ test("player uses the normal challenge composer with a fixed admin-selected oppo
     expect(
       own.slots.filter((slot) => slot.challengeId === game._id),
     ).toHaveLength(4);
-    const accepted = await page.request.post("/api/league", {
-      headers: { Origin: new URL(page.url()).origin },
-      data: { type: "challenge.respond", challengeId: game._id, accept: true },
-    });
-    expect(accepted.ok(), await accepted.text()).toBe(true);
-    expect(
-      (await read(page)).challenges.find((c) => c._id === game._id)!.status,
-    ).toBe("accepted");
+    const defenderContext = await browser.newContext();
+    try {
+      const receiving = await defenderContext.newPage();
+      await login(receiving, "adversario@fightclub.local");
+      await receiving.goto("/desafios/" + game._id);
+      const accept = receiving.getByRole("button", {
+        name: "Aceitar",
+        exact: true,
+      });
+      await expect(accept).toBeEnabled();
+      await accept.click();
+      await expect
+        .poll(
+          async () =>
+            (await read(page)).challenges.find((c) => c._id === game._id)!
+              .status,
+        )
+        .toBe("accepted");
+    } finally {
+      await defenderContext.close();
+    }
   } finally {
     await context.close();
   }

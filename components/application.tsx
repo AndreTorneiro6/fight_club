@@ -2414,12 +2414,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
     : undefined;
   const canRespondByRole =
     !s.settings[0].weeklyCompetition ||
-    ((s.weeklyRounds.find(
-      (r) =>
-        r.weekStart ===
-        (c.weekStart ??
-          weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
-    )?.weekType === "OPEN_ATTACK" ||
+    ((c.mandatoryAssignment ||
+      s.weeklyRounds.find(
+        (r) =>
+          r.weekStart ===
+          (c.weekStart ??
+            weeklyWindow(s, [c.challengerId, c.defenderId]).weekStart),
+      )?.weekType === "OPEN_ATTACK" ||
       canBeChallenged(weeklyRole(s, c.defenderId, Date.now(), c.weekStart))) &&
       weeklyResponsePriority?.eligible);
   const mySlots = s.slots.filter(
