@@ -1,3 +1,10 @@
+## Version 2.0.2 LIVE verified — 24 November 2026
+
+- User authorized deployment of the published-paper editing/republication and mandatory-publication fixes. Actions run 45403730800 passed all required checks and the deploy job for exact revision f0198eee0bc8bd78a466b13a0c9cf3138a959d6c. The added republication browser scenario is included in the required workflow; no checks were removed, cancelled or bypassed.
+- Deployment logs confirm the validated revision on trading-bot-vm, reuse of cached Docker build layers, and successful public health verification. Independent post-deployment public /api/health returned {"ok":true}.
+- Published papéis can be edited, saved privately and republished for teams without existing commitments while other games are scheduled. Only changed players receive republication notifications. Existing games, schedules, rankings, deadlines and opening settings are preserved. Mandatory saved drafts can be published together while unrelated games await scheduling; direct individual assignment still needs no second publication.
+- No manual deployment, infrastructure reconfiguration or live league-data rewrite was performed. This follow-up records the release only; retain it locally without triggering another production deployment for documentation.
+
 ## Version 2.0.2 — published-paper revisions and mandatory publication, deployment submitted — 24 November 2026
 
 - User requested editing, saving and republishing already-published papéis despite other games being scheduled, plus mandatory-game publication while some teams still lack a challenge or schedule. Implemented and locally validated; the user subsequently authorized deployment. Submitting through the existing deploy-branch Actions workflow with every required check retained, including the new republication browser scenario. Deployment completion is not yet verified. Existing deploy branch was already one documentation commit ahead of origin; that work is preserved.
