@@ -131,8 +131,23 @@ export function weeklyReason(
       ? s.challenges.find((c) => c._id === ignoreId)?.weekStart
       : undefined) ??
     weeklyChallengeWeek(s, now, attacker.divisionId);
-  const manual = administrativePreparation;
   const selected = s.weeklyRounds.find((r) => r.weekStart === week);
+  const assigned = assignedMandatoryMatchup(
+    s,
+    week,
+    attacker._id,
+    defender._id,
+  );
+  const existingAssignment =
+    !!ignoreId &&
+    selected?.manualMatchups?.[attacker.divisionId]?.pairs.some(
+      (pair) =>
+        pair.challengeId === ignoreId &&
+        attackingTeam.some((m) => m._id === pair.challengerId) &&
+        defendingTeam.some((m) => m._id === pair.defenderId),
+    );
+  const manual =
+    administrativePreparation || !!assigned || !!existingAssignment;
   if (!manual) {
     if (!weeklyPublishedAt(selected, attacker.divisionId))
       return "A aguardar a publicação dos papéis semanais pelo administrador.";
@@ -157,12 +172,6 @@ export function weeklyReason(
     )
       return "Esta dupla está em Ataque e não pode ser desafiada; não está em defesa esta semana.";
   }
-  const assigned = assignedMandatoryMatchup(
-    s,
-    week,
-    attacker._id,
-    defender._id,
-  );
   const participantIds = [...attackingTeam, ...defendingTeam].map((m) => m._id);
   if (
     waitingMandatoryMatchups(s, week, attacker.divisionId).some(
@@ -177,7 +186,7 @@ export function weeklyReason(
   const positionReason =
     weeklyPositionReason(s.players, attacker._id, "attack") ??
     weeklyPositionReason(s.players, defender._id, "defense");
-  if (positionReason && !assigned) return positionReason;
+  if (positionReason && !assigned && !existingAssignment) return positionReason;
   for (const p of [...attackingTeam, ...defendingTeam]) {
     if (
       s.matches.some(

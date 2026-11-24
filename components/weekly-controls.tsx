@@ -233,7 +233,7 @@ export function WeeklyRoles({
   s: View;
   run: (command: unknown, message?: string) => Promise<any>;
   busy: boolean;
-  onChallenge?: (player: Player) => void;
+  onChallenge?: (player: Player, weekStart?: string) => void;
   initialWeek?: string;
   initialDivision?: string;
   lockedContext?: boolean;
@@ -255,7 +255,6 @@ export function WeeklyRoles({
     admin ? (initialDivision ?? "all") : me.divisionId,
   );
   const [editMode, setEditMode] = useState(false);
-  const [confirmedGameId, setConfirmedGameId] = useState<string>();
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(
     round?.assignments.map((entry) => {
@@ -527,42 +526,26 @@ export function WeeklyRoles({
               <span>
                 <strong>Jogo obrigatório contra {opponents}.</strong>{" "}
                 {attacking
-                  ? `O adversário já foi escolhido pelo administrador. Carrega em «Confirmar jogo obrigatório» até ${deadline}; depois combina o horário no jogo criado. Não precisas de enviar um desafio normal. Se não confirmares, o jogo é criado automaticamente no fim do prazo.`
+                  ? `O administrador escolheu o teu adversário. Usa «Desafiar» para enviar o desafio normal a esta dupla até ${deadline}. Podes propor horários no mesmo formulário. Se não enviares, o jogo é criado automaticamente no fim do prazo.`
                   : `A dupla atacante tem até ${deadline} para confirmar. Depois disso, o jogo é criado automaticamente.`}
               </span>
               {attacking && (
                 <button
                   className="primary small"
                   disabled={busy}
-                  onClick={async () => {
-                    const result = await run(
-                      {
-                        type: "mandatory.matchup.confirm",
-                        pairId: pair.id,
-                        weekStart,
-                      },
-                      "Jogo obrigatório confirmado. Abre o jogo para combinar o horário.",
+                  onClick={() => {
+                    const target = s.players.find(
+                      (p) => p._id === pair.defenderId,
                     );
-                    if (result?.id) setConfirmedGameId(result.id);
+                    if (target) onChallenge?.(target, weekStart);
                   }}
                 >
-                  Confirmar jogo obrigatório
+                  Desafiar
                 </button>
               )}
             </div>
           );
         })}
-      {!admin && confirmedGameId && (
-        <p className="inset" role="status">
-          Jogo obrigatório confirmado.{" "}
-          <Link
-            className="button primary"
-            href={"/desafios/" + confirmedGameId}
-          >
-            Abrir jogo para combinar o horário
-          </Link>
-        </p>
-      )}
       {admin && (
         <p>
           Ataque: só pode desafiar. Defesa: aguarda um desafio. Combo: pode

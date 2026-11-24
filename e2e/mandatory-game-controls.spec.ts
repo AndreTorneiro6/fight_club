@@ -65,7 +65,7 @@ async function assign(
   ).toBeVisible();
 }
 
-test("player confirms an admin-selected opponent beyond normal reach and title rules with unpublished papers", async ({
+test("player uses the normal challenge composer with a fixed admin-selected opponent and optional time proposals", async ({
   page,
   browser,
 }) => {
@@ -94,17 +94,33 @@ test("player confirms an admin-selected opponent beyond normal reach and title r
     await login(player, "jogador@fightclub.local");
     await player.goto("/desafios");
     await expect(
-      player.getByText(/Não precisas de enviar um desafio normal/),
-    ).toBeVisible();
-    await player
-      .getByRole("button", { name: "Confirmar jogo obrigatório", exact: true })
-      .click();
-    await expect(
       player.getByRole("button", {
         name: "Confirmar jogo obrigatório",
         exact: true,
       }),
     ).toHaveCount(0);
+    await player.getByRole("button", { name: "Desafiar", exact: true }).click();
+    const composer = player.getByRole("dialog", {
+      name: "Enviar desafio",
+      exact: true,
+    });
+    await expect(composer).toBeVisible();
+    await expect(composer).toContainText(defender.members[0].name);
+    await expect(composer.getByRole("combobox")).toHaveCount(0);
+    expect(
+      (await read(page)).weeklyRounds.find((r) => r.weekStart === week)!
+        .manualMatchups!.ouro.pairs[0].challengeId,
+    ).toBeUndefined();
+    await composer.getByLabel("Propor horários já (opcional)").check();
+    for (let i = 1; i <= 4; i++) {
+      await composer
+        .getByLabel(`Data da opção ${i}`, { exact: true })
+        .fill(addClubDays(week, i - 1));
+    }
+    await composer
+      .getByRole("button", { name: "Enviar desafio", exact: true })
+      .click();
+    await expect(composer).toHaveCount(0);
     await expect
       .poll(
         async () =>
@@ -116,16 +132,22 @@ test("player confirms an admin-selected opponent beyond normal reach and title r
     const linked = after.weeklyRounds.find((r) => r.weekStart === week)!
       .manualMatchups!.ouro.pairs[0];
     const game = after.challenges.find((c) => c._id === linked.challengeId)!;
-    expect(game.status).toBe("accepted");
+    expect(game.status).toBe("pending");
     expect(game.mandatoryAssignment).toBe(true);
     expect(linked.id).toBe(pair.id);
-    const open = player.getByRole("link", {
-      name: "Abrir jogo para combinar o horário",
-      exact: true,
-    });
-    await expect(open).toHaveAttribute("href", "/desafios/" + game._id);
-    await open.click();
     await expect(player).toHaveURL(new RegExp("/desafios/" + game._id));
+    const own = await read(player);
+    expect(
+      own.slots.filter((slot) => slot.challengeId === game._id),
+    ).toHaveLength(4);
+    const accepted = await page.request.post("/api/league", {
+      headers: { Origin: new URL(page.url()).origin },
+      data: { type: "challenge.respond", challengeId: game._id, accept: true },
+    });
+    expect(accepted.ok(), await accepted.text()).toBe(true);
+    expect(
+      (await read(page)).challenges.find((c) => c._id === game._id)!.status,
+    ).toBe("accepted");
   } finally {
     await context.close();
   }

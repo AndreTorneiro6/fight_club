@@ -1460,7 +1460,7 @@ test("the planner never offers the same unresolved pairing from an earlier froze
   assert.equal(offered(), true);
 });
 
-test("a published admin game remains mandatory when ordinary challenges require acceptance", () => {
+test("a player challenges the fixed mandatory opponent with ordinary acceptance rules", () => {
   const { s, weekStart } = publishedMandatoryGame();
   s.settings[0].weeklyMandatoryChallenges = false;
   s.settings[0].weeklyDynamicRoles = false;
@@ -1471,8 +1471,19 @@ test("a published admin game remains mandatory when ordinary challenges require 
     now,
   );
   assert.equal(s.challenges.length, 1);
-  assert.equal(s.challenges[0].status, "accepted");
+  assert.equal(s.challenges[0].status, "pending");
   assert.equal(s.challenges[0].mandatoryAssignment, true);
+  execute(
+    s,
+    actor(2, "b"),
+    {
+      type: "challenge.respond",
+      challengeId: s.challenges[0]._id,
+      accept: true,
+    },
+    now,
+  );
+  assert.equal(s.challenges[0].status, "accepted");
 });
 
 test("future manual drafts are week-specific, consume no active slots and publish before role opening", () => {
@@ -2584,3 +2595,68 @@ test("deadline worker creates an admin-selected last-versus-first game without o
     s.audit.some((a) => a.action === "mandatory.challenge.auto-created"),
   );
 });
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  test(`${code}: admin-fixed opponent uses ordinary challenge submission, proposals and defender response`, () => {
+    const s = fixture(code, 12, 2);
+    s.settings[0].weeklyMandatoryChallenges = false;
+    s.settings[0].weeklyDynamicRoles = false;
+    delete s.weeklyRounds[0].publishedAt;
+    s.weeklyRounds[0].divisionChallengeOpenings = { [code]: null };
+    const pair = assignMandatory(s, 12, 1);
+    const initialSlots = ["2026-10-27", "2026-10-28", "2026-10-29"].map(
+      (day) => ({
+        start: day + "T18:00:00Z",
+        end: day + "T20:00:00Z",
+      }),
+    );
+    const result = execute(
+      s,
+      actor(12, "b"),
+      {
+        type: "challenge.create",
+        weekStart: week,
+        defenderId: "t1a",
+        initialSlots,
+      },
+      now,
+    ) as { id: string };
+    const game = s.challenges.find((c) => c._id === result.id)!;
+    assert.equal(game.status, "pending");
+    assert.equal(game.weekStart, week);
+    assert.equal(pair.challengeId, game._id);
+    assert.equal(pair.mandatoryPendingUntil, undefined);
+    assert.equal(
+      s.slots.filter((slot) => slot.challengeId === game._id).length,
+      3,
+    );
+    assert.ok(
+      s.notifications.some(
+        (n) =>
+          n.playerId === "t1b" &&
+          n.challengeId === game._id &&
+          n.body.includes("aceitar ou recusar"),
+      ),
+    );
+    assert.throws(
+      () =>
+        execute(
+          s,
+          actor(7),
+          { type: "challenge.respond", challengeId: game._id, accept: true },
+          now,
+        ),
+      /Só o defensor/,
+    );
+    execute(
+      s,
+      actor(1, "b"),
+      { type: "challenge.respond", challengeId: game._id, accept: true },
+      now,
+    );
+    assert.equal(game.status, "accepted");
+    const games = structuredClone(s.challenges);
+    processDeadlines(s, now + 12 * 3600000, false);
+    assert.deepEqual(s.challenges, games);
+  });
+}

@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.3";
+export const applicationVersion = "2.0.4";
 export const releaseNotes = [
+  {
+    version: "2.0.4",
+    date: "2026-11-24",
+    title: "Desafiar o adversário obrigatório pelo formulário habitual",
+    changes: [
+      "O jogo obrigatório apresenta Desafiar e abre o mesmo formulário Enviar desafio dos restantes jogos, com o adversário escolhido pelo administrador e propostas de horário opcionais.",
+      "O desafio segue as mesmas regras de resposta dos outros jogos. Não existe um passo separado de confirmação do emparelhamento; a semana atribuída e as exceções de ranking mantêm-se.",
+      "O administrador continua a poder marcar imediatamente. O prazo de 12 horas para enviar o desafio e a criação automática no fim desse prazo mantêm-se.",
+    ],
+  },
   {
     version: "2.0.3",
     date: "2026-11-24",

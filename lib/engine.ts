@@ -1919,7 +1919,7 @@ export function execute(
       notify(
         member._id,
         "🥊 Jogo obrigatório atribuído",
-        "Abre Desafios e carrega em «Confirmar jogo obrigatório». O adversário já está definido pelo administrador; não precisas de enviar um desafio normal. Tens 12 horas para confirmar, depois o jogo é criado automaticamente. O clube também o pode marcar imediatamente.",
+        "Abre Desafios e usa «Desafiar» para enviar o desafio à dupla escolhida pelo administrador. Podes propor horários no formulário habitual. Tens 12 horas para enviar; depois, o jogo é criado automaticamente. O clube também o pode marcar imediatamente.",
         undefined,
         `mandatory-matchup:${pair.id}:${member._id}`,
         {
@@ -3251,7 +3251,8 @@ export function execute(
       }
       if (
         rules.weeklyCompetition &&
-        (rules.weeklyMandatoryChallenges || manual)
+        (rules.weeklyMandatoryChallenges ||
+          (manual && cmd.type === "admin.challenge.create"))
       ) {
         // Include the candidate only in the priority projection until all guards pass.
         const priority = weeklyChallengePriority(
@@ -3271,6 +3272,7 @@ export function execute(
         c.scheduleBy = c.playBy;
       }
       if (mandatoryPair) {
+        c.mandatoryAssignment = true;
         mandatoryPair.challengeId = c._id;
         delete mandatoryPair.mandatoryPendingUntil;
         const plan = s.weeklyRounds.find((r) => r.weekStart === requestedWeek)!
@@ -3278,7 +3280,8 @@ export function execute(
         plan.version += 1;
       }
       s.challenges.push(c);
-      if (c.mandatoryAssignment) closeIncompatibleQueue(c);
+      if (c.mandatoryAssignment && c.status === "accepted")
+        closeIncompatibleQueue(c);
       if (cmd.initialSlots)
         s.slots.push(
           ...cmd.initialSlots.map((slot) => ({
@@ -3289,7 +3292,7 @@ export function execute(
             ...slot,
           })),
         );
-      if (c.mandatoryAssignment) {
+      if (c.mandatoryAssignment && c.status === "accepted") {
         for (const pid of challengeParticipants(c, s.players))
           notify(
             pid,
@@ -3368,6 +3371,7 @@ export function execute(
       );
       if (
         c.mandatoryAssignment &&
+        c.status === "accepted" &&
         dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
       ) {
         const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
@@ -3398,7 +3402,7 @@ export function execute(
           maximumMatches: plan.maximumMatches,
         });
       }
-      if (c.mandatoryAssignment && c.weekStart) {
+      if (c.mandatoryAssignment && c.status === "accepted" && c.weekStart) {
         if (
           weeklyPublishedAt(
             s.weeklyRounds.find((r) => r.weekStart === c.weekStart),

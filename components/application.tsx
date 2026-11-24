@@ -1994,6 +1994,7 @@ function Challenges(a: Actions) {
     [filter, setFilter] = useState(s.actor.role === "admin" ? "all" : "active"),
     [scope, setScope] = useState(s.actor.role === "admin" ? "league" : "mine"),
     [target, setTarget] = useState<Player | null>(null),
+    [targetWeek, setTargetWeek] = useState<string>(),
     [assign, setAssign] = useState(false),
     [division, setDivision] = useState("all"),
     [state, setState] = useState("all");
@@ -2121,7 +2122,15 @@ function Challenges(a: Actions) {
           </Link>
         </section>
       ) : (
-        <WeeklyRoles s={s} run={a.run} busy={a.busy} onChallenge={setTarget} />
+        <WeeklyRoles
+          s={s}
+          run={a.run}
+          busy={a.busy}
+          onChallenge={(player, weekStart) => {
+            setTargetWeek(weekStart);
+            setTarget(player);
+          }}
+        />
       )}
       {admin && !managed && !s.settings[0].weeklyCompetition ? (
         <div className="inset space-top" style={{ marginBottom: 20 }}>
@@ -2376,7 +2385,11 @@ function Challenges(a: Actions) {
         <ChallengeComposer
           {...a}
           target={target}
-          close={() => setTarget(null)}
+          weekStart={targetWeek}
+          close={() => {
+            setTarget(null);
+            setTargetWeek(undefined);
+          }}
         />
       )}
       {assign && <AssignmentDialog {...a} close={() => setAssign(false)} />}
@@ -7166,14 +7179,27 @@ function Statistics({ s }: Actions) {
 }
 
 function ChallengeComposer(
-  a: Actions & { target: Player; close: () => void; titleFight?: boolean },
+  a: Actions & {
+    target: Player;
+    close: () => void;
+    titleFight?: boolean;
+    weekStart?: string;
+  },
 ) {
   const { s, target, close, run, busy, notify } = a,
     p = s.players.find((p) => p._id === s.actor.playerId)!,
     router = useRouter();
   const weeklyWindowValue = s.settings[0].weeklyCompetition
-    ? weeklyWindow(s, [p._id, target._id])
+    ? weeklyWindow(s, [p._id, target._id], Date.now(), a.weekStart)
     : undefined;
+  if (
+    a.weekStart &&
+    weeklyWindowValue &&
+    Date.parse(weeklyWindowValue.playBy) <= Date.now()
+  ) {
+    weeklyWindowValue.deferredUntil = clubWeek().start;
+    weeklyWindowValue.playBy = clubWeek().endsAt;
+  }
   const [proposals, setProposals] = useState(() =>
       initialProposals(s, p, Date.now(), weeklyWindowValue),
     ),
@@ -7245,7 +7271,9 @@ function ChallengeComposer(
           <p className="inset">
             {weeklyWindowValue.deferredUntil
               ? `Desafio adiado por férias: o jogo pode realizar-se a partir de ${weeklyWindowValue.deferredUntil}.`
-              : "Um jogo por dupla nesta semana. Os adversários apresentados respeitam o tipo de semana e a distância configurada."}
+              : a.weekStart
+                ? "Jogo obrigatório: o adversário foi escolhido pelo administrador. Envia o desafio e propõe horários como nos restantes jogos."
+                : "Um jogo por dupla nesta semana. Os adversários apresentados respeitam o tipo de semana e a distância configurada."}
           </p>
         )}
         <label className="check">

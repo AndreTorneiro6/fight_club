@@ -1,3 +1,15 @@
+## Version 2.0.4 — ordinary challenge form for the mandatory opponent — 24 November 2026
+
+- During the v2.0.3 deployment, the user clarified that mandatory games must use the same Desafiar/Enviar desafio flow as ordinary games, with only the opponent fixed by the administrator. Implemented the clarification as a follow-up patch; submitting through the same required deploy-branch workflow. Completion is not yet verified.
+- Removed the separate confirmation action from the player interface. Desafiar on an assignment opens the existing ChallengeComposer with its fixed opponent and original assignment week, including optional time proposals; successful submission opens the resulting challenge normally. Closing the composer resets its week so other challenges retain their own context. Carried assignments keep a viable proposal window across Sunday/Monday.
+- Player submission follows the ordinary weeklyMandatoryChallenges setting: optional challenges wait for the defender's ordinary response, while leagues configured for immediate assignment keep that behavior. Linked explicit assignments retain their ranking/role/opening exceptions during response and scheduling, without allowing arbitrary opponents. The older confirmation API remains compatible for already-loaded clients; it is not a separate step in the new interface.
+- The admin's immediate atomic booking, arbitrary-rank mandatory pairings and twelve-hour automatic fallback remain intact. Assignment notices now instruct players to use Desafiar and the usual form.
+- Local typecheck, all 631 tests and production build pass. Both updated mandatory-control browser tests and all three existing manual-matchmaking tests pass on isolated demo data. The new scenario verifies no confirmation button, fixed opponent, no opponent selector, four optional time proposals, the correct future week, ordinary pending/acceptance flow and navigation into the created game. No live league records were changed.
+
+## Version 2.0.3 LIVE verified — 24 November 2026
+
+- Actions run 45465180292 passed all required checks and deployed exact revision 8acae777692642e2fe15233d52abef7f7ef3de02. Independent public /api/health returned {"ok":true}. No workflow bypass or manual deployment occurred. The subsequent player-flow clarification is addressed in v2.0.4 above; the arbitrary-rank and immediate admin-booking changes are retained.
+
 ## Version 2.0.3 — mandatory-game authority, confirmation and immediate booking — 24 November 2026
 
 - Follow-up to the released papéis changes: user requested mandatory pairings without ranking-distance restrictions, usable player confirmation for Horácio, and immediate admin scheduling without waiting twelve hours. Implemented and locally validated; submitting through the authorized deploy-branch workflow. Deployment completion is not yet verified.

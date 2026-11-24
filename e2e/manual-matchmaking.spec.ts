@@ -181,7 +181,7 @@ test("admin chooses a division's matches without player challenges or forced ext
     );
     await expect(
       defender.getByRole("button", {
-        name: "Confirmar jogo obrigatório",
+        name: "Desafiar",
         exact: true,
       }),
     ).toHaveCount(0);
@@ -206,7 +206,14 @@ test("admin chooses a division's matches without player challenges or forced ext
     await login(attacker, "jogador@fightclub.local");
     await attacker.goto("/desafios");
     await attacker
-      .getByRole("button", { name: "Confirmar jogo obrigatório", exact: true })
+      .getByRole("button", { name: "Desafiar", exact: true })
+      .click();
+    const composer = attacker.getByRole("dialog", {
+      name: "Enviar desafio",
+      exact: true,
+    });
+    await composer
+      .getByRole("button", { name: "Enviar desafio", exact: true })
       .click();
     await expect
       .poll(
