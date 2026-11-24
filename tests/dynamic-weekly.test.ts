@@ -26,6 +26,7 @@ import {
   generateWeeklyRoles,
   refreshGeneratedWeeklyDrafts,
 } from "../lib/weekly-role-workflow";
+import { effectiveRoles } from "../lib/effective-roles";
 import { filterFeatureView } from "../lib/feature-view";
 const now = Date.parse("2026-10-25T12:00:00Z"),
   week = "2026-10-26";
@@ -2114,4 +2115,176 @@ test("publishing again does not restart the 12-hour window", () => {
     now + 3600000,
   );
   assert.equal(pair().mandatoryPendingUntil, deadline);
+});
+
+test("published papers save private revisions and republish free teams alongside scheduled games", () => {
+  const s = fixture("ouro", 8, 3);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  send(s, 4, 2);
+  s.challenges[0].status = "scheduled";
+  s.challenges[0].scheduledAt = "2026-10-28T18:00:00Z";
+  const round = s.weeklyRounds[0];
+  round.divisionOpeningDelays = { ouro: 30 };
+  round.divisionChallengeOpenings = { ouro: "2026-10-25T10:00:00Z" };
+  const before = structuredClone(s);
+  const assignments = effectiveRoles(round).map((a) => ({
+    ...a,
+    role: /^t5[ab]$/.test(a.playerId)
+      ? ("defense" as const)
+      : /^t6[ab]$/.test(a.playerId)
+        ? ("attack" as const)
+        : a.role,
+  }));
+  const save = {
+    type: "admin.week.division.save",
+    weekStart: week,
+    divisionId: "ouro",
+    expectedVersion: round.version ?? 0,
+    assignments,
+  };
+  execute(s, admin, save, now);
+  assert.deepEqual(round.assignments, before.weeklyRounds[0].assignments);
+  assert.deepEqual(s.notifications, before.notifications);
+  assert.deepEqual(round.divisionRoleDrafts?.ouro, assignments);
+  const view = structuredClone(s);
+  filterFeatureView(view, actor(5));
+  assert.equal(view.weeklyRounds[0].divisionRoleDrafts, undefined);
+  assert.ok(
+    !view.audit.some((a) => a.action === "week.division.revision.saved"),
+  );
+  assert.throws(() => execute(s, admin, save, now), /Outro administrador/);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.division.publish",
+      weekStart: week,
+      divisionId: "ouro",
+      expectedVersion: round.version ?? 0,
+    },
+    now,
+  );
+  assert.deepEqual(effectiveRoles(round), assignments);
+  for (const a of before.weeklyRounds[0].assignments.filter(
+    (a) => !/^t[56][ab]$/.test(a.playerId),
+  ))
+    assert.deepEqual(
+      round.assignments.find((entry) => entry.playerId === a.playerId),
+      a,
+    );
+  assert.equal(round.divisionRoleDrafts?.ouro, undefined);
+  assert.deepEqual(s.challenges, before.challenges);
+  assert.deepEqual(s.matches, before.matches);
+  assert.deepEqual(s.players, before.players);
+  assert.deepEqual(s.results, before.results);
+  assert.deepEqual(
+    round.divisionChallengeOpenings,
+    before.weeklyRounds[0].divisionChallengeOpenings,
+  );
+  assert.equal(round.publishedAt, before.weeklyRounds[0].publishedAt);
+  assert.deepEqual(
+    s.notifications
+      .slice(before.notifications.length)
+      .map((n) => n.playerId)
+      .sort(),
+    ["t5a", "t5b", "t6a", "t6b"],
+  );
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          ...save,
+          expectedVersion: round.version,
+          assignments: assignments.map((a) => ({
+            ...a,
+            role: /^t4[ab]$/.test(a.playerId) ? "defense" : a.role,
+          })),
+        },
+        now,
+      ),
+    /Mantém os papéis/,
+  );
+});
+
+test("republishing revalidates teams that committed after the draft was saved", () => {
+  const s = fixture("ouro", 8, 3);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  const round = s.weeklyRounds[0];
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.division.save",
+      weekStart: week,
+      divisionId: "ouro",
+      expectedVersion: round.version ?? 0,
+      assignments: round.assignments.map((a) => ({
+        ...a,
+        role: /^t4[ab]$/.test(a.playerId) ? "defense" : a.role,
+      })),
+    },
+    now,
+  );
+  send(s, 4, 2);
+  const before = structuredClone(s);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        admin,
+        {
+          type: "admin.week.division.publish",
+          weekStart: week,
+          divisionId: "ouro",
+          expectedVersion: round.version ?? 0,
+        },
+        now,
+      ),
+    /Mantém os papéis/,
+  );
+  assert.deepEqual(s, before);
+});
+
+test("mandatory drafts publish with unrelated games still awaiting schedules and other teams without challenges", () => {
+  const s = fixture("ouro", 10, 3);
+  const admin: Actor = { ...actor(1), role: "admin" };
+  send(s, 4, 2);
+  assert.equal(s.challenges[0].status, "accepted");
+  const games = structuredClone(s.challenges);
+  const papers = structuredClone(s.weeklyRounds[0].assignments);
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchup.add",
+      divisionId: "ouro",
+      weekStart: week,
+      challengerId: "t6a",
+      defenderId: "t5a",
+      expectedVersion: 0,
+    },
+    now,
+  );
+  execute(
+    s,
+    admin,
+    {
+      type: "admin.week.matchups.publish",
+      divisionId: "ouro",
+      weekStart: week,
+      expectedVersion: 1,
+    },
+    now,
+  );
+  assert.deepEqual(s.challenges, games);
+  assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+  const pair = s.weeklyRounds[0].manualMatchups!.ouro.pairs[0];
+  assert.ok(pair.publishedAt);
+  assert.equal(Date.parse(pair.mandatoryPendingUntil!), now + 12 * 3600000);
+  assert.equal(pair.challengeId, undefined);
+  send(s, 6, 5);
+  assert.ok(pair.challengeId);
+  assert.deepEqual(s.challenges[0], games[0]);
 });

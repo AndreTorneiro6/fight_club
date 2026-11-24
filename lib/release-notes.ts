@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.1";
+export const applicationVersion = "2.0.2";
 export const releaseNotes = [
+  {
+    version: "2.0.2",
+    date: "2026-11-24",
+    title: "Editar e republicar papéis com jogos já marcados",
+    changes: [
+      "Os papéis publicados das equipas sem jogo podem ser editados e guardados em rascunho, mesmo quando outras equipas já têm desafios ou jogos agendados.",
+      "Republicar aplica as alterações e avisa apenas os jogadores cujo papel mudou, preservando os jogos, horários, campos e abertura dos desafios.",
+      "Os jogos obrigatórios em rascunho podem ser publicados em conjunto mesmo com outros jogos por agendar ou equipas ainda sem desafio.",
+    ],
+  },
   {
     version: "2.0.1",
     date: "2026-11-22",

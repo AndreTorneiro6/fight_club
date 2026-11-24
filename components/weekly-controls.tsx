@@ -12,7 +12,7 @@ import {
 import { matchdayWeekLabel } from "@/lib/matchday";
 import { challengeDistance } from "@/lib/challenge-distance";
 import { firstCompetitionWeek, seasonWeek } from "@/lib/competition-calendar";
-import { teamPosition } from "@/lib/team-competition";
+import { challengeSide, teamPosition } from "@/lib/team-competition";
 import { teamMembers } from "@/lib/ranking-groups";
 import { playerMandatoryMatchups } from "@/lib/mandatory-matchups";
 import { useEffect, useState } from "react";
@@ -257,17 +257,39 @@ export function WeeklyRoles({
   const [editMode, setEditMode] = useState(false);
   const round = s.weeklyRounds.find((entry) => entry.weekStart === week);
   const saved = JSON.stringify(
-    round?.assignments.map((entry) => ({
-      ...entry,
-      role: weeklyPublishedAt(
-        round,
-        s.players.find((p) => p._id === entry.playerId)?.divisionId,
-      )
-        ? entry.role === "super_attack"
-          ? entry.role
-          : (weeklyRole(s, entry.playerId, Date.now(), week) ?? entry.role)
-        : entry.role,
-    })) ?? [],
+    round?.assignments.map((entry) => {
+      const player = s.players.find((p) => p._id === entry.playerId);
+      const published = !!weeklyPublishedAt(round, player?.divisionId);
+      const live = published
+        ? (effectiveRoles(round).find((a) => a.playerId === entry.playerId)
+            ?.role ?? entry.role)
+        : entry.role;
+      const committed = s.challenges.some(
+        (c) =>
+          !c.competitionRoundId &&
+          (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
+          !["cancelled", "refused", "expired"].includes(c.status) &&
+          challengeSide(c, entry.playerId, s.players),
+      );
+      const members = teamMembers(s.players, entry.playerId);
+      const reserved = round.manualMatchups?.[
+        player?.divisionId ?? ""
+      ]?.pairs.some(
+        (pair) =>
+          pair.publishedAt &&
+          !pair.challengeId &&
+          members.some((m) =>
+            [pair.challengerId, pair.defenderId].includes(m._id),
+          ),
+      );
+      const draft =
+        admin && !committed && !reserved
+          ? round.divisionRoleDrafts?.[player?.divisionId ?? ""]?.find(
+              (a) => a.playerId === entry.playerId,
+            )?.role
+          : undefined;
+      return { ...entry, role: draft ?? live };
+    }) ?? [],
   );
   const [roles, setRoles] = useState<
     Record<string, "attack" | "defense" | "super_attack">
@@ -317,20 +339,7 @@ export function WeeklyRoles({
           .flatMap((d) => [...divisionWeekOptions(s, d._id, week, roles)])
       : [],
   );
-  // Published roles of one division can be corrected while nobody in it has a
-  // challenge that week, even after challenges opened (admin.week.division.correct).
-  const correctable =
-    admin &&
-    division !== "all" &&
-    published &&
-    week >= clubWeek().start &&
-    !s.challenges.some(
-      (c) =>
-        c.divisionId === division &&
-        !c.competitionRoundId &&
-        (c.weekStart ?? clubWeek(c.createdAt).start) === week &&
-        !["cancelled", "refused", "expired"].includes(c.status),
-    );
+  const correctable = admin && published && week >= clubWeek().start;
   const unsavedRoleChanges = hasUnsavedDivisionRoles(
     s.players,
     roles,
@@ -362,7 +371,9 @@ export function WeeklyRoles({
       },
       publish
         ? "Papéis publicados. A abertura mantém a configuração definida pelo administrador."
-        : "Rascunho semanal guardado.",
+        : published
+          ? "Alterações guardadas. Republica para avisar as equipas envolvidas."
+          : "Rascunho semanal guardado.",
     );
   };
   const divisionAssignments = (divisionId: string) =>
@@ -397,7 +408,7 @@ export function WeeklyRoles({
                   ),
           }))
       : [];
-  /** Corrects the published roles of the selected division before it opens. */
+  /** Save and republish a revision without changing existing games. */
   const correctDivisionNow = async (divisionId: string, name: string) => {
     if (!round) return;
     const changes = divisionAssignments(divisionId);
@@ -412,21 +423,25 @@ export function WeeklyRoles({
       );
       return;
     }
-    const reason = window.prompt(
-      `Motivo da correção dos papéis de ${name} (fica no histórico). Só os jogadores cujo papel muda recebem aviso.`,
-      "Correção manual dos papéis publicados.",
-    );
-    if (!reason || reason.trim().length < 3) return;
-    await run(
+    const saved = await run(
       {
-        type: "admin.week.division.correct",
+        type: "admin.week.division.save",
         divisionId,
         weekStart: week,
         expectedVersion: round.version ?? 0,
-        changes,
-        reason: reason.trim(),
+        assignments: changes,
       },
-      `Papéis de ${name} corrigidos. Abre os desafios quando estiveres pronto.`,
+      "",
+    );
+    if (!saved) return;
+    await run(
+      {
+        type: "admin.week.division.publish",
+        divisionId,
+        weekStart: week,
+        expectedVersion: (round.version ?? 0) + 1,
+      },
+      `Papéis de ${name} republicados. Só os jogadores com papel alterado foram avisados.`,
     );
   };
   /** Saves on-screen changes, approves and publishes one division in one action. */
@@ -939,7 +954,17 @@ export function WeeklyRoles({
                 ),
               ),
           );
-          const lockedByChallenge = existingChallenges.length > 0;
+          const reserved = round?.manualMatchups?.[
+            members[0].divisionId
+          ]?.pairs.some(
+            (pair) =>
+              pair.publishedAt &&
+              !pair.challengeId &&
+              members.some((m) =>
+                [pair.challengerId, pair.defenderId].includes(m._id),
+              ),
+          );
+          const lockedByChallenge = existingChallenges.length > 0 || !!reserved;
           const requiredRoles = new Set(
             existingChallenges.flatMap((challenge) =>
               members.flatMap((member) =>
@@ -1262,7 +1287,11 @@ export function WeeklyRoles({
               </button>
             )}
             <button
-              disabled={busy || published || week < clubWeek().start}
+              disabled={
+                busy ||
+                (published && division === "all") ||
+                week < clubWeek().start
+              }
               onClick={() => void save(false)}
             >
               Guardar rascunho
@@ -1320,16 +1349,45 @@ export function WeeklyRoles({
                     para evitar avisos contraditórios.
                   </p>
                 )}
-                {published && correctable && d._id === division && (
+                {published && correctable && (
                   <>
                     <small>
-                      Ainda não há desafios de {d.name} nesta semana: podes
-                      corrigir os papéis publicados. Só os jogadores com papel
-                      alterado são avisados.
+                      Podes guardar e republicar os papéis das equipas sem jogo.
+                      Os desafios, horários e campos existentes mantêm-se. Só os
+                      jogadores com papel alterado são avisados ao republicar.
                     </small>
                     <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(
+                          {
+                            type: "admin.week.division.save",
+                            divisionId: d._id,
+                            weekStart: week,
+                            expectedVersion: round?.version ?? 0,
+                            assignments: divisionAssignments(d._id),
+                          },
+                          "Alterações guardadas. Republica para avisar as equipas envolvidas.",
+                        )
+                      }
+                    >
+                      Guardar alterações · {d.name}
+                    </button>
+                    {round?.divisionRoleDrafts?.[d._id] && (
+                      <small>Alterações guardadas por republicar.</small>
+                    )}
+                    <button
                       className="primary"
-                      disabled={busy || !unsavedRoleChanges}
+                      disabled={
+                        busy ||
+                        (!round?.divisionRoleDrafts?.[d._id] &&
+                          !hasUnsavedDivisionRoles(
+                            s.players,
+                            roles,
+                            round?.assignments ?? [],
+                            d._id,
+                          ))
+                      }
                       onClick={() => {
                         if (
                           changes.length &&
@@ -1341,7 +1399,7 @@ export function WeeklyRoles({
                         void correctDivisionNow(d._id, d.name);
                       }}
                     >
-                      Corrigir papéis · {d.name}
+                      Republicar papéis · {d.name}
                     </button>
                   </>
                 )}

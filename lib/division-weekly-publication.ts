@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound, Actor } from "./types";
 import { ensure } from "./rules";
+import { challengeSide } from "./team-competition";
+import { effectiveRoles } from "./effective-roles";
 import { rankingEntries } from "./ranking-groups";
 import { weeklyPositionReason } from "./weekly";
 import { weeklyPublishedAt } from "./weekly-publication";
@@ -49,6 +51,23 @@ export function publishDivisionPapers(
     "Outro administrador alterou os papéis. Atualiza antes de continuar.",
     409,
   );
+  if (weeklyPublishedAt(r, divisionId) && !approve) {
+    const draft = r.divisionRoleDrafts?.[divisionId];
+    ensure(
+      draft,
+      "Os papéis já estão publicados. Guarda as alterações antes de republicar.",
+    );
+    return correctPublishedDivisionPapers(
+      s,
+      divisionId,
+      weekStart,
+      expectedVersion,
+      draft,
+      "Republicação dos papéis guardados pelo administrador.",
+      by,
+      timestamp,
+    );
+  }
   ensure(
     !weeklyPublishedAt(r, divisionId),
     "Os papéis desta divisão já estão publicados.",
@@ -174,8 +193,7 @@ export function publishDivisionPapers(
   return { id: r._id };
 }
 
-/** Corrects already-published roles of one division before it opens, while no
- * challenge exists yet. Only changed players are notified; history is audited. */
+/** Republish changed roles while preserving committed teams and existing games. */
 export function correctPublishedDivisionPapers(
   s: State,
   divisionId: string,
@@ -201,14 +219,45 @@ export function correctPublishedDivisionPapers(
     "Só é possível corrigir papéis já publicados.",
   );
   ensure(
-    !s.challenges.some(
+    weekStart >= clubWeek(timestamp).start,
+    "Escolhe uma semana atual ou futura.",
+  );
+  ensure(
+    new Set(changes.map((c) => c.playerId)).size === changes.length,
+    "Cada jogador só pode ter um papel.",
+  );
+  const liveRoles = effectiveRoles(r);
+  for (const change of changes) {
+    if (
+      liveRoles.find((a) => a.playerId === change.playerId)?.role ===
+      change.role
+    )
+      continue;
+    const committed = s.challenges.some(
       (c) =>
         c.divisionId === divisionId &&
+        !c.competitionRoundId &&
         (c.weekStart ?? clubWeek(c.createdAt).start) === weekStart &&
-        !["cancelled", "refused", "expired"].includes(c.status),
-    ),
-    "Já existem desafios nesta semana; os papéis não podem ser corrigidos.",
-  );
+        !["cancelled", "refused", "expired"].includes(c.status) &&
+        challengeSide(c, change.playerId, s.players),
+    );
+    const reserved = r.manualMatchups?.[divisionId]?.pairs.some(
+      (pair) =>
+        pair.publishedAt &&
+        !pair.challengeId &&
+        [pair.challengerId, pair.defenderId].some((id) =>
+          rankingEntries(s.players, divisionId).some(
+            (team) =>
+              team.members.some((m) => m._id === id) &&
+              team.members.some((m) => m._id === change.playerId),
+          ),
+        ),
+    );
+    ensure(
+      !committed && !reserved,
+      "Mantém os papéis das equipas que já têm desafios ou jogos obrigatórios nesta semana.",
+    );
+  }
   ensure(changes.length > 0, "Indica os papéis a corrigir.");
   for (const change of changes)
     ensure(
@@ -216,41 +265,53 @@ export function correctPublishedDivisionPapers(
         divisionId && r.assignments.some((a) => a.playerId === change.playerId),
       "Jogador sem papel publicado nesta divisão.",
     );
-  const before = r.assignments.filter((a) =>
-    changes.some((c) => c.playerId === a.playerId),
+  const actualChanges = changes.filter(
+    (change) =>
+      liveRoles.find((a) => a.playerId === change.playerId)?.role !==
+      change.role,
   );
-  r.assignments = r.assignments.map(
-    (a) => changes.find((c) => c.playerId === a.playerId) ?? a,
+  const before = liveRoles.filter((a) =>
+    actualChanges.some((c) => c.playerId === a.playerId),
   );
-  // Each team keeps a single role compatible with its position.
+  const nextRoles = liveRoles.map(
+    (a) => actualChanges.find((c) => c.playerId === a.playerId) ?? a,
+  );
+  // Validate the affected teams before applying anything. Untouched historical roles stay intact.
   for (const team of rankingEntries(s.players, divisionId)) {
-    const roles = team.members
-      .filter(
-        (m) =>
-          m.status === "active" &&
-          !m.awaitingApproval &&
-          !m.registrationRejectedAt,
-      )
-      .map((m) => r.assignments.find((a) => a.playerId === m._id)?.role);
-    if (!roles.length) continue;
+    if (
+      !team.members.some((m) => actualChanges.some((c) => c.playerId === m._id))
+    )
+      continue;
+    const active = team.members.filter(
+      (m) =>
+        m.status === "active" &&
+        !m.awaitingApproval &&
+        !m.registrationRejectedAt,
+    );
+    const roles = active.map(
+      (m) => nextRoles.find((a) => a.playerId === m._id)?.role,
+    );
     ensure(
       roles.every(Boolean) && new Set(roles).size === 1,
       "Atribui um único papel a todos os membros de cada dupla.",
     );
-    for (const m of team.members)
-      if (roles[0])
-        ensure(
-          !weeklyPositionReason(s.players, m._id, roles[0]),
-          "Papel incompatível com a posição da dupla.",
-        );
+    for (const m of active)
+      ensure(
+        !weeklyPositionReason(s.players, m._id, roles[0]!),
+        "Papel incompatível com a posição da dupla.",
+      );
   }
+  r.assignments = r.assignments.map(
+    (a) => actualChanges.find((c) => c.playerId === a.playerId) ?? a,
+  );
   if (r.dynamicAssignments)
     r.dynamicAssignments = r.dynamicAssignments.map(
-      (a) => changes.find((c) => c.playerId === a.playerId) ?? a,
+      (a) => actualChanges.find((c) => c.playerId === a.playerId) ?? a,
     );
+  if (r.divisionRoleDrafts) delete r.divisionRoleDrafts[divisionId];
   r.version = (r.version ?? 0) + 1;
   const now = new Date(timestamp).toISOString();
-  for (const change of changes) {
+  for (const change of actualChanges) {
     const old = before.find((b) => b.playerId === change.playerId);
     if (old?.role === change.role) continue;
     s.notifications.push({
@@ -275,7 +336,7 @@ export function correctPublishedDivisionPapers(
       weekStart,
       reason,
       before,
-      after: changes,
+      after: actualChanges,
       version: r.version,
     }),
   });
@@ -430,7 +491,8 @@ export function scheduleDivisionPapersPublication(
         "Publica primeiro o ranking semanal desta divisão.",
       );
     }
-  const canonical = publishesAt === null ? null : new Date(publishesAt).toISOString();
+  const canonical =
+    publishesAt === null ? null : new Date(publishesAt).toISOString();
   ensure(
     weekStart >= clubWeek(timestamp).start &&
       (canonical === null ||
@@ -438,9 +500,11 @@ export function scheduleDivisionPapersPublication(
           Date.parse(canonical) <= Date.parse(clubWeek(weekStart).endsAt))),
     "A publicação deve estar entre a semana anterior e o fim da semana dos jogos.",
   );
-  const previous = r.divisionPublications?.[divisionId]?.publishedAt ?? r.divisionPublications?.[divisionId]?.approvedAt;
+  const previous =
+    r.divisionPublications?.[divisionId]?.publishedAt ??
+    r.divisionPublications?.[divisionId]?.approvedAt;
   r.divisionPublications ??= {};
-  const pub = r.divisionPublications[divisionId] ??= {};
+  const pub = (r.divisionPublications[divisionId] ??= {});
   if (canonical !== null) {
     pub.scheduledAt = canonical;
   } else {

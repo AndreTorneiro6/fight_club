@@ -18,6 +18,7 @@ import type { Actor, State } from "./types";
 export function filterFeatureView(state: State, actor: Actor) {
   if (actor.role !== "admin")
     for (const round of state.weeklyRounds) {
+      delete round.divisionRoleDrafts;
       round.mandatoryReservedTeamKeys = mandatoryReservedTeamKeys(round);
       round.manualMatchups = visibleMandatoryMatchups(
         round,
@@ -143,6 +144,7 @@ export function filterFeatureView(state: State, actor: Actor) {
   state.adminNotes = [];
   state.audit = state.audit.filter(
     (entry) =>
+      entry.action !== "week.division.revision.saved" &&
       !entry.action.startsWith("admin.notes.") &&
       !entry.action.startsWith("admin.coins.") &&
       !entry.action.startsWith("admin.photos.") &&

@@ -418,6 +418,8 @@ export interface WeeklyRound extends Entity {
       scheduledAt?: string;
     }
   >;
+  /** Private edits to published papers; live assignments stay authoritative until republished. */
+  divisionRoleDrafts?: Record<string, WeeklyRound["assignments"]>;
   divisionPublicationDelays?: Record<string, number>;
   divisionRoleGeneration?: Record<
     string,

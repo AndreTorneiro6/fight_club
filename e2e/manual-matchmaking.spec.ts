@@ -350,8 +350,11 @@ test("legacy saved mandatory pairs appear on both team cards and can be assigned
   await checkRows("Jogo obrigatório guardado:");
   await page.goto(`/admin?tab=week&task=mandatory&division=prata&week=${week}`);
   await expect(
-    page.getByRole("button", { name: /Publicar jogos/ }),
-  ).toHaveCount(0);
+    page.getByRole("button", {
+      name: "Publicar jogos obrigatórios",
+      exact: true,
+    }),
+  ).toBeEnabled();
   await page
     .getByRole("button", { name: "Atribuir jogo", exact: true })
     .click();
@@ -362,5 +365,11 @@ test("legacy saved mandatory pairs appear on both team cards and can be assigned
         .manualMatchups.prata.pairs[0].publishedAt;
     })
     .toBeTruthy();
+  await expect(
+    page.getByRole("button", {
+      name: "Publicar jogos obrigatórios",
+      exact: true,
+    }),
+  ).toHaveCount(0);
   await checkRows("Jogo obrigatório atribuído:");
 });

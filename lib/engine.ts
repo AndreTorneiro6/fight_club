@@ -2471,10 +2471,7 @@ export function execute(
       );
     case "admin.week.division.save": {
       const r = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
-      ensure(
-        r && !weeklyPublishedAt(r, cmd.divisionId),
-        "Escolhe papéis por publicar desta divisão.",
-      );
+      ensure(r, "Escolhe papéis por publicar desta divisão.");
       ensure(
         (r.version ?? 0) === cmd.expectedVersion,
         "Outro administrador alterou os papéis. Atualiza antes de continuar.",
@@ -2484,6 +2481,30 @@ export function execute(
         cmd.weekStart >= clubWeek(timestamp).start,
         "Escolhe uma semana atual ou futura.",
       );
+      if (weeklyPublishedAt(r, cmd.divisionId)) {
+        // Validate against the same rules as publication without changing live roles or notifying players.
+        correctPublishedDivisionPapers(
+          structuredClone(s),
+          cmd.divisionId,
+          cmd.weekStart,
+          cmd.expectedVersion,
+          cmd.assignments,
+          "Validar rascunho de republicação.",
+          actor.userId,
+          timestamp,
+        );
+        r.divisionRoleDrafts = {
+          ...r.divisionRoleDrafts,
+          [cmd.divisionId]: cmd.assignments,
+        };
+        r.version = (r.version ?? 0) + 1;
+        log("week.division.revision.saved", {
+          divisionId: cmd.divisionId,
+          weekStart: cmd.weekStart,
+          assignments: cmd.assignments,
+        });
+        return { id: r._id };
+      }
       ensure(
         new Set(cmd.assignments.map((a) => a.playerId)).size ===
           cmd.assignments.length,
@@ -5730,10 +5751,7 @@ function processMandatoryMatchups(s: State, timestamp: number) {
   }
 }
 
-export function processScheduledPublications(
-  s: State,
-  timestamp = Date.now(),
-) {
+export function processScheduledPublications(s: State, timestamp = Date.now()) {
   const now = new Date(timestamp).toISOString();
   for (const r of s.weeklyRounds) {
     if (!r.divisionPublications) continue;
@@ -5746,7 +5764,15 @@ export function processScheduledPublications(
       const currentSignature = divisionPaperSignature(s, r, divisionId);
       if (pub.approvalSnapshot !== currentSignature) continue;
       // Publish the papers
-      publishDivisionPapers(s, divisionId, r.weekStart, r.version ?? 0, false, "system:scheduled-publication", timestamp);
+      publishDivisionPapers(
+        s,
+        divisionId,
+        r.weekStart,
+        r.version ?? 0,
+        false,
+        "system:scheduled-publication",
+        timestamp,
+      );
     }
   }
 }

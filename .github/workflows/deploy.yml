@@ -205,6 +205,7 @@ jobs:
           npx playwright test e2e/dynamic-weekly.spec.ts
           npx playwright test e2e/manual-matchmaking.spec.ts
           npx playwright test e2e/admin-week-workspace.spec.ts
+          npx playwright test e2e/weekly-paper-republication.spec.ts
         env:
           TMPDIR: ${{ runner.temp }}
 

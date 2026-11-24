@@ -4906,6 +4906,29 @@ function AdminDivisionMatchmaking(
           >
             Definir jogo obrigatório
           </button>
+          {!!draft.length && (
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  {
+                    type: "admin.week.matchups.publish",
+                    weekStart: week,
+                    divisionId: division,
+                    expectedVersion: plan.version,
+                  },
+                  "Jogos obrigatórios atribuídos. As duplas atacantes têm 12 horas para confirmar.",
+                )
+              }
+            >
+              Publicar jogos obrigatórios
+            </button>
+          )}
+          <small>
+            Os jogos por agendar não impedem atribuir jogos às restantes duplas
+            sem desafio.
+          </small>
           {draft.map((pair) => (
             <div key={pair.id} className="inset row between wrap">
               <span>
