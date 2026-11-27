@@ -40,8 +40,8 @@ test("weekly workspace preserves context across tasks, reload and game managemen
     }
   });
   await page.goto("/admin");
-  await page.getByRole("link", { name: "Gerir semana", exact: true }).click();
-  await page.getByLabel("Semana a gerir", { exact: true }).selectOption(week);
+  await page.getByRole("link", { name: "Gerir jornada", exact: true }).click();
+  await page.getByLabel("Jornada a gerir", { exact: true }).selectOption(week);
   await page
     .getByLabel("Divisão a gerir", { exact: true })
     .selectOption(game.divisionId);
@@ -53,7 +53,7 @@ test("weekly workspace preserves context across tasks, reload and game managemen
       exact: true,
     }),
   ).toBeVisible();
-  await expect(page.getByLabel("Semana dos jogos a definir")).toHaveCount(0);
+  await expect(page.getByLabel("Jornada a definir")).toHaveCount(0);
   await expect(page.getByLabel("Divisão dos jogos")).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(`week=${week}`));
   await steps.getByRole("button", { name: /Papéis/ }).click();
@@ -87,7 +87,7 @@ test("weekly workspace preserves context across tasks, reload and game managemen
     page.getByRole("heading", { name: "Jogos por agendar", exact: true }),
   ).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Semana a gerir", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("Jornada a gerir", { exact: true })).toHaveValue(
     week,
   );
   await expect(page.getByLabel("Divisão a gerir", { exact: true })).toHaveValue(
@@ -108,7 +108,7 @@ test("weekly workspace preserves context across tasks, reload and game managemen
   });
   await page.getByRole("link", { name: "Agendar jogo", exact: true }).click();
   await page.getByRole("link", { name: "Voltar à gestão da semana" }).click();
-  await expect(page.getByLabel("Semana a gerir", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("Jornada a gerir", { exact: true })).toHaveValue(
     week,
   );
   await steps.getByRole("button", { name: /Resultados e correções/ }).click();

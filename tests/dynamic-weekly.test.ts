@@ -1827,60 +1827,92 @@ test("Ouro can extend to 12→1, but only offers the extension when necessary", 
   assert.equal(pairing(s, 12, 1)?.status, "accepted");
   assert.equal(pairing(s, 12, 1)?.effectiveChallengeDistance, 11);
 });
-test("Ouro opponent exclusions are saved, audited and respected by reach extensions", () => {
-  const s = fixture("ouro", 12, 4);
-  committedOuro(s, [
-    [2, 1],
-    [4, 3],
-    [8, 5],
-    [12, 10],
-  ]);
-  execute(
-    s,
-    { ...actor(1), role: "admin" },
-    {
-      type: "admin.week.ouro.opponents.save",
-      weekStart: week,
-      expectedVersion: 1,
-      teamKey: "t11a:t11b",
-      allowedTeamKeys: [],
-    },
-    now,
-  );
-  assert.ok(s.audit.some((a) => a.action === "week.ouro.opponents.saved"));
-  send(s, 9, 7);
-  assert.ok(pairing(s, 9, 7));
-  assert.ok(!pairing(s, 11, 6));
-  assert.equal(dynamicWeeklyPlan(s, "ouro", week).maximumMatches, 5);
-  assert.throws(() => send(s, 11, 6));
+test("every division gets the same reach, opponents, suggestions and history", () => {
+  const results = (["ouro", "prata", "bronze"] as const).map((code) => {
+    const s = fixture(code, 12, 3);
+    delete s.settings[0].ouroNormalReach;
+    s.settings[0].divisionChallengeDistances = { [code]: 3 };
+    s.weeklyRounds[0].ouroAllowedOpponents = { "t11a:t11b": [] };
+    const plan = dynamicWeeklyPlan(s, code, week);
+    const next = generateWeeklyRoles(s, "2026-11-02", "admin", now, code);
+    return {
+      distance: challengeDistance(s, code),
+      eligible: plan.eligible,
+      maximum: plan.maximumMatches,
+      suggested: next.assignments,
+      history: [...divisionWeekOptions(s, code, week, {}).values()],
+    };
+  });
+  assert.deepEqual(results[0], results[1]);
+  assert.deepEqual(results[0], results[2]);
+  assert.ok(results[0].eligible.some((p) => p.attackerId === "t11a"));
 });
 
-test("Ouro selections support combined production-length partner IDs", () => {
-  const s = fixture("ouro", 12, 4);
-  const ids = new Map(s.players.map((p) => [p._id, p._id.padEnd(64, "x")]));
-  for (const p of s.players) {
-    p._id = ids.get(p._id)!;
-    p.partnerId = ids.get(p.partnerId!)!;
-  }
-  for (const a of s.weeklyRounds[0].assignments)
-    a.playerId = ids.get(a.playerId)!;
-  const teams = rankingEntries(s.players, "ouro");
-  assert.equal(teams[10].id.length, 129);
+test("an admin sets Ouro's distance like any division, replacing the saved legacy reach", () => {
+  const s = fixture("ouro", 12, 3);
+  s.settings[0].ouroNormalReach = 4;
+  assert.equal(challengeDistance(s, "ouro"), 4);
   execute(
     s,
     { ...actor(1), role: "admin" },
     {
-      type: "admin.week.ouro.opponents.save",
-      weekStart: week,
-      expectedVersion: 1,
-      teamKey: teams[10].id,
-      allowedTeamKeys: [teams[5].id],
+      type: "admin.challenge.distance.set",
+      divisionId: "ouro",
+      distance: 2,
+      expectedDistance: 4,
+      reason: "Mesma regra em todas as divisões",
     },
     now,
   );
-  assert.deepEqual(s.weeklyRounds[0].ouroAllowedOpponents?.[teams[10].id], [
-    teams[5].id,
-  ]);
+  assert.equal(s.settings[0].ouroNormalReach, null);
+  assert.equal(s.settings[0].divisionChallengeDistances?.ouro, 2);
+  assert.equal(challengeDistance(s, "ouro"), 2);
+});
+
+test("saving the rules keeps the legacy reach until Ouro's distance changes", () => {
+  const s = fixture("ouro", 12, 3);
+  s.settings[0].ouroNormalReach = 4;
+  const save = (distance: number) => {
+    const { _id, ouroNormalReach, ...settings } = s.settings[0];
+    execute(
+      s,
+      { ...actor(1), role: "admin" },
+      {
+        type: "admin.settings.save",
+        settings: {
+          ...settings,
+          divisionChallengeDistances: { ouro: distance },
+        },
+      },
+      now,
+    );
+  };
+  save(3);
+  assert.equal(challengeDistance(s, "ouro"), 4);
+  save(2);
+  assert.equal(challengeDistance(s, "ouro"), 2);
+});
+
+test("the retired Ouro exclusion command is refused without changing anything", () => {
+  const s = fixture("ouro", 12, 4);
+  const before = structuredClone(s.weeklyRounds);
+  assert.throws(
+    () =>
+      execute(
+        s,
+        { ...actor(1), role: "admin" },
+        {
+          type: "admin.week.ouro.opponents.save",
+          weekStart: week,
+          expectedVersion: 1,
+          teamKey: "t11a:t11b",
+          allowedTeamKeys: [],
+        },
+        now,
+      ),
+    /mesmas regras/,
+  );
+  assert.deepEqual(s.weeklyRounds, before);
 });
 
 for (const code of ["prata", "bronze"] as const)

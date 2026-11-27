@@ -75,7 +75,6 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       defenderKey: d,
     });
   }
-  const ouro = s.divisions.find((d) => d._id === divisionId)?.code === "ouro";
   const round = s.weeklyRounds.find((r) => r.weekStart === week);
   const roleFor = (key: string) =>
     round?.assignments.find((r) =>
@@ -96,9 +95,6 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       if (
         (freeWeek || roleFor(a.id) !== "defense") &&
         (freeWeek || roleFor(d.id) !== "attack") &&
-        (!ouro ||
-          !round?.ouroAllowedOpponents?.[a.id] ||
-          round.ouroAllowedOpponents[a.id].includes(d.id)) &&
         weeklyPairAllowed(s, divisionId, entries, a, d, week, true)
       )
         pairs.push({
@@ -261,7 +257,6 @@ export function dynamicWeeklyPlan(s: State, divisionId: string, week: string) {
     s.players,
     s.divisions,
     s.settings[0].ouroNormalReach,
-    s.weeklyRounds.find((r) => r.weekStart === week)?.ouroAllowedOpponents,
     s.challenges,
     s.exceptions,
     s.settings[0].divisionChallengeDistances,
@@ -308,17 +303,12 @@ export function dynamicTargetReason(
     plan.teams.findIndex((t) => t.members.some((m) => m._id === defenderId)) +
     1;
   if (!a || !d) return "As duplas devem pertencer à mesma divisão.";
-  const ouro = s.divisions.find((d) => d._id === p.divisionId)?.code === "ouro";
   if (d >= a) return "Adversário fora do limite de posições.";
   if (consecutiveRematch(s, plan.teams[a - 1].id, plan.teams[d - 1].id, week))
     return CONSECUTIVE_REMATCH_MESSAGE;
   const unavailable =
     weeklyTeamUnavailableReason(s, plan.teams[a - 1], week) ??
     weeklyTeamUnavailableReason(s, plan.teams[d - 1], week);
-  const allowed = s.weeklyRounds.find((r) => r.weekStart === week)
-    ?.ouroAllowedOpponents?.[plan.teams[a - 1].id];
-  if (ouro && allowed && !allowed.includes(plan.teams[d - 1].id))
-    return "Este adversário foi excluído pelo administrador.";
   if (unavailable) return unavailable;
   if (plan.errors.length) return plan.errors[0];
   // Normal valid choices preserve first-come priority. Extended choices come

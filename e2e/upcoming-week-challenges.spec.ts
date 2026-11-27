@@ -180,7 +180,7 @@ test("published next-week Open Attack roles appear immediately to players and pe
       }),
     ).toBeVisible();
     await expect(
-      attacker.getByText(`Semana dos jogos: ${week}`, { exact: false }),
+      attacker.getByText(/Jornada \d+ · Ranking:/),
     ).toBeVisible();
     const earlierIncoming = await post(page, {
       type: "admin.challenge.create",

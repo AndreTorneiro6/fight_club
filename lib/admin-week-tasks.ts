@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import { isDraftMatchup } from "./mandatory-matchups";
 import { addClubDays, clubWeek } from "./calendar";
 import { weeklyPublishedAt } from "./weekly-publication";
@@ -66,7 +67,7 @@ export function adminWeekTasks(
         tasks.push({
           label: `${label} · ${d.name}`,
           count,
-          detail: `Semana de ${week.slice(8, 10)}/${week.slice(5, 7)} · ${detail}`,
+          detail: `${matchdayWeekLabel(s, week, d._id, now)} · ${detail}`,
           href: opening
             ? `/admin?tab=weekly&week=${week}&division=${d._id}`
             : `/admin?tab=week&week=${week}&division=${d._id}&task=${task}`,

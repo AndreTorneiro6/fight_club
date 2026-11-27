@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import {
   isDraftMatchup,
   isWaitingMatchup,
@@ -4867,7 +4868,7 @@ function AdminDivisionMatchmaking(
         {!a.context && (
           <>
             <label>
-              Semana dos jogos a definir
+              Jornada a definir
               <select
                 value={week}
                 disabled={busy}
@@ -4878,7 +4879,7 @@ function AdminDivisionMatchmaking(
               >
                 {weeks.map((w) => (
                   <option key={w} value={w}>
-                    Semana de {w}
+                    {matchdayWeekLabel(s, w, division)}
                     {w === weeks[0] ? " · atual" : ""}
                   </option>
                 ))}
@@ -4910,7 +4911,7 @@ function AdminDivisionMatchmaking(
           duplas continuam a desafiar normalmente.
         </p>
         <small>
-          Jornada de {week} · {games.length} jogos criados · {draft.length}{" "}
+          {matchdayWeekLabel(s, week, division)} · {games.length} jogos criados · {draft.length}{" "}
           pares por atribuir · {waiting.length} a aguardar desafio ·{" "}
           {free.length} duplas sem jogo.
         </small>
@@ -5200,13 +5201,13 @@ function AdminChallenges(a: Actions) {
             </select>
           </label>
           <label>
-            Semana dos jogos
+            Jornada dos jogos
             <select
-              aria-label="Filtrar semana dos desafios"
+              aria-label="Filtrar jornada dos desafios"
               value={week}
               onChange={(e) => setWeek(e.target.value)}
             >
-              <option value="all">Todas as semanas</option>
+              <option value="all">Todas as jornadas</option>
               {[
                 ...new Set(
                   s.challenges
@@ -5218,7 +5219,7 @@ function AdminChallenges(a: Actions) {
                 .reverse()
                 .map((w) => (
                   <option key={w} value={w}>
-                    Semana de {w}
+                    {matchdayWeekLabel(s, w)}
                   </option>
                 ))}
             </select>
@@ -6230,6 +6231,7 @@ const settingLabels: Record<
     | "prizes"
     | "contentVersion"
     | "divisionChallengeDistances"
+    | "ouroNormalReach"
     | "weeklyDynamicDivisionIds"
     | "manualMatchmakingDivisionIds"
   >,
@@ -6251,7 +6253,6 @@ const settingLabels: Record<
   weeklyRankingHour: "Hora do resumo semanal · Portugal · 0–23",
   requireClubConfirmation: "Exigir confirmação do clube e campo",
   initialSuggestionCount: "Opções iniciais de calendário · 3 ou 4",
-  ouroNormalReach: "Ouro · posições de alcance normal",
   maxPositionsAbove: "Posições que pode desafiar acima",
   maxActiveChallenges:
     "Máximo de desafios simultâneos · fora da competição semanal",
@@ -6392,10 +6393,7 @@ function Rules({ s, run, busy }: Actions) {
               <select
                 aria-label={`Distância de ataque · ${d.name}`}
                 disabled={busy}
-                value={
-                  settings.divisionChallengeDistances?.[d._id] ??
-                  settings.maxPositionsAbove
-                }
+                value={challengeDistance(s, d._id)}
                 onChange={async (e) => {
                   const distance = Number(e.target.value);
                   const result = await run(
@@ -7363,7 +7361,7 @@ function AssignmentDialog(
       >
         <p style={{ fontSize: 12 }}>
           {a.draftWeekStart
-            ? `Escolhe quaisquer duas duplas disponíveis para a semana de ${a.draftWeekStart}, sem limite de posições. Ao guardar, a dupla atacante usa Desafiar em Desafios. Podes lançar o desafio imediatamente em Jogos obrigatórios, sem definir horários nem esperar as 12 horas.`
+            ? `Escolhe quaisquer duas duplas disponíveis para a ${matchdayWeekLabel(s, a.draftWeekStart, division)}, sem limite de posições. Ao guardar, a dupla atacante usa Desafiar em Desafios. Podes lançar o desafio imediatamente em Jogos obrigatórios, sem definir horários nem esperar as 12 horas.`
             : manual
               ? "Escolhe as duas duplas. O jogo fica atribuído e ambas são notificadas para combinar o horário. Os papéis semanais e o algoritmo não escolhem o adversário."
               : "Define quem ataca e quem defende neste desafio. A intervenção fica no histórico. Os dois jogadores recebem uma notificação."}

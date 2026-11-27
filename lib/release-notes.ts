@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.0.6";
+export const applicationVersion = "2.1.0";
 export const releaseNotes = [
+  {
+    version: "2.1.0",
+    date: "2026-11-27",
+    title: "Mesmas regras em todas as divisões e competição por jornadas",
+    changes: [
+      "Ouro segue as mesmas regras de Prata e Bronze, nas propostas de papéis, no histórico e no controlo do administrador. A distância de ataque altera-se da mesma forma; o alcance de Ouro guardado mantém-se até o administrador o alterar.",
+      "Foram retirados os adversários permitidos e a simulação exclusivos de Ouro. Exclusões guardadas anteriormente deixam de se aplicar.",
+      "A competição passa a ser apresentada por jornadas em vez de datas semanais. Cada divisão tem a sua contagem, que avança quando os seus desafios abrem.",
+    ],
+  },
   {
     version: "2.0.6",
     date: "2026-11-24",

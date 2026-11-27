@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import { weeklyPublishedAt } from "@/lib/weekly-publication";
 import type { View } from "@/lib/types";
 import { rankingEntries } from "@/lib/ranking-groups";
@@ -79,7 +80,7 @@ export default function RoundChallengeCoverage({
       }));
   const title = r
     ? `Jornada ${r.number}`
-    : `${s.divisions.find((d) => d._id === divisionId)?.name ?? "Liga"} — Semana ${weekStart}`;
+    : `${s.divisions.find((d) => d._id === divisionId)?.name ?? "Liga"} — ${matchdayWeekLabel(s, weekStart!, divisionId)}`;
   const published = r
     ? !!r.rolesPublishedAt
     : !!weeklyPublishedAt(weekly, divisionId);

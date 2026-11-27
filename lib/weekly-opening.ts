@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import { weeklyPublishedAt } from "./weekly-publication";
 import { divisionRankingPublished } from "./round-transition";
 import { randomUUID } from "node:crypto";
@@ -149,7 +150,7 @@ export function notifyWeeklyOpenings(s: State, timestamp = Date.now()) {
         playerId: p._id,
         kind: "challenge",
         title: "🥊 Os desafios estão abertos!",
-        body: `Já podes desafiar para a semana de ${r.weekStart}. ${r.weekType === "OPEN_ATTACK" ? "SEMANA DE ATAQUE LIVRE — todas as duplas elegíveis podem desafiar acima, exceto o campeão." : "Consulta o teu papel de ATAQUE ou DEFESA e os adversários elegíveis."}`,
+        body: `${matchdayWeekLabel(s, r.weekStart, p.divisionId, timestamp)}: já podes desafiar. ${r.weekType === "OPEN_ATTACK" ? "SEMANA DE ATAQUE LIVRE — todas as duplas elegíveis podem desafiar acima, exceto o campeão." : "Consulta o teu papel de ATAQUE ou DEFESA e os adversários elegíveis."}`,
         weeklyChallengeOpening: {
           weekStart: r.weekStart,
           opensAt,

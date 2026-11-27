@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import type { View } from "@/lib/types";
 import { addClubDays, clubWeek } from "@/lib/calendar";
 import {
@@ -57,7 +58,7 @@ export default function WeeklyTurnoverStatus({ s }: { s: View }) {
         return {
           d,
           state: "Próxima jornada publicada",
-          detail: `Semana de ${completion.nextWeek}: ${
+          detail: `${matchdayWeekLabel(s, completion.nextWeek, d._id)}: ${
             opensAt
               ? `desafios ${Date.parse(opensAt) <= now ? "abertos desde" : "abrem"} ${lisbon(opensAt)}.`
               : "desafios a aguardar abertura manual."
@@ -68,24 +69,24 @@ export default function WeeklyTurnoverStatus({ s }: { s: View }) {
         return {
           d,
           state: "A aguardar jogos",
-          detail: `Semana de ${week}: ${completion.completed}/${completion.total} jogos com resultado. Faltam ${completion.pending.map(number).join(", ") || "jogos"}.${frozen}`,
+          detail: `${matchdayWeekLabel(s, week, d._id)}: ${completion.completed}/${completion.total} jogos com resultado. Faltam ${completion.pending.map(number).join(", ") || "jogos"}.${frozen}`,
         };
       if (!divisionRankingPublished(s, season._id, d._id, week, now))
         return {
           d,
           state: "A publicar ranking",
-          detail: `Semana de ${week} concluída. O sistema publica dentro de 1 minuto.${frozen}`,
+          detail: `${matchdayWeekLabel(s, week, d._id)} concluída. O sistema publica dentro de 1 minuto.${frozen}`,
         };
       return {
         d,
         state: "A aguardar administrador",
-        detail: `Ranking publicado. O administrador revê e publica os papéis da semana de ${completion.nextWeek} e decide quando abrir os desafios.`,
+        detail: `Ranking publicado. O administrador revê e publica os papéis da ${matchdayWeekLabel(s, completion.nextWeek, d._id)} e decide quando abrir os desafios.`,
       };
     }
     return {
       d,
       state: "Sem jornada publicada",
-      detail: "Publica os papéis da semana para iniciar o ciclo.",
+      detail: "Publica os papéis da jornada para iniciar o ciclo.",
     };
   });
   return (

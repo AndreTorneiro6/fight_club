@@ -172,7 +172,7 @@ test("admin sees decisions before tools; secondary navigation and mobile layout 
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
-    page.getByRole("button", { name: "Gerir semana", exact: true }),
+    page.getByRole("button", { name: "Gerir jornada", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(

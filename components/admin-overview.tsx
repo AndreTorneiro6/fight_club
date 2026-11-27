@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import { adminWeekTasks } from "@/lib/admin-week-tasks";
 import { LiveMatchScore } from "./live-match-score";
 import { todayMatches } from "@/lib/result-readiness";
@@ -183,7 +184,8 @@ export default function AdminOverview({
               className="button"
               href={`/admin?tab=turnover&division=${d._id}&week=${r.weekStart}&season=${season._id}`}
             >
-              {d.name} · {r.weekStart} · Continuar publicação{" "}
+              {d.name} · {matchdayWeekLabel(s, r.weekStart, d._id)} ·
+              Continuar publicação{" "}
               <ArrowRight size={15} />
             </Link>,
           ];
@@ -201,7 +203,7 @@ export default function AdminOverview({
           </p>
         </div>
         <Link className="button primary" href="/admin?tab=week">
-          Gerir semana <ArrowRight size={16} />
+          Gerir jornada <ArrowRight size={16} />
         </Link>
       </section>
       <section
@@ -372,7 +374,11 @@ export default function AdminOverview({
                   >
                     <small className="admin-game-meta">
                       {s.divisions.find((d) => d._id === c.divisionId)?.name} ·
-                      Semana de {c.weekStart ?? clubWeek(c.createdAt).start}
+                      {matchdayWeekLabel(
+                        s,
+                        c.weekStart ?? clubWeek(c.createdAt).start,
+                        c.divisionId,
+                      )}
                       {c.deferredUntil
                         ? ` · Adiado até ${c.deferredUntil}`
                         : ""}
@@ -423,11 +429,7 @@ export default function AdminOverview({
             <CalendarDays size={20} />
           </div>
           <p className="muted">
-            Semana de{" "}
-            {new Date(`${week}T12:00:00Z`).toLocaleDateString("pt-PT", {
-              day: "2-digit",
-              month: "2-digit",
-            })}{" "}
+            {matchdayWeekLabel(s, week)}{" "}
             ·{" "}
             {round?.weekType === "OPEN_ATTACK"
               ? "Ataque livre"

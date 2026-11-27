@@ -80,9 +80,10 @@ test("first competitive week is independent of preparation opening, preserves ol
   assert.deepEqual(s.weeklyRounds, old);
   assert.equal(seasonWeek(s, now), "2026-10-26");
   assert.equal(weeklyChallengeWeek(s, now), "2026-10-26");
-  assert.equal(matchdayNumber(s, "2026-10-19"), undefined);
-  assert.equal(matchdayNumber(s, "2026-10-26"), 1);
-  assert.equal(matchdayNumber(s, "2026-11-02"), 2);
+  const number = (week: string) => matchdayNumber(s, week, "ouro", now);
+  assert.equal(number("2026-10-19"), undefined);
+  assert.equal(number("2026-10-26"), 1);
+  assert.equal(number("2026-11-02"), 2);
 });
 test("old preparation roles do not turn first real week into NORMAL or allow regeneration before the season boundary", () => {
   const s = fixture();

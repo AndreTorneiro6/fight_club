@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import { weeklyRoleName } from "@/lib/weekly-role-rules";
 import Link from "next/link";
 import { challengeDistance } from "@/lib/challenge-distance";
@@ -73,7 +74,8 @@ export default function AdminRoundTransition({
               )
             }
           >
-            {c.division.name} · Semana de {c.week}
+            {c.division.name} ·{" "}
+            {matchdayWeekLabel(s, c.week, c.division._id)}
           </button>
         ))}
       </section>
@@ -101,9 +103,9 @@ export default function AdminRoundTransition({
               : "Abertura e notificações"}
         </h2>
         <p>
-          Semana concluída: {weekStart} · {completion.completed}/
-          {completion.total} jogos validados. Próxima semana:{" "}
-          {completion.nextWeek}.
+          Concluída: {matchdayWeekLabel(s, weekStart, divisionId)} ·{" "}
+          {completion.completed}/{completion.total} jogos validados. A seguir:{" "}
+          {matchdayWeekLabel(s, completion.nextWeek, divisionId)}.
         </p>
       </div>
       <div className="row wrap" aria-label="Etapas da próxima jornada">

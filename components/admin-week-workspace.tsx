@@ -1,4 +1,5 @@
 "use client";
+import { matchdayWeekLabel } from "@/lib/matchday";
 import { isDraftMatchup } from "@/lib/mandatory-matchups";
 
 import { useTransition, type ReactNode } from "react";
@@ -103,7 +104,7 @@ export default function AdminWeekWorkspace({
       <div className="panel stack admin-week-context">
         <div>
           <div className="eyebrow gold">COMPETIÇÃO · PASSO A PASSO</div>
-          <h2 id="admin-week-title">Gerir semana</h2>
+          <h2 id="admin-week-title">Gerir jornada</h2>
           <p className="muted">
             Publica os papéis, define os confrontos e acompanha cada jogo no
             mesmo espaço.
@@ -111,16 +112,16 @@ export default function AdminWeekWorkspace({
         </div>
         <div className="form-grid">
           <label>
-            Semana a gerir
+            Jornada a gerir
             <select
-              aria-label="Semana a gerir"
+              aria-label="Jornada a gerir"
               value={week}
               disabled={busy || navigating}
               onChange={(e) => update({ week: e.target.value })}
             >
               {weeks.map((w) => (
                 <option key={w} value={w}>
-                  {fmtDate(w + "T12:00:00Z")}
+                  {matchdayWeekLabel(s, w, division._id)}
                   {w === clubWeek().start ? " · atual" : ""}
                 </option>
               ))}

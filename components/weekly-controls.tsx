@@ -1,5 +1,4 @@
 "use client";
-import OuroOpponentsControl from "./ouro-opponents-control";
 import { ComboRoleIcon } from "./combo-role-icon";
 import {
   adminMatchmakingEnabled,
@@ -124,10 +123,13 @@ export function WeekNavigation({
   week,
   onChange,
   minWeek,
+  label: title,
 }: {
   week: string;
   onChange: (week: string) => void;
   minWeek?: string;
+  /** Replaces the calendar dates, e.g. with the jornada. */
+  label?: string;
 }) {
   const label = (day: string) =>
     new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
@@ -147,7 +149,7 @@ export function WeekNavigation({
         <ArrowLeft size={18} />
       </button>
       <strong aria-live="polite">
-        {label(week)} — {label(addClubDays(week, 6))}
+        {title ?? `${label(week)} — ${label(addClubDays(week, 6))}`}
       </strong>
       <button
         className="icon-button"
@@ -570,11 +572,16 @@ export function WeeklyRoles({
       )}
       {admin ? (
         !lockedContext && (
-          <WeekNavigation week={week} onChange={setWeek} minWeek={first} />
+          <WeekNavigation
+            week={week}
+            onChange={setWeek}
+            minWeek={first}
+            label={matchdayWeekLabel(s, week, division)}
+          />
         )
       ) : (
         <p>
-          Semana dos jogos: {week} · Ranking:{" "}
+          {matchdayWeekLabel(s, week, me.divisionId)} · Ranking:{" "}
           {rankingEntries(s.players, me.divisionId).findIndex((t) =>
             t.members.some((m) => m._id === me._id),
           ) + 1}{" "}
@@ -698,7 +705,7 @@ export function WeeklyRoles({
                         title={r.weekStart}
                         onClick={() => setWeek(r.weekStart)}
                       >
-                        {matchdayWeekLabel(s, r.weekStart)}
+                        {matchdayWeekLabel(s, r.weekStart, division)}
                       </button>
                       {index === 0 && (
                         <span className="weekly-history-latest-label">
@@ -784,7 +791,7 @@ export function WeeklyRoles({
           {new Date(opening).toLocaleString("pt-PT", {
             timeZone: "Europe/Lisbon",
           })}{" "}
-          (Portugal). A semana dos jogos mantém-se {week}.
+          (Portugal). {matchdayWeekLabel(s, week, division)}.
         </p>
       )}
       <p role="status">
@@ -1178,24 +1185,6 @@ export function WeeklyRoles({
                   </small>
                 )}
               </div>
-              {admin &&
-                s.divisions.find((d) => d._id === members[0].divisionId)
-                  ?.code === "ouro" &&
-                canChallenge(role) &&
-                canChallenge(
-                  round?.assignments.find((a) =>
-                    members.some((m) => m._id === a.playerId),
-                  )?.role,
-                ) &&
-                round && (
-                  <OuroOpponentsControl
-                    s={s}
-                    week={week}
-                    teamKey={entry.id}
-                    run={run}
-                    busy={busy}
-                  />
-                )}
             </div>
           );
         })}

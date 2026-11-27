@@ -1,9 +1,11 @@
 import { challengeTeamRanks } from "./challenge-team-ranks";
 import { formatSetScores, parseLegacySetScores } from "./set-scores";
 import { isTitleMatch, isOfficialTitleMatch } from "./title-matches";
-import { clubWeek } from "./calendar";
+import { clubWeek, addClubDays } from "./calendar";
+import { weeklyPublishedAt } from "./weekly-publication";
+import { weeklyOpeningAt } from "./weekly";
 import { teamMembers } from "./ranking-groups";
-import type { State } from "./types";
+import type { Season, State } from "./types";
 
 export type PosterMode = "fixtures" | "results" | "title" | "title_results";
 export const isResultPoster = (mode: PosterMode) =>
@@ -117,7 +119,75 @@ export function matchdayCards(
         a.number - b.number,
     );
 }
-export function matchdayNumber(state: State, week: string) {
+type JornadaState = Pick<
+  State,
+  "seasons" | "weeklyRounds" | "challenges" | "divisions"
+>;
+
+const dayMonth = (day: string) =>
+  new Date(day + "T12:00:00Z").toLocaleDateString("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  });
+
+function divisionJornada(
+  state: JornadaState,
+  season: Season,
+  week: string,
+  divisionId: string,
+  now: number,
+) {
+  const first = season.firstCompetitionWeek ?? clubWeek(season.start).start;
+  const inSeason = (w: string) => w >= first && w <= season.end;
+  const current = clubWeek(now).start;
+  const launched = new Set(
+    state.weeklyRounds
+      .filter((r) => {
+        const publishedAt = weeklyPublishedAt(r, divisionId);
+        if (!inSeason(r.weekStart) || !publishedAt) return false;
+        const opening = weeklyOpeningAt(r, divisionId);
+        return opening !== null && Date.parse(opening ?? publishedAt) <= now;
+      })
+      .map((r) => r.weekStart),
+  );
+  // A finished week with games was played, even if its opening was later held.
+  for (const c of state.challenges) {
+    const w = c.weekStart;
+    if (
+      w &&
+      w < current &&
+      inSeason(w) &&
+      c.divisionId === divisionId &&
+      !c.competitionRoundId &&
+      !["cancelled", "refused", "expired"].includes(c.status)
+    )
+      launched.add(w);
+  }
+  const weeks = [...launched].sort();
+  const index = weeks.indexOf(week);
+  if (index >= 0) return index + 1;
+  // Not launched yet: preview the number it takes when its challenges open.
+  const last = weeks.at(-1);
+  const next = [current, first, last ? addClubDays(last, 7) : first]
+    .sort()
+    .at(-1)!;
+  if (week < next) return undefined;
+  return (
+    weeks.length +
+    1 +
+    Math.round((Date.parse(week) - Date.parse(next)) / (7 * 86400000))
+  );
+}
+
+/** A division's jornada: its Nth week with challenges launched in the season.
+ * Without a division, defined only when every division is on the same number. */
+export function matchdayNumber(
+  state: JornadaState,
+  week: string,
+  divisionId?: string,
+  now = Date.now(),
+): number | undefined {
   const season = state.seasons.find(
     (season) => season.start <= clubWeek(week).end && season.end >= week,
   );
@@ -126,30 +196,33 @@ export function matchdayNumber(state: State, week: string) {
     (season.firstCompetitionWeek && week < season.firstCompetitionWeek)
   )
     return undefined;
-  return Math.max(
-    1,
-    Math.floor(
-      (Date.parse(week + "T12:00:00Z") -
-        Date.parse(
-          (season.firstCompetitionWeek ?? clubWeek(season.start).start) +
-            "T12:00:00Z",
-        )) /
-        (7 * 86400000),
-    ) + 1,
+  if (divisionId && divisionId !== "all")
+    return divisionJornada(state, season, week, divisionId, now);
+  const numbers = new Set(
+    state.divisions.map((d) =>
+      divisionJornada(state, season, week, d._id, now),
+    ),
   );
+  return numbers.size === 1 ? [...numbers][0] : undefined;
 }
 
-/** Season-relative week label, shared by competition history views. */
-export function matchdayWeekLabel(state: State, week: string) {
-  const number = matchdayNumber(state, week);
-  const { start, end } = clubWeek(week);
-  const formatDate = (d: string) =>
-    new Date(d + "T12:00:00Z").toLocaleDateString("pt-PT", {
-      day: "2-digit",
-      month: "2-digit",
-      timeZone: "UTC",
+/** How a competition week is named everywhere: by jornada, per division. */
+export function matchdayWeekLabel(
+  state: JornadaState,
+  week: string,
+  divisionId?: string,
+  now = Date.now(),
+) {
+  const number = matchdayNumber(state, week, divisionId, now);
+  if (number !== undefined) return `Jornada ${number}`;
+  if (!divisionId || divisionId === "all") {
+    const each = state.divisions.flatMap((d) => {
+      const n = matchdayNumber(state, week, d._id, now);
+      return n === undefined ? [] : [`${d.name}: Jornada ${n}`];
     });
-  const dateRange = `${formatDate(start)} a ${formatDate(end)}`;
-  if (number === undefined) return `Jornada por definir (${dateRange})`;
-  return `Jornada ${number} (${dateRange})`;
+    if (each.length) return each.join(" · ");
+  }
+  // Preparation and never-opened weeks have no number; keep them identifiable.
+  const { start, end } = clubWeek(week);
+  return `Sem jornada (${dayMonth(start)} a ${dayMonth(end)})`;
 }

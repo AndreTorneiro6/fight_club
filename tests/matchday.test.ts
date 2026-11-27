@@ -99,11 +99,12 @@ test("poster respects stored team snapshots after a partner is renamed or replac
     "Parceiro original",
   ]);
 });
-test("cancelled games are omitted and the weekly round number is derived from the season", () => {
+test("cancelled games are omitted and do not count as a launched jornada", () => {
   const s = state();
   s.challenges[0].status = "cancelled";
   assert.equal(matchdayCards(s, "2026-10-19", "all", "fixtures").length, 0);
-  assert.equal(matchdayNumber(s, "2026-10-19"), 4);
+  const now = Date.parse("2026-10-20T12:00:00Z");
+  assert.equal(matchdayNumber(s, "2026-10-19", "gold", now), 1);
 });
 
 test("title fights stay separate from normal fixtures and results using saved match ranks", () => {

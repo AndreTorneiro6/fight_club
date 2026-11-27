@@ -284,10 +284,10 @@ test("admins can assign mandatory games several weeks ahead without a publicatio
     addClubDays(clubWeek().start, 21),
   ];
   for (const [i, week] of weeks.entries()) {
-    await page.getByLabel("Semana a gerir", { exact: true }).selectOption(week);
+    await page.getByLabel("Jornada a gerir", { exact: true }).selectOption(week);
     await expect(page).toHaveURL(new RegExp(`week=${week}`));
     await expect(
-      panel.getByText(new RegExp(`Jornada de ${week}`)),
+      panel.getByText(/Jornada \d+ ·/),
     ).toBeVisible();
     await expect(panel.getByLabel("Quem define os confrontos")).toHaveCount(0);
     await panel
@@ -318,7 +318,7 @@ test("admins can assign mandatory games several weeks ahead without a publicatio
     ).toBeTruthy();
   }
   await page
-    .getByLabel("Semana a gerir", { exact: true })
+    .getByLabel("Jornada a gerir", { exact: true })
     .selectOption(weeks[0]);
   await expect(panel.getByText(/1 a aguardar desafio/)).toBeVisible();
 });

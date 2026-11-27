@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import {
   canBeChallenged,
   canChallenge,
@@ -205,7 +206,6 @@ export const settingsSchema = z.object({
   initialSuggestionCount: z.union([z.literal(3), z.literal(4)]).default(4),
   rulesText: z.string().trim().max(12000).default(""),
   prizes: z.array(prizeSchema).max(30).default([]),
-  ouroNormalReach: z.number().int().min(1).max(100).optional(),
   maxPositionsAbove: z.number().int().min(1).max(100),
   maxActiveChallenges: z.number().int().min(1).max(10),
   minDaysBetween: z.number().int().min(0).max(90),
@@ -1875,7 +1875,7 @@ export function execute(
           notify(
             r.playerId,
             "Papel semanal atualizado",
-            `O teu papel na semana de ${weekStart} passou para ${weeklyRoleName(r.role).toUpperCase()}, para permitir o máximo de jogos após os desafios prioritários.`,
+            `O teu papel na ${matchdayWeekLabel(s, weekStart, divisionId, timestamp)} passou para ${weeklyRoleName(r.role).toUpperCase()}, para permitir o máximo de jogos após os desafios prioritários.`,
             undefined,
             `dynamic-role:${weekStart}:${round.version}:${r.playerId}`,
             { kind: "update", deliveryChannels: ["push"] },
@@ -1942,7 +1942,7 @@ export function execute(
     }
     notifyAdmins(
       "Jogo obrigatório atribuído",
-      `Emparelhamento obrigatório publicado para a semana de ${weekStart}. Aguarda o desafio da dupla atacante (12h), ou lança o desafio imediatamente em Jogos obrigatórios.`,
+      `Emparelhamento obrigatório publicado para a ${matchdayWeekLabel(s, weekStart, attackers[0].divisionId, timestamp)}. Aguarda o desafio da dupla atacante (12h), ou lança o desafio imediatamente em Jogos obrigatórios.`,
       undefined,
       `mandatory-matchup:${pair.id}`,
     );
@@ -2307,70 +2307,13 @@ export function execute(
       break;
     }
     case "admin.week.ouro.opponents.save": {
-      const round = s.weeklyRounds.find((r) => r.weekStart === cmd.weekStart);
+      // Retired: kept so already-open admin pages get a clear answer.
       ensure(
-        round && cmd.weekStart >= clubWeek(timestamp).start,
-        "Escolhe papéis da semana atual ou futura.",
-      );
-      ensure(
-        (round.version ?? 0) === cmd.expectedVersion,
-        "Os papéis mudaram. Atualiza antes de guardar.",
+        false,
+        "As exclusões de adversários de Ouro foram retiradas: todas as divisões seguem as mesmas regras. Atualiza a página.",
         409,
       );
-      const division = s.divisions.find((d) => d.code === "ouro");
-      ensure(division, "Divisão Ouro inexistente.");
-      const teams = rankingEntries(s.players, division._id);
-      const source = teams.findIndex((t) => t.id === cmd.teamKey);
-      ensure(source > 0, "A primeira dupla está em Defesa.");
-      ensure(
-        teams[source].members.every((p) =>
-          canChallenge(
-            round.assignments.find((a) => a.playerId === p._id)?.role,
-          ),
-        ),
-        "Este controlo aplica-se às duplas em Ataque ou Combo.",
-      );
-      ensure(
-        !s.challenges.some(
-          (c) =>
-            c.divisionId === division._id &&
-            (c.weekStart ?? clubWeek(c.createdAt).start) === cmd.weekStart &&
-            !["cancelled", "refused", "expired"].includes(c.status) &&
-            teams[source].members.some((p) => involves(c, p._id, s.players)),
-        ),
-        "Esta dupla já tem um confronto definido.",
-      );
-      ensure(
-        new Set(cmd.allowedTeamKeys).size === cmd.allowedTeamKeys.length &&
-          cmd.allowedTeamKeys.every((key) =>
-            teams.slice(0, source).some((t) => t.id === key),
-          ),
-        "Seleciona apenas adversários acima desta dupla.",
-      );
-      const before = round.ouroAllowedOpponents?.[cmd.teamKey];
-      round.ouroAllowedOpponents = {
-        ...round.ouroAllowedOpponents,
-        [cmd.teamKey]: cmd.allowedTeamKeys,
-      };
-      round.version = (round.version ?? 0) + 1;
-      delete round.approvedAt;
-      delete round.approvedVersion;
-      delete round.approvalSnapshot;
-      if (
-        round.divisionPublications?.[division._id] &&
-        !round.divisionPublications[division._id].publishedAt
-      ) {
-        delete round.divisionPublications[division._id].approvedAt;
-        delete round.divisionPublications[division._id].approvalSnapshot;
-      }
-      log("week.ouro.opponents.saved", {
-        weekStart: cmd.weekStart,
-        teamKey: cmd.teamKey,
-        before,
-        after: cmd.allowedTeamKeys,
-        version: round.version,
-      });
-      return { id: round._id };
+      break;
     }
     case "admin.challenge.distance.set": {
       ensure(
@@ -2389,7 +2332,7 @@ export function execute(
       );
       if (previous === cmd.distance) return { ok: true };
       if (s.divisions.find((d) => d._id === cmd.divisionId)?.code === "ouro")
-        rules.ouroNormalReach = cmd.distance;
+        rules.ouroNormalReach = null;
       rules.divisionChallengeDistances = {
         ...rules.divisionChallengeDistances,
         [cmd.divisionId]: cmd.distance,
@@ -2960,7 +2903,7 @@ export function execute(
           notify(
             entry.playerId,
             "Papel semanal publicado",
-            `Semana de ${cmd.weekStart}: ${weeklyRoleName(entry.role)}. Consulta os adversários disponíveis.`,
+            `${matchdayWeekLabel(s, cmd.weekStart, s.players.find((p) => p._id === entry.playerId)?.divisionId, timestamp)}: ${weeklyRoleName(entry.role)}. Consulta os adversários disponíveis.`,
           );
       if (cmd.publish && cmd.weekStart === weeklyChallengeWeek(s, timestamp))
         for (const division of s.divisions)
@@ -2981,7 +2924,7 @@ export function execute(
             )
               notifyAdmins(
                 "Bloqueio potencial de desafios",
-                `Semana ${cmd.weekStart}: ${team.members.map((m) => m.name).join(" + ")} não tem duplas disponíveis para desafiar.`,
+                `${matchdayWeekLabel(s, cmd.weekStart, team.members[0].divisionId, timestamp)}: ${team.members.map((m) => m.name).join(" + ")} não tem duplas disponíveis para desafiar.`,
                 undefined,
                 `weekly-no-targets:${cmd.weekStart}:${team.id}`,
               );
@@ -4967,6 +4910,17 @@ export function execute(
         {
           _id: "league",
           ...cmd.settings,
+          // Not client-editable. A changed Ouro distance replaces the old value.
+          ouroNormalReach: s.divisions.some((d) => {
+            const next = cmd.settings.divisionChallengeDistances?.[d._id];
+            return (
+              d.code === "ouro" &&
+              next !== undefined &&
+              next !== rules.divisionChallengeDistances?.[d._id]
+            );
+          })
+            ? null
+            : rules.ouroNormalReach,
           rulesText: rules.rulesText,
           prizes: rules.prizes,
           contentVersion: rules.contentVersion,
@@ -5917,7 +5871,7 @@ function processMandatoryMatchups(s: State, timestamp: number) {
           playerId: "__admins__",
           kind: "update",
           title: "Jogo obrigatório por resolver",
-          body: `Semana de ${weekStart}: o jogo não foi criado automaticamente. ${error.message}`,
+          body: `${matchdayWeekLabel(s, weekStart, undefined, timestamp)}: o jogo não foi criado automaticamente. ${error.message}`,
           createdAt,
           read: false,
           dedupe,

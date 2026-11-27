@@ -1,3 +1,11 @@
+## Version 2.1.0 — deployment submitted: equal division rules and per-division jornadas — 27 November 2026
+
+- User requested that Ouro follow exactly what Prata/Bronze follow (reach, admin control, Ataque/Defesa suggestions, history) and that the competition be named by jornada, launched when challenges open, noting Ouro is one jornada behind.
+- Removed the Ouro-only opponent exclusions/simulator (stored exclusions are ignored; the old command is refused). Distance now has one admin path. The saved ouroNormalReach stays effective until an admin changes Ouro's distance, then becomes null. Suggestions, history and planner already shared one code path.
+- Jornada numbers are per division: season weeks whose challenges opened (finished weeks with games also count); unopened later weeks preview the next number; skipped weeks show "Sem jornada (dates)". Internal weekStart keys, Monday-Sunday playing windows, deadlines and stored data are unchanged. Date calendars (agenda, courts, payments) keep dates.
+- Outstanding: confirm with the user that live numbers show Ouro one behind Prata/Bronze (not verified against production data), and whether playing windows should also follow jornada openings instead of calendar weeks. Division settings (helper scope, distances, openings) are admin data and were not changed.
+- Validation: typecheck, all 639 tests, production build and every required browser group pass locally (admin-overview and dynamic-weekly after a rebuild and spec updates). User authorized deployment through the deploy-branch workflow; completion is not yet verified.
+
 ## Version 2.0.6 LIVE verified — final mandatory-game flow — 24 November 2026
 
 - Actions run 45471215707 passed every required check and deployment for exact revision bcac606686c79d0057cc2998184324776a74d6df. Deployment logs confirm that revision on the existing trading-bot-vm production target, cached Docker layers and successful public health. Independent post-deployment /api/health returned {"ok":true}.

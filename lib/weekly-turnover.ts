@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import { randomUUID } from "node:crypto";
 import type { State } from "./types";
 import { addClubDays, clubWeek, wallTime } from "./calendar";
@@ -90,7 +91,7 @@ export function autoWeeklyTurnover(s: State, timestamp: number) {
           adminAlert(
             s,
             "Fecho automático da jornada parado",
-            `${division.name}, semana de ${week}: o ranking não foi publicado. ${error}`,
+            `${division.name}, ${matchdayWeekLabel(s, week, d, timestamp)}: o ranking não foi publicado. ${error}`,
             `auto-turnover:ranking:${week}:${d}:${error}`,
             timestamp,
           );
@@ -135,7 +136,7 @@ export function alertUnfinishedDivisions(
     adminAlert(
       s,
       "Jornada à espera de jogos",
-      `${division.name}, semana de ${week}: faltam ${completion.pending.length} jogo(s) com resultado (${games}). O ranking e a próxima jornada desta divisão avançam automaticamente quando estiverem concluídos.`,
+      `${division.name}, ${matchdayWeekLabel(s, week, division._id, timestamp)}: faltam ${completion.pending.length} jogo(s) com resultado (${games}). O ranking e a próxima jornada desta divisão avançam automaticamente quando estiverem concluídos.`,
       `auto-turnover:waiting:${week}:${division._id}`,
       timestamp,
     );

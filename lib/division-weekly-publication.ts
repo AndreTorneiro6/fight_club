@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import { randomUUID } from "node:crypto";
 import type { State, WeeklyRound, Actor } from "./types";
 import { ensure } from "./rules";
@@ -168,7 +169,7 @@ export function publishDivisionPapers(
         playerId: p._id,
         kind: "challenge",
         title: "Papel semanal publicado",
-        body: `Semana de ${weekStart}: ${weeklyRoleName(a.role)}. Consulta os papéis e a abertura dos desafios.`,
+        body: `${matchdayWeekLabel(s, weekStart, divisionId, timestamp)}: ${weeklyRoleName(a.role)}. Consulta os papéis e a abertura dos desafios.`,
         createdAt: now,
         read: false,
         dedupe,
@@ -319,7 +320,7 @@ export function correctPublishedDivisionPapers(
       playerId: change.playerId,
       kind: "challenge",
       title: "Papel semanal corrigido",
-      body: `Semana de ${weekStart}: o teu papel passou para ${weeklyRoleName(change.role)}. Consulta os papéis e a abertura dos desafios.`,
+      body: `${matchdayWeekLabel(s, weekStart, divisionId, timestamp)}: o teu papel passou para ${weeklyRoleName(change.role)}. Consulta os papéis e a abertura dos desafios.`,
       createdAt: now,
       read: false,
       dedupe: `division-papers-correction:${weekStart}:${divisionId}:${r.version}:${change.playerId}`,

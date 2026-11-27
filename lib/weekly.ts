@@ -155,7 +155,7 @@ export function weeklyReason(
     if (opensAt === null)
       return "Os desafios desta divisão aguardam abertura pelo administrador.";
     if (opensAt && Date.parse(opensAt) > now)
-      return `Os desafios para a semana de ${week} abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
+      return `Os desafios desta jornada abrem em ${new Date(opensAt).toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" })} (Portugal).`;
   }
   const open = selected?.weekType === "OPEN_ATTACK";
   if (!open && !manual) {

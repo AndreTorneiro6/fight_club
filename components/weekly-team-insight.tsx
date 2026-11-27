@@ -45,7 +45,7 @@ export function WeeklyTeamRoleHistory({
     <details className="weekly-role-history">
       <summary className="weekly-role-history-summary">
         <span className="weekly-history-week" title={day(history[0].week)}>
-          {matchdayWeekLabel(s, history[0].week)}
+          {matchdayWeekLabel(s, history[0].week, team[0]?.divisionId)}
         </span>
         <span
           className={`weekly-history-role ${history[0].final ?? "unassigned"}`}
@@ -66,7 +66,7 @@ export function WeeklyTeamRoleHistory({
           >
             <div className="row wrap">
               <strong className="weekly-history-week" title={day(h.week)}>
-                {matchdayWeekLabel(s, h.week)}
+                {matchdayWeekLabel(s, h.week, team[0]?.divisionId)}
               </strong>
               {index === 0 && (
                 <small className="weekly-history-latest-label">

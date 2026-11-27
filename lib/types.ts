@@ -123,7 +123,8 @@ export interface Settings extends Entity {
   rulesText: string;
   prizes: Prize[];
   contentVersion?: number;
-  ouroNormalReach?: number;
+  /** Legacy Ouro reach; null once replaced by divisionChallengeDistances. */
+  ouroNormalReach?: number | null;
   maxPositionsAbove: number;
   maxActiveChallenges: number;
   minDaysBetween: number;
@@ -396,6 +397,7 @@ export interface ManualWeekMatchup {
 export interface WeeklyRound extends Entity {
   /** Public projection of reserved teams, without disclosing their opponent or side. */
   mandatoryReservedTeamKeys?: string[];
+  /** Retired and ignored; still part of saved approval signatures. */
   ouroAllowedOpponents?: Record<string, string[]>;
   /** Legacy metadata; mandatory games no longer disable normal player challenges. */
   manualMatchmaking?: Record<string, boolean>;

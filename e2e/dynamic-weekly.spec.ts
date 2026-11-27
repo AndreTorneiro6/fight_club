@@ -244,21 +244,7 @@ test("admin refreshes only Bronze future papers with three-position rules", asyn
   });
   s = await read();
   const before = s.weeklyRounds.find((r: any) => r.weekStart === week);
-  await page.goto("/admin?tab=weekly");
-  while (
-    !(await page.locator("#weekly-role-assignment").textContent())?.includes(
-      new Date(`${week}T12:00:00Z`).toLocaleDateString("pt-PT", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      }),
-    )
-  ) {
-    await page
-      .getByRole("button", { name: "Semana seguinte", exact: true })
-      .click();
-  }
+  await page.goto(`/admin?tab=weekly&week=${week}`);
   await page
     .getByRole("combobox", { name: "Categoria dos papéis" })
     .selectOption("bronze");
@@ -369,45 +355,9 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
         ?.role;
     })
     .toBe("attack");
-  await row(2)
-    .getByText("Adversários permitidos e simulação", { exact: true })
-    .click();
-  const allowed = row(2)
-    .locator("details")
-    .filter({
-      has: page.getByText("Adversários permitidos e simulação", {
-        exact: true,
-      }),
-    });
-  await allowed.getByRole("checkbox", { name: /^#1 / }).uncheck();
-  const beforePreview = await (await page.request.get("/api/league")).json();
-  await allowed
-    .getByLabel("Simular outro desafio · não cria jogos")
-    .selectOption({ label: "#2 → #1" });
-  await expect(allowed.getByText(/Após o desafio simulado/)).toBeVisible();
-  const afterPreview = await (await page.request.get("/api/league")).json();
-  expect(afterPreview.challenges).toEqual(beforePreview.challenges);
-  expect(afterPreview.weeklyRounds).toEqual(beforePreview.weeklyRounds);
-  await allowed
-    .getByRole("button", {
-      name: "Guardar adversários permitidos",
-      exact: true,
-    })
-    .click();
-  await expect
-    .poll(async () => {
-      const v = await (await page.request.get("/api/league")).json();
-      return v.weeklyRounds.find((r: any) => r.weekStart === week)
-        .ouroAllowedOpponents?.[teams[2].id];
-    })
-    .toEqual([teams[1].id]);
-  await page.reload();
-  await row(2)
-    .getByText("Adversários permitidos e simulação", { exact: true })
-    .click();
   await expect(
-    allowed.getByRole("checkbox", { name: /^#1 / }),
-  ).not.toBeChecked();
+    page.getByText("Adversários permitidos e simulação", { exact: true }),
+  ).toHaveCount(0);
   await row(2)
     .getByRole("button", { name: /^Remover seleção:/ })
     .click();
@@ -440,7 +390,7 @@ test("Ouro offers Super Attack, persists the choice and keeps boundary roles", a
   ).toHaveCount(0);
 });
 
-test("Ouro rankings stay complete while challenge options show eligible opponents only", async ({
+test("Ouro rankings stay complete in the ranking, home and admin views", async ({
   page,
   browser,
 }) => {
@@ -456,22 +406,6 @@ test("Ouro rankings stay complete while challenge options show eligible opponent
   if (await tour.isVisible()) await tour.click();
   const s = await (await page.request.get("/api/league")).json();
   const teams = rankingEntries(s.players, "ouro");
-  const source = teams.find((t) =>
-    t.members.some((p) => p._id === "player-5"),
-  )!;
-  const week = addClubDays(clubWeek().start, 7);
-  const round = s.weeklyRounds.find((r: any) => r.weekStart === week);
-  const saved = await page.request.post("/api/league", {
-    headers: { Origin: "http://localhost:3100" },
-    data: {
-      type: "admin.week.ouro.opponents.save",
-      weekStart: week,
-      expectedVersion: round.version,
-      teamKey: source.id,
-      allowedTeamKeys: [teams[1].id],
-    },
-  });
-  expect(saved.ok(), await saved.text()).toBeTruthy();
   const context = await browser.newContext();
   try {
     const player = await context.newPage();
@@ -504,35 +438,6 @@ test("Ouro rankings stay complete while challenge options show eligible opponent
     await expect(player.locator("[data-ranking-entry]")).toHaveCount(
       Math.min(5, teams.length),
     );
-    await player.goto("/desafios");
-    await expect(
-      player.locator(`[data-weekly-team="${teams[0].id}"]`),
-    ).toHaveCount(0);
-    await expect(
-      player.locator(`[data-weekly-team="${teams[1].id}"]`),
-    ).toBeVisible();
-    const latest = await (await page.request.get("/api/league")).json();
-    const cleared = await page.request.post("/api/league", {
-      headers: { Origin: "http://localhost:3100" },
-      data: {
-        type: "admin.week.ouro.opponents.save",
-        weekStart: week,
-        expectedVersion: latest.weeklyRounds.find(
-          (r: any) => r.weekStart === week,
-        ).version,
-        teamKey: source.id,
-        allowedTeamKeys: [],
-      },
-    });
-    expect(cleared.ok(), await cleared.text()).toBeTruthy();
-    await player.goto("/ranking");
-    await expect(player.locator("[data-ranking-entry]")).toHaveCount(
-      teams.length,
-    );
-    await player.goto("/desafios");
-    await expect(
-      player.locator(`[data-weekly-team="${teams[1].id}"]`),
-    ).toHaveCount(0);
   } finally {
     await context.close();
   }

@@ -6,7 +6,7 @@ import { adminGroups as groups } from "@/lib/admin-sections";
 
 const primary = [
   ["summary", "Resumo"],
-  ["week", "Gerir semana"],
+  ["week", "Gerir jornada"],
   ["games", "Jogos"],
   ["challenges", "Desafios"],
   ["results", "Resultados"],

@@ -55,7 +55,7 @@ export default function MatchdayGenerator({
       ? "Todas as divisões"
       : (s.divisions.find((divisionRow) => divisionRow._id === division)
           ?.name ?? "Liga");
-  const round = matchdayNumber(s, week);
+  const round = matchdayNumber(s, week, division);
   const signature = JSON.stringify({
     cards,
     mode,
@@ -117,7 +117,7 @@ export default function MatchdayGenerator({
       />
       <div className="form-grid">
         <label>
-          Semana do cartaz
+          Data da jornada do cartaz
           <input
             type="date"
             value={week}

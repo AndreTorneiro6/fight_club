@@ -1,3 +1,4 @@
+import { matchdayWeekLabel } from "./matchday";
 import { drawBronzeEmblem } from "./bronze-emblem";
 import { posterTemplateUrl } from "./poster-templates";
 import { rankingEntries, teamRecord } from "./ranking-groups";
@@ -241,7 +242,7 @@ export async function renderPublicationPoster(s: View, options: PosterOptions) {
   });
   const label =
     options.kind === "weekly"
-      ? `Semana de ${options.week?.split("-").reverse().join("/") ?? "—"} · ${options.status ?? "Rascunho"}`
+      ? `${options.week ? matchdayWeekLabel(s, options.week, options.selection) : "—"} · ${options.status ?? "Rascunho"}`
       : `Atualizado em ${date} · J: jogos · V: vitórias · D: derrotas`;
   text(
     `${label} · Imagem ${page + 1}/${posterPageCount(s, options.selection, options.kind)}`,
