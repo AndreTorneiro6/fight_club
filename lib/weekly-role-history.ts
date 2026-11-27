@@ -205,7 +205,7 @@ export function divisionWeekOptions(
   const planned = new Map<string, TeamWeekOptions["planned"]>();
   const plannerRoles = new Map<string, Role>();
   let plannerEligible: { attackerKey: string; defenderKey: string }[] | undefined;
-  if (dynamicWeeklyEnabled(s, divisionId, week)) {
+  if (dynamicWeeklyEnabled(s)) {
     const ids = new Set(entries.flatMap((t) => t.members.map((m) => m._id)));
     const existing = s.weeklyRounds.find((r) => r.weekStart === week);
     const assignments = [

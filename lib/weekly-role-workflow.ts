@@ -341,7 +341,7 @@ export function generateWeeklyRoles(
         )
         .map((m) => ({ playerId: m._id, role }));
     });
-    if (dynamicWeeklyEnabled(s, d._id, weekStart)) {
+    if (dynamicWeeklyEnabled(s)) {
       const preview: State = {
         ...s,
         weeklyRounds: [

@@ -13,19 +13,9 @@ import {
   CONSECUTIVE_REMATCH_MESSAGE,
   consecutiveRematch,
 } from "./consecutive-rematch";
-export function dynamicWeeklyEnabled(
-  s: State,
-  divisionId?: string,
-  week?: string,
-) {
-  return !!(
-    s.settings[0].weeklyCompetition &&
-    s.settings[0].weeklyDynamicRoles &&
-    (!s.settings[0].weeklyDynamicDivisionIds ||
-      (divisionId
-        ? s.settings[0].weeklyDynamicDivisionIds.includes(divisionId)
-        : s.settings[0].weeklyDynamicDivisionIds.length > 0))
-  );
+/** The opponent assistant is part of the weekly competition in every division. */
+export function dynamicWeeklyEnabled(s: State) {
+  return !!s.settings[0].weeklyCompetition;
 }
 export type DynamicPair = {
   attackerId: string;
@@ -231,14 +221,43 @@ function computeDynamicWeeklyPlan(s: State, divisionId: string, week: string) {
       remaining &= ~bit(i);
     }
   }
+  // A team with no free opponent within its reach may challenge the nearest
+  // free team above, even when that adds no game: first submission wins. These
+  // options never change the suggested schedule or the maximum.
+  const opened = errors.length
+    ? []
+    : available.flatMap((team) => {
+        const mine = pairs.filter((p) => p.attackerKey === team.id);
+        if (mine.some(normal)) return [];
+        const rank = (key: string) =>
+          entries.findIndex((t) => t.id === key) + 1;
+        const nearest = mine
+          .filter(
+            (p) =>
+              rank(p.defenderKey) !== 1 ||
+              rank(team.id) <= s.settings[0].titleMaxPosition,
+          )
+          .sort((a, b) => rank(b.defenderKey) - rank(a.defenderKey))[0];
+        return nearest &&
+          !eligible.some(
+            (e) =>
+              e.attackerKey === team.id &&
+              e.defenderKey === nearest.defenderKey,
+          )
+          ? [nearest]
+          : [];
+      });
   return {
     canonical,
     maximumMatches:
       Math.ceil(maximum / 1e9) + fixed.length + reservedKeys.length / 2,
     fixed,
-    eligible: edges
-      .filter((e) => normal(e) || eligible.includes(e))
-      .map(({ a, d, ...p }) => p),
+    eligible: [
+      ...edges
+        .filter((e) => normal(e) || eligible.includes(e))
+        .map(({ a, d, ...p }) => p),
+      ...opened,
+    ],
     forced: errors.length ? [] : forced.map(({ a, d, ...p }) => p),
     errors,
     teams: entries,
@@ -337,7 +356,7 @@ export function dynamicRoleChanges(
     role: "attack" | "defense" | "super_attack";
   }[],
 ) {
-  if (!dynamicWeeklyEnabled(s, divisionId, week)) return [];
+  if (!dynamicWeeklyEnabled(s)) return [];
   const preview: State = {
     ...s,
     weeklyRounds: s.weeklyRounds.map((r) =>

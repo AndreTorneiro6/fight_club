@@ -6233,6 +6233,7 @@ const settingLabels: Record<
     | "divisionChallengeDistances"
     | "ouroNormalReach"
     | "weeklyDynamicDivisionIds"
+    | "weeklyDynamicRoles"
     | "manualMatchmakingDivisionIds"
   >,
   string
@@ -6240,8 +6241,6 @@ const settingLabels: Record<
   leagueEmailsEnabled:
     "Permitir notificações da liga por email · desativado: apenas questões de conta",
   weeklyCompetition: "Competição semanal · um jogo e papéis publicados",
-  weeklyDynamicRoles:
-    "Ajudar a encontrar adversários e alargar o alcance sem alterar os papéis",
   weeklyMandatoryChallenges:
     "Desafios semanais obrigatórios · combinar apenas horário",
   autoWeeklyRoles: "Gerar rascunhos de papéis automaticamente",
@@ -6280,8 +6279,6 @@ const settingLabels: Record<
 };
 function Rules({ s, run, busy }: Actions) {
   const [settings, setSettings] = useState({
-    weeklyDynamicRoles: false,
-    weeklyDynamicDivisionIds: s.divisions.map((d) => d._id),
     divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
@@ -6293,8 +6290,6 @@ function Rules({ s, run, busy }: Actions) {
     ...s.settings[0],
   });
   const incomingSettings = JSON.stringify({
-    weeklyDynamicRoles: false,
-    weeklyDynamicDivisionIds: s.divisions.map((d) => d._id),
     divisionChallengeDistances: {},
     weeklyMandatoryChallenges: false,
     autoWeeklyRoles: true,
@@ -6364,29 +6359,6 @@ function Rules({ s, run, busy }: Actions) {
           desafios mantêm-se até uma intervenção do administrador.
         </p>
         <div className="form-grid">
-          {s.divisions.map((d) => (
-            <label className="check" key={`dynamic-${d._id}`}>
-              <input
-                type="checkbox"
-                checked={(
-                  settings.weeklyDynamicDivisionIds ??
-                  s.divisions.map((d) => d._id)
-                ).includes(d._id)}
-                onChange={(e) => {
-                  const ids =
-                    settings.weeklyDynamicDivisionIds ??
-                    s.divisions.map((d) => d._id);
-                  setSettings({
-                    ...settings,
-                    weeklyDynamicDivisionIds: e.target.checked
-                      ? [...ids, d._id]
-                      : ids.filter((id) => id !== d._id),
-                  });
-                }}
-              />
-              Assistente de adversários · {d.name}
-            </label>
-          ))}
           {s.divisions.map((d) => (
             <label key={d._id}>
               Distância de ataque · {d.name}

@@ -2338,11 +2338,7 @@ export function execute(
         [cmd.divisionId]: cmd.distance,
       };
       if (
-        dynamicWeeklyEnabled(
-          s,
-          cmd.divisionId,
-          weeklyChallengeWeek(s, timestamp, cmd.divisionId),
-        )
+        dynamicWeeklyEnabled(s)
       ) {
         const week = weeklyChallengeWeek(s, timestamp, cmd.divisionId),
           round = s.weeklyRounds.find((r) => r.weekStart === week);
@@ -3053,7 +3049,7 @@ export function execute(
         d,
         timestamp,
         undefined,
-        false,
+        cmd.type === "admin.challenge.create",
         requestedWeek,
         manual,
       );
@@ -3360,7 +3356,7 @@ export function execute(
       if (
         c.mandatoryAssignment &&
         c.status === "accepted" &&
-        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
+        dynamicWeeklyEnabled(s)
       ) {
         const plan = dynamicWeeklyPlan(s, c.divisionId, c.weekStart!);
         const finalPlan = refreshDynamicRoles(
@@ -3437,7 +3433,7 @@ export function execute(
       );
       const attackerRank = teamPosition(s.players, attacker._id),
         defenderRank = teamPosition(s.players, defender._id);
-      const adaptive = dynamicWeeklyEnabled(s, c.divisionId, c.weekStart);
+      const adaptive = dynamicWeeklyEnabled(s);
       ensure(
         attackerRank > defenderRank &&
           (adaptive ||
@@ -3533,7 +3529,7 @@ export function execute(
       if (
         mandatory &&
         !c.competitionRoundId &&
-        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart)
+        dynamicWeeklyEnabled(s)
       )
         refreshDynamicRoles(c.divisionId, c.weekStart!, c._id);
       if (mandatory) {
@@ -3748,7 +3744,7 @@ export function execute(
       if (
         c.weekStart &&
         !c.competitionRoundId &&
-        dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
+        dynamicWeeklyEnabled(s) &&
         weeklyPublishedAt(
           s.weeklyRounds.find((r) => r.weekStart === c.weekStart),
           c.divisionId,
@@ -4855,10 +4851,6 @@ export function execute(
       break;
     }
     case "admin.settings.save": {
-      ensure(
-        !cmd.settings.weeklyDynamicRoles || cmd.settings.weeklyCompetition,
-        "O assistente de adversários exige competição semanal.",
-      );
       if (cmd.settings.manualMatchmakingDivisionIds)
         ensure(
           new Set(cmd.settings.manualMatchmakingDivisionIds).size ===
@@ -4867,28 +4859,6 @@ export function execute(
               s.divisions.some((d) => d._id === id),
             ),
           "Divisões de confrontos manuais inválidas.",
-        );
-      if (cmd.settings.weeklyDynamicDivisionIds)
-        ensure(
-          new Set(cmd.settings.weeklyDynamicDivisionIds).size ===
-            cmd.settings.weeklyDynamicDivisionIds.length &&
-            cmd.settings.weeklyDynamicDivisionIds.every((id) =>
-              s.divisions.some((d) => d._id === id),
-            ),
-          "Divisões de papéis dinâmicos inválidas.",
-        );
-      if (cmd.settings.weeklyDynamicRoles)
-        ensure(
-          !s.challenges.some(
-            (c) =>
-              !c.competitionRoundId &&
-              (!cmd.settings.weeklyDynamicDivisionIds ||
-                cmd.settings.weeklyDynamicDivisionIds.includes(c.divisionId)) &&
-              !dynamicWeeklyEnabled(s, c.divisionId, c.weekStart) &&
-              c.status === "pending" &&
-              Date.parse(c.respondBy) > timestamp,
-          ),
-          "Resolve os desafios pendentes antes de ativar os papéis dinâmicos.",
         );
       for (const [divisionId, distance] of Object.entries(
         cmd.settings.divisionChallengeDistances ?? {},

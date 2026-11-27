@@ -1,6 +1,6 @@
 # Assistente semanal de papéis e adversários
 
-Comportamento local de v1.23.1, preparado em 22/11/2026. Este documento descreve o código; não confirma a configuração nem a versão em produção. As jornadas oficiais geridas em Competição e jornadas mantêm o seu fluxo próprio.
+Comportamento de v2.2.0, preparado em 27/11/2026. O assistente está sempre ativo em todas as divisões com competição semanal; a decisão do administrador prevalece sobre ele. Este documento descreve o código; não confirma a configuração nem a versão em produção. As jornadas oficiais geridas em Competição e jornadas mantêm o seu fluxo próprio.
 
 ## Rascunhos e papéis
 
@@ -12,11 +12,13 @@ Uma edição administrativa deixa de ser um rascunho automático: não é substi
 
 ## Alcance e prioridade
 
-A distância configurada é o alcance normal. O assistente procura a maior cobertura possível sem trocar os papéis e, entre os planos com essa cobertura, prefere o menor número de confrontos alargados e depois a menor distância adicional. As extensões necessárias podem aparecer antes do primeiro desafio, em Ouro, Prata e Bronze quando o assistente está ativo nessa divisão. O alcance do título também pode ser alargado quando necessário para essa cobertura.
+A distância configurada é o alcance normal. O assistente procura a maior cobertura possível sem trocar os papéis e, entre os planos com essa cobertura, prefere o menor número de confrontos alargados e depois a menor distância adicional. As extensões necessárias podem aparecer antes do primeiro desafio, em Ouro, Prata e Bronze. O alcance do título também pode ser alargado quando necessário para essa cobertura.
+
+Uma dupla sem adversário livre dentro do alcance pode desafiar a dupla livre mais próxima acima, mesmo que isso não acrescente um jogo ao plano; o primeiro desafio enviado tem prioridade. Esta abertura não inclui a primeira dupla fora do limite do título e não altera o plano sugerido. Os confrontos criados ou reatribuídos pelo administrador não são recusados pelo assistente nem pelo alcance.
 
 Os desafios válidos dentro do alcance normal ficam disponíveis, mesmo que não pertençam a uma combinação preferida pelo assistente. O primeiro desafio válido confirmado no servidor é preservado. Depois dele, o assistente recalcula as opções das restantes duplas, sem criar jogos adicionais. Não reserva adversários só porque pertencem a um plano preferido. O plano sugerido ajuda o administrador a avaliar a cobertura; não obriga os jogadores a segui-lo.
 
-As regras de divisão, participação, posição acima, repetição da semana anterior, exclusões administrativas e compromissos existentes continuam validadas no servidor. Se os papéis não permitirem mais jogos, mesmo com alcance alargado, o sistema assinala a situação em vez de trocar papéis. A publicação e abertura dos desafios continuam controladas pelo administrador.
+As regras de divisão, participação, posição acima, repetição da semana anterior e compromissos existentes continuam validadas no servidor. Se os papéis não permitirem mais jogos, mesmo com alcance alargado, o sistema assinala a situação em vez de trocar papéis. A publicação e abertura dos desafios continuam controladas pelo administrador.
 
 ## Jogos obrigatórios escolhidos pelo administrador
 

@@ -113,7 +113,8 @@ export function weeklyReason(
   defender: Player,
   now = Date.now(),
   ignoreId?: string,
-  reassign = false,
+  /** The administrator chose this pairing: the assistant never vetoes it. */
+  byAdmin = false,
   requestedWeek?: string,
   administrativePreparation = false,
 ) {
@@ -167,7 +168,7 @@ export function weeklyReason(
       return "Esta dupla está em defesa e deve aguardar um desafio.";
     // Keep games created before their current papers valid.
     if (
-      (!ignoreId || reassign) &&
+      (!ignoreId || byAdmin) &&
       defendingTeam.some((p) => !canBeChallenged(role(p)))
     )
       return "Esta dupla está em Ataque e não pode ser desafiada; não está em defesa esta semana.";
@@ -225,9 +226,9 @@ export function weeklyReason(
         ? "Já tens um desafio atribuído nesta semana."
         : "Este defensor já tem um desafio nesta semana.";
   }
-  // A new challenge, or an admin reassignment (`reassign`), must respect the
+  // A new challenge, or an admin pairing (`byAdmin`), must respect the
   // rematch and coverage rules; responding to an existing one is not re-judged.
-  const check = !ignoreId || reassign;
+  const check = !ignoreId || byAdmin;
   if (
     check &&
     consecutiveRematch(
@@ -244,7 +245,7 @@ export function weeklyReason(
     )
   )
     return CONSECUTIVE_REMATCH_MESSAGE;
-  if (check && !manual && dynamicWeeklyEnabled(s, attacker.divisionId, week)) {
+  if (check && !manual && !byAdmin && dynamicWeeklyEnabled(s)) {
     const others = ignoreId
       ? { ...s, challenges: s.challenges.filter((c) => c._id !== ignoreId) }
       : s;

@@ -958,7 +958,7 @@ test("admin settings validate per-league distances and allow the helper with opt
     },
     now,
   );
-  assert.equal(dynamicWeeklyEnabled(s, "bronze", week), true);
+  assert.equal(dynamicWeeklyEnabled(s), true);
 });
 
 test("suggestions do not create games or conflict alerts; rest-day guards still apply", () => {
@@ -1438,7 +1438,7 @@ test("legacy admin-only flags never suspend normal player challenges", () => {
   const s = fixture("ouro", 12);
   s.settings[0].manualMatchmakingDivisionIds = ["ouro"];
   s.weeklyRounds[0].manualMatchmaking = { ouro: true };
-  assert.equal(dynamicWeeklyEnabled(s, "ouro", week), true);
+  assert.equal(dynamicWeeklyEnabled(s), true);
   send(s, 4, 2);
   send(s, 12, 10);
   assert.equal(s.challenges.length, 2);
@@ -1502,8 +1502,8 @@ test("future manual drafts are week-specific, consume no active slots and publis
     },
     now,
   );
-  assert.equal(dynamicWeeklyEnabled(s, "ouro", week), true);
-  assert.equal(dynamicWeeklyEnabled(s, "ouro", future), true);
+  assert.equal(dynamicWeeklyEnabled(s), true);
+  assert.equal(dynamicWeeklyEnabled(s), true);
   const add = {
     type: "admin.week.matchup.add",
     divisionId: "ouro",
@@ -2744,5 +2744,123 @@ for (const code of ["ouro", "prata", "bronze"] as const) {
     processDeadlines(s, now + 12 * 3600000, false);
     assert.equal(s.challenges.length, 1);
     assert.deepEqual(s.matches, before.matches);
+  });
+}
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  const targets = (s: State, rank: number) =>
+    dynamicWeeklyPlan(s, code, week)
+      .eligible.filter((p) => p.attackerId === `t${rank}a`)
+      .map((p) => Number(p.defenderId.slice(1, -1)));
+  const commit = (s: State, pairs: [number, number][]) => {
+    for (const [a, d] of pairs) {
+      committedOuro(s, [[a, d]]);
+      s.challenges.at(-1)!.divisionId = code;
+    }
+  };
+  /** #7-#9 are busy; #5 is the only free defender and #6 reaches it. */
+  const contested = () => {
+    const s = fixture(code, 10, 3);
+    const roles: Record<number, "attack" | "defense"> = {
+      1: "defense",
+      2: "defense",
+      3: "defense",
+      4: "attack",
+      5: "defense",
+      6: "attack",
+      10: "attack",
+    };
+    for (const a of s.weeklyRounds[0].assignments)
+      a.role = roles[Number(a.playerId.slice(1, -1))] ?? a.role;
+    commit(s, [
+      [7, 1],
+      [8, 2],
+      [9, 3],
+    ]);
+    return s;
+  };
+
+  test(`${code}: a blocked team may challenge the nearest free team above without adding a game`, () => {
+    const s = contested();
+    const papers = structuredClone(s.weeklyRounds[0].assignments);
+    assert.deepEqual(targets(s, 10), [5]);
+    assert.deepEqual(targets(s, 6), [5]);
+    const plan = dynamicWeeklyPlan(s, code, week);
+    // The suggested schedule still gives the in-reach team the game.
+    assert.ok(!plan.canonical.some((p) => p.attackerId === "t10a"));
+    send(s, 10, 5);
+    assert.ok(pairing(s, 10, 5));
+    assert.throws(() => send(s, 6, 5));
+    assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+  });
+
+  test(`${code}: a team with a free opponent in reach gets no extension, and a blocked one only the nearest`, () => {
+    const s = fixture(code, 10, 3);
+    assert.ok(targets(s, 10).every((d) => d >= 7));
+    commit(s, [
+      [7, 1],
+      [8, 2],
+      [9, 3],
+    ]);
+    assert.deepEqual(targets(s, 10), [6]);
+  });
+
+  test(`${code}: opening further up never offers the champion beyond the title limit or last week's opponent`, () => {
+    const s = fixture(code, 6, 1);
+    s.settings[0].titleMaxPosition = 2;
+    // #1 is the only free defender: #2 takes it normally, #6 stays blocked.
+    for (const a of s.weeklyRounds[0].assignments)
+      a.role = /^t1[ab]$/.test(a.playerId) ? "defense" : "attack";
+    commit(s, [[4, 3]]);
+    assert.deepEqual(targets(s, 6), []);
+    assert.deepEqual(targets(s, 2), [1]);
+    const rematch = contested();
+    rematch.challenges.push({
+      ...rematch.challenges[0],
+      _id: "last-week",
+      weekStart: "2026-10-19",
+      status: "completed",
+      challengerId: "t10a",
+      defenderId: "t5a",
+      challengerTeam: undefined,
+      defenderTeam: undefined,
+    });
+    assert.ok(!targets(rematch, 10).includes(5));
+  });
+
+  test(`${code}: the assistant stays on and never overrides an administrator's pairing`, () => {
+    const s = fixture(code, 12, 2);
+    s.settings[0].weeklyDynamicRoles = false;
+    s.settings[0].weeklyDynamicDivisionIds = [];
+    assert.equal(dynamicWeeklyEnabled(s), true);
+    const papers = structuredClone(s.weeklyRounds[0].assignments);
+    assert.throws(() => send(s, 11, 3), /alcance/);
+    execute(
+      s,
+      { ...actor(1), role: "admin" },
+      {
+        type: "admin.challenge.create",
+        weekStart: week,
+        challengerId: "t11a",
+        defenderId: "t3a",
+      },
+      now,
+    );
+    assert.ok(pairing(s, 11, 3));
+    assert.deepEqual(s.weeklyRounds[0].assignments, papers);
+  });
+
+  test(`${code}: a challenge sent before the assistant was always on can still be accepted`, () => {
+    const s = fixture(code, 8, 3);
+    s.settings[0].weeklyMandatoryChallenges = false;
+    const { id } = send(s, 5, 3);
+    s.settings[0].weeklyDynamicRoles = false;
+    execute(
+      s,
+      actor(3),
+      { type: "challenge.respond", challengeId: id, accept: true },
+      now,
+    );
+    assert.equal(pairing(s, 5, 3)?.status, "accepted");
   });
 }

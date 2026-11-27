@@ -10,7 +10,7 @@ export function weeklyRolesProblem(s: State, divisionId: string, week: string) {
   if (!round) return "Não existem papéis para esta semana.";
   if (
     round.weekType === "OPEN_ATTACK" ||
-    !dynamicWeeklyEnabled(s, divisionId, week)
+    !dynamicWeeklyEnabled(s)
   )
     return null;
   const ids = new Set(

@@ -1,3 +1,10 @@
+## Version 2.2.0 — deployment submitted — 27 November 2026
+
+- User chose: assistant always on in every division, admin has full control, and "option A": a team with no free opponent within reach may challenge the nearest free team above even if no game is added.
+- dynamicWeeklyEnabled now depends only on weeklyCompetition; the Regras toggles are removed and the stored flags ignored. Blocked-team options are added only to the planner's eligible list (suggested schedule/maximum unchanged) and exclude #1 beyond the title limit. Existing optimiser extensions are unchanged. Admin challenge create/reassign is no longer vetoed by the planner or reach; publication, opening, role, one-game and consecutive-rematch checks remain.
+- Validation: typecheck, 654 tests, production build and every required browser group pass (a first run failed only because leftover local test databases filled /dev/shm). User authorized deployment; completion not yet verified.
+- Open: remaining "semanal" wording to "jornada" (not answered); playing windows remain Monday-Sunday.
+
 ## Version 2.1.0 LIVE verified — 27 November 2026
 
 - Actions run 46082154139 passed the checks and deploy jobs for revision 0b6ce55b46e0d9e8690e4f57c70b32ce4707e172; public /api/health returned {"ok":true}. Still to be confirmed by the user: live jornada numbers show Ouro one behind Prata/Bronze.

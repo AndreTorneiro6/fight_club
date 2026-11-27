@@ -1,6 +1,16 @@
 /** Every release increments package.json and adds an immutable entry here. */
-export const applicationVersion = "2.1.0";
+export const applicationVersion = "2.2.0";
 export const releaseNotes = [
+  {
+    version: "2.2.0",
+    date: "2026-11-27",
+    title: "Assistente sempre ativo e alcance aberto a duplas bloqueadas",
+    changes: [
+      "O assistente de adversários está sempre ativo em todas as divisões com competição semanal; deixa de haver interruptor nas regras.",
+      "Uma dupla sem adversário livre dentro do alcance pode desafiar a dupla livre mais próxima acima, mesmo que isso não aumente o número de jogos. O primeiro desafio enviado tem prioridade; o limite do jogo do título mantém-se nesta abertura.",
+      "A decisão do administrador prevalece: confrontos criados ou reatribuídos pelo administrador deixam de ser recusados pelo assistente ou pelo alcance.",
+    ],
+  },
   {
     version: "2.1.0",
     date: "2026-11-27",

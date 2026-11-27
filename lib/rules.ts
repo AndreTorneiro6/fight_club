@@ -103,7 +103,7 @@ export function challengeReason(
     defender,
     now,
     undefined,
-    false,
+    administrative,
     week,
     !!assigned,
   );
@@ -118,7 +118,7 @@ export function challengeReason(
     aRank = teams.findIndex((t) => t.members.some((m) => m._id === me._id)) + 1,
     dRank =
       teams.findIndex((t) => t.members.some((m) => m._id === defender._id)) + 1;
-  const adaptive = dynamicWeeklyEnabled(s, me.divisionId, week) && !assigned;
+  const adaptive = dynamicWeeklyEnabled(s) && !assigned;
   if (
     !assigned &&
     (dRank >= aRank ||

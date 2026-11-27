@@ -203,7 +203,6 @@ test("protected incompatible commitments, stale plans and players cannot be over
 test("hard-rule failures roll back the entire operation including opening restoration", () => {
   const s = fixture();
   pause(s);
-  s.settings[0].ouroNormalReach = 1;
   const invalid = {
     ...input,
     fixtures: [
@@ -216,11 +215,13 @@ test("hard-rule failures roll back the entire operation including opening restor
       },
     ],
   };
+  // A paused season fails only while applying, after the pause is restored.
+  s.seasons[0].status = "paused";
   const p = planFixedWeeklyMatchups(s, invalid),
     before = structuredClone(s);
   assert.throws(
     () => applyFixedWeeklyMatchups(s, admin, invalid, p.fingerprint, now),
-    /limite|distância/,
+    /época/i,
   );
   assert.deepEqual(s, before);
 });
@@ -318,7 +319,7 @@ test("mandatory challenges enforce published roles, distance and team-wide commi
         { type: "challenge.create", defenderId: "p1" },
         now,
       ),
-    /limite|distância/,
+    /alcance/,
   );
   execute(s, actor("p3"), { type: "challenge.create", defenderId: "p1" }, now);
   assert.throws(

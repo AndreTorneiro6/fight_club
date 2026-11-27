@@ -106,6 +106,7 @@ export interface Settings extends Entity {
   leagueEmailsEnabled?: boolean;
   weeklyCompetition: boolean;
   weeklyMandatoryChallenges?: boolean;
+  /** Retired, ignored: the assistant is always on in weekly competition. */
   weeklyDynamicRoles?: boolean;
   weeklyDynamicDivisionIds?: string[];
   manualMatchmakingDivisionIds?: string[];
