@@ -1,3 +1,7 @@
+## Version 2.1.0 LIVE verified — 27 November 2026
+
+- Actions run 46082154139 passed the checks and deploy jobs for revision 0b6ce55b46e0d9e8690e4f57c70b32ce4707e172; public /api/health returned {"ok":true}. Still to be confirmed by the user: live jornada numbers show Ouro one behind Prata/Bronze.
+
 ## Version 2.1.0 — deployment submitted: equal division rules and per-division jornadas — 27 November 2026
 
 - User requested that Ouro follow exactly what Prata/Bronze follow (reach, admin control, Ataque/Defesa suggestions, history) and that the competition be named by jornada, launched when challenges open, noting Ouro is one jornada behind.
