@@ -131,12 +131,12 @@ const dayMonth = (day: string) =>
     timeZone: "UTC",
   });
 
-function divisionJornada(
+/** The weeks whose challenges have opened for a division, oldest first. */
+export function launchedWeeks(
   state: JornadaState,
   season: Season,
-  week: string,
   divisionId: string,
-  now: number,
+  now = Date.now(),
 ) {
   const first = season.firstCompetitionWeek ?? clubWeek(season.start).start;
   const inSeason = (w: string) => w >= first && w <= season.end;
@@ -164,7 +164,19 @@ function divisionJornada(
     )
       launched.add(w);
   }
-  const weeks = [...launched].sort();
+  return [...launched].sort();
+}
+
+function divisionJornada(
+  state: JornadaState,
+  season: Season,
+  week: string,
+  divisionId: string,
+  now: number,
+) {
+  const first = season.firstCompetitionWeek ?? clubWeek(season.start).start;
+  const current = clubWeek(now).start;
+  const weeks = launchedWeeks(state, season, divisionId, now);
   const index = weeks.indexOf(week);
   if (index >= 0) return index + 1;
   // Not launched yet: preview the number it takes when its challenges open.

@@ -514,6 +514,9 @@ test("rule changes refresh only unpublished divisions of a partially published d
 test("independent paper publication honors a saved countdown, otherwise waits for explicit opening", async () => {
   const { generateWeeklyRoles } = await import("../lib/weekly-role-workflow");
   const s = fixture();
+  // The countdown only starts once the division's games are finished.
+  for (const game of s.challenges.filter((c) => c.divisionId === "gold"))
+    game.status = "cancelled";
   generateWeeklyRoles(s, next, admin.userId, now);
   let r = s.weeklyRounds.find((r) => r.weekStart === next)!;
   execute(

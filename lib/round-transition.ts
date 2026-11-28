@@ -47,7 +47,8 @@ export function divisionRoundCompletion(
       !!season &&
       season.status === "active" &&
       !!weeklyPublishedAt(round, divisionId) &&
-      !!candidates.length &&
+      // A week whose games are all frozen is finished; an empty week is not.
+      !!all.length &&
       completed.length === games.length &&
       (!season.firstCompetitionWeek ||
         weekStart >= season.firstCompetitionWeek),

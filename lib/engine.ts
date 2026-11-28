@@ -1,3 +1,4 @@
+import { enforceJornadaOpenings, plannedOpenings } from "./jornada-gate";
 import { matchdayWeekLabel } from "./matchday";
 import {
   canBeChallenged,
@@ -783,6 +784,22 @@ export function execute(
   actor: Actor,
   raw: unknown,
   timestamp = Date.now(),
+) {
+  const openings = plannedOpenings(s);
+  const result = executeCommand(s, actor, raw, timestamp);
+  const input = (raw ?? {}) as Record<string, unknown>;
+  // Only a request to open challenges is refused; publishing keeps the papers.
+  const requested =
+    (input.type === "admin.week.opening.set" && !!input.opensAt) ||
+    (input.type === "admin.week.opening.delay.set" && !!input.activate);
+  enforceJornadaOpenings(s, openings, requested, timestamp);
+  return result;
+}
+function executeCommand(
+  s: State,
+  actor: Actor,
+  raw: unknown,
+  timestamp: number,
 ) {
   const featureType =
     raw && typeof raw === "object" && "type" in raw ? String(raw.type) : "";
@@ -2014,7 +2031,7 @@ export function execute(
         403,
       );
       if (pair.challengeId) return { id: pair.challengeId };
-      return execute(
+      return executeCommand(
         s,
         actor,
         {
@@ -2037,7 +2054,7 @@ export function execute(
         409,
       );
       const draft = structuredClone(s);
-      const result = execute(
+      const result = executeCommand(
         draft,
         actor,
         {
@@ -2079,7 +2096,7 @@ export function execute(
       );
       // Creation, court validation, booking and notifications commit together.
       const draft = structuredClone(s);
-      const result = execute(
+      const result = executeCommand(
         draft,
         actor,
         {
@@ -2095,7 +2112,7 @@ export function execute(
       draft.notifications = draft.notifications.filter(
         (n) => n.challengeId !== result.id,
       );
-      execute(
+      executeCommand(
         draft,
         actor,
         {
@@ -2724,7 +2741,7 @@ export function execute(
         409,
       );
       const probe = structuredClone(s);
-      execute(
+      executeCommand(
         probe,
         actor,
         {
@@ -4814,7 +4831,7 @@ export function execute(
           requestedTeamPosition <= teams.length,
           "Posição da dupla fora do ranking da divisão.",
         );
-        execute(
+        executeCommand(
           s,
           actor,
           {
@@ -4840,7 +4857,7 @@ export function execute(
           : s.players.find(
               (p) => row.email && normalizeEmail(p.email) === row.email,
             );
-        execute(
+        executeCommand(
           s,
           actor,
           { ...row, type: "admin.player.save", playerId: existing?._id },
@@ -5880,6 +5897,15 @@ export function processDeadlines(
   s: State,
   timestamp = Date.now(),
   generateRoles = true,
+) {
+  const openings = plannedOpenings(s);
+  processScheduledWork(s, timestamp, generateRoles);
+  enforceJornadaOpenings(s, openings, false, timestamp);
+}
+function processScheduledWork(
+  s: State,
+  timestamp: number,
+  generateRoles: boolean,
 ) {
   reconcileStickerTrades(s, timestamp);
   processMatchVotingAnnouncement(s, timestamp);
