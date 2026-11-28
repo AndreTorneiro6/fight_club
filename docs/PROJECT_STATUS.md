@@ -1,3 +1,11 @@
+## Version 2.2.0 LIVE verified; distances set to 3; jornadas checked — 28 November 2026
+
+- Actions run 46084375795 passed checks and deploy for ea75540255c485c051ca5904d6f84c2ae32ac175; public /api/health returned {"ok":true}.
+- User asked to keep the remaining "semana" wording, set every division's attack distance to 3 and check Ouro ("do it for me"). Added main-only division-maintenance.yml (c34906f; check/preview/apply, encrypted reports without player data). Runs: check 46085789025, preview 46085823283, apply 46085868129, post-check 46085898563.
+- Applied through admin.challenge.distance.set in the league transaction: Ouro 4 → 3; Prata and Bronze already 3. Changed settings, unpublished weekly drafts and audit only; published papers/openings preserved, no new notifications, games untouched.
+- Jornadas at check time: for week 23 Nov, Prata and Bronze launched Jornada 5; Ouro has launched 4 (week 23 Nov unpublished/held), so Ouro is one behind. The UI previews "Jornada 5" for Ouro's unopened week; if it stays unopened after 29 Nov that week becomes "Sem jornada" and 30 Nov previews Ouro 5 / others 6.
+- Reports are in ~/.local/share/fight-club-recovery/2026-11-28 (private; never commit).
+
 ## Version 2.2.0 — deployment submitted — 27 November 2026
 
 - User chose: assistant always on in every division, admin has full control, and "option A": a team with no free opponent within reach may challenge the nearest free team above even if no game is added.
