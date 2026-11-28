@@ -4,8 +4,9 @@ export const releaseNotes = [
   {
     version: "2.3.0",
     date: "2026-11-28",
-    title: "A jornada seguinte só abre com os jogos concluídos",
+    title: "Jogos sem prazo e jornadas que abrem com os jogos concluídos",
     changes: [
+      "Os desafios aceites deixam de expirar: não há prazo para marcar nem para jogar, e os jogos podem ser marcados em qualquer semana até ao fim da época. O prazo para aceitar um desafio mantém-se.",
       "Em cada divisão, os desafios de uma nova jornada só podem abrir quando os jogos da última jornada aberta estiverem concluídos, cancelados ou expirados. A mensagem indica os jogos em falta.",
       "Jogos congelados ou adiados não impedem a abertura, mesmo que sejam todos os jogos da jornada.",
       "Publicar papéis continua a ser possível; a abertura fica em espera e os administradores são avisados. Jornadas já abertas não são alteradas.",

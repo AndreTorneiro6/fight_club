@@ -35,9 +35,22 @@ export const terminal = new Set([
 ]);
 export const involves = (c: Challenge, id: string, players?: Player[]) =>
   !!challengeSide(c, id, players);
+/** The last moment a game may end: the end of its season. Dates saved on
+ * ordinary games by earlier versions are no longer deadlines. */
+export function playLimit(
+  s: Pick<State, "seasons">,
+  c: Pick<Challenge, "seasonId" | "playBy" | "competitionRoundId">,
+) {
+  if (c.competitionRoundId) return Date.parse(c.playBy);
+  const end = s.seasons.find((season) => season._id === c.seasonId)?.end;
+  return Date.parse(`${end ?? "9999-12-31"}T23:59:59Z`);
+}
 export function effectiveStatus(c: Challenge, now = Date.now()) {
   if (c.status === "pending" && Date.parse(c.respondBy) < now) return "expired";
+  // Ordinary games have no deadline to be scheduled or played; only managed
+  // competition rounds do.
   if (
+    c.competitionRoundId &&
     ["accepted", "schedule_pending"].includes(c.status) &&
     Math.min(Date.parse(c.scheduleBy), Date.parse(c.playBy)) < now
   )

@@ -186,7 +186,10 @@ test("Bronze suggests a remaining game without creating it or changing published
         { exact: true },
       ),
     ).toBeVisible();
-    await expect(player.getByText("Marcar até", { exact: true })).toBeVisible();
+    await expect(
+      player.getByText("Datas do desafio", { exact: true }),
+    ).toBeVisible();
+    await expect(player.getByText("Marcar até", { exact: true })).toHaveCount(0);
     await player.goto("/ranking");
     await expect(
       player.locator(".ranking-row").filter({ hasText: p.name }),

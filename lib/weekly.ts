@@ -299,7 +299,13 @@ export function weeklyWindow(
   return {
     weekStart: week.start,
     deferredUntil,
-    playBy: clubWeek(deferredUntil ?? week.start).endsAt,
+    // No deadline to play: games only have to fit in the season.
+    playBy: `${
+      (
+        s.seasons.find((e) => e.status === "active") ??
+        s.seasons.find((e) => e.status === "paused")
+      )?.end ?? "9999-12-31"
+    }T23:59:59Z`,
   };
 }
 export function weeklyBookingReason(
@@ -309,12 +315,9 @@ export function weeklyBookingReason(
   now = Date.now(),
 ) {
   if (!s.settings[0].weeklyCompetition) return null;
-  const week = clubWeek(start).start;
   const teamIds = [c.challengerId, c.defenderId].flatMap((id) =>
     teamMembers(s.players, id).map((member) => member._id),
   );
-  if (c.weekStart && !c.deferredUntil && week !== c.weekStart)
-    return "O jogo deve realizar-se na semana do desafio.";
   if (c.deferredUntil && clubDay(start) < c.deferredUntil)
     return c.postponementReason
       ? "Marca o jogo a partir da data de disponibilidade."

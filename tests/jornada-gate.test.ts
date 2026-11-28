@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execute, processDeadlines } from "../lib/engine";
+import { effectiveStatus, playLimit } from "../lib/rules";
 import {
   enforceJornadaOpenings,
   jornadaBlockers,
@@ -201,5 +202,30 @@ for (const code of ["ouro", "prata", "bronze"] as const) {
       weeklyOpeningAt(s.weeklyRounds[0], code),
       "2026-11-16T10:00:00Z",
     );
+  });
+}
+
+for (const code of ["ouro", "prata", "bronze"] as const) {
+  test(`${code}: an accepted game has no deadline and still holds the next jornada`, () => {
+    const s = fixture(code);
+    complete(s, "g1");
+    const game = s.challenges[1];
+    game.respondBy = game.scheduleBy = game.playBy = "2026-11-22T23:59:59Z";
+    processDeadlines(s, now);
+    assert.equal(game.status, "accepted");
+    assert.equal(effectiveStatus(game, now), "accepted");
+    assert.equal(playLimit(s, game), Date.parse("2027-01-31T23:59:59Z"));
+    assert.throws(() => open(s, code), /#2/);
+    game.status = "cancelled";
+    open(s, code);
+  });
+
+  test(`${code}: an unanswered challenge still expires`, () => {
+    const s = fixture(code);
+    const game = s.challenges[1];
+    game.status = "pending";
+    game.respondBy = "2026-11-18T00:00:00Z";
+    processDeadlines(s, now);
+    assert.equal(game.status, "expired");
   });
 }

@@ -1,7 +1,8 @@
-## Version 2.3.0 — local, awaiting deployment go-ahead — 28 November 2026
+## Version 2.3.0 — deployment authorized — 28 November 2026
 
 - User rule: a division's next jornada opens only when its games are finished; frozen games must not block it.
-- lib/jornada-gate.ts is applied after commands and the deadline worker. Explicit opening requests are refused with the blocking game numbers; other publications keep papers, hold the opening and alert admins once. Judged against the last launched jornada; frozen/postponed/cancelled/expired games never block; all-frozen weeks now count as complete. Already open jornadas and mandatory launches are unaffected. Monday-Sunday play windows and expiry are unchanged.
+- lib/jornada-gate.ts is applied after commands and the deadline worker. Explicit opening requests are refused with the blocking game numbers; other publications keep papers, hold the opening and alert admins once. Judged against the last launched jornada; frozen/postponed/cancelled/expired games never block; all-frozen weeks now count as complete. Already open jornadas and mandatory launches are unaffected.
+- User then asked to remove the playing deadline completely: ordinary accepted games never expire (stored scheduleBy/playBy ignored; season end is the only limit), same-week booking rules removed, late mandatory confirmations no longer marked postponed, scheduling reminders removed. Acceptance deadline for pending challenges is unchanged. User said they fixed the obligated-game flow themselves: no auto-accept was built. Already expired games are not revived.
 - Check before/after deployment: game #72 (Ouro, week 16 Nov, extended to about 30 Nov) would block Gold's next jornada if still unplayed. Not verified against live data.
 
 ## Version 2.2.0 LIVE verified; distances set to 3; jornadas checked — 28 November 2026

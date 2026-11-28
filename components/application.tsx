@@ -172,6 +172,7 @@ import {
   fmtTime,
   involves,
   terminal,
+  playLimit,
 } from "@/lib/rules";
 import {
   defaultSettings,
@@ -1980,7 +1981,7 @@ function ChallengeCard({ s, c }: { s: View; c: Challenge }) {
             <CalendarDays size={11} />{" "}
             {when
               ? `${fmtDate(when)} · ${fmtTime(when)}`
-              : `Até ${fmtDate(c.playBy)}`}
+              : "Por marcar"}
           </small>
         </div>
       </Link>
@@ -2439,7 +2440,7 @@ function ChallengeDetail(a: Actions & { id: string }) {
     c.durationMinutes,
     s.settings[0].slotStepMinutes,
     Date.now(),
-    Date.parse(c.playBy),
+    playLimit(s, c),
   );
   const name = (id: string) => challengeTeamName(c, id, s.players);
   return (
@@ -2617,8 +2618,8 @@ function ChallengeDetail(a: Actions & { id: string }) {
               <div className="stack">
                 <p style={{ fontSize: 12 }}>
                   Cada dupla propõe uma janela. Qualquer parceiro pode gerir os
-                  horários. O jogo dura {c.durationMinutes} minutos e tem de
-                  terminar até {fmtDate(c.playBy)}.
+                  horários. O jogo dura {c.durationMinutes} minutos e não tem prazo
+                  para ser jogado.
                 </p>
                 <div>
                   <h3 style={{ marginBottom: 12 }}>A tua disponibilidade</h3>
@@ -2760,12 +2761,13 @@ function ChallengeDetail(a: Actions & { id: string }) {
           )}
         </div>
         <div className="stack" style={{ alignContent: "start" }}>
-          <Section title="Prazos do desafio">
+          <Section title="Datas do desafio">
             <div className="stack">
               {[
                 ["Criado em", c.createdAt],
-                ["Marcar até", c.scheduleBy],
-                ["Jogar até", c.playBy],
+                ...(c.status === "pending"
+                  ? [["Aceitar até", c.respondBy]]
+                  : []),
               ].map(([label, value]) => (
                 <div className="row between" key={label}>
                   <small>{label}</small>
@@ -2859,7 +2861,7 @@ function WeeklySuggestions({ s, run, c, busy }: Actions & { c: Challenge }) {
       start.setHours(h, m, 0, 0);
       end.setHours(eh, em, 0, 0);
       if (
-        end.getTime() <= Date.parse(c.playBy) &&
+        end.getTime() <= playLimit(s, c) &&
         !s.exceptions.some(
           (x) =>
             x.playerId === s.actor.playerId &&
@@ -6232,6 +6234,9 @@ const settingLabels: Record<
     | "contentVersion"
     | "divisionChallengeDistances"
     | "ouroNormalReach"
+    | "extendDays"
+    | "playDays"
+    | "scheduleDays"
     | "weeklyDynamicDivisionIds"
     | "weeklyDynamicRoles"
     | "manualMatchmakingDivisionIds"
@@ -6257,8 +6262,6 @@ const settingLabels: Record<
     "Máximo de desafios simultâneos · fora da competição semanal",
   minDaysBetween: "Intervalo mínimo entre desafios · dias",
   acceptHours: "Prazo para aceitar · horas",
-  scheduleDays: "Prazo para marcar · dias",
-  playDays: "Prazo para jogar · dias",
   matchMinutes: "Duração do jogo · minutos",
   slotStepMinutes: "Intervalo entre horários · minutos",
   rankingModel: "Modelo de ranking",
@@ -6274,7 +6277,6 @@ const settingLabels: Record<
   titleChangesOnWin: "Transferir título se o contender vencer",
   titleAffectsRanking: "Title Fight altera o ranking",
   seasonMonths: "Duração sugerida de época · meses",
-  extendDays: "Prolongamento de prazos · dias",
   extendResponseHours: "Prolongamento de resposta · horas",
 };
 function Rules({ s, run, busy }: Actions) {
@@ -7061,14 +7063,6 @@ function ChallengeComposer(
   const weeklyWindowValue = s.settings[0].weeklyCompetition
     ? weeklyWindow(s, [p._id, target._id], Date.now(), a.weekStart)
     : undefined;
-  if (
-    a.weekStart &&
-    weeklyWindowValue &&
-    Date.parse(weeklyWindowValue.playBy) <= Date.now()
-  ) {
-    weeklyWindowValue.deferredUntil = clubWeek().start;
-    weeklyWindowValue.playBy = clubWeek().endsAt;
-  }
   const [proposals, setProposals] = useState(() =>
       initialProposals(s, p, Date.now(), weeklyWindowValue),
     ),
@@ -7499,8 +7493,8 @@ function LeagueInformation(a: Actions & { page: "regras" | "premios" }) {
     [
       "Prazos",
       rules.weeklyCompetition && rules.weeklyMandatoryChallenges
-        ? "Não é necessário aceitar o adversário. O prazo para combinar e jogar é apresentado no desafio da jornada."
-        : `${rules.acceptHours} horas para aceitar, ${rules.scheduleDays} dias para marcar após a aceitação e ${rules.playDays} dias para jogar após a criação.`,
+        ? "Não é necessário aceitar o adversário. Não há prazo para combinar e jogar."
+        : `${rules.acceptHours} horas para aceitar. Depois de aceite, não há prazo para marcar nem para jogar.`,
     ],
     [
       "Marcação",
@@ -7830,7 +7824,7 @@ function AdminScheduleRecord({
     c.durationMinutes,
     s.settings[0].slotStepMinutes,
     0,
-    Date.parse(c.playBy),
+    playLimit(s, c),
   );
   const proposal = c.scheduleProposal;
   const chosen = (x: Slot) =>
@@ -7922,7 +7916,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
     c.durationMinutes,
     s.settings[0].slotStepMinutes,
     Date.now(),
-    Date.parse(c.playBy),
+    playLimit(s, c),
   );
   const proposal = c.scheduleProposal,
     myConfirmed =
@@ -8230,7 +8224,7 @@ function ChallengeCalendar(a: Actions & { c: Challenge }) {
                 disabled={
                   busy ||
                   selected < clubDay(Date.now()) ||
-                  selected > clubDay(c.playBy)
+                  selected > clubDay(playLimit(s, c))
                 }
                 onClick={() => setAdding(true)}
               >

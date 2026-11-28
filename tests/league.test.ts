@@ -698,7 +698,7 @@ test("correcting an untouched confirmed result reconciles ranking and preserves 
   assert.equal(s.results[0].winnerId, "p6");
   assert(s.audit.some((a) => a.action === "result.corrected"));
 });
-test("extending an expired accepted challenge restores the scheduling stage", () => {
+test("an accepted challenge never expires", () => {
   const s = fixture(),
     c = create(s);
   execute(
@@ -709,13 +709,6 @@ test("extending an expired accepted challenge restores the scheduling stage", ()
   );
   const later = time + 6 * 86400000;
   processDeadlines(s, later);
-  assert.equal(c.status, "expired");
-  execute(
-    s,
-    actor(1, "admin"),
-    { type: "admin.resolve", challengeId: c._id, action: "extend" },
-    later,
-  );
   assert.equal(c.status, "accepted");
 });
 test("promotion placement is configurable and history contains actual positions", () => {
@@ -1796,7 +1789,7 @@ test("outside Ouro weekly roles require attackers to challenge assigned defender
   assert.throws(() => create(s, 8, 7), /não está em defesa/);
   const c = create(s);
   assert.equal(c.weekStart, "2026-10-12");
-  assert.equal(c.playBy, clubWeek(time).endsAt);
+  assert.equal(c.playBy, "2027-04-01T23:59:59.000Z");
   assert.throws(() => create(s, 8, 5), /desafio atribuído/);
   const contender = create(s, 7, 6);
   assert.throws(
@@ -1852,7 +1845,7 @@ test("vacation players can be challenged and their weekly game is deferred until
   assert.equal(challengeReason(s, s.players[7], s.players[5], time), null);
   const c = create(s);
   assert.equal(c.deferredUntil, "2026-10-26");
-  assert.equal(c.playBy, clubWeek("2026-10-26").endsAt);
+  assert.equal(c.playBy, "2027-04-01T23:59:59.000Z");
   execute(
     s,
     actor(6),
@@ -1902,14 +1895,15 @@ test("weekly scheduling rejects a second game from the same competition week", (
     weeklyBookingReason(s, other, iso(1), time)!,
     /um jogo por semana/,
   );
-  assert.match(
+  // A game may be played in any later week.
+  assert.equal(
     weeklyBookingReason(
       s,
-      { ...other, deferredUntil: undefined, weekStart: "2026-10-12" },
+      { ...other, deferredUntil: undefined, weekStart: "2026-10-05" },
       iso(7),
       time,
-    )!,
-    /semana do desafio/,
+    ),
+    null,
   );
 });
 
@@ -2916,9 +2910,9 @@ test("next-week publication opens challenges immediately, keeps their playing we
     time,
     weeklyWindow(s, ["p8", "p6"], time),
   );
-  assert.ok(proposals.every((p) => p.day >= next && p.day <= "2026-10-25"));
+  assert.ok(proposals.every((p) => p.day >= next));
   assert.equal(c.respondBy, iso(2));
-  assert.equal(clubWeek(c.playBy).start, next);
+  assert.equal(c.playBy, "2027-04-01T23:59:59.000Z");
   assert.equal(s.results.length, 0);
   execute(
     s,
@@ -2927,7 +2921,7 @@ test("next-week publication opens challenges immediately, keeps their playing we
     time,
   );
   assert.equal(c.status, "accepted");
-  assert.match(weeklyBookingReason(s, c, iso(1), time)!, /semana do desafio/);
+  assert.equal(weeklyBookingReason(s, c, iso(1), time), null);
 });
 
 test("existing current-week challenges retain their own roles and priority after next-week publication", async () => {

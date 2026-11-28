@@ -513,7 +513,8 @@ for (const automatic of [false, true]) {
     const c = s.challenges[0];
     assert.equal(c.status, "accepted");
     assert.equal(c.weekStart, week);
-    assert.equal(c.deferredUntil, "2026-11-02");
+    // Not marked postponed: an unplayed game still holds the next jornada.
+    assert.equal(c.deferredUntil, undefined);
     assert.ok(Date.parse(c.playBy) > monday);
     assert.deepEqual(s.weeklyRounds[0].assignments, papers);
     processDeadlines(s, monday + 60000, false);
@@ -1579,7 +1580,7 @@ test("future manual drafts are week-specific, consume no active slots and publis
   assert.equal(c.weekStart, future);
   assert.equal(c.status, "accepted");
   assert.equal(c.mandatoryAssignment, true);
-  assert.equal(c.playBy, "2026-11-22T23:59:59.999Z");
+  assert.equal(c.playBy, "2027-04-01T23:59:59.000Z");
   // Pair should now be linked to the challenge
   assert.equal(pair.challengeId, c._id);
   // Second publish should be idempotent

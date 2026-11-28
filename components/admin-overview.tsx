@@ -132,10 +132,10 @@ export default function AdminOverview({
         action: () => onSelect("challenges"),
       },
       {
-        label: "Prazos ultrapassados nesta jornada",
+        label: "Desafios expirados nesta jornada",
         count: overdue.length,
         detail:
-          "Revê estes confrontos e decide se é necessário prolongar o prazo.",
+          "Ficaram sem resposta. Decide se é necessário prolongar o prazo para aceitar.",
         action: () => onSelect("challenges"),
       },
       ...adminWeekTasks(s, now),

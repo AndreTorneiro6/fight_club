@@ -131,6 +131,7 @@ import {
   canRefuse,
   challengeReason,
   effectiveStatus,
+  playLimit,
   ensure,
   involves,
   overlaps,
@@ -1590,11 +1591,6 @@ function executeCommand(
     }
     const weeklyBooking = weeklyBookingReason(s, c, start, timestamp);
     ensure(!weeklyBooking, weeklyBooking ?? "Jogo semanal inválido.");
-    if (rules.weeklyCompetition)
-      ensure(
-        clubWeek(start).start === clubWeek(Date.parse(end) - 1).start,
-        "O jogo deve começar e terminar na mesma semana.",
-      );
     ensure(
       completed ? Date.parse(end) <= timestamp : Date.parse(start) > timestamp,
       completed
@@ -1602,7 +1598,7 @@ function executeCommand(
         : "Escolhe um horário futuro.",
     );
     ensure(
-      Date.parse(end) <= Date.parse(c.playBy),
+      Date.parse(end) <= playLimit(s, c),
       "O jogo termina depois do prazo.",
     );
     ensure(
@@ -3074,12 +3070,6 @@ function executeCommand(
       const window = rules.weeklyCompetition
         ? weeklyWindow(s, [p._id, d._id], timestamp, requestedWeek)
         : null;
-      const carriedMandatory =
-        !!mandatoryPair && !!window && Date.parse(window.playBy) <= timestamp;
-      if (carriedMandatory && window) {
-        window.deferredUntil = clubWeek(timestamp).start;
-        window.playBy = clubWeek(timestamp).endsAt;
-      }
       if (
         [
           "challenge.create",
@@ -3192,12 +3182,6 @@ function executeCommand(
         ...(window
           ? { weekStart: window.weekStart, deferredUntil: window.deferredUntil }
           : {}),
-        ...(carriedMandatory
-          ? {
-              postponementReason:
-                "Jogo obrigatório confirmado após o fim da semana original.",
-            }
-          : {}),
       };
       if (window) {
         c.playBy = new Date(
@@ -3207,9 +3191,6 @@ function executeCommand(
           ),
         ).toISOString();
         c.scheduleBy = c.playBy;
-        c.respondBy = new Date(
-          Math.min(Date.parse(c.respondBy), Date.parse(c.playBy)),
-        ).toISOString();
       }
       if (cmd.initialSlots) {
         const seen = new Set<string>();
@@ -3223,7 +3204,7 @@ function executeCommand(
             Date.parse(slot.start) > timestamp &&
               Date.parse(slot.end) - Date.parse(slot.start) >=
                 c.durationMinutes * 60000 &&
-              Date.parse(slot.end) <= Date.parse(c.playBy),
+              Date.parse(slot.end) <= playLimit(s, c),
             "Cada opção deve ser futura, permitir o jogo completo e respeitar o prazo.",
           );
           ensure(
@@ -3522,7 +3503,7 @@ function executeCommand(
       if (mandatory) c.mandatoryAssignment = true;
       c.status = mandatory ? "accepted" : "pending";
       c.respondBy = new Date(
-        Math.min(Date.parse(c.playBy), timestamp + rules.acceptHours * 3600000),
+        timestamp + rules.acceptHours * 3600000,
       ).toISOString();
       // Consent and proposed windows belonged to the former assignment. Messages remain in the audit/history.
       s.slots = s.slots.filter((x) => x.challengeId !== c._id);
@@ -3629,12 +3610,7 @@ function executeCommand(
       }
       if (cmd.accept) {
         c.status = "accepted";
-        c.scheduleBy = new Date(
-          Math.min(
-            Date.parse(c.playBy),
-            timestamp + rules.scheduleDays * 86400000,
-          ),
-        ).toISOString();
+        c.playBy = c.scheduleBy = new Date(playLimit(s, c)).toISOString();
         for (const pid of challengeParticipants(c, s.players))
           notify(
             pid,
@@ -3797,7 +3773,7 @@ function executeCommand(
       ensure(
         Date.parse(cmd.start) > timestamp &&
           Date.parse(cmd.end) > Date.parse(cmd.start) &&
-          Date.parse(cmd.end) <= Date.parse(c.playBy),
+          Date.parse(cmd.end) <= playLimit(s, c),
         "Horário inválido ou fora do prazo.",
       );
       ensure(
@@ -3918,12 +3894,7 @@ function executeCommand(
           c.weeklyPriorityReason = priority.reason;
         }
         c.status = "accepted";
-        c.scheduleBy = new Date(
-          Math.min(
-            Date.parse(c.playBy),
-            timestamp + rules.scheduleDays * 86400000,
-          ),
-        ).toISOString();
+        c.playBy = c.scheduleBy = new Date(playLimit(s, c)).toISOString();
       }
       season();
       const end = new Date(
@@ -4889,10 +4860,6 @@ function executeCommand(
           "A distância deve ser inferior ao número de duplas da divisão.",
         );
       }
-      ensure(
-        cmd.settings.scheduleDays <= cmd.settings.playDays,
-        "O prazo de marcação deve caber no prazo para jogar.",
-      );
       s.settings = [
         {
           _id: "league",
@@ -5187,13 +5154,7 @@ function executeCommand(
         season();
         c.deferredUntil = clubDay(cmd.start);
         c.postponementReason = cmd.note;
-        const deadline = clubWeek(cmd.start).endsAt;
-        c.scheduleBy = new Date(
-          Math.max(Date.parse(c.scheduleBy), Date.parse(deadline)),
-        ).toISOString();
-        c.playBy = new Date(
-          Math.max(Date.parse(c.playBy), Date.parse(deadline)),
-        ).toISOString();
+        c.playBy = c.scheduleBy = new Date(playLimit(s, c)).toISOString();
       }
       if (direct) {
         season();
@@ -5964,7 +5925,8 @@ function processScheduledWork(
     if (
       c.status === "schedule_pending" &&
       c.scheduleProposal?.previousStatus === "scheduled" &&
-      effectiveStatus(c, timestamp) === "expired"
+      (effectiveStatus(c, timestamp) === "expired" ||
+        Date.parse(c.scheduleProposal.start) <= timestamp)
     ) {
       const proposal = c.scheduleProposal;
       delete c.scheduleProposal;
@@ -6017,21 +5979,6 @@ function processScheduledWork(
         );
     }
     if (terminal.has(c.status)) continue;
-    const deadline = ["accepted", "schedule_pending"].includes(c.status)
-      ? c.scheduleBy
-      : null;
-    if (
-      deadline &&
-      Date.parse(deadline) - timestamp <= rules.reminderHours * 3600000
-    )
-      for (const pid of challengeParticipants(c, s.players))
-        add(
-          pid,
-          "O prazo está próximo",
-          "Consulta o desafio para responder ou marcar o jogo.",
-          c,
-          `deadline:${c._id}:${deadline}`,
-        );
     if (
       c.status === "scheduled" &&
       c.scheduledAt &&

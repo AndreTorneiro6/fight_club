@@ -45,30 +45,21 @@ export function initialProposals(
   s: View,
   p: Player,
   now = Date.now(),
-  weekly?: { weekStart?: string; deferredUntil?: string; playBy: string },
+  weekly?: { weekStart?: string; deferredUntil?: string },
 ): Proposal[] {
   const count = s.settings[0].initialSuggestionCount,
     items: Proposal[] = [],
     availability = s.availability.filter((w) => w.playerId === p._id);
   const today = wallTime(now).day;
-  const deadline = Math.min(
-    weekly ? Date.parse(weekly.playBy) : Infinity,
-    weekly?.deferredUntil ? Infinity : now + s.settings[0].playDays * 86400000,
-    Date.parse(
-      (s.seasons.find((x) => x.status === "active")?.end ?? "9999-12-31") +
-        "T23:59:59Z",
-    ),
+  const deadline = Date.parse(
+    (s.seasons.find((x) => x.status === "active")?.end ?? "9999-12-31") +
+      "T23:59:59Z",
   );
   const firstDay = [today, weekly?.weekStart, weekly?.deferredUntil]
     .filter((d): d is string => !!d)
     .sort()
     .at(-1)!;
-  const horizon = weekly
-    ? Math.max(
-        s.settings[0].playDays,
-        Math.ceil((Date.parse(weekly.playBy) - now) / 86400000),
-      )
-    : s.settings[0].playDays;
+  const horizon = s.settings[0].playDays;
   for (let i = 0; i <= horizon && items.length < count; i++) {
     const date = new Date(firstDay + "T12:00:00Z");
     date.setUTCDate(date.getUTCDate() + i);

@@ -592,10 +592,6 @@ test("admin postponement keeps the original week and extends scheduling deadline
     postpone: true,
     note: "Lesão de um jogador",
   };
-  assert.throws(
-    () => execute(s, admin, { ...command, postpone: false }, now),
-    /semana/,
-  );
   execute(s, admin, directCommand(s), now);
   execute(
     s,
