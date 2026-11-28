@@ -1,0 +1,115 @@
+name: Check divisions and set attack distance
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: check and preview never write; apply saves the distances
+        type: choice
+        options: [check, preview, apply]
+        default: check
+      distance:
+        description: Attack distance for every division (preview and apply)
+        default: "3"
+      public_key:
+        description: Base64 PEM RSA public key for encrypting the report
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  divisions:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, "${{ vars.DEPLOY_RUNNER_LABEL || 'fight-club-oracle' }}"]
+    timeout-minutes: 5
+    environment: production
+    steps:
+      # Data maintenance only, through the running release's validated engine and
+      # normal league transaction. Never deploys. Reports contain no player data.
+      - name: Report divisions and optionally set the attack distance
+        env:
+          DIVISION_MODE: ${{ inputs.mode }}
+          DIVISION_DISTANCE: ${{ inputs.distance }}
+          REPORT_PUBLIC_KEY: ${{ inputs.public_key }}
+        run: |
+          docker exec -i -e DIVISION_MODE -e DIVISION_DISTANCE -e REPORT_PUBLIC_KEY fight-club-app-1 node --import tsx --input-type=module <<'JS'
+          import { createHash, createPublicKey, randomBytes, createCipheriv, publicEncrypt } from 'node:crypto';
+          import { database, readState, transaction } from './lib/db.ts';
+          import { execute } from './lib/engine.ts';
+          import { ensure } from './lib/rules.ts';
+          import { matchdayNumber } from './lib/matchday.ts';
+          import { weeklyOpeningAt } from './lib/weekly.ts';
+          import { weeklyPublishedAt } from './lib/weekly-publication.ts';
+          import { challengeDistance } from './lib/challenge-distance.ts';
+          import { clubWeek, addClubDays } from './lib/calendar.ts';
+          import { applicationVersion } from './lib/release-notes.ts';
+          const mode = process.env.DIVISION_MODE, distance = Number(process.env.DIVISION_DISTANCE);
+          ensure(['check', 'preview', 'apply'].includes(mode), 'Invalid mode');
+          ensure(Number.isInteger(distance) && distance >= 1 && distance <= 10, 'Invalid distance');
+          const publicKey = createPublicKey(Buffer.from(process.env.REPORT_PUBLIC_KEY, 'base64'));
+          ensure(publicKey.asymmetricKeyType === 'rsa' && publicKey.asymmetricKeyDetails.modulusLength >= 3072, 'RSA key of at least 3072 bits required');
+          const digest = value => createHash('sha256').update(JSON.stringify(value ?? null)).digest('hex');
+          const report = s => {
+            const season = s.seasons.find(e => e.status === 'active') ?? s.seasons.find(e => e.status === 'paused');
+            ensure(season, 'No active season');
+            const current = clubWeek().start;
+            const weeks = [];
+            for (let w = season.firstCompetitionWeek ?? clubWeek(season.start).start; w <= addClubDays(current, 14); w = addClubDays(w, 7)) weeks.push(w);
+            return {
+              season: { status: season.status, start: season.start, firstCompetitionWeek: season.firstCompetitionWeek },
+              currentWeek: current,
+              divisions: s.divisions.map(d => ({
+                name: d.name,
+                distance: challengeDistance(s, d._id),
+                weeks: weeks.map(week => {
+                  const round = s.weeklyRounds.find(r => r.weekStart === week);
+                  const games = s.challenges.filter(c => !c.competitionRoundId && c.divisionId === d._id && c.weekStart === week && !['cancelled', 'refused', 'expired'].includes(c.status));
+                  return { week, jornada: matchdayNumber(s, week, d._id) ?? null, publishedAt: weeklyPublishedAt(round, d._id) ?? null, opensAt: round ? weeklyOpeningAt(round, d._id) ?? null : null, openingHeld: !!round && weeklyOpeningAt(round, d._id) === null, games: games.length };
+                }),
+              })),
+            };
+          };
+          const change = async (s, db, session) => {
+            const before = structuredClone(s);
+            const users = await db.collection('users').find({ role: 'admin', verified: true }, { session }).toArray();
+            const player = s.players.find(p => users.some(u => u._id === p.userId) && p.status === 'active' && !p.awaitingApproval && !p.registrationRejectedAt);
+            ensure(player?.userId, 'No eligible verified administrator');
+            const actor = { userId: player.userId, playerId: player._id, role: 'admin' };
+            const changes = [];
+            for (const d of s.divisions) {
+              const previous = challengeDistance(s, d._id);
+              if (previous !== distance)
+                execute(s, actor, { type: 'admin.challenge.distance.set', divisionId: d._id, distance, expectedDistance: previous, reason: 'Distância igual em todas as divisões, pedida pela organização' });
+              changes.push({ division: d.name, previous, next: challengeDistance(s, d._id) });
+            }
+            ensure(changes.every(c => c.next === distance), 'Distance was not applied to every division');
+            const touched = Object.keys(s).filter(k => digest(s[k]) !== digest(before[k]));
+            ensure(touched.every(k => ['settings', 'weeklyRounds', 'notifications', 'audit'].includes(k)), 'Change touched an unrelated collection: ' + touched.join(','));
+            const rules = value => { const { divisionChallengeDistances, ouroNormalReach, ...rest } = value.settings[0]; return rest; };
+            ensure(digest(rules(s)) === digest(rules(before)), 'Change altered another setting');
+            for (const old of before.weeklyRounds) {
+              const next = s.weeklyRounds.find(r => r._id === old._id);
+              ensure(next, 'A weekly round disappeared');
+              for (const d of s.divisions) {
+                if (!weeklyPublishedAt(old, d._id)) continue;
+                const ids = new Set(before.players.filter(p => p.divisionId === d._id).map(p => p._id));
+                const papers = r => r.assignments.filter(a => ids.has(a.playerId)).map(a => a.playerId + ':' + a.role).sort();
+                ensure(digest(papers(next)) === digest(papers(old)), 'Change altered published papers');
+                ensure(weeklyPublishedAt(next, d._id) === weeklyPublishedAt(old, d._id) && weeklyOpeningAt(next, d._id) === weeklyOpeningAt(old, d._id), 'Change altered publication or opening');
+              }
+            }
+            return { changes, touched, newNotifications: s.notifications.length - before.notifications.length, report: report(s) };
+          };
+          const { client, db } = await database();
+          try {
+            const result = mode === 'apply' ? await transaction(change)
+              : mode === 'preview' ? await change(await readState(db), db)
+              : { report: report(await readState(db)) };
+            const key = randomBytes(32), iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);
+            const data = Buffer.concat([cipher.update(JSON.stringify({ capturedAt: new Date().toISOString(), mode, version: applicationVersion, ...result })), cipher.final()]);
+            const encoded = Buffer.from(JSON.stringify({ key: publicEncrypt({ key: publicKey, oaepHash: 'sha256' }, key).toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') })).toString('base64');
+            for (let offset = 0; offset < encoded.length; offset += 4000) console.log('ENCRYPTED_DIVISION_REPORT=' + encoded.slice(offset, offset + 4000));
+            console.log('Completed: ' + mode);
+          } finally { await client.close(); }
+          JS
