@@ -44,6 +44,8 @@ jobs:
           import { challengeDistance } from './lib/challenge-distance.ts';
           import { clubWeek, addClubDays } from './lib/calendar.ts';
           import { applicationVersion } from './lib/release-notes.ts';
+          import { jornadaBlockers } from './lib/jornada-gate.ts';
+          import { divisionRoundCompletion } from './lib/round-transition.ts';
           const mode = process.env.DIVISION_MODE, distance = Number(process.env.DIVISION_DISTANCE);
           ensure(['check', 'preview', 'apply'].includes(mode), 'Invalid mode');
           ensure(Number.isInteger(distance) && distance >= 1 && distance <= 10, 'Invalid distance');
@@ -62,6 +64,12 @@ jobs:
               divisions: s.divisions.map(d => ({
                 name: d.name,
                 distance: challengeDistance(s, d._id),
+                nextOpening: (() => {
+                  const { week, games } = jornadaBlockers(s, d._id, addClubDays(current, 7));
+                  const frozen = week ? divisionRoundCompletion(s, season._id, d._id, week).frozen : [];
+                  const brief = c => ({ number: c.number, status: c.status, scheduledAt: c.scheduledAt ?? null });
+                  return { lastLaunchedWeek: week ?? null, blocking: games.map(brief), frozen: s.challenges.filter(c => frozen.includes(c._id)).map(brief) };
+                })(),
                 weeks: weeks.map(week => {
                   const round = s.weeklyRounds.find(r => r.weekStart === week);
                   const games = s.challenges.filter(c => !c.competitionRoundId && c.divisionId === d._id && c.weekStart === week && !['cancelled', 'refused', 'expired'].includes(c.status));
